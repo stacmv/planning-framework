@@ -1,0 +1,38 @@
+# OS specific
+.DS_Store
+Thumbs.db
+*.swp
+*.swo
+*~
+
+# Editor directories and files
+.vscode/
+.idea/
+*.sublime-project
+*.sublime-workspace
+
+# Temporary files
+*.tmp
+*.bak
+*.log
+
+# Distribution / packaging
+dist/
+build/
+*.tar.gz
+*.zip
+
+# Node (if we add npm package)
+node_modules/
+package-lock.json
+yarn.lock
+
+# Python (if we add python tools)
+__pycache__/
+*.py[cod]
+*.egg-info/
+.pytest_cache/
+
+# Testing
+coverage/
+.coverage
