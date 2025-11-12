@@ -3,7 +3,7 @@
 > **A structured approach to maintaining context across development sessions with AI assistants**
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
-[![Version](https://img.shields.io/badge/version-1.0.0-blue.svg)](FRAMEWORK.md)
+[![Version](https://img.shields.io/badge/version-1.1.0-blue.svg)](FRAMEWORK.md)
 
 ---
 
@@ -219,16 +219,16 @@ templates/
 
 ### Project Size Adaptations
 
-**Small Projects (8-40 hours):**
+**Small Projects:**
 - Simplify PRD to 1-2 pages
 - Use single-phase implementation plan
 - Keep all templates
 
-**Medium Projects (40-200 hours):**
+**Medium Projects:**
 - Use all templates as-is
 - Standard customization
 
-**Large Projects (>200 hours):**
+**Large Projects:**
 - Split implementation plan by phase
 - Add `risks.md`, `dependencies.md`, `testing-plan.md`
 - Create detailed component specifications
@@ -328,6 +328,13 @@ MIT License - Use freely in any project. See [LICENSE](LICENSE) for details.
 ---
 
 ## Version History
+
+- **v1.1.0** (2025-11-12) - Time Estimation Removal
+  - **Breaking:** Remove all time estimation fields from templates
+  - Add comprehensive migration guide for AI assistants
+  - Update project size classifications (remove hour ranges)
+  - Preserve all progress tracking and structural elements
+  - See [CHANGELOG.md](CHANGELOG.md) for full details
 
 - **v1.0.0** (2025-11-05) - Initial release
   - Core templates (PRD, Implementation Plan, Session Log, Decisions)

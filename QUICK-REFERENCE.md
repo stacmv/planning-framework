@@ -36,7 +36,7 @@ cat docs/planning/decisions.md
 
 ### 1. Update Session Log
 ```markdown
-### Session: 2025-11-04 (Duration: 2 hours)
+### Session: 2025-11-04
 
 **Phase:** Phase 1 - Foundation
 **Goal:** Implement config parser
@@ -212,7 +212,7 @@ cp decisions-template.md docs/planning/decisions.md
 - Include examples and diagrams
 
 **Effective Implementation Plans:**
-- Break tasks into 1-4 hour chunks
+- Break tasks into manageable chunks
 - Mark dependencies clearly
 - Keep "Quick Status" up to date
 
@@ -272,6 +272,6 @@ cp decisions-template.md docs/planning/decisions.md
 
 ---
 
-**Version:** 1.0
-**Last Updated:** 2025-11-04
+**Version:** 1.1
+**Last Updated:** 2025-11-12
 **Full Documentation:** `docs/planning/FRAMEWORK.md`

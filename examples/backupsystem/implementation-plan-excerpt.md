@@ -121,7 +121,6 @@ BackupSystem/
 ### 1.1 Planning Infrastructure ✅ Complete
 
 **Status:** ✅ Complete (2025-11-01)
-**Duration:** 3 hours
 **Dependencies:** None
 
 **Tasks:**
@@ -145,7 +144,6 @@ BackupSystem/
 ### 1.5 Project Scaffolding ✅ Complete
 
 **Status:** ✅ Complete (2025-11-01)
-**Duration:** 2 hours
 **Dependencies:** 1.1, 1.2, 1.3
 
 **Tasks:**
@@ -176,7 +174,6 @@ BackupSystem/
 ### 2.1 PHP Configuration Parser ⏸️ NEXT SESSION
 
 **Status:** ⏸️ Not Started
-**Estimated Duration:** 4 hours
 **Dependencies:** 1.5
 **Assignee:** Claude (with user review)
 
@@ -243,7 +240,6 @@ class BackupConfig {
 ### 2.2 Go Configuration Parser ⏸️ Pending
 
 **Status:** ⏸️ Not Started
-**Estimated Duration:** 5 hours (includes learning time)
 **Dependencies:** 2.1 (PHP version as reference)
 
 **Context:**
@@ -329,7 +325,7 @@ Before starting the next session:
    make lint  # Should pass
    ```
 
-3. **Start Task 2.1** (4 hours estimated)
+3. **Start Task 2.1**
    - Create `src/Config/ConfigParser.php`
    - Write tests first (TDD approach)
    - Implement parsing logic

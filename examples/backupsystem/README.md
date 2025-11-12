@@ -11,7 +11,7 @@ This directory contains excerpts from the **BackupSystem v2.0** project, which s
 
 ## Framework Usage Stats
 
-- **Project Duration:** 3+ weeks across multiple sessions
+- **Project Span:** Multiple weeks across multiple sessions
 - **PRD:** 1,811 lines covering requirements, architecture, testing strategy
 - **Implementation Plan:** 6 phases, 22 components, detailed task breakdown
 - **Sessions Tracked:** Multiple sessions with complete context preservation
@@ -34,7 +34,7 @@ Excerpt from the Implementation Plan showing:
 - Quick Status section (how to track current state)
 - Phase breakdown with dependencies
 - Component specifications
-- Task-level detail with time estimates
+- Task-level detail
 
 **Key Learning:** How to break down a multi-month project into manageable, trackable tasks
 
@@ -75,14 +75,14 @@ Complete Architecture Decision Log showing:
 
 ### Challenges Encountered
 
-⚠️ **Initial Setup Time:** First session spent 1-2 hours creating planning infrastructure
-- **Mitigation:** This framework now provides templates and setup scripts to reduce this to 10 minutes
+⚠️ **Initial Setup Time:** First session spent significant time creating planning infrastructure
+- **Mitigation:** This framework now provides templates and setup scripts to reduce setup significantly
 
 ⚠️ **Remembering to Update:** Initially forgot to update planning docs during sessions
 - **Mitigation:** Session end ritual became habit after 2-3 sessions
 
 ⚠️ **Balancing Detail:** Early implementation plan was too detailed, creating maintenance overhead
-- **Mitigation:** Found sweet spot of 1-4 hour task granularity
+- **Mitigation:** Found sweet spot for task granularity
 
 ### Unexpected Benefits
 
@@ -101,13 +101,13 @@ Complete Architecture Decision Log showing:
 The session log shows how development continued across multiple weeks with complete context restoration:
 
 ```
-Session 2025-11-01 (Setup & Planning) → 3 hours
+Session 2025-11-01 (Setup & Planning)
   ↓
-Session 2025-11-01 Continued (Project Scaffolding) → 2 hours
+Session 2025-11-01 Continued (Project Scaffolding)
   ↓
 [Weeks pass]
   ↓
-Session 2025-11-05 (Extract Planning Framework) → Current session
+Session 2025-11-05 (Extract Planning Framework)
 ```
 
 **Without the framework:** Each session would start with "what was I doing again?"
@@ -144,14 +144,14 @@ This single section answered 5 questions:
 
 ## Applying to Your Project
 
-### Small Project (<40 hours)
+### Small Project
 
 If BackupSystem were smaller:
 - Simplify PRD to 2-3 pages (keep executive summary, requirements, architecture)
 - Combine phases in implementation plan (e.g., "Phase 1: Core Features" instead of 6 phases)
 - Still use session log and decisions.md (proven valuable even for small projects)
 
-### Large Project (>200 hours)
+### Large Project
 
 If BackupSystem were larger:
 - Split implementation-plan.md by phase (implementation-plan-phase1.md, etc.)

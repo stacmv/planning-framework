@@ -168,19 +168,19 @@ This will:
 
 ### Adapting for Project Size
 
-**Tiny projects (< 8 hours):**
+**Tiny projects:**
 - Use: implementation-plan (simplified), session-log
 - Skip: PRD, decisions.md
 
-**Small projects (8-40 hours):**
+**Small projects:**
 - Use: All templates
 - Simplify: PRD (1-2 pages), implementation-plan (single phase)
 
-**Medium projects (40-200 hours):**
+**Medium projects:**
 - Use: All templates (full)
 - Standard customization
 
-**Large projects (> 200 hours):**
+**Large projects:**
 - Use: All templates (full)
 - Extend: Split implementation-plan by phase, add risks.md
 
@@ -292,5 +292,6 @@ These templates are released under MIT License. Use freely in any project.
 ---
 
 **Created:** 2025-11-04
-**Version:** 1.0
+**Version:** 1.1
+**Last Updated:** 2025-11-12
 **Project:** BackupSystem v2.0

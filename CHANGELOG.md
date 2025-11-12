@@ -83,17 +83,81 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [1.1.0] - 2025-11-12
+
+### Changed - BREAKING CHANGES
+
+**Time Estimations Removed:**
+- Removed all time estimation fields from templates (session duration, estimated time, phase duration)
+- Removed hour-based project size classifications (e.g., "Small Projects (8-40 hours)" → "Small Projects")
+- Removed time statistics from session logs (Total Development Time, Average Session Length)
+- Updated task granularity advice (removed "1-4 hour chunks" → "manageable chunks")
+
+**Rationale:** AI-assisted development has significantly different velocity than human-only development. Time estimations created false expectations and added maintenance overhead without providing value. Focus shifted to task completion and progress tracking instead.
+
+**Files Updated:**
+- `templates/implementation-plan-template.md` - Removed phase and task time estimates
+- `templates/session-log-template.md` - Removed session durations and time statistics
+- `templates/README.md` - Updated project size guidelines
+- `FRAMEWORK.md` - Updated template feature descriptions and project classifications
+- `README.md` - Updated project size adaptations
+- `QUICK-REFERENCE.md` - Removed time-based examples and advice
+- `docs/planning/` - All local documentation updated
+- `examples/backupsystem/` - All examples updated for consistency
+
+### Added
+
+**Migration Support:**
+- **`docs/MIGRATION-GUIDE-V1.1.md`** - Comprehensive migration guide for AI assistants
+  - Step-by-step instructions for updating existing projects
+  - Search & replace patterns for common time estimation formats
+  - Examples of what to change vs what to keep
+  - Verification checklist
+  - Troubleshooting guide
+
+### Kept Unchanged
+
+**Preserved Time References:**
+- Technical requirements (RTO/RPO, SLA) in system specifications
+- Performance metrics describing system behavior (not dev time)
+- Historical decision context in ADRs (when time was part of the decision)
+- Session count and completion tracking
+- All progress tracking mechanisms (checkboxes, percentages, phase completion)
+
+### Migration
+
+**For Existing Projects:**
+
+To migrate your project to v1.1:
+
+1. **Read the migration guide:** `docs/MIGRATION-GUIDE-V1.1.md`
+2. **Run automated checks:**
+   ```bash
+   grep -rn "Estimated Time:" docs/planning/
+   grep -rn "Duration:.*hours" docs/planning/
+   ```
+3. **Update your files** following the guide patterns
+4. **Verify** using the checklist in the migration guide
+
+**AI Assistants:** The migration guide is specifically designed for you to help users update their projects.
+
+### Version Compatibility
+
+- **v1.0 → v1.1:** Breaking changes, manual migration required
+- **Migration time:** 10-20 minutes for typical project
+- **Files affected:** Typically 5-10 files per project
+
+---
+
 ## [Unreleased]
 
 ### Planned
 
-**v1.1.0 (Future):**
+**v1.2.0 (Future):**
 - NPM package for easy installation
 - Additional templates (risk register, testing plan)
 - CI/CD integration examples
 - Video tutorials
-
-**v1.2.0 (Future):**
 - Domain-specific template packs (web, mobile, data science)
 - Integration examples (Jira, Linear, Notion)
 - Automated progress report generation
@@ -139,6 +203,7 @@ See [README.md](README.md) for full documentation.
 
 | Version | Date | Highlights |
 |---------|------|------------|
+| 1.1.0 | 2025-11-12 | Remove time estimations, add migration guide |
 | 1.0.0 | 2025-11-05 | Initial release with core templates and documentation |
 
 ---

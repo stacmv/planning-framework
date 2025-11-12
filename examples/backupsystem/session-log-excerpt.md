@@ -11,7 +11,7 @@ Track progress, decisions, and next steps for each development session.
 
 **Before writing any code:**
 
-1. **Restore Context** (2 minutes):
+1. **Restore Context:**
    ```bash
    tail -50 docs/planning/session-log.md      # What happened last time?
    head -40 docs/planning/implementation-plan.md  # What's next?
@@ -51,7 +51,6 @@ Track progress, decisions, and next steps for each development session.
 
 ## Session 2025-11-01 (Setup & Planning)
 
-**Duration:** ~3 hours
 **Participants:** User (Stac) + Claude
 
 ### Goals
@@ -118,8 +117,6 @@ None
 5. Create Makefile
 6. Create example config files
 
-**Estimated Time:** 3-4 hours
-
 **Preparation:**
 - Review implementation plan Phase 1.5
 - Review PRD sections on directory structure
@@ -136,7 +133,6 @@ None
 
 ## Session 2025-11-01 (Continued) - Project Scaffolding
 
-**Duration:** ~2 hours
 **Participants:** Claude (continuation after context reset)
 
 ### Goals
@@ -202,8 +198,6 @@ No new architectural decisions. Followed ADRs from previous session:
 5. [ ] Add PHPStan level 8 type annotations
 6. [ ] Document with PHPDoc
 
-**Estimated Time:** 4 hours
-
 **Preparation:**
 - Review symfony/yaml documentation
 - Review Pest documentation on assertions
@@ -219,7 +213,6 @@ No new architectural decisions. Followed ADRs from previous session:
 
 ## Session 2025-11-05 - Extract Planning Framework
 
-**Duration:** ~3 hours
 **Participants:** User + Claude
 
 ### Goals
@@ -297,8 +290,6 @@ None - extraction went smoothly
 
 **Recommended:** Option A (complete framework extraction)
 
-**Estimated Time:** 2 hours
-
 ### Notes
 - This session demonstrates framework flexibility - priorities changed mid-project
 - Framework made it easy to switch contexts (read session log, knew exactly where we were)
@@ -329,7 +320,6 @@ Use this template when starting a new session:
 ```markdown
 ## Session YYYY-MM-DD - [Brief Description]
 
-**Duration:** X hours
 **Participants:** [Who worked on this]
 
 ### Goals
@@ -361,8 +351,6 @@ tail -50 docs/planning/session-log.md
 **Tasks:**
 1. [ ] Task 1
 2. [ ] Task 2
-
-**Estimated Time:** X hours
 
 ### Notes
 - [Important observation]

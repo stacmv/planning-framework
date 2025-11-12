@@ -36,3 +36,6 @@ __pycache__/
 # Testing
 coverage/
 .coverage
+# Planning Framework - Keep these files versioned
+# docs/prd.md
+# docs/planning/
