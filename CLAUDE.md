@@ -1,118 +1,126 @@
-# CLAUDE.md
+# Planning Framework v2.0 - Claude Code Integration
 
-This file provides guidance to Claude Code when working with this repository.
+**⚠️ Important: This project uses Planning Framework v2.0**
 
-# CLAUDE.md Instructions
+Planning Framework v2.0 uses **`PLANNING.md`** for all AI agents (Claude, Gemini, Qwen).
 
-Copy this section into your project's `CLAUDE.md` file to integrate the Planning Framework.
-
----
-
-## Starting a New Session
-
-**IMPORTANT:** Before starting any work, follow these steps to restore context:
-
-1. **Read session log** - See what was done last time and what's next:
-   ```bash
-   tail -50 docs/planning/session-log.md
-   ```
-
-2. **Check implementation status** - Review current phase and next task:
-   ```bash
-   head -40 docs/planning/implementation-plan.md
-   ```
-
-3. **Review decisions** - Refresh on architectural choices:
-   ```bash
-   cat docs/planning/decisions.md
-   ```
-
-4. **Start the task** - Begin with the task marked "Next Session" in implementation plan
-
-**Planning Infrastructure Location:**
-- `/docs/planning/implementation-plan.md` - Detailed task breakdown, component specs, progress tracking
-- `/docs/planning/session-log.md` - Session-by-session progress and notes
-- `/docs/planning/decisions.md` - Architecture Decision Records (ADR)
-- `/docs/prd.md` - Product Requirements Document (what and why)
+👉 **Read `PLANNING.md` for complete framework instructions.**
 
 ---
 
-## Session End Ritual
+## Quick Migration Note
 
-Before ending a session, **ALWAYS**:
+**v1.0 → v2.0 Changes:**
+- `CLAUDE.md` → `PLANNING.md` (multi-agent support)
+- Global files → Issue-based workflow
+- See `PLANNING.md` for new workflow
 
-1. **Update session log** - Add entry to `docs/planning/session-log.md`:
-   - Completed tasks (with checkboxes)
-   - Decisions made (reference ADRs)
-   - Any blockers
-   - Next session priorities
-
-2. **Update implementation plan** - In `docs/planning/implementation-plan.md`:
-   - Check off completed tasks
-   - Update "Quick Status" section
-   - Mark next task clearly
-
-3. **Document decisions** - Add to `docs/planning/decisions.md`:
-   - Create ADR for any architectural decisions
-   - Use standard ADR format
-
-4. **Commit changes**:
-   ```bash
-   git add .
-   git commit -m "Session YYYY-MM-DD: [Brief description]"
-   ```
+**For v1.0 projects:** Run `./scripts/migrate-v1-to-v2.sh` to upgrade.
 
 ---
 
-## Planning Framework Usage
+## What's New in v2.0
 
-This project uses a structured planning framework to maintain context across sessions.
+**Issue-Based Workflow:**
+- Each task gets its own issue folder
+- Complete context in: `docs/issues/open/YYYYMMDD-type-slug/`
+- Global files stay small (roadmap only)
 
-**Key principles:**
-- All progress tracked with checkboxes
-- Decisions documented with rationale (ADRs)
-- Next steps always clearly marked
-- Context preserved for AI assistants
-
-**For detailed framework documentation:**
-- See `/docs/planning/FRAMEWORK.md` for complete guide
-- See `/docs/planning/templates/` for document templates
-
----
-
-## What AI Assistants Should Do
-
-**On every session start:**
-1. ✅ Read the three core planning documents (session log, implementation plan, decisions)
-2. ✅ Understand current phase and next task
-3. ✅ Ask clarifying questions if context is unclear
-4. ✅ Follow patterns and decisions documented in decisions.md
-
-**During session:**
-1. ✅ Update progress immediately (don't batch updates)
-2. ✅ Document decisions as they're made (ADR format)
-3. ✅ Note any blockers in real-time
-4. ✅ Commit frequently with clear messages
-
-**Before session ends:**
-1. ✅ Update all three core documents
-2. ✅ Mark next task clearly
-3. ✅ Ensure "Quick Status" reflects reality
-4. ✅ Create git commit with session summary
-
-**Never:**
-- ❌ Skip reading planning docs at session start
-- ❌ Make architectural decisions without documenting (ADR)
-- ❌ Complete tasks without updating implementation plan
-- ❌ End session without updating session log
+**Key Files:**
+- `PLANNING.md` - Framework instructions (**READ THIS**)
+- `.qa-workflow.md` - QA requirements
+- `docs/planning/implementation-plan.md` - Roadmap
+- `docs/planning/session-log.md` - Timeline
+- `docs/planning/decisions.md` - Architectural decisions
 
 ---
 
-## Customization Notes
+## Session Start (v2.0)
 
-[Add any project-specific planning instructions here]
+**1. Read framework config:**
+```bash
+cat PLANNING.md
+```
+
+**2. Read global context:**
+```bash
+tail -20 docs/planning/session-log.md
+cat docs/planning/implementation-plan.md
+```
+
+**3. If working on issue, read:**
+```bash
+cat docs/issues/open/[issue-id]/prompt.md
+cat docs/issues/open/[issue-id]/analysis.md
+cat docs/issues/open/[issue-id]/implementation-plan.md
+cat docs/issues/open/[issue-id]/session-log.md
+```
+
+**4. Read project decisions:**
+```bash
+cat docs/planning/decisions.md
+```
 
 ---
 
-**Planning Framework Version:** 1.0
-**Last Updated:** YYYY-MM-DD
+## Issue Workflow
+
+```
+CREATE → ANALYZE → PLAN → IMPLEMENT → QA → CLOSE
+```
+
+**Agent Guidelines:**
+- ✅ ONE issue per session (focused work)
+- ✅ Update issue session-log.md after working
+- ✅ Check off tasks in implementation-plan.md
+- ✅ Run QA before closing (.qa-workflow.md)
+- ✅ Get user confirmation before closing
+
+**See `PLANNING.md` for complete workflow.**
+
+---
+
+## Session End (v2.0)
+
+**If working on issue:**
+- [ ] Update issue `session-log.md`
+- [ ] Check off completed tasks in issue `implementation-plan.md`
+- [ ] Note blockers and next priorities
+- [ ] Commit changes
+
+**If closing issue:**
+- [ ] Run QA workflow (`.qa-workflow.md`)
+- [ ] Merge branch to parent
+- [ ] Move issue: `open/` → `closed/`
+- [ ] Update global `session-log.md` (one-line entry)
+- [ ] Promote significant decisions to global `decisions.md`
+- [ ] Commit closure
+
+**See `PLANNING.md` for complete closure workflow.**
+
+---
+
+## Documentation
+
+- **[PLANNING.md](PLANNING.md)** - **START HERE** - Complete framework config
+- **[FRAMEWORK.md](docs/planning/FRAMEWORK.md)** - Full documentation
+- **[QUICKSTART.md](docs/planning/QUICKSTART.md)** - 5-minute guide
+- **[MIGRATION-GUIDE.md](docs/planning/MIGRATION-GUIDE.md)** - v1.0 → v2.0 upgrade
+
+---
+
+## For Projects Using v1.0
+
+This file kept for backwards compatibility. New v2.0 projects use `PLANNING.md`.
+
+**To upgrade your v1.0 project:**
+```bash
+./scripts/migrate-v1-to-v2.sh
+```
+
+---
+
+**Framework Version:** 2.0.0
+**Last Updated:** 2024-01-27
+
+**👉 Read `PLANNING.md` for complete instructions.**

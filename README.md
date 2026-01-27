@@ -1,104 +1,214 @@
-# Project Planning Framework
+# Planning Framework v2.0
 
-> **A structured approach to maintaining context across development sessions with AI assistants**
+> **Issue-based workflow for AI-assisted development across sessions and branches**
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
-[![Version](https://img.shields.io/badge/version-1.1.0-blue.svg)](FRAMEWORK.md)
+[![Version](https://img.shields.io/badge/version-2.0.0-blue.svg)](docs/planning/FRAMEWORK.md)
 
 ---
 
-## Overview
+## What's New in v2.0
 
-The **Project Planning Framework** solves the context loss problem that occurs when working on projects across multiple sessions, especially with AI assistants like Claude Code, GitHub Copilot, or ChatGPT.
+**✨ Issue-Based Workflow** - Each task gets its own folder with complete context
+**🎯 Bounded File Sizes** - Global files stay small, execution details in issues
+**🚫 No Merge Conflicts** - Issue folders are branch-specific
+**🤖 Multi-Agent Support** - Single config for Claude/Gemini/Qwen
+**✅ Quality Gates** - Built-in QA workflow
 
-### Problems This Solves
-
-✅ **"Where did I leave off?"** - Clear session tracking with explicit next steps
-✅ **"What decisions did we make?"** - Documented architecture choices with rationale
-✅ **"What's the overall plan?"** - Detailed roadmap with dependencies and progress
-✅ **"Why did we choose X over Y?"** - Decision history prevents revisiting settled questions
-✅ **"What's the project structure?"** - Explicit directory layouts and component specs
+### Upgrading from v1.0?
+See **[MIGRATION-GUIDE.md](docs/planning/MIGRATION-GUIDE.md)** for step-by-step instructions.
 
 ---
 
-## Quick Start
+## The Problem
 
-### Option 1: Automated Setup (Recommended)
+When working with AI agents across multiple sessions:
+- ❌ Context is lost between sessions
+- ❌ Planning files grow unbounded
+- ❌ Feature branches conflict on shared planning docs
+- ❌ No structured way to track features/bugs
 
-```bash
-# Download the framework
-git clone https://github.com/yourusername/planning-framework.git
-cd planning-framework/templates
+## The Solution
 
-# Run setup in your project
-./setup-planning-framework.sh /path/to/your/project "YourProjectName"
-```
+Planning Framework v2.0 uses an **issue-based workflow**:
+- ✅ Each task in its own issue folder
+- ✅ Complete context (prompt, analysis, plan, progress)
+- ✅ Global files stay minimal (roadmap only)
+- ✅ Zero merge conflicts (branch-specific issues)
+- ✅ Multi-agent support (Claude Code, Gemini CLI, Qwen Code)
 
-**What this does:**
-- ✅ Creates `docs/planning/` directory structure
-- ✅ Copies and customizes templates with your project name
-- ✅ Integrates with `CLAUDE.md` for AI assistant guidance
-- ✅ Creates initial git commit (optional)
+---
 
-### Option 2: Manual Setup
+## Quick Start (5 Minutes)
 
-```bash
-# In your project root
-mkdir -p docs/planning
-
-# Copy templates
-cp planning-framework/templates/prd-template.md docs/prd.md
-cp planning-framework/templates/implementation-plan-template.md docs/planning/implementation-plan.md
-cp planning-framework/templates/session-log-template.md docs/planning/session-log.md
-cp planning-framework/templates/decisions-template.md docs/planning/decisions.md
-
-# Customize: Replace [Project Name] and YYYY-MM-DD with your values
-```
-
-### Option 3: NPM Package (Coming Soon)
+### For New Projects
 
 ```bash
-npx @planning-framework/init
+# 1. Clone planning framework
+git clone https://github.com/[your-org]/planning-framework
+cd planning-framework
+
+# 2. Run interactive setup
+./scripts/setup-planning-v2.sh
+# Follow prompts: project name, issue types, QA requirements
+
+# 3. Commit the framework
+git add .
+git commit -m "Setup Planning Framework v2.0"
+
+# 4. Create first issue
+# Ask your AI agent: "Create an issue to [add feature]"
 ```
+
+### For Existing v1.0 Projects
+
+```bash
+# Migrate from v1.0 to v2.0
+./scripts/migrate-v1-to-v2.sh
+# Backs up v1.0, creates v2.0 structure, generates report
+```
+
+**See [QUICKSTART.md](docs/planning/QUICKSTART.md) for complete 5-minute guide.**
 
 ---
 
 ## How It Works
 
-### Core Documents
+### Issue-Based Workflow
 
-| Document | Purpose | Update When |
-|----------|---------|-------------|
-| **prd.md** | Product requirements (WHAT and WHY) | During planning phase |
-| **implementation-plan.md** | Task breakdown, dependencies, progress | After each session |
-| **session-log.md** | Session notes, blockers, next steps | During/end of each session |
-| **decisions.md** | Architecture Decision Records (ADRs) | When making major decisions |
-
-### Session Start Ritual (2 minutes)
-
-When starting a development session, your AI assistant (or you) should:
-
-```bash
-# 1. Read session log - See what was done last time
-tail -50 docs/planning/session-log.md
-
-# 2. Check implementation status - Review current phase and next task
-head -40 docs/planning/implementation-plan.md
-
-# 3. Review decisions - Refresh on architectural choices
-cat docs/planning/decisions.md
+```
+USER REQUEST → CREATE ISSUE → ANALYZE → PLAN → IMPLEMENT → QA → CLOSE
 ```
 
-**Then:** Start with the task marked "Next Session" in the implementation plan.
+### File Structure
 
-### Session End Ritual (5 minutes)
+```
+your-project/
+├── PLANNING.md                      # Framework config
+├── .qa-workflow.md                  # QA requirements
+│
+├── docs/
+│   ├── issues/
+│   │   ├── open/                    # Active work
+│   │   │   └── 20240127-feat-add-auth/
+│   │   │       ├── prompt.md        # Original request
+│   │   │       ├── analysis.md      # Understanding
+│   │   │       ├── implementation-plan.md  # Tasks
+│   │   │       └── session-log.md   # Progress
+│   │   │
+│   │   └── closed/                  # Completed (archived)
+│   │
+│   └── planning/
+│       ├── implementation-plan.md   # Roadmap (stays small!)
+│       ├── session-log.md           # Timeline
+│       └── decisions.md             # Decisions
+```
 
-Before ending a session:
+### What Agents Do
 
-1. ✅ Update `session-log.md` with completed tasks and next priorities
-2. ✅ Update `implementation-plan.md` progress checkboxes
-3. ✅ Document any architectural decisions in `decisions.md`
-4. ✅ Commit your work: `git commit -m "Session YYYY-MM-DD: Brief description"`
+**Session Start:**
+1. Read `PLANNING.md` - Framework instructions
+2. Read issue files - Context for current task
+3. Read global `decisions.md` - Architectural choices
+
+**During Work:**
+- Focus on ONE issue per session
+- Update progress in `session-log.md`
+- Check off tasks in `implementation-plan.md`
+
+**Before Closing:**
+- Run QA workflow (`.qa-workflow.md`)
+- Get user confirmation
+- Merge and archive issue
+
+---
+
+## Key Features
+
+### 1. Issue Naming
+
+**Format:** `YYYYMMDD-{type}-{slug}`
+
+**Example:** `20240127-feat-add-authentication`
+
+- Date ensures uniqueness across branches
+- Type visible at glance (feat/bug/improve)
+- Slug provides readability
+
+### 2. Branches
+
+**One branch per issue:** `issue/YYYYMMDD-{type}-{slug}`
+- 1:1 mapping with issue folder
+- Clean isolation, no conflicts
+
+### 3. Global Files (Stay Small!)
+
+**implementation-plan.md** - Roadmap + active issues
+**session-log.md** - One-line entries when issues close
+**decisions.md** - Architectural decisions
+
+**Details live in issue folders, not global files.**
+
+### 4. Quality Assurance
+
+`.qa-workflow.md` defines gates before closing:
+- Linting/formatting
+- Tests (existing + new)
+- Documentation
+- Security review
+
+---
+
+## Documentation
+
+- 📖 **[Complete Guide](docs/planning/FRAMEWORK.md)** - Full documentation
+- ⚡ **[Quick Start](docs/planning/QUICKSTART.md)** - 5-minute setup
+- 🔄 **[Migration Guide](docs/planning/MIGRATION-GUIDE.md)** - v1.0 → v2.0
+- 📁 **[Templates](docs/planning/templates/)** - All templates
+
+---
+
+## Multi-Agent Support
+
+Works with:
+- **Claude Code** - Anthropic's CLI tool
+- **Gemini CLI** - Google's CLI tool
+- **Qwen Code** - Qwen's CLI tool
+- **Any AI agent** - Generic instructions
+
+**Single `PLANNING.md` for all agents.**
+
+Session logs track which agent did what:
+```
+[Claude Code] ✓ [issue-id](link) - Description
+[Gemini CLI] 2024-01-28: Ad-hoc work
+```
+
+---
+
+## Scripts & Automation
+
+**Setup:**
+```bash
+./scripts/setup-planning-v2.sh      # Interactive setup
+```
+
+**Migration:**
+```bash
+./scripts/migrate-v1-to-v2.sh       # Migrate from v1.0
+```
+
+**Helpers:**
+```bash
+./scripts/create-issue.sh           # Manual issue creation
+./scripts/close-issue.sh            # Issue closure automation
+```
+
+All scripts:
+- Interactive prompts
+- Colorized output
+- Error handling
+- Comprehensive help
 
 ---
 
@@ -108,196 +218,102 @@ Before ending a session:
 
 ✅ **Zero context loss** - Pick up exactly where you left off
 ✅ **Clear progress** - Visual tracking with checkboxes
-✅ **Decision history** - Understand why choices were made
-✅ **Better handoffs** - Team members (or future you) can continue seamlessly
+✅ **Isolated work** - Issues don't interfere with each other
+✅ **No conflicts** - Branch-specific planning files
 
-### For AI Assistants
+### For AI Agents
 
-✅ **Reduced hallucination** - Clear facts about project state
-✅ **Consistent behavior** - Follows documented patterns and decisions
-✅ **Proactive planning** - Can suggest next steps based on plan
-✅ **Continuity** - Maintains context across session boundaries
+✅ **Focused context** - Read only relevant issue
+✅ **Clear workflow** - 6-phase lifecycle
+✅ **Consistent behavior** - Follows documented patterns
+✅ **Reduced tokens** - Small files, not 1000s of lines
 
 ### For Teams
 
-✅ **Faster onboarding** - New team members understand project quickly
-✅ **Async collaboration** - Clear status for distributed teams
-✅ **Audit trail** - Decision history for compliance/review
-✅ **Risk management** - Documented dependencies and blockers
+✅ **Parallel development** - No merge conflicts
+✅ **Issue tracking** - Built-in feature/bug management
+✅ **Quality gates** - QA workflow before merging
+✅ **Decision history** - Architectural choices documented
 
 ---
 
-## Documentation
+## Real-World Usage
 
-- 📖 **[Complete Framework Guide](FRAMEWORK.md)** - Detailed documentation
-- ⚡ **[Quick Reference](QUICK-REFERENCE.md)** - One-page cheat sheet
-- 📁 **[Templates](templates/)** - All document templates
-- 💡 **[Example Project](examples/backupsystem/)** - Real-world example
-
----
-
-## Real-World Example
-
-This framework was developed during the **BackupSystem v2.0** project and proven effective:
-
-- 📄 **1,811-line PRD** covering requirements, architecture, testing strategy
-- 📋 **6 phases, 22 components** in implementation plan
-- 📝 **Session tracking** with clear next steps across weeks
-- 🔍 **7 ADRs** documenting major technical choices (dual PHP/Go implementation, testing frameworks, etc.)
-
-**Result:** Zero context loss between sessions spanning multiple weeks, with seamless handoff between sessions.
-
-See `examples/backupsystem/` for excerpts.
+Planning Framework v2.0 was built using itself (dogfooding):
+- **Issue:** `20240127-feat-implement-v2`
+- **6 phases:** Bootstrap, Templates, Scripts, Documentation, Self-Migration, Testing
+- **51 tasks:** Tracked in implementation-plan.md
+- **Progress:** Updated after each session
+- **Result:** Working v2.0 framework! 🎉
 
 ---
 
-## Framework Components
+## Customization
 
-### Templates Included
+### Issue Types
 
-```
-templates/
-├── prd-template.md                     # Product Requirements Document
-├── implementation-plan-template.md     # Detailed task breakdown
-├── session-log-template.md             # Session tracking
-├── decisions-template.md               # Architecture Decision Records
-├── claude-instructions.md              # CLAUDE.md integration
-├── setup-planning-framework.sh         # Bash setup script
-└── setup-planning-framework.ps1        # PowerShell setup script
+Default: `feat`, `bug`, `improve`
+
+Add more in `PLANNING.md`:
+```markdown
+- `refactor` - Code restructuring
+- `docs` - Documentation only
+- `test` - Testing improvements
+- `chore` - Maintenance tasks
 ```
 
-### Document Templates
+### QA Workflow
 
-1. **PRD (Product Requirements Document)**
-   - Executive summary, vision, objectives
-   - Current system analysis
-   - Functional and non-functional requirements
-   - Technical architecture
-   - Success criteria
-
-2. **Implementation Plan**
-   - Quick Status section (current phase, next task)
-   - Directory structure with checkboxes
-   - Phase breakdown with tasks and dependencies
-   - Component specifications
-   - Progress tracking
-
-3. **Session Log**
-   - Session start/end rituals
-   - Completed tasks (with checkboxes)
-   - Decisions made
-   - Blockers encountered
-   - Next session priorities
-
-4. **Decisions Log (ADR)**
-   - Architecture Decision Record format
-   - Context, options, decision, rationale, consequences
-   - Status tracking (Accepted/Superseded/Deprecated)
+Customize `.qa-workflow.md`:
+```markdown
+### Project-Specific
+- [ ] Performance: API response < 100ms
+- [ ] Security: No SQL injection risks
+- [ ] Accessibility: WCAG AA compliant
+```
 
 ---
 
-## When to Use This Framework
+## When to Use
 
 ### ✅ Good Fit
 
-- Projects spanning multiple weeks/months
-- Projects with multiple contributors
+- Multi-session projects (days/weeks/months)
 - AI-assisted development
-- Complex projects with many architectural decisions
-- Learning projects (track progress and understanding)
+- Multiple feature branches
+- Complex projects with many decisions
+- Team collaboration
 
 ### ⚠️ May Be Overkill For
 
 - Single-session prototypes
 - Trivial scripts (<100 LOC)
 - Well-defined, simple tasks
-- Projects with continuous context (no breaks)
 
 ---
 
-## Customization
+## What's Different from v1.0?
 
-### Project Size Adaptations
-
-**Small Projects:**
-- Simplify PRD to 1-2 pages
-- Use single-phase implementation plan
-- Keep all templates
-
-**Medium Projects:**
-- Use all templates as-is
-- Standard customization
-
-**Large Projects:**
-- Split implementation plan by phase
-- Add `risks.md`, `dependencies.md`, `testing-plan.md`
-- Create detailed component specifications
-
-### Domain-Specific Customizations
-
-- **Web Apps:** Add UI/UX requirements, API specs, database schema
-- **Data Science:** Add dataset descriptions, model metrics, experiment tracking
-- **DevOps:** Add infrastructure diagrams, SLA/SLO definitions, monitoring plans
-- **Learning Projects:** Add `/docs/learning/` with exercises and objectives
-
----
-
-## Integration with Development Tools
-
-### Claude Code / AI Assistants
-
-Add the session start ritual to your `CLAUDE.md` file:
-
-```markdown
-## Starting a New Session
-
-**IMPORTANT:** Before starting any work, restore context:
-
-1. Read session log: `tail -50 docs/planning/session-log.md`
-2. Check implementation status: `head -40 docs/planning/implementation-plan.md`
-3. Review decisions: `cat docs/planning/decisions.md`
-4. Start the task marked "Next Session"
-```
-
-The setup script automatically adds this to your `CLAUDE.md`.
-
-### Git Hooks
-
-Example pre-commit hook to remind updating planning docs:
-
-```bash
-#!/bin/bash
-if git diff --cached --name-only | grep -q "^src/"; then
-  echo "Remember to update docs/planning/session-log.md"
-fi
-```
-
-### CI/CD
-
-Check that planning docs are updated when code changes:
-
-```yaml
-# .github/workflows/check-docs.yml
-- name: Check if session log updated
-  run: |
-    if git diff --name-only origin/main | grep -q "^src/"; then
-      if ! git diff --name-only origin/main | grep -q "docs/planning/session-log.md"; then
-        echo "Warning: Code changed but session log not updated"
-      fi
-    fi
-```
+| Feature | v1.0 | v2.0 |
+|---------|------|------|
+| **Work tracking** | Global files | Issue folders |
+| **File growth** | Unbounded | Bounded (roadmap only) |
+| **Merge conflicts** | Yes (planning docs) | No (branch-specific) |
+| **Multi-agent** | Separate configs | Single PLANNING.md |
+| **Issue tracking** | Manual | Built-in workflow |
+| **QA gates** | None | .qa-workflow.md |
 
 ---
 
 ## Contributing
 
-Improvements welcome! Common contributions:
+Contributions welcome! Areas:
 
-- ✨ Additional templates (risk register, test plan, deployment plan)
-- 🔧 Setup scripts for other platforms
-- 📚 Integration examples for other tools (Jira, Linear, Notion)
-- 🎨 Domain-specific template variations
-- 📖 Real-world project examples
+- ✨ Additional templates
+- 🔧 Platform-specific improvements
+- 📚 Integration examples
+- 🎨 Domain-specific variations
+- 📖 Real-world examples
 
 See [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines.
 
@@ -305,11 +321,11 @@ See [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines.
 
 ## Support
 
-- 📖 **Documentation:** See [FRAMEWORK.md](FRAMEWORK.md) for complete guide
-- ⚡ **Quick Help:** See [QUICK-REFERENCE.md](QUICK-REFERENCE.md)
-- 💡 **Examples:** See [examples/](examples/)
-- 🐛 **Issues:** [GitHub Issues](https://github.com/yourusername/planning-framework/issues)
-- 💬 **Discussions:** [GitHub Discussions](https://github.com/yourusername/planning-framework/discussions)
+- 📖 **Documentation:** [FRAMEWORK.md](docs/planning/FRAMEWORK.md)
+- ⚡ **Quick Help:** [QUICKSTART.md](docs/planning/QUICKSTART.md)
+- 🔄 **Migration:** [MIGRATION-GUIDE.md](docs/planning/MIGRATION-GUIDE.md)
+- 🐛 **Issues:** [GitHub Issues](https://github.com/[your-org]/planning-framework/issues)
+- 💬 **Discussions:** [GitHub Discussions](https://github.com/[your-org]/planning-framework/discussions)
 
 ---
 
@@ -322,27 +338,34 @@ MIT License - Use freely in any project. See [LICENSE](LICENSE) for details.
 ## Acknowledgments
 
 **Created by:** Human + Claude collaboration
-**Original Project:** [BackupSystem v2.0](https://github.com/stacmv/BackupSystem)
-**Inspired by:** The need for better context preservation in AI-assisted development
+**Inspired by:** Need for better context preservation in AI-assisted development
+**Built with:** Planning Framework v2.0 (dogfooding!)
 
 ---
 
 ## Version History
 
-- **v1.1.0** (2025-11-12) - Time Estimation Removal
-  - **Breaking:** Remove all time estimation fields from templates
-  - Add comprehensive migration guide for AI assistants
-  - Update project size classifications (remove hour ranges)
-  - Preserve all progress tracking and structural elements
-  - See [CHANGELOG.md](CHANGELOG.md) for full details
+- **v2.0.0** (2024-01-27) - Issue-Based Workflow
+  - 🎯 Issue-based workflow (each task in its own folder)
+  - 📏 Bounded file sizes (global files stay small)
+  - 🚫 No merge conflicts (branch-specific issues)
+  - 🤖 Multi-agent support (single PLANNING.md)
+  - ✅ Built-in QA workflow
+  - 🔧 Automation scripts (setup, migration, helpers)
+  - 📖 Comprehensive documentation
+  - See [CHANGELOG.md](CHANGELOG.md) for details
 
-- **v1.0.0** (2025-11-05) - Initial release
+- **v1.1.0** (2024-11-12) - Time Estimation Removal
+  - Remove time estimation fields
+  - Update templates and documentation
+
+- **v1.0.0** (2024-11-05) - Initial Release
   - Core templates (PRD, Implementation Plan, Session Log, Decisions)
-  - Setup scripts (Bash, PowerShell)
+  - Setup scripts
   - CLAUDE.md integration
-  - Complete documentation
-  - Real-world example from BackupSystem project
 
 ---
 
 **Star this repo if it helps your project! ⭐**
+
+**Planning Framework v2.0 - Build better with AI assistance** 🚀
