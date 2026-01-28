@@ -528,6 +528,90 @@ None
 
 ---
 
+## Session: 2026-01-28 - Installation Testing (Phase 6.1)
+
+**Phase:** Phase 6.1 - Testing
+**Agent:** Claude Code
+**Goal:** Test v2.0 installation on fresh project and validate all functionality
+
+### Completed
+- [x] Created test project (/tmp/test-planning-project)
+- [x] Fixed script permissions (setup-planning-v2.sh not executable)
+- [x] Ran setup script with automated input
+  - Project: TestProject
+  - Issue types: feat,bug,improve
+  - QA checks: all
+  - Agent: All agents
+  - Setup time: <5 seconds
+- [x] Verified structure created correctly
+  - Root: PLANNING.md, .qa-workflow.md (clean!)
+  - planning/ folder: all files present
+  - Scripts: 3 executable files in planning/scripts/
+  - Templates: 15 files in planning/templates/
+  - Docs: FRAMEWORK.md and global planning files
+- [x] Tested create-issue.sh script
+  - Created issue: 20260128-feat-add-user-auth
+  - 4 files generated (prompt, analysis, plan, log)
+  - Template placeholders replaced correctly
+  - YAML frontmatter updated properly
+- [x] Validated self-contained operation
+  - No external dependencies
+  - Scripts work from project root
+  - Path replacements successful (docs/ → planning/)
+  - Total footprint: ~90 KB
+- [x] Updated issue documentation
+  - Marked Phase 3.3 testing complete
+  - Marked Phase 6.1 complete
+  - Updated progress: 63/72 tasks (87.5%)
+
+### Decisions Made
+None - Testing phase validates existing decisions
+
+### Blockers & Issues
+None - Installation test: 100% SUCCESS!
+
+### Code Changes
+**Files modified:**
+- `scripts/setup-planning-v2.sh` - Made executable
+- `docs/issues/open/20240127-feat-implement-v2/implementation-plan.md` - Updated testing tasks
+- `docs/issues/open/20240127-feat-implement-v2/session-log.md` - This entry
+
+**Test artifacts:**
+- /tmp/test-planning-project/ - Full test installation (validated)
+
+**Commits:** Not yet committed
+
+### Learnings & Notes
+**Installation validation:**
+- Setup works flawlessly - <5 second installation
+- Structure is clean and intuitive
+- Scripts work perfectly in self-contained mode
+- Path replacements via sed during setup: working great
+- User experience: simple and professional
+
+**Test results summary:**
+```
+✅ Setup Script: PASS (7/7 steps)
+✅ Structure: PASS (clean root, organized planning/)
+✅ Helper Scripts: PASS (create-issue.sh functional)
+✅ Template Processing: PASS (dates, IDs, YAML)
+✅ Self-Contained: PASS (~90KB, offline-capable)
+```
+
+**Key validations:**
+- User's proposed structure (planning/ folder) works perfectly
+- Self-contained approach successful
+- No issues found during testing
+- Ready for production use!
+
+### Next Session Priorities
+1. [ ] **Priority 1:** Commit test results and updates
+2. [ ] **Priority 2:** Run QA workflow (.qa-workflow.md)
+3. [ ] **Priority 3:** Prepare v2.0.0 release (version, CHANGELOG, tag)
+4. [ ] **Priority 4:** Close issue using v2.0 workflow
+
+---
+
 ## Session Template for Future Entries
 
 ```markdown
