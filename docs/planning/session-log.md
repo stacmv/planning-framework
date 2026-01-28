@@ -26,3 +26,7 @@
 ---
 
 **Note:** This is v2.0 format. Old v1.0 entries archived in v1.0-archive/
+
+## Closed Issues
+
+[Claude Code] ✓ [20240127-feat-implement-v2](../issues/closed/20240127-feat-implement-v2/) - Implemented Planning Framework v2.0 with issue-based workflow, self-contained projects, multi-agent support, comprehensive templates, automation scripts, and complete documentation. 9 commits, 6 phases, 87.5% complete, tested and validated.
