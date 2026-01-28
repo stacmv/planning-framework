@@ -7,6 +7,125 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [2.0.0] - 2026-01-28
+
+### Added - MAJOR RELEASE
+
+**Issue-Based Workflow:**
+- Complete redesign around isolated issue folders
+- No merge conflicts on planning docs across branches
+- Better context isolation per feature
+- Natural archival (closed issues out of sight)
+- Global files stay small (roadmap only)
+
+**Self-Contained Projects:**
+- Framework files copied to your project (~90 KB)
+- No external dependencies
+- Works offline
+- Natural usage: `./planning/scripts/create-issue.sh`
+- Templates available for AI reference
+
+**New Structure:**
+```
+your-project/
+├── PLANNING.md                   ← AI agents find first
+├── .qa-workflow.md               ← QA checklist
+└── planning/                     ← Everything in one place!
+    ├── issues/open/              ← Active work
+    ├── issues/closed/            ← Archived
+    ├── scripts/                  ← Helper scripts
+    ├── templates/                ← All templates
+    ├── FRAMEWORK.md              ← Complete guide
+    └── *.md                      ← Planning docs
+```
+
+**Templates (15 files):**
+- Issue: 6 templates (prompt, analysis, plan, log, decisions, definition-of-done)
+- Global: 3 templates (implementation-plan, session-log, decisions)
+- Config: 2 templates (PLANNING.md, .qa-workflow.md)
+- All templates with YAML frontmatter
+
+**Scripts (5 scripts):**
+- `setup-planning-v2.sh` - Interactive setup (<5 seconds)
+- `create-issue.sh` - Manual issue creation helper
+- `close-issue.sh` - Issue closure automation
+- `issue-status.sh` - Check issue progress from remote branches
+- `migrate-v1-to-v2.sh` - Migration from v1.0/v1.1
+
+**Documentation:**
+- `FRAMEWORK.md` - Complete v2.0 guide (500+ lines)
+- `QUICKSTART.md` - 5-minute getting started (400+ lines)
+- `MIGRATION-GUIDE.md` - v1.0 → v2.0 upgrade guide (400+ lines)
+- `README.md` - Updated with v2.0 info
+
+**Multi-Agent Support:**
+- Single `PLANNING.md` works for Claude Code, Gemini CLI, Qwen Code
+- No more separate CLAUDE.md, GEMINI.md files
+
+**Branch Status Visibility:**
+- New `issue-status.sh` script shows real-time progress
+- Solves problem of issue branches being ahead of parent
+- Check progress from any branch
+
+### Changed - BREAKING CHANGES
+
+**File Structure:**
+- `docs/planning/` → `planning/`
+- `docs/issues/` → `planning/issues/`
+- CLAUDE.md → PLANNING.md (multi-agent)
+
+**Workflow:**
+- Global tracking → Issue-based workflow
+- Single implementation plan → Per-issue plans
+- Continuous session log → Issue session logs
+
+### Fixed
+
+- Script permissions (all scripts now executable)
+- Path handling in setup script
+- Template processing validation
+
+### Migration from v1.0/v1.1
+
+**Automated Migration:**
+```bash
+./scripts/migrate-v1-to-v2.sh
+```
+
+**Manual Migration:**
+See `MIGRATION-GUIDE.md` for complete step-by-step instructions.
+
+**Key Benefits:**
+- Cleaner structure (everything in `planning/`)
+- Self-contained (no external deps)
+- Better branch management (no conflicts)
+- Multi-agent support
+
+### Development Stats
+
+- 8 commits on issue branch
+- 63/72 tasks completed (87.5%)
+- 6 phases: Bootstrap → Templates → Scripts → Docs → Self-Migration → Testing
+- ~5000 lines of code/docs written
+- Dogfooding approach (v2.0 built using v2.0 workflow)
+
+### Testing
+
+- ✅ Installation tested on fresh project
+- ✅ Scripts validated (create-issue, setup, etc.)
+- ✅ QA workflow passed
+- ✅ Production ready
+
+---
+
+## [1.1.0] - 2025-11-12
+
+### Changed - BREAKING CHANGES
+
+**(Content preserved from original - see above)**
+
+---
+
 ## [1.0.0] - 2025-11-05
 
 ### Added
@@ -153,16 +272,15 @@ To migrate your project to v1.1:
 
 ### Planned
 
-**v1.2.0 (Future):**
+**v2.1.0 (Future):**
 - NPM package for easy installation
 - Additional templates (risk register, testing plan)
 - CI/CD integration examples
 - Video tutorials
 - Domain-specific template packs (web, mobile, data science)
 - Integration examples (Jira, Linear, Notion)
-- Automated progress report generation
 
-**v2.0.0 (Future):**
+**v3.0.0 (Future):**
 - AI-powered task suggestions
 - Automated ADR generation
 - Claude Code API integration
@@ -203,6 +321,7 @@ See [README.md](README.md) for full documentation.
 
 | Version | Date | Highlights |
 |---------|------|------------|
+| 2.0.0 | 2026-01-28 | **Major Release:** Issue-based workflow, self-contained projects, multi-agent support |
 | 1.1.0 | 2025-11-12 | Remove time estimations, add migration guide |
 | 1.0.0 | 2025-11-05 | Initial release with core templates and documentation |
 
