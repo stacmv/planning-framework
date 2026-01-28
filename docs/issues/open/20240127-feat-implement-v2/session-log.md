@@ -469,6 +469,65 @@ None
 
 ---
 
+## Session: 2026-01-28 - Cleaner Folder Structure (Phase 3.5)
+
+**Phase:** Phase 3.5 (Additional)
+**Agent:** Claude Code
+**Goal:** Implement cleaner, self-contained folder structure for target projects
+
+### Completed
+- [x] Identified usability issue during testing discussion
+  - User wants to test installation but noticed scripts/templates stay in framework repo
+  - Current design requires: `/path/to/framework/scripts/create-issue.sh` (awkward!)
+  - Helper scripts need templates, so both must be accessible
+- [x] User proposed cleaner structure - All framework files in `planning/` folder
+- [x] Updated `setup-planning-v2.sh` (complete rewrite)
+  - Creates `planning/` structure (not `docs/`)
+  - Copies helper scripts to `planning/scripts/`
+  - Copies all templates to `planning/templates/`
+  - Copies FRAMEWORK.md to `planning/`
+  - Automated path replacements via sed for copied scripts
+- [x] Verified path replacements cover all cases
+- [x] Updated issue implementation-plan.md with Phase 3.5 (9 new tasks)
+- [x] Updated progress tracking (55/61 tasks, 90%)
+- [x] Updated session log with this entry
+
+### Decisions Made
+1. **Folder Structure:** Cleaner, self-contained design
+   - Structure: `planning/{issues,scripts,templates,*.md}` + root `PLANNING.md/.qa-workflow.md`
+   - Rationale: Everything in one place, easy to use, no external dependencies
+   - Usage: `./planning/scripts/create-issue.sh` (natural!)
+
+### Blockers & Issues
+None
+
+### Code Changes
+**Files modified:**
+- `scripts/setup-planning-v2.sh` - Complete rewrite for new structure
+- `docs/issues/open/20240127-feat-implement-v2/implementation-plan.md` - Added Phase 3.5
+- `docs/issues/open/20240127-feat-implement-v2/session-log.md` - This entry
+
+**Commits:** Not yet committed
+
+### Learnings & Notes
+**User feedback is gold:**
+- User immediately spotted usability issue before testing
+- Proposed much cleaner structure than original design
+- Dogfooding catches issues early!
+
+**New structure benefits:**
+- Everything in one `planning/` folder
+- Self-contained, offline-capable
+- Natural usage pattern
+- Clean root directory (only 2 framework files)
+
+### Next Session Priorities
+1. [ ] **Priority 1:** Commit both solutions (sync + structure)
+2. [ ] **Priority 2:** TEST v2.0 installation on fresh project (NOW READY!)
+3. [ ] **Priority 3:** Continue Phase 6 - Run QA workflow
+
+---
+
 ## Session Template for Future Entries
 
 ```markdown

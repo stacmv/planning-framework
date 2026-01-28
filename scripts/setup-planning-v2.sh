@@ -13,7 +13,9 @@ NC='\033[0m' # No Color
 
 # Script directory (where templates are located)
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-TEMPLATE_DIR="$(dirname "$SCRIPT_DIR")/docs/planning/templates"
+FRAMEWORK_ROOT="$(dirname "$SCRIPT_DIR")"
+TEMPLATE_DIR="$FRAMEWORK_ROOT/docs/planning/templates"
+SCRIPTS_SOURCE="$SCRIPT_DIR"
 
 # Check if templates exist
 if [ ! -d "$TEMPLATE_DIR" ]; then
@@ -104,19 +106,63 @@ echo ""
 # 2. Create Folder Structure
 # ============================================================================
 
-echo -e "${BLUE}[1/6]${NC} Creating folder structure..."
+echo -e "${BLUE}[1/7]${NC} Creating folder structure..."
 
-mkdir -p docs/issues/open
-mkdir -p docs/issues/closed
-mkdir -p docs/planning
+mkdir -p planning/issues/open
+mkdir -p planning/issues/closed
+mkdir -p planning/scripts
+mkdir -p planning/templates
 
 echo -e "${GREEN}✓${NC} Folders created"
 
 # ============================================================================
-# 3. Copy and Customize PLANNING.md
+# 3. Copy Scripts
 # ============================================================================
 
-echo -e "${BLUE}[2/6]${NC} Creating PLANNING.md..."
+echo -e "${BLUE}[2/7]${NC} Copying helper scripts..."
+
+# Copy helper scripts to project
+for script in create-issue.sh close-issue.sh issue-status.sh; do
+    if [ -f "$SCRIPTS_SOURCE/$script" ]; then
+        cp "$SCRIPTS_SOURCE/$script" "planning/scripts/$script"
+        chmod +x "planning/scripts/$script"
+        echo -e "${GREEN}✓${NC} $script copied"
+    else
+        echo -e "${YELLOW}⚠${NC} $script not found, skipping"
+    fi
+done
+
+# Update script paths to work from new location
+# Scripts now expect templates at ../templates/ (relative to planning/scripts/)
+if [ -f "planning/scripts/create-issue.sh" ]; then
+    sed -i 's|TEMPLATE_DIR="$(dirname "$SCRIPT_DIR")/docs/planning/templates"|TEMPLATE_DIR="$(dirname "$SCRIPT_DIR")/templates"|g' "planning/scripts/create-issue.sh"
+    sed -i 's|docs/issues/|planning/issues/|g' "planning/scripts/create-issue.sh"
+fi
+
+if [ -f "planning/scripts/close-issue.sh" ]; then
+    sed -i 's|docs/issues/|planning/issues/|g' "planning/scripts/close-issue.sh"
+    sed -i 's|docs/planning/|planning/|g' "planning/scripts/close-issue.sh"
+fi
+
+if [ -f "planning/scripts/issue-status.sh" ]; then
+    sed -i 's|docs/issues/|planning/issues/|g' "planning/scripts/issue-status.sh"
+fi
+
+# ============================================================================
+# 4. Copy Templates
+# ============================================================================
+
+echo -e "${BLUE}[3/7]${NC} Copying templates..."
+
+# Copy all templates to project for reference
+cp -r "$TEMPLATE_DIR"/* "planning/templates/"
+echo -e "${GREEN}✓${NC} Templates copied"
+
+# ============================================================================
+# 5. Copy and Customize PLANNING.md
+# ============================================================================
+
+echo -e "${BLUE}[4/7]${NC} Creating PLANNING.md..."
 
 if [ -f "PLANNING.md" ]; then
     echo -e "${YELLOW}Warning: PLANNING.md already exists. Creating PLANNING.md.new${NC}"
@@ -132,17 +178,17 @@ CURRENT_DATE=$(date +%Y-%m-%d)
 sed -i "s/\[Project Name\]/$PROJECT_NAME/g" "$OUTPUT_FILE"
 sed -i "s/YYYY-MM-DD/$CURRENT_DATE/g" "$OUTPUT_FILE"
 
-# Update issue types section
-ISSUE_TYPES_FORMATTED=$(echo "$ISSUE_TYPES" | sed 's/,/`, `/g')
-sed -i "s/feat\`, \`bug\`, \`improve/feat\`, \`bug\`, \`improve/g" "$OUTPUT_FILE"
+# Update paths in PLANNING.md to new structure
+sed -i 's|docs/issues/|planning/issues/|g' "$OUTPUT_FILE"
+sed -i 's|docs/planning/|planning/|g' "$OUTPUT_FILE"
 
 echo -e "${GREEN}✓${NC} PLANNING.md created"
 
 # ============================================================================
-# 4. Copy and Customize .qa-workflow.md
+# 6. Copy and Customize .qa-workflow.md
 # ============================================================================
 
-echo -e "${BLUE}[3/6]${NC} Creating .qa-workflow.md..."
+echo -e "${BLUE}[5/7]${NC} Creating .qa-workflow.md..."
 
 if [ -f ".qa-workflow.md" ]; then
     echo -e "${YELLOW}Warning: .qa-workflow.md already exists. Creating .qa-workflow.md.new${NC}"
@@ -160,46 +206,63 @@ sed -i "s/YYYY-MM-DD/$CURRENT_DATE/g" "$QA_OUTPUT_FILE"
 echo -e "${GREEN}✓${NC} .qa-workflow.md created"
 
 # ============================================================================
-# 5. Initialize Global Planning Files
+# 7. Initialize Global Planning Files
 # ============================================================================
 
-echo -e "${BLUE}[4/6]${NC} Initializing global planning files..."
+echo -e "${BLUE}[6/7]${NC} Initializing global planning files..."
 
 # implementation-plan.md
-if [ ! -f "docs/planning/implementation-plan.md" ]; then
-    cp "$TEMPLATE_DIR/global/implementation-plan.md" "docs/planning/implementation-plan.md"
-    sed -i "s/\[Project Name\]/$PROJECT_NAME/g" "docs/planning/implementation-plan.md"
-    sed -i "s/YYYY-MM-DD/$CURRENT_DATE/g" "docs/planning/implementation-plan.md"
+if [ ! -f "planning/implementation-plan.md" ]; then
+    cp "$TEMPLATE_DIR/global/implementation-plan.md" "planning/implementation-plan.md"
+    sed -i "s/\[Project Name\]/$PROJECT_NAME/g" "planning/implementation-plan.md"
+    sed -i "s/YYYY-MM-DD/$CURRENT_DATE/g" "planning/implementation-plan.md"
+    sed -i 's|docs/issues/|planning/issues/|g' "planning/implementation-plan.md"
     echo -e "${GREEN}✓${NC} implementation-plan.md created"
 else
     echo -e "${YELLOW}⚠${NC} implementation-plan.md already exists, skipping"
 fi
 
 # session-log.md
-if [ ! -f "docs/planning/session-log.md" ]; then
-    cp "$TEMPLATE_DIR/global/session-log.md" "docs/planning/session-log.md"
-    sed -i "s/\[Project Name\]/$PROJECT_NAME/g" "docs/planning/session-log.md"
-    sed -i "s/YYYY-MM-DD/$CURRENT_DATE/g" "docs/planning/session-log.md"
+if [ ! -f "planning/session-log.md" ]; then
+    cp "$TEMPLATE_DIR/global/session-log.md" "planning/session-log.md"
+    sed -i "s/\[Project Name\]/$PROJECT_NAME/g" "planning/session-log.md"
+    sed -i "s/YYYY-MM-DD/$CURRENT_DATE/g" "planning/session-log.md"
+    sed -i 's|docs/issues/|planning/issues/|g' "planning/session-log.md"
     echo -e "${GREEN}✓${NC} session-log.md created"
 else
     echo -e "${YELLOW}⚠${NC} session-log.md already exists, skipping"
 fi
 
 # decisions.md
-if [ ! -f "docs/planning/decisions.md" ]; then
-    cp "$TEMPLATE_DIR/global/decisions.md" "docs/planning/decisions.md"
-    sed -i "s/\[Project Name\]/$PROJECT_NAME/g" "docs/planning/decisions.md"
-    sed -i "s/YYYY-MM-DD/$CURRENT_DATE/g" "docs/planning/decisions.md"
+if [ ! -f "planning/decisions.md" ]; then
+    cp "$TEMPLATE_DIR/global/decisions.md" "planning/decisions.md"
+    sed -i "s/\[Project Name\]/$PROJECT_NAME/g" "planning/decisions.md"
+    sed -i "s/YYYY-MM-DD/$CURRENT_DATE/g" "planning/decisions.md"
     echo -e "${GREEN}✓${NC} decisions.md created"
 else
     echo -e "${YELLOW}⚠${NC} decisions.md already exists, skipping"
 fi
 
+# Copy FRAMEWORK.md guide
+if [ ! -f "planning/FRAMEWORK.md" ]; then
+    if [ -f "$FRAMEWORK_ROOT/docs/planning/FRAMEWORK.md" ]; then
+        cp "$FRAMEWORK_ROOT/docs/planning/FRAMEWORK.md" "planning/FRAMEWORK.md"
+        # Update paths in FRAMEWORK.md
+        sed -i 's|docs/issues/|planning/issues/|g' "planning/FRAMEWORK.md"
+        sed -i 's|docs/planning/|planning/|g' "planning/FRAMEWORK.md"
+        echo -e "${GREEN}✓${NC} FRAMEWORK.md copied"
+    else
+        echo -e "${YELLOW}⚠${NC} FRAMEWORK.md not found in source, skipping"
+    fi
+else
+    echo -e "${YELLOW}⚠${NC} FRAMEWORK.md already exists, skipping"
+fi
+
 # ============================================================================
-# 6. Create .gitignore entries (optional)
+# 8. Create .gitignore entries (optional)
 # ============================================================================
 
-echo -e "${BLUE}[5/6]${NC} Checking .gitignore..."
+echo -e "${BLUE}[7/7]${NC} Checking .gitignore..."
 
 if [ -f ".gitignore" ]; then
     if ! grep -q "# Planning Framework" .gitignore 2>/dev/null; then
@@ -207,8 +270,7 @@ if [ -f ".gitignore" ]; then
 
 # Planning Framework v2.0
 # Uncomment if you want to keep planning files private:
-# docs/issues/
-# docs/planning/
+# planning/
 # PLANNING.md
 # .qa-workflow.md
 EOF
@@ -221,10 +283,9 @@ else
 fi
 
 # ============================================================================
-# 7. Success Message
+# 9. Success Message
 # ============================================================================
 
-echo -e "${BLUE}[6/6]${NC} Setup complete!"
 echo ""
 echo -e "${GREEN}╔════════════════════════════════════════════════════════════╗${NC}"
 echo -e "${GREEN}║              Setup Successful! 🎉                          ║${NC}"
@@ -233,29 +294,34 @@ echo ""
 echo -e "${YELLOW}Files created:${NC}"
 echo "  ✓ $OUTPUT_FILE"
 echo "  ✓ $QA_OUTPUT_FILE"
-echo "  ✓ docs/issues/open/"
-echo "  ✓ docs/issues/closed/"
-echo "  ✓ docs/planning/implementation-plan.md"
-echo "  ✓ docs/planning/session-log.md"
-echo "  ✓ docs/planning/decisions.md"
+echo "  ✓ planning/issues/open/"
+echo "  ✓ planning/issues/closed/"
+echo "  ✓ planning/scripts/ (create-issue, close-issue, issue-status)"
+echo "  ✓ planning/templates/ (all templates)"
+echo "  ✓ planning/implementation-plan.md"
+echo "  ✓ planning/session-log.md"
+echo "  ✓ planning/decisions.md"
+echo "  ✓ planning/FRAMEWORK.md"
 echo ""
 echo -e "${YELLOW}Next steps:${NC}"
 echo ""
 echo "  1. Review and customize:"
 echo "     - $OUTPUT_FILE (framework config)"
 echo "     - $QA_OUTPUT_FILE (QA requirements)"
-echo "     - docs/planning/implementation-plan.md (roadmap)"
+echo "     - planning/implementation-plan.md (roadmap)"
 echo ""
 echo "  2. Commit the framework files:"
 echo "     git add ."
 echo "     git commit -m \"Setup Planning Framework v2.0\""
 echo ""
 echo "  3. Create your first issue:"
-echo "     Ask your AI agent to create an issue for your first task"
+echo "     planning/scripts/create-issue.sh"
+echo "     # Or ask your AI agent to create an issue"
 echo ""
 echo "  4. Read the documentation:"
 echo "     - PLANNING.md - Complete framework guide"
-echo "     - docs/planning/templates/README.md - Template usage"
+echo "     - planning/FRAMEWORK.md - Detailed reference"
+echo "     - planning/templates/README.md - Template usage"
 echo ""
 echo -e "${BLUE}Happy coding with Planning Framework v2.0! 🚀${NC}"
 echo ""

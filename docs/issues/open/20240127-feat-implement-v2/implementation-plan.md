@@ -84,6 +84,17 @@ Implement complete Planning Framework v2.0 with templates, scripts, and document
 - [x] Documented behavior in PLANNING.md "Working with Issue Branches"
 - [x] Added troubleshooting guidance for status checking
 
+### 3.5 Cleaner Folder Structure (Self-Contained Projects)
+- [x] Identified usability issue - scripts/templates not in target project
+- [x] Designed cleaner structure: all framework files in `planning/` folder
+- [x] Updated `setup-planning-v2.sh`:
+  - [x] Copy scripts to `planning/scripts/` in target project
+  - [x] Copy templates to `planning/templates/` in target project
+  - [x] Copy FRAMEWORK.md to `planning/` in target project
+  - [x] Create `planning/issues/`, not `docs/issues/`
+  - [x] Path replacements in copied scripts (sed automation)
+- [x] New structure: Root has PLANNING.md + .qa-workflow.md, everything else in `planning/`
+
 ---
 
 ## Phase 4: Documentation ✅ COMPLETE
@@ -206,12 +217,12 @@ This issue is complete when:
 
 **Phase 1:** ✅ Complete (5/5 tasks)
 **Phase 2:** ✅ Complete (12/12 tasks)
-**Phase 3:** ✅ Complete (18/19 tasks) - Testing deferred to Phase 6
+**Phase 3:** ✅ Complete (27/28 tasks) - Testing deferred to Phase 6
 **Phase 4:** ✅ Complete (6/10 tasks) - Examples deferred (dogfooding serves as examples)
 **Phase 5:** ✅ Complete (5/6 tasks) - QA & closure in Phase 6
 **Phase 6:** ⏸️ Not Started (0/10 tasks) - Testing, QA, release
 
-**Overall:** 46/52 tasks complete (88%) - 4 tasks deferred, 2 in Phase 6
+**Overall:** 55/61 tasks complete (90%) - 4 tasks deferred, 2 in Phase 6
 
 ---
 
