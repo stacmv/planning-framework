@@ -73,8 +73,16 @@ Implement complete Planning Framework v2.0 with templates, scripts, and document
 ### 3.3 Helper Scripts (Optional)
 - [x] `scripts/create-issue.sh` - Manual issue creation
 - [x] `scripts/close-issue.sh` - Issue closure automation
+- [x] `scripts/issue-status.sh` - Check issue progress from remote branch
 - [x] Made all scripts executable
 - [ ] Test all scripts on clean environment (deferred to Phase 6)
+
+### 3.4 Branch Synchronization Solution
+- [x] Identified synchronization issue (branch vs parent status)
+- [x] Designed Hybrid Solution (1 + 5)
+- [x] Created `scripts/issue-status.sh` for checking remote progress
+- [x] Documented behavior in PLANNING.md "Working with Issue Branches"
+- [x] Added troubleshooting guidance for status checking
 
 ---
 
@@ -198,12 +206,12 @@ This issue is complete when:
 
 **Phase 1:** ✅ Complete (5/5 tasks)
 **Phase 2:** ✅ Complete (12/12 tasks)
-**Phase 3:** ✅ Complete (13/14 tasks) - Testing deferred to Phase 6
+**Phase 3:** ✅ Complete (18/19 tasks) - Testing deferred to Phase 6
 **Phase 4:** ✅ Complete (6/10 tasks) - Examples deferred (dogfooding serves as examples)
 **Phase 5:** ✅ Complete (5/6 tasks) - QA & closure in Phase 6
 **Phase 6:** ⏸️ Not Started (0/10 tasks) - Testing, QA, release
 
-**Overall:** 41/47 tasks complete (87%) - 4 tasks deferred, 2 in Phase 6
+**Overall:** 46/52 tasks complete (88%) - 4 tasks deferred, 2 in Phase 6
 
 ---
 

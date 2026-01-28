@@ -264,6 +264,82 @@ Co-Authored-By: Claude Sonnet 4.5 <noreply@anthropic.com>"
 
 ---
 
+## Working with Issue Branches
+
+### Understanding Issue Status Synchronization
+
+**Important:** Active issues on branches may have more progress than visible on the parent branch (develop/main).
+
+**Why this happens:**
+- Issues are developed in isolated branches (`issue/YYYYMMDD-type-slug`)
+- Issue files (`implementation-plan.md`, `session-log.md`) exist only on the issue branch
+- Parent branch doesn't see changes until issue is merged
+- Global `implementation-plan.md` on parent may be stale
+
+**This is by design:**
+- ✅ Prevents merge conflicts across feature branches
+- ✅ Keeps context isolated per issue
+- ✅ Parent branch shows roadmap, not real-time status
+- ✅ Real status synchronizes only at issue closure
+
+### Checking Real-Time Issue Status
+
+**Method 1: Use status script (recommended)**
+```bash
+./scripts/issue-status.sh YYYYMMDD-type-slug
+```
+
+This shows:
+- Commits ahead of parent
+- Last commit info
+- Progress tracking (%)
+- Recent activity
+- Quick actions
+
+**Method 2: View files from remote branch**
+```bash
+# Fetch latest
+git fetch origin
+
+# View implementation plan
+git show origin/issue/YYYYMMDD-type-slug:docs/issues/open/YYYYMMDD-type-slug/implementation-plan.md
+
+# View session log
+git show origin/issue/YYYYMMDD-type-slug:docs/issues/open/YYYYMMDD-type-slug/session-log.md
+
+# View all changes
+git diff develop...origin/issue/YYYYMMDD-type-slug
+```
+
+**Method 3: Checkout issue branch**
+```bash
+# Fetch and checkout
+git fetch origin
+git checkout -b issue/YYYYMMDD-type-slug --track origin/issue/YYYYMMDD-type-slug
+
+# Read files normally
+cat docs/issues/open/YYYYMMDD-type-slug/implementation-plan.md
+```
+
+### Global vs Issue Status
+
+**Global files (on parent branch):**
+- `docs/planning/implementation-plan.md` - Roadmap + issue links
+- `docs/planning/session-log.md` - One-line entries when issues close
+- Shows high-level plan, not execution details
+
+**Issue files (on issue branch):**
+- `docs/issues/open/YYYYMMDD-type-slug/implementation-plan.md` - Detailed tasks
+- `docs/issues/open/YYYYMMDD-type-slug/session-log.md` - Session-by-session progress
+- Real-time status during development
+
+**When status synchronizes:**
+- Issue closure: Global files updated with summary
+- Issue merge: All changes integrate to parent
+- Before closure: Check issue branch for current state
+
+---
+
 ## Project-Specific Configuration
 
 ### Issue Types
