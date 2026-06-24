@@ -22,9 +22,7 @@ Output:
 Planning Framework v<VERSION>
 No open issues found.
 
-To create an issue:
-  mkdir docs/issues/open/YYYYMMDD-type-slug/
-  # then add prompt.md describing the task
+Tell me what you want to build or fix and I'll create the issue folder and prompt.md for you.
 ```
 Stop here.
 
@@ -99,12 +97,12 @@ CREATE → /pf-brd → BRD → /pf-check → (check passes) → /pf-test-plan �
 
 ### bug workflow
 ```
-CREATE → (write analysis.md manually) → ANALYSIS → /pf-check → (check passes) → /pf-test-plan → TEST_PLAN → /pf-check → (check passes) → /pf-impl-plan → IMPL_PLAN → /pf-execute
+CREATE → ANALYSIS → /pf-check → (check passes) → /pf-test-plan → TEST_PLAN → /pf-check → (check passes) → /pf-impl-plan → IMPL_PLAN → /pf-execute
 ```
 
 | Last completed stage | Next step |
 |---|---|
-| CREATE only (no analysis.md) | Write `analysis.md` manually inside the issue folder describing root cause |
+| CREATE only (no analysis.md) | Ask the user to describe the bug, then write `analysis.md` (root cause, reproduction steps, impact) to the issue folder |
 | ANALYSIS present | `/pf-check` |
 | ANALYSIS + check passed | `/pf-test-plan` |
 | TEST_PLAN | `/pf-check` |
@@ -124,10 +122,10 @@ Completed stages: <STAGE1>, <STAGE2>, ...
 Next step: /<next-command>
 ```
 
-If no stages are completed yet (only the folder exists with no documents), show:
+If no stages are completed yet (only the folder exists with no documents), ask the user to describe the task, then create `prompt.md` in the issue folder and show:
 ```
 Planning Framework v<VERSION>
 Active issue: <ISSUE-ID>  (type: feat/improve/bug)
-Completed stages: (none)
-Next step: Add prompt.md to the issue folder to begin
+Completed stages: (none — prompt.md created)
+Next step: /pf-brd
 ```
