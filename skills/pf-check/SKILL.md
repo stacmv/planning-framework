@@ -13,5 +13,12 @@ Read `docs/issues/open/[ISSUE-ID]/specs.md` (or the most recently produced docum
 
 Group findings by priority: P0 (blocker), P1 (important), P2 (minor).
 
-Then ask: shall we address all the P0 and P1 issues?
-If yes: update the document. Use the AskUserQuestion tool to ask clarifying questions until you are 95% confident. For each question, add your recommendation (with reason why) below the options.
+Then use AskUserQuestion to present these options:
+
+**"How would you like to proceed?"**
+- **Fix now** — I'll address all P0 and P1 issues and update the document. I'll ask you clarifying questions where needed.
+- **I'll fix manually** — You'll edit the document yourself, then run /pf-check again to re-verify.
+- **Skip and continue** — Proceed to the next pipeline stage despite the issues (not recommended for P0).
+
+If "Fix now": update the document. Use AskUserQuestion to ask clarifying questions until you are 95% confident. For each question, add your recommendation (with reason why) below the options.
+If "I'll fix manually" or "Skip and continue": confirm the choice and state the next /pf-* command to run.
