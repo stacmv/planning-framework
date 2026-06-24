@@ -1,22 +1,44 @@
-# Planning Framework v2.0
+# Planning Framework v3.0
 
 > **Issue-based workflow for AI-assisted development across sessions and branches**
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
-[![Version](https://img.shields.io/badge/version-2.0.0-blue.svg)](docs/planning/FRAMEWORK.md)
+[![Version](https://img.shields.io/badge/version-3.0.0-blue.svg)](docs/planning/FRAMEWORK.md)
+
+---
+
+## What's New in v3.0
+
+**Skills-Based Workflow** - Run `/pf` to see active issue status and your next step — no manual file reads to orient
+**BRD Pipeline** - feat/improve issues follow BRD → spec → test plan → implementation plan before any code
+**Pipeline Enforcement** - Skills refuse to run if prerequisites are missing, keeping documents consistent
+**`/pf-check`** - Verifies consistency across all pipeline documents at any point
+**`scripts/update-skills.sh`** - Propagate skill updates to all consumer projects from one place
+
+### Skill Commands
+
+| Command | Purpose |
+|---------|---------|
+| `/pf` | Show active issue status and next step |
+| `/pf-brd` | Create Business Requirements Document for an issue |
+| `/pf-spec` | Generate spec from BRD |
+| `/pf-check` | Verify consistency between pipeline documents |
+| `/pf-test-plan` | Generate test plan from spec |
+| `/pf-impl-plan` | Generate implementation plan from test plan |
+| `/pf-execute` | Begin implementation (requires complete pipeline) |
+
+### Upgrading from v2.0?
+See **[MIGRATION-GUIDE.md](docs/planning/MIGRATION-GUIDE.md)** for step-by-step instructions, or run `./scripts/migrate-v2-to-v3.sh`.
 
 ---
 
 ## What's New in v2.0
 
-**✨ Issue-Based Workflow** - Each task gets its own folder with complete context
-**🎯 Bounded File Sizes** - Global files stay small, execution details in issues
-**🚫 No Merge Conflicts** - Issue folders are branch-specific
-**🤖 Multi-Agent Support** - Single config for Claude/Gemini/Qwen
-**✅ Quality Gates** - Built-in QA workflow
-
-### Upgrading from v1.0?
-See **[MIGRATION-GUIDE.md](docs/planning/MIGRATION-GUIDE.md)** for step-by-step instructions.
+**Issue-Based Workflow** - Each task gets its own folder with complete context
+**Bounded File Sizes** - Global files stay small, execution details in issues
+**No Merge Conflicts** - Issue folders are branch-specific
+**Multi-Agent Support** - Single config for Claude/Gemini/Qwen
+**Quality Gates** - Built-in QA workflow
 
 ---
 
@@ -48,24 +70,24 @@ Planning Framework v2.0 uses an **issue-based workflow**:
 git clone https://github.com/[your-org]/planning-framework
 cd planning-framework
 
-# 2. Run interactive setup
-./scripts/setup-planning-v2.sh
+# 2. Run interactive setup (installs framework + skills)
+./scripts/setup-planning-v3.sh
 # Follow prompts: project name, issue types, QA requirements
 
 # 3. Commit the framework
 git add .
-git commit -m "Setup Planning Framework v2.0"
+git commit -m "Setup Planning Framework v3.0"
 
 # 4. Create first issue
 # Ask your AI agent: "Create an issue to [add feature]"
 ```
 
-### For Existing v1.0 Projects
+### For Existing v2.0 Projects
 
 ```bash
-# Migrate from v1.0 to v2.0
-./scripts/migrate-v1-to-v2.sh
-# Backs up v1.0, creates v2.0 structure, generates report
+# Migrate from v2.0 to v3.0
+./scripts/migrate-v2-to-v3.sh
+# Backs up v2.0, installs skills, updates structure, generates report
 ```
 
 **See [QUICKSTART.md](docs/planning/QUICKSTART.md) for complete 5-minute guide.**
@@ -190,18 +212,17 @@ Session logs track which agent did what:
 
 **Setup:**
 ```bash
-./scripts/setup-planning-v2.sh      # Interactive setup
+./scripts/setup-planning-v3.sh      # Interactive setup (includes skills)
 ```
 
 **Migration:**
 ```bash
-./scripts/migrate-v1-to-v2.sh       # Migrate from v1.0
+./scripts/migrate-v2-to-v3.sh       # Migrate from v2.0
 ```
 
-**Helpers:**
+**Skills maintenance:**
 ```bash
-./scripts/create-issue.sh           # Manual issue creation
-./scripts/close-issue.sh            # Issue closure automation
+./scripts/update-skills.sh          # Propagate skill updates to consumer projects
 ```
 
 All scripts:
@@ -345,21 +366,28 @@ MIT License - Use freely in any project. See [LICENSE](LICENSE) for details.
 
 ## Version History
 
-- **v2.0.0** (2024-01-27) - Issue-Based Workflow
-  - 🎯 Issue-based workflow (each task in its own folder)
-  - 📏 Bounded file sizes (global files stay small)
-  - 🚫 No merge conflicts (branch-specific issues)
-  - 🤖 Multi-agent support (single PLANNING.md)
-  - ✅ Built-in QA workflow
-  - 🔧 Automation scripts (setup, migration, helpers)
-  - 📖 Comprehensive documentation
+- **v3.0.0** (2026-06-24) - Skills-Based Workflow
+  - 7 Claude Code skills (`/pf`, `/pf-brd`, `/pf-spec`, `/pf-check`, `/pf-test-plan`, `/pf-impl-plan`, `/pf-execute`)
+  - BRD → spec → test plan → implementation plan pipeline
+  - Pipeline enforcement (prerequisites checked by skills)
+  - `scripts/setup-planning-v3.sh` and `scripts/update-skills.sh`
   - See [CHANGELOG.md](CHANGELOG.md) for details
 
-- **v1.1.0** (2024-11-12) - Time Estimation Removal
+- **v2.0.0** (2026-01-28) - Issue-Based Workflow
+  - Issue-based workflow (each task in its own folder)
+  - Bounded file sizes (global files stay small)
+  - No merge conflicts (branch-specific issues)
+  - Multi-agent support (single PLANNING.md)
+  - Built-in QA workflow
+  - Automation scripts (setup, migration, helpers)
+  - Comprehensive documentation
+  - See [CHANGELOG.md](CHANGELOG.md) for details
+
+- **v1.1.0** (2025-11-12) - Time Estimation Removal
   - Remove time estimation fields
   - Update templates and documentation
 
-- **v1.0.0** (2024-11-05) - Initial Release
+- **v1.0.0** (2025-11-05) - Initial Release
   - Core templates (PRD, Implementation Plan, Session Log, Decisions)
   - Setup scripts
   - CLAUDE.md integration
@@ -368,4 +396,4 @@ MIT License - Use freely in any project. See [LICENSE](LICENSE) for details.
 
 **Star this repo if it helps your project! ⭐**
 
-**Planning Framework v2.0 - Build better with AI assistance** 🚀
+**Planning Framework v3.0 - Build better with AI assistance** 🚀

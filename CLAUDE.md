@@ -1,8 +1,8 @@
-# Planning Framework v2.0 - Claude Code Integration
+# Planning Framework v3.0 - Claude Code Integration
 
-**⚠️ Important: This project uses Planning Framework v2.0**
+**⚠️ Important: This project uses Planning Framework v3.0**
 
-Planning Framework v2.0 uses **`PLANNING.md`** for all AI agents (Claude, Gemini, Qwen).
+Planning Framework v3.0 uses **`PLANNING.md`** for all AI agents (Claude, Gemini, Qwen).
 
 👉 **Read `PLANNING.md` for complete framework instructions.**
 
@@ -10,56 +10,41 @@ Planning Framework v2.0 uses **`PLANNING.md`** for all AI agents (Claude, Gemini
 
 ## Quick Migration Note
 
-**v1.0 → v2.0 Changes:**
-- `CLAUDE.md` → `PLANNING.md` (multi-agent support)
-- Global files → Issue-based workflow
+**v2.0 → v3.0 Changes:**
+- Skills-based workflow via `/pf` and related commands
+- BRD → spec → test plan → implementation plan pipeline
+- `skills/` directory with 7 Claude Code skills
 - See `PLANNING.md` for new workflow
 
-**For v1.0 projects:** Run `./scripts/migrate-v1-to-v2.sh` to upgrade.
+**For v2.0 projects:** Run `./scripts/migrate-v2-to-v3.sh` to upgrade.
 
 ---
 
-## What's New in v2.0
+## What's New in v3.0
 
-**Issue-Based Workflow:**
-- Each task gets its own issue folder
-- Complete context in: `docs/issues/open/YYYYMMDD-type-slug/`
-- Global files stay small (roadmap only)
+**Skills-Based Workflow:**
+- Run `/pf` to see active issue status and next step
+- BRD → spec → test plan → implementation plan pipeline for feat/improve issues
+- `/pf-check` verifies consistency between pipeline documents
+- Skills enforce prerequisites — each step requires the previous one
 
 **Key Files:**
 - `PLANNING.md` - Framework instructions (**READ THIS**)
 - `.qa-workflow.md` - QA requirements
+- `skills/` - Claude Code skills (`/pf`, `/pf-brd`, `/pf-spec`, `/pf-check`, `/pf-test-plan`, `/pf-impl-plan`, `/pf-execute`)
 - `docs/planning/implementation-plan.md` - Roadmap
 - `docs/planning/session-log.md` - Timeline
 - `docs/planning/decisions.md` - Architectural decisions
 
 ---
 
-## Session Start (v2.0)
+## Session Start (v3.0)
 
-**1. Read framework config:**
-```bash
-cat PLANNING.md
-```
+**Run `/pf` to see active issue status and next step.**
 
-**2. Read global context:**
-```bash
-tail -20 docs/planning/session-log.md
-cat docs/planning/implementation-plan.md
-```
+The `/pf` skill reads your active issue, shows current pipeline stage, and tells you what to do next. No manual file reads needed to orient yourself.
 
-**3. If working on issue, read:**
-```bash
-cat docs/issues/open/[issue-id]/prompt.md
-cat docs/issues/open/[issue-id]/analysis.md
-cat docs/issues/open/[issue-id]/implementation-plan.md
-cat docs/issues/open/[issue-id]/session-log.md
-```
-
-**4. Read project decisions:**
-```bash
-cat docs/planning/decisions.md
-```
+For full framework details, see `PLANNING.md`.
 
 ---
 
@@ -80,11 +65,11 @@ CREATE → ANALYZE → PLAN → IMPLEMENT → QA → CLOSE
 
 ---
 
-## Session End (v2.0)
+## Session End (v3.0)
 
 **If working on issue:**
 - [ ] Update issue `session-log.md`
-- [ ] Check off completed tasks in issue `implementation-plan.md`
+- [ ] Check off completed tasks in issue `implementation_plan.md`
 - [ ] Note blockers and next priorities
 - [ ] Commit changes
 
@@ -105,22 +90,22 @@ CREATE → ANALYZE → PLAN → IMPLEMENT → QA → CLOSE
 - **[PLANNING.md](PLANNING.md)** - **START HERE** - Complete framework config
 - **[FRAMEWORK.md](docs/planning/FRAMEWORK.md)** - Full documentation
 - **[QUICKSTART.md](docs/planning/QUICKSTART.md)** - 5-minute guide
-- **[MIGRATION-GUIDE.md](docs/planning/MIGRATION-GUIDE.md)** - v1.0 → v2.0 upgrade
+- **[MIGRATION-GUIDE.md](docs/planning/MIGRATION-GUIDE.md)** - v2.0 → v3.0 upgrade
 
 ---
 
-## For Projects Using v1.0
+## For Projects Using v2.0
 
-This file kept for backwards compatibility. New v2.0 projects use `PLANNING.md`.
+This file kept for backwards compatibility. New v3.0 projects use `PLANNING.md`.
 
-**To upgrade your v1.0 project:**
+**To upgrade your v2.0 project:**
 ```bash
-./scripts/migrate-v1-to-v2.sh
+./scripts/migrate-v2-to-v3.sh
 ```
 
 ---
 
-**Framework Version:** 2.0.0
-**Last Updated:** 2024-01-27
+**Framework Version:** 3.0.0
+**Last Updated:** 2026-06-24
 
 **👉 Read `PLANNING.md` for complete instructions.**

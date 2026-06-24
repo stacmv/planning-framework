@@ -1,16 +1,16 @@
-# Planning Framework v2.0 - Quick Start
+# Planning Framework v3.0 - Quick Start
 
 **Get started in 5 minutes**
-**Version:** 2.0.0
-**Last Updated:** 2024-01-27
+**Version:** 3.0.0
+**Last Updated:** 2026-06-24
 
 ---
 
 ## What is Planning Framework?
 
-Planning Framework v2.0 helps AI agents work on your project across multiple sessions without losing context.
+Planning Framework v3.0 helps AI agents work on your project across multiple sessions without losing context. v3.0 adds a skills layer for Claude Code that enforces a document pipeline before any implementation starts.
 
-**Key idea:** Each task gets its own **issue folder** with complete context (request, plan, progress). Global files stay small. No merge conflicts.
+**Key idea:** Each task gets its own **issue folder** with a pipeline of documents (BRD → spec → test plan → implementation plan → progress). Global files stay small. No merge conflicts.
 
 **Perfect for:** AI-assisted development with Claude Code, Gemini CLI, Qwen Code, or other AI agents.
 
@@ -24,18 +24,19 @@ Planning Framework v2.0 helps AI agents work on your project across multiple ses
 # In your project directory
 git clone https://github.com/[your-org]/planning-framework /tmp/planning-fw
 cd /tmp/planning-fw
-./scripts/setup-planning-v2.sh
+./scripts/setup-planning-v3.sh
 ```
 
 Answer prompts:
 - Project name: `your-project`
-- Issue types: ` Enter` (use defaults: feat, bug, improve)
+- Issue types: `Enter` (use defaults: feat, bug, improve)
 - QA checks: `Enter` (use all)
 - Agent: `4` (all agents)
 
 **Created:**
 - `PLANNING.md` - Framework instructions
 - `.qa-workflow.md` - Quality gates
+- `skills/` - Claude Code skills (`/pf`, `/pf-brd`, `/pf-spec`, `/pf-check`, `/pf-test-plan`, `/pf-impl-plan`, `/pf-execute`)
 - `docs/issues/open/` and `/closed/` - Issue folders
 - `docs/planning/` - Global planning files
 
@@ -43,7 +44,7 @@ Answer prompts:
 
 ```bash
 git add .
-git commit -m "Setup Planning Framework v2.0"
+git commit -m "Setup Planning Framework v3.0"
 ```
 
 ### Step 3: Create First Issue (2 min)
@@ -75,20 +76,31 @@ Agent follows workflow automatically:
 
 ## Core Workflow
 
-### Issue Lifecycle
+### 5-Minute Workflow (Claude Code with Skills)
 
 ```
-USER REQUEST
-    ↓
-CREATE ISSUE (agent asks if non-trivial)
-    ↓
-ANALYZE (understand problem, plan approach)
-    ↓
-IMPLEMENT (work through tasks, track progress)
-    ↓
-QA (run quality checks - must pass!)
-    ↓
-CLOSE (merge, archive, update global logs)
+/pf                  ← See active issue and next step
+/pf-brd              ← Create BRD (feat/improve)
+/pf-check            ← Verify BRD is complete
+/pf-spec             ← Generate spec from BRD
+/pf-check            ← Verify spec matches BRD
+/pf-test-plan        ← Generate test plan from spec
+/pf-impl-plan        ← Generate implementation plan
+/pf-execute          ← Begin implementation
+```
+
+Each skill checks that the previous step is done before proceeding.
+
+### Issue Lifecycle
+
+**feat / improve:**
+```
+CREATE → BRD → SPEC → TEST PLAN → IMPL PLAN → IMPLEMENT → QA → CLOSE
+```
+
+**bug:**
+```
+CREATE → ANALYZE → TEST PLAN → IMPL PLAN → IMPLEMENT → QA → CLOSE
 ```
 
 ### File Structure
@@ -97,14 +109,17 @@ CLOSE (merge, archive, update global logs)
 your-project/
 ├── PLANNING.md                      # Read this first!
 ├── .qa-workflow.md                  # QA requirements
+├── skills/                          # Claude Code skills (/pf, /pf-brd, etc.)
 │
 ├── docs/
 │   ├── issues/
 │   │   ├── open/                    # Work in progress
 │   │   │   └── 20240127-feat-add-auth/
 │   │   │       ├── prompt.md        # Your request
-│   │   │       ├── analysis.md      # Agent's plan
-│   │   │       ├── implementation-plan.md  # Tasks
+│   │   │       ├── brd.md           # Business requirements (feat/improve)
+│   │   │       ├── specs.md         # Technical spec (feat/improve)
+│   │   │       ├── test_plan.md     # Test plan (all types)
+│   │   │       ├── implementation_plan.md  # Tasks
 │   │   │       └── session-log.md   # Progress
 │   │   │
 │   │   └── closed/                  # Done!
@@ -117,7 +132,10 @@ your-project/
 
 ### What Agents Do
 
-**Session Start:**
+**Session Start (Claude Code):**
+- Run `/pf` — reads active issue, shows stage and next step
+
+**Session Start (other agents):**
 1. Read `PLANNING.md` - Framework instructions
 2. Read issue files - Context for this task
 3. Read global `decisions.md` - Architectural choices
@@ -125,7 +143,7 @@ your-project/
 **During Work:**
 - Focus on ONE issue at a time
 - Update `session-log.md` after working
-- Check off tasks in `implementation-plan.md`
+- Check off tasks in `implementation_plan.md`
 - Document decisions if needed
 
 **Session End:**
@@ -152,13 +170,21 @@ your-project/
 - Type = feat, bug, improve (customizable)
 - Slug = readable description
 
-**Contains:**
+**Contains (feat/improve):**
 - `prompt.md` - Your original request
-- `analysis.md` - Agent's understanding
-- `implementation-plan.md` - Task checklist
+- `brd.md` - Business requirements
+- `specs.md` - Technical specification
+- `test_plan.md` - Test plan (required before implementation)
+- `implementation_plan.md` - Task checklist
 - `session-log.md` - Progress tracking
 - `decisions.md` (optional) - Decisions made
-- `definition-of-done.md` (optional) - Completion criteria
+
+**Contains (bug):**
+- `prompt.md` - Your original request
+- `analysis.md` - Root cause analysis
+- `test_plan.md` - Failing test + fix verification
+- `implementation_plan.md` - Task checklist
+- `session-log.md` - Progress tracking
 
 ### Branches
 
@@ -192,7 +218,19 @@ Details live in **issue folders**, not global files.
 
 ## Common Commands
 
-### For AI Agents
+### For Claude Code (Skills)
+
+```
+/pf                  Show active issue and next pipeline step
+/pf-brd              Create BRD for active feat/improve issue
+/pf-spec             Create spec from BRD
+/pf-check            Verify pipeline document consistency
+/pf-test-plan        Create test plan from spec or analysis
+/pf-impl-plan        Create implementation plan from test plan
+/pf-execute          Begin implementation
+```
+
+### For Other AI Agents
 
 ```bash
 # Session start - read context
@@ -202,14 +240,12 @@ cat docs/planning/implementation-plan.md
 
 # If working on issue
 cat docs/issues/open/[issue-id]/prompt.md
-cat docs/issues/open/[issue-id]/analysis.md
-cat docs/issues/open/[issue-id]/implementation-plan.md
+cat docs/issues/open/[issue-id]/brd.md         # or analysis.md for bugs
+cat docs/issues/open/[issue-id]/implementation_plan.md
 
-# Create issue (or ask agent)
-./scripts/create-issue.sh
-
-# Close issue (or ask agent)
-./scripts/close-issue.sh
+# Check issue progress
+ls docs/issues/open/[issue-id]/
+cat docs/issues/open/[issue-id]/session-log.md
 ```
 
 ### For Users
@@ -224,11 +260,8 @@ cat docs/issues/open/[issue-id]/session-log.md
 # See recent work
 tail -20 docs/planning/session-log.md
 
-# Create issue manually
-./scripts/create-issue.sh
-
-# Help agent close issue
-./scripts/close-issue.sh
+# Update skills in this project from framework source
+./scripts/update-skills.sh
 ```
 
 ---
@@ -250,15 +283,17 @@ tail -20 docs/planning/session-log.md
 ```
 docs/issues/open/20240127-feat-add-authentication/
 ├── prompt.md           "I need to add user authentication..."
-├── analysis.md         Problem understanding, approach
-└── implementation-plan.md   Broken into phases/tasks
+├── brd.md              Business requirements, user stories, success criteria
+├── specs.md            Technical design, API contracts, component breakdown
+├── test_plan.md        Test scenarios and acceptance criteria
+└── implementation_plan.md   Broken into phases/tasks
 ```
 
 ### Working on Issue
 
 **Agent:**
 1. Creates branch: `issue/20240127-feat-add-authentication`
-2. Works through `implementation-plan.md` tasks
+2. Works through `implementation_plan.md` tasks
 3. After session, updates `session-log.md`:
 
 ```markdown
@@ -359,6 +394,35 @@ Session logs track which agent did what:
 
 ---
 
+## Updating Skills
+
+When the framework publishes skill updates, pull them into your project:
+
+```bash
+./scripts/update-skills.sh
+```
+
+This copies the latest skill files from the framework source into your project's `skills/` directory. Commit the result to propagate the update to your team.
+
+---
+
+## Migrating from v2
+
+```bash
+./scripts/migrate-v2-to-v3.sh
+```
+
+This script:
+1. Backs up your current setup
+2. Installs the `skills/` directory
+3. Renames any `implementation-plan.md` files in issue folders to `implementation_plan.md`
+4. Updates `PLANNING.md` to v3.0 essentials
+5. Generates a migration report
+
+After migrating, existing open issues without a `brd.md` / `specs.md` will continue to work — the pipeline only applies to newly created issues. Bug issues follow the analysis + test plan path and are unaffected.
+
+---
+
 ## Troubleshooting
 
 ### "Agent doesn't understand framework"
@@ -425,18 +489,21 @@ Love Planning Framework? Share it:
 ## Quick Reference Card
 
 ```
-SETUP:       ./scripts/setup-planning-v2.sh
-CREATE:      Ask agent to create issue
-WORK:        Agent reads issue files, implements, updates progress
-QA:          Agent runs .qa-workflow.md
-CLOSE:       Agent merges, archives, updates global logs
+SETUP:       ./scripts/setup-planning-v3.sh
+MIGRATE v2:  ./scripts/migrate-v2-to-v3.sh
+UPDATE:      ./scripts/update-skills.sh
+
+SESSION:     /pf → shows status and next step (Claude Code)
+PIPELINE:    /pf-brd → /pf-spec → /pf-test-plan → /pf-impl-plan → /pf-execute
+CHECK:       /pf-check → verifies pipeline consistency
 
 FOLDER:      docs/issues/open/YYYYMMDD-type-slug/
 BRANCH:      issue/YYYYMMDD-type-slug
 NAMING:      Date-Type-Slug (e.g., 20240127-feat-add-auth)
 
-REQUIRED:    prompt.md, analysis.md, implementation-plan.md, session-log.md
-OPTIONAL:    decisions.md, definition-of-done.md
+feat/improve: prompt.md, brd.md, specs.md, test_plan.md, implementation_plan.md, session-log.md
+bug:          prompt.md, analysis.md, test_plan.md, implementation_plan.md, session-log.md
+optional:     decisions.md
 
 GLOBAL:      implementation-plan.md (roadmap, stays small!)
              session-log.md (one-line entries)
@@ -445,11 +512,11 @@ GLOBAL:      implementation-plan.md (roadmap, stays small!)
 
 ---
 
-**You're ready to use Planning Framework v2.0!**
+**You're ready to use Planning Framework v3.0!**
 
 Create your first issue and start building. 🚀
 
 ---
 
-**Version:** 2.0.0
-**Last Updated:** 2024-01-27
+**Version:** 3.0.0
+**Last Updated:** 2026-06-24

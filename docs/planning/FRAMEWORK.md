@@ -1,7 +1,7 @@
-# Planning Framework v2.0 - Complete Guide
+# Planning Framework v3.0 - Complete Guide
 
-**Version:** 2.0.0
-**Last Updated:** 2024-01-27
+**Version:** 3.0.0
+**Last Updated:** 2026-06-24
 
 ---
 
@@ -11,19 +11,21 @@
 2. [Getting Started](#getting-started)
 3. [Core Concepts](#core-concepts)
 4. [Issue Workflow](#issue-workflow)
-5. [File Structure](#file-structure)
-6. [Agent Guidelines](#agent-guidelines)
-7. [Best Practices](#best-practices)
-8. [Multi-Agent Support](#multi-agent-support)
-9. [Customization](#customization)
-10. [Troubleshooting](#troubleshooting)
-11. [FAQ](#faq)
+5. [Skills](#skills)
+6. [Pipeline Enforcement](#pipeline-enforcement)
+7. [File Structure](#file-structure)
+8. [Agent Guidelines](#agent-guidelines)
+9. [Best Practices](#best-practices)
+10. [Multi-Agent Support](#multi-agent-support)
+11. [Customization](#customization)
+12. [Troubleshooting](#troubleshooting)
+13. [FAQ](#faq)
 
 ---
 
 ## Overview
 
-Planning Framework v2.0 is an **issue-based workflow system** designed for AI-assisted development across multiple sessions and branches.
+Planning Framework v3.0 is an **issue-based workflow system** designed for AI-assisted development across multiple sessions and branches, with a skills layer for Claude Code that enforces a structured document pipeline.
 
 ### The Problem
 
@@ -32,16 +34,23 @@ When working with AI agents across multiple sessions:
 - Planning files grow unbounded
 - Feature branches conflict on shared planning docs
 - No structured way to track features/bugs
+- Implementation starts before requirements are clear
 
 ### The Solution
 
-Planning Framework v2.0 solves these problems through:
+Planning Framework v3.0 solves these problems through:
 
 **Issue-Based Workflow:**
 - Each task gets its own issue folder
-- Issues contain complete context (prompt, analysis, plan, progress)
+- Issues contain complete context (BRD, spec, test plan, implementation plan, progress)
 - Global files stay minimal (roadmap only)
 - No merge conflicts (issue folders are branch-specific)
+
+**Skills-Based Workflow (Claude Code):**
+- `/pf` shows active issue status and next step at session start
+- BRD → spec → test plan → implementation plan pipeline for feat/improve issues
+- Skills enforce prerequisites — each stage requires the prior one to exist
+- `/pf-check` verifies cross-document consistency at any point
 
 **Multi-Agent Support:**
 - Single `PLANNING.md` config works for Claude/Gemini/Qwen
@@ -50,8 +59,8 @@ Planning Framework v2.0 solves these problems through:
 
 **Quality Gates:**
 - `.qa-workflow.md` defines quality requirements
+- `test_plan.md` required before any implementation begins
 - QA must pass before closing issues
-- Separate requirements for features/bugs/improvements
 
 ### Key Benefits
 
@@ -59,7 +68,7 @@ Planning Framework v2.0 solves these problems through:
 ✅ **No Merge Conflicts** - Issue folders are branch-specific
 ✅ **Better Context** - Agent reads only relevant issue
 ✅ **Natural Archival** - Closed issues out of sight
-✅ **Clear Workflow** - 6-phase issue lifecycle
+✅ **Structured Pipeline** - Requirements before code
 ✅ **Multi-Agent** - Works with Claude Code, Gemini CLI, Qwen Code
 
 ---
@@ -75,24 +84,24 @@ Planning Framework v2.0 solves these problems through:
 git clone https://github.com/[your-org]/planning-framework
 cd planning-framework
 
-# 2. Run interactive setup
-./scripts/setup-planning-v2.sh
+# 2. Run interactive setup (installs framework + skills)
+./scripts/setup-planning-v3.sh
 # Follow prompts: project name, issue types, QA requirements
 
 # 3. Commit the framework
 git add .
-git commit -m "Setup Planning Framework v2.0"
+git commit -m "Setup Planning Framework v3.0"
 
 # 4. Start working!
-# Ask your AI agent to create your first issue
+# Ask your AI agent to create your first issue, or run /pf
 ```
 
-**For existing v1.0 projects:**
+**For existing v2.0 projects:**
 
 ```bash
-# Migrate from v1.0 to v2.0
-./scripts/migrate-v1-to-v2.sh
-# Backs up v1.0, creates v2.0 structure, generates report
+# Migrate from v2.0 to v3.0
+./scripts/migrate-v2-to-v3.sh
+# Backs up v2.0, installs skills, updates structure, generates report
 ```
 
 ### What Gets Created
@@ -176,11 +185,37 @@ docs/issues/open/20240127-feat-add-auth/
 
 ## Issue Workflow
 
-### Complete Lifecycle (6 Phases)
+### Document Sets by Issue Type
+
+Different issue types require different document sets:
+
+| Document | feat | improve | bug |
+|----------|------|---------|-----|
+| `prompt.md` | required | required | required |
+| `brd.md` | required | required | - |
+| `specs.md` | required | required | - |
+| `analysis.md` | - | - | required |
+| `test_plan.md` | required | required | required |
+| `implementation_plan.md` | required | required | required |
+| `session-log.md` | required | required | required |
+| `decisions.md` | optional | optional | optional |
+
+### Pipeline: feat / improve
 
 ```
-CREATE → ANALYZE → PLAN → IMPLEMENT → QA → CLOSE
+CREATE → BRD → SPEC → TEST PLAN → IMPLEMENTATION PLAN → IMPLEMENT → QA → CLOSE
 ```
+
+Use `/pf-brd`, `/pf-spec`, `/pf-test-plan`, `/pf-impl-plan`, `/pf-execute` in order.
+Run `/pf-check` at any point to verify consistency across documents.
+
+### Pipeline: bug
+
+```
+CREATE → ANALYZE → TEST PLAN → IMPLEMENTATION PLAN → IMPLEMENT → QA → CLOSE
+```
+
+Bugs skip BRD/spec and go straight to analysis + test plan (write the failing test first).
 
 ### Phase 1: Create
 
@@ -194,78 +229,73 @@ CREATE → ANALYZE → PLAN → IMPLEMENT → QA → CLOSE
 - For non-trivial work: Ask user "Should I create issue for this?"
 - For trivial fixes: Work directly, log in global session-log
 
-**Steps:**
 ```bash
-# Create issue folder
 mkdir docs/issues/open/20240127-feat-add-auth/
-
-# Create prompt.md
-# Paste user's original request
+# Create prompt.md with user's original request
 ```
 
-### Phase 2: Analyze
+### Phase 2: BRD (feat/improve) or Analyze (bug)
 
-**Fill out analysis.md:**
+**feat/improve — run `/pf-brd`:**
+
+Creates `brd.md` covering business requirements, user stories, success criteria, scope, and constraints.
+
+**bug — fill out `analysis.md`:**
 
 ```yaml
 ---
 created: 2024-01-27
-type: feat
-branch: issue/20240127-feat-add-auth
+type: bug
+branch: issue/20240127-bug-login-crash
 status: open
 ---
 ```
 
-**Analysis includes:**
-- Problem understanding
-- Proposed solution approach
-- Technical considerations
-- Dependencies and blockers
-- Risks & mitigations
-- Success criteria
+Analysis includes problem description, reproduction steps, root cause hypothesis, proposed fix, and risks.
 
-### Phase 3: Plan
+### Phase 3: Spec (feat/improve only)
 
-**Create implementation-plan.md:**
-- Break down into phases
-- Detailed task checklist
-- Component specifications
-- Progress tracking
+Run `/pf-spec` — creates `specs.md` from `brd.md`.
 
-**Optional: Create definition-of-done.md**
-- Detailed completion criteria
-- Test scenarios
-- Acceptance checklist
+Spec covers technical design, API contracts, data models, component breakdown, and non-functional requirements.
 
-### Phase 4: Implement
+### Phase 4: Test Plan
 
-**Start working:**
+Run `/pf-test-plan` — creates `test_plan.md` from `specs.md` (feat/improve) or `analysis.md` (bug).
+
+All issues require `test_plan.md` before implementation begins.
+
+### Phase 5: Implementation Plan
+
+Run `/pf-impl-plan` — creates `implementation_plan.md` from `test_plan.md`.
+
+Breaks work into phases with detailed task checklists. `/pf-execute` refuses to run without this file.
+
+### Phase 6: Implement
+
+Run `/pf-execute` or work manually:
 
 ```bash
-# Commit current changes
-git add . && git commit -m "..."
-
 # Create issue branch
 git checkout -b issue/20240127-feat-add-auth
 
-# Work through implementation-plan.md
+# Work through implementation_plan.md
 # Update session-log.md after each session
 ```
 
 **Rules:**
 - ✅ ONE issue per session (focused work)
 - ✅ Update session-log.md after each session
-- ✅ Check off tasks in implementation-plan.md
+- ✅ Check off tasks in implementation_plan.md
 - ✅ Document blockers immediately
 - ✅ Create decisions.md if architectural decisions made
 - ✅ Commit frequently with clear messages
 
-### Phase 5: QA
+### Phase 7: QA
 
 **Run QA workflow from `.qa-workflow.md`:**
 
 ```bash
-# Example
 npm run lint
 npm test
 npm run test:integration
@@ -276,16 +306,11 @@ npm run test:integration
 **Must pass:**
 - [ ] Linting/formatting
 - [ ] All existing tests pass
-- [ ] New tests added
+- [ ] New tests added (covering test_plan.md scenarios)
 - [ ] Documentation updated
 - [ ] (Bugs) Failing test created, then passes
 
-**If QA fails:**
-- Fix issues
-- Retry QA workflow
-- Don't close until all checks pass
-
-### Phase 6: Close
+### Phase 8: Close
 
 **Prerequisites:**
 - [ ] QA workflow passes
@@ -306,18 +331,51 @@ mv docs/issues/open/20240127-feat-add-auth docs/issues/closed/
 echo "[Claude Code] ✓ [20240127-feat-add-auth](../issues/closed/20240127-feat-add-auth/) - Added JWT authentication" >> docs/planning/session-log.md
 
 # 4. Promote significant decisions to global decisions.md
-# (Manual: copy important ADRs)
 
 # 5. Update global implementation-plan.md
-# (Mark milestone complete, update progress)
 
 # 6. Commit
 git add .
 git commit -m "Close issue 20240127-feat-add-auth: Added JWT authentication"
-
-# 7. Branch cleanup (manual)
-# git branch -d issue/20240127-feat-add-auth
 ```
+
+---
+
+## Skills
+
+Seven Claude Code skills live in the `skills/` directory and are installed into consumer projects by `setup-planning-v3.sh` and `update-skills.sh`.
+
+| Skill | Command | What it does |
+|-------|---------|-------------|
+| `pf.md` | `/pf` | Shows active issue, current pipeline stage, and next recommended action |
+| `pf-brd.md` | `/pf-brd` | Creates `brd.md` for a feat/improve issue |
+| `pf-spec.md` | `/pf-spec` | Creates `specs.md` from `brd.md` |
+| `pf-check.md` | `/pf-check` | Verifies consistency between all pipeline documents |
+| `pf-test-plan.md` | `/pf-test-plan` | Creates `test_plan.md` from `specs.md` or `analysis.md` |
+| `pf-impl-plan.md` | `/pf-impl-plan` | Creates `implementation_plan.md` from `test_plan.md` |
+| `pf-execute.md` | `/pf-execute` | Begins implementation; requires complete pipeline |
+
+### Updating Skills
+
+To propagate skill updates to all consumer projects registered with the framework:
+
+```bash
+./scripts/update-skills.sh
+```
+
+---
+
+## Pipeline Enforcement
+
+Skills check prerequisites before running:
+
+- `/pf-spec` requires `brd.md` to exist
+- `/pf-test-plan` requires `specs.md` (feat/improve) or `analysis.md` (bug)
+- `/pf-impl-plan` requires `test_plan.md`
+- `/pf-execute` requires `implementation_plan.md`
+- `/pf-check` reports any missing or inconsistent documents
+
+If a prerequisite is missing, the skill explains what needs to be done first rather than proceeding with incomplete context.
 
 ---
 
@@ -330,16 +388,27 @@ project/
 ├── PLANNING.md                          # Framework config
 ├── .qa-workflow.md                      # QA requirements
 │
+├── skills/                              # Claude Code skills
+│   ├── pf.md                            # /pf — status + next step
+│   ├── pf-brd.md                        # /pf-brd — create BRD
+│   ├── pf-spec.md                       # /pf-spec — create spec
+│   ├── pf-check.md                      # /pf-check — consistency check
+│   ├── pf-test-plan.md                  # /pf-test-plan — create test plan
+│   ├── pf-impl-plan.md                  # /pf-impl-plan — create impl plan
+│   └── pf-execute.md                    # /pf-execute — begin implementation
+│
 ├── docs/
 │   ├── issues/
 │   │   ├── open/                        # Active issues
 │   │   │   └── 20240127-feat-add-auth/
 │   │   │       ├── prompt.md            # Original request
-│   │   │       ├── analysis.md          # Understanding + metadata
-│   │   │       ├── implementation-plan.md  # Task breakdown
+│   │   │       ├── brd.md               # Business requirements (feat/improve)
+│   │   │       ├── specs.md             # Technical spec (feat/improve)
+│   │   │       ├── analysis.md          # Analysis (bug)
+│   │   │       ├── test_plan.md         # Test plan (all types)
+│   │   │       ├── implementation_plan.md  # Task breakdown
 │   │   │       ├── session-log.md       # Progress log
-│   │   │       ├── decisions.md         # (optional) Issue decisions
-│   │   │       └── definition-of-done.md   # (optional) Criteria
+│   │   │       └── decisions.md         # (optional) Issue decisions
 │   │   │
 │   │   └── closed/                      # Completed issues (archived)
 │   │       └── 20240126-feat-user-dashboard/
@@ -357,10 +426,9 @@ project/
 │           └── README.md
 │
 └── scripts/
-    ├── setup-planning-v2.sh             # Interactive setup
-    ├── migrate-v1-to-v2.sh              # v1.0 → v2.0 migration
-    ├── create-issue.sh                  # Manual issue creation
-    └── close-issue.sh                   # Issue closure helper
+    ├── setup-planning-v3.sh             # Interactive setup (includes skills)
+    ├── migrate-v2-to-v3.sh              # v2.0 → v3.0 migration
+    └── update-skills.sh                 # Propagate skill updates
 ```
 
 ---
@@ -371,6 +439,10 @@ project/
 
 **Session Start Checklist:**
 
+**For Claude Code:** Run `/pf` — it reads active issue context and shows the current pipeline stage and next step automatically.
+
+**For other agents:**
+
 1. **Read global context:**
    - `PLANNING.md` - Framework instructions
    - `docs/planning/implementation-plan.md` - Current roadmap
@@ -378,8 +450,8 @@ project/
 
 2. **If working on issue, read:**
    - `docs/issues/open/{issue-id}/prompt.md`
-   - `docs/issues/open/{issue-id}/analysis.md`
-   - `docs/issues/open/{issue-id}/implementation-plan.md`
+   - `docs/issues/open/{issue-id}/brd.md` or `analysis.md` (depending on type)
+   - `docs/issues/open/{issue-id}/implementation_plan.md`
    - `docs/issues/open/{issue-id}/session-log.md`
 
 3. **Read project context:**
@@ -409,7 +481,7 @@ project/
 **Session End Checklist:**
 
 - [ ] Update issue session-log.md
-- [ ] Check off completed tasks in implementation-plan.md
+- [ ] Check off completed tasks in implementation_plan.md
 - [ ] Note blockers and next priorities
 - [ ] Commit changes with clear message
 
@@ -487,14 +559,13 @@ See complete FAQ in full documentation.
 - [templates/README.md](templates/README.md) - Template usage
 
 **Scripts:**
-- `scripts/setup-planning-v2.sh` - Interactive setup
-- `scripts/migrate-v1-to-v2.sh` - Migration tool
-- `scripts/create-issue.sh` - Issue creation helper
-- `scripts/close-issue.sh` - Issue closure helper
+- `scripts/setup-planning-v3.sh` - Interactive setup (includes skills)
+- `scripts/migrate-v2-to-v3.sh` - Migration tool
+- `scripts/update-skills.sh` - Propagate skill updates to consumer projects
 
 ---
 
-**Framework Version:** 2.0.0
-**Last Updated:** 2024-01-27
+**Framework Version:** 3.0.0
+**Last Updated:** 2026-06-24
 
-Happy coding with Planning Framework v2.0! 🚀
+Happy coding with Planning Framework v3.0! 🚀

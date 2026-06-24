@@ -7,6 +7,29 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [3.0.0] - 2026-06-24
+
+### Added
+- `skills/` directory with 7 Claude Code skills: `/pf`, `/pf-brd`, `/pf-spec`, `/pf-check`, `/pf-test-plan`, `/pf-impl-plan`, `/pf-execute`
+- BRD → spec → test plan → implementation plan pipeline for feature and improvement issues
+- `/pf-check` consistency verification between pipeline documents
+- `scripts/setup-planning-v3.sh` — installs framework including skills into consumer project
+- `scripts/update-skills.sh` — distributes skill updates to consumer projects
+- `scripts/migrate-v2-to-v3.sh` — migrates v2.0 consumer projects to v3.0
+- New issue templates: `brd.md`, `specs.md`, `test_plan.md`, `implementation_plan.md`
+
+### Changed
+- PLANNING.md slimmed to multi-agent essentials; Claude-specific guidance moved to skills
+- Issue document set varies by type: feat/improve use BRD pipeline; bug uses analysis + test plan
+- `implementation-plan.md` renamed to `implementation_plan.md` (underscores) in issue folders
+- All issues now require `test_plan.md` before implementation
+
+### Removed
+- `scripts/create-issue.sh` — rarely used, removed to reduce maintenance burden
+- `scripts/close-issue.sh` — rarely used, removed to reduce maintenance burden
+
+---
+
 ## [2.0.0] - 2026-01-28
 
 ### Added - MAJOR RELEASE
@@ -321,6 +344,7 @@ See [README.md](README.md) for full documentation.
 
 | Version | Date | Highlights |
 |---------|------|------------|
+| 3.0.0 | 2026-06-24 | **Major Release:** Skills-based workflow, BRD pipeline, `/pf` commands |
 | 2.0.0 | 2026-01-28 | **Major Release:** Issue-based workflow, self-contained projects, multi-agent support |
 | 1.1.0 | 2025-11-12 | Remove time estimations, add migration guide |
 | 1.0.0 | 2025-11-05 | Initial release with core templates and documentation |
