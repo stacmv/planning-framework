@@ -8,6 +8,7 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 FRAMEWORK_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
 SKILLS_SRC="$FRAMEWORK_DIR/skills"
 TEMPLATES_SRC="$FRAMEWORK_DIR/docs/planning/templates"
+GLOBAL_SKILLS_DIR="$HOME/.claude/skills"
 
 # ─── 1. Prompt for target directory ───────────────────────────────────────────
 
@@ -29,7 +30,8 @@ TARGET="$(cd "$TARGET" 2>/dev/null && pwd)" || {
 
 echo ""
 echo "Will install Planning Framework v3.0 into:"
-echo "  $TARGET"
+echo "  Project : $TARGET"
+echo "  Skills  : $GLOBAL_SKILLS_DIR (global, available in all projects)"
 echo ""
 read -rp "Proceed? [Y/n]: " CONFIRM
 CONFIRM="${CONFIRM:-Y}"
@@ -43,13 +45,12 @@ esac
 
 echo ""
 
-# ─── 3. Create directory structure ────────────────────────────────────────────
+# ─── 3. Create project directory structure ────────────────────────────────────
 
 for dir in \
   "$TARGET/docs/issues/open" \
   "$TARGET/docs/issues/closed" \
-  "$TARGET/docs/planning" \
-  "$TARGET/.claude/skills"
+  "$TARGET/docs/planning"
 do
   if [ ! -d "$dir" ]; then
     mkdir -p "$dir"
@@ -59,30 +60,23 @@ do
   fi
 done
 
-# ─── 4. Copy skills ───────────────────────────────────────────────────────────
+# ─── 4. Install skills to ~/.claude/skills/ ───────────────────────────────────
 
 echo ""
-echo "Copying skills..."
+echo "Installing skills to $GLOBAL_SKILLS_DIR ..."
 
-SKILLS=(
-  "pf.md"
-  "pf-brd.md"
-  "pf-spec.md"
-  "pf-check.md"
-  "pf-test-plan.md"
-  "pf-impl-plan.md"
-  "pf-execute.md"
-)
+SKILLS=(pf pf-brd pf-spec pf-check pf-test-plan pf-impl-plan pf-execute)
 
 for skill in "${SKILLS[@]}"; do
   src="$SKILLS_SRC/$skill"
-  dst="$TARGET/.claude/skills/$skill"
-  if [ ! -f "$src" ]; then
+  dst="$GLOBAL_SKILLS_DIR/$skill"
+  if [ ! -d "$src" ]; then
     echo "  WARNING: source skill not found: $src"
     continue
   fi
-  cp "$src" "$dst"
-  echo "  copied   .claude/skills/$skill"
+  mkdir -p "$dst"
+  cp -r "$src/." "$dst/"
+  echo "  installed  $skill/"
 done
 
 # ─── 5. Copy planning templates ───────────────────────────────────────────────
@@ -91,10 +85,7 @@ echo ""
 echo "Copying templates..."
 
 TEMPLATES_DST="$TARGET/docs/planning/templates"
-if [ ! -d "$TEMPLATES_DST" ]; then
-  mkdir -p "$TEMPLATES_DST"
-fi
-
+mkdir -p "$TEMPLATES_DST"
 cp -r "$TEMPLATES_SRC/." "$TEMPLATES_DST/"
 echo "  copied   docs/planning/templates/"
 
@@ -121,9 +112,11 @@ done
 # ─── 7. Success summary ───────────────────────────────────────────────────────
 
 echo ""
-echo "✓ Planning Framework v3.0 installed in $TARGET"
+echo "✓ Planning Framework v3.0 installed"
+echo "  Project : $TARGET"
+echo "  Skills  : $GLOBAL_SKILLS_DIR"
 echo ""
-echo "Installed skills:"
+echo "Available skills (global, all projects):"
 echo "  /pf           — show current issue status and next step"
 echo "  /pf-brd       — create Business Requirements Document"
 echo "  /pf-spec      — create technical specification"

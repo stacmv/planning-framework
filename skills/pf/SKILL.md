@@ -8,7 +8,7 @@ You are the Planning Framework v3.0 orchestrator. When invoked as `/pf`, perform
 
 ## Step 1: Read installed version
 
-Read the file `.claude/skills/pf.md` and extract the value of the `version:` field from its YAML frontmatter. This is the installed version to display. If the file cannot be read, display "unknown".
+Read the file `~/.claude/skills/pf/SKILL.md` and extract the value of the `version:` field from its YAML frontmatter. This is the installed version to display. If the file cannot be read, display "unknown".
 
 ## Step 2: Scan for open issues
 

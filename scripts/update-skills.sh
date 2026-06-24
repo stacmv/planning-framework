@@ -3,7 +3,7 @@ set -e
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 SOURCE_DIR="${SCRIPT_DIR}/../skills"
-TARGET_DIR="$(pwd)/.claude/skills"
+TARGET_DIR="$HOME/.claude/skills"
 
 # Parse arguments
 while [[ $# -gt 0 ]]; do
@@ -26,39 +26,40 @@ if [[ ! -d "$SOURCE_DIR" ]]; then
     exit 1
 fi
 
-# Check that source contains .md files
-shopt -s nullglob
-md_files=("$SOURCE_DIR"/*.md)
-shopt -u nullglob
+# Check that source contains skill subdirectories
+skill_dirs=()
+while IFS= read -r -d '' d; do
+    [[ -f "$d/SKILL.md" ]] && skill_dirs+=("$d")
+done < <(find "$SOURCE_DIR" -mindepth 1 -maxdepth 1 -type d -print0)
 
-if [[ ${#md_files[@]} -eq 0 ]]; then
-    echo "Error: no .md files found in source directory: $SOURCE_DIR" >&2
+if [[ ${#skill_dirs[@]} -eq 0 ]]; then
+    echo "Error: no skill directories (containing SKILL.md) found in: $SOURCE_DIR" >&2
     exit 1
 fi
-
-# Create target directory if needed
-mkdir -p "$TARGET_DIR"
 
 # Counters
 count_updated=0
 count_new=0
 count_unchanged=0
 
-# Process each .md file
-for src_file in "${md_files[@]}"; do
-    filename="$(basename "$src_file")"
-    dst_file="$TARGET_DIR/$filename"
+echo "Updating skills in $TARGET_DIR ..."
+echo ""
 
-    if [[ ! -f "$dst_file" ]]; then
-        cp "$src_file" "$dst_file"
-        printf "[new]       %s\n" "$filename"
+for src_dir in "${skill_dirs[@]}"; do
+    skill_name="$(basename "$src_dir")"
+    dst_dir="$TARGET_DIR/$skill_name"
+
+    if [[ ! -d "$dst_dir" ]]; then
+        mkdir -p "$dst_dir"
+        cp -r "$src_dir/." "$dst_dir/"
+        printf "[new]       %s/\n" "$skill_name"
         (( count_new++ )) || true
-    elif diff -q "$src_file" "$dst_file" > /dev/null 2>&1; then
-        printf "[unchanged] %s\n" "$filename"
+    elif diff -rq "$src_dir" "$dst_dir" > /dev/null 2>&1; then
+        printf "[unchanged] %s/\n" "$skill_name"
         (( count_unchanged++ )) || true
     else
-        cp "$src_file" "$dst_file"
-        printf "[updated]   %s\n" "$filename"
+        cp -r "$src_dir/." "$dst_dir/"
+        printf "[updated]   %s/\n" "$skill_name"
         (( count_updated++ )) || true
     fi
 done
