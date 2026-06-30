@@ -6,6 +6,24 @@ version: 3.0.0
 
 Update the installed Planning Framework skills to the latest version.
 
+## Managed Skills
+
+The following skills are discovered and updated automatically:
+
+- `pf` — orchestrator: shows active issue status and next step
+- `pf-help` — framework overview and quick-start
+- `pf-brd` — Business Requirements Document generation
+- `pf-spec` — technical spec authoring
+- `pf-check` — pipeline document consistency review
+- `pf-test-plan` — test plan generation
+- `pf-impl-plan` — implementation plan creation
+- `pf-execute` — implementation execution via sub-agents
+- `pf-test` — run tests for the active issue
+- `pf-qa` — QA checklist execution
+- `pf-qa-setup` — QA environment setup
+- `pf-close` — issue closure workflow
+- `pf-update` — this skill (self-updates)
+
 ## Step 1: Find the framework source
 
 Look for the planning-framework repo in common locations by running:

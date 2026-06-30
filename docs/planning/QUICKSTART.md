@@ -36,7 +36,7 @@ Answer prompts:
 **Created:**
 - `PLANNING.md` - Framework instructions
 - `.qa-workflow.md` - Quality gates
-- `skills/` - Claude Code skills (`/pf`, `/pf-brd`, `/pf-spec`, `/pf-check`, `/pf-test-plan`, `/pf-impl-plan`, `/pf-execute`)
+- `skills/` - Claude Code skills (`/pf`, `/pf-brd`, `/pf-spec`, `/pf-check`, `/pf-test-plan`, `/pf-impl-plan`, `/pf-execute`, `/pf-test`, `/pf-qa`, `/pf-qa-setup`, `/pf-close`)
 - `docs/issues/open/` and `/closed/` - Issue folders
 - `docs/planning/` - Global planning files
 
@@ -87,20 +87,28 @@ Agent follows workflow automatically:
 /pf-test-plan        ← Generate test plan from spec
 /pf-impl-plan        ← Generate implementation plan
 /pf-execute          ← Begin implementation
+/pf-test             ← Run automated tests and generate manual checklist
+/pf-qa               ← Run QA checks and produce qa_report.md
+/pf-close            ← Merge branch, archive issue, update session-log
 ```
 
 Each skill checks that the previous step is done before proceeding.
 
 ### Issue Lifecycle
 
-**feat / improve:**
+**feat:**
 ```
-CREATE → BRD → SPEC → TEST PLAN → IMPL PLAN → IMPLEMENT → QA → CLOSE
+CREATE → BRD → SPEC → TEST_PLAN → IMPL_PLAN → /pf-execute → TESTING → /pf-qa → QA → /pf-close → CLOSED
+```
+
+**improve:**
+```
+CREATE → BRD → TEST_PLAN → IMPL_PLAN → /pf-execute → TESTING → /pf-qa → QA → /pf-close → CLOSED
 ```
 
 **bug:**
 ```
-CREATE → ANALYZE → TEST PLAN → IMPL PLAN → IMPLEMENT → QA → CLOSE
+CREATE → ANALYZE → TEST_PLAN → IMPL_PLAN → /pf-execute → TESTING → /pf-qa → QA → /pf-close → CLOSED
 ```
 
 ### File Structure
@@ -228,6 +236,10 @@ Details live in **issue folders**, not global files.
 /pf-test-plan        Create test plan from spec or analysis
 /pf-impl-plan        Create implementation plan from test plan
 /pf-execute          Begin implementation
+/pf-test             Run automated tests, update Status Tracker, generate manual_test_checklist.md
+/pf-qa               Run QA checks from .qa-workflow.md and produce qa_report.md with PASS/FAIL verdict
+/pf-qa-setup         Create or update .qa-workflow.md for the project
+/pf-close            Merge branch, archive issue folder, update session-log
 ```
 
 ### For Other AI Agents
@@ -494,8 +506,9 @@ MIGRATE v2:  ./scripts/migrate-v2-to-v3.sh
 UPDATE:      ./scripts/update-skills.sh
 
 SESSION:     /pf → shows status and next step (Claude Code)
-PIPELINE:    /pf-brd → /pf-spec → /pf-test-plan → /pf-impl-plan → /pf-execute
+PIPELINE:    /pf-brd → /pf-spec → /pf-test-plan → /pf-impl-plan → /pf-execute → /pf-test → /pf-qa → /pf-close
 CHECK:       /pf-check → verifies pipeline consistency
+QA SETUP:    /pf-qa-setup → create/update .qa-workflow.md
 
 FOLDER:      docs/issues/open/YYYYMMDD-type-slug/
 BRANCH:      issue/YYYYMMDD-type-slug

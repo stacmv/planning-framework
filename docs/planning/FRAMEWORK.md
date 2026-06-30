@@ -200,22 +200,51 @@ Different issue types require different document sets:
 | `session-log.md` | required | required | required |
 | `decisions.md` | optional | optional | optional |
 
-### Pipeline: feat / improve
+### Pipeline: feat
 
 ```
-CREATE → BRD → SPEC → TEST PLAN → IMPLEMENTATION PLAN → IMPLEMENT → QA → CLOSE
+CREATE → BRD → SPEC → TEST_PLAN → IMPL_PLAN → /pf-execute → TESTING → /pf-qa → QA → /pf-close → CLOSED
 ```
 
-Use `/pf-brd`, `/pf-spec`, `/pf-test-plan`, `/pf-impl-plan`, `/pf-execute` in order.
+Use `/pf-brd`, `/pf-spec`, `/pf-test-plan`, `/pf-impl-plan`, `/pf-execute`, `/pf-test`, `/pf-qa`, `/pf-close` in order.
 Run `/pf-check` at any point to verify consistency across documents.
+
+### Pipeline: improve
+
+```
+CREATE → BRD → TEST_PLAN → IMPL_PLAN → /pf-execute → TESTING → /pf-qa → QA → /pf-close → CLOSED
+```
+
+Improve issues skip the spec step — BRD goes directly to test plan.
 
 ### Pipeline: bug
 
 ```
-CREATE → ANALYZE → TEST PLAN → IMPLEMENTATION PLAN → IMPLEMENT → QA → CLOSE
+CREATE → ANALYZE → TEST_PLAN → IMPL_PLAN → /pf-execute → TESTING → /pf-qa → QA → /pf-close → CLOSED
 ```
 
 Bugs skip BRD/spec and go straight to analysis + test plan (write the failing test first).
+
+### Full Lifecycle
+
+All issue types follow the same end-to-end stages, differing only in their planning documents:
+
+| Stage | feat | improve | bug | Skill |
+|-------|------|---------|-----|-------|
+| Create | CREATE | CREATE | CREATE | (manual) |
+| Plan | BRD → SPEC | BRD | ANALYSIS | `/pf-brd`, `/pf-spec` |
+| Test Plan | TEST_PLAN | TEST_PLAN | TEST_PLAN | `/pf-test-plan` |
+| Impl Plan | IMPL_PLAN | IMPL_PLAN | IMPL_PLAN | `/pf-impl-plan` |
+| Implement | IMPLEMENT | IMPLEMENT | IMPLEMENT | `/pf-execute` |
+| Testing | TESTING | TESTING | TESTING | `/pf-test` |
+| QA | QA | QA | QA | `/pf-qa` |
+| Close | CLOSED | CLOSED | CLOSED | `/pf-close` |
+
+**TESTING stage** — `/pf-test` runs the automated test suite, updates the Status Tracker in `test_plan.md`, and generates `manual_test_checklist.md` for scenarios that require human verification.
+
+**QA stage** — `/pf-qa` executes every check defined in `.qa-workflow.md` and writes `qa_report.md` with a PASS or FAIL verdict. The issue cannot be closed until this report shows PASS. Use `/pf-qa-setup` to create or update `.qa-workflow.md` for the project.
+
+**CLOSE stage** — `/pf-close` merges the issue branch to the parent, moves the issue folder from `open/` to `closed/`, appends a one-line entry to `docs/planning/session-log.md`, promotes significant decisions, and commits everything.
 
 ### Phase 1: Create
 
@@ -343,7 +372,7 @@ git commit -m "Close issue 20240127-feat-add-auth: Added JWT authentication"
 
 ## Skills
 
-Seven Claude Code skills live in the `skills/` directory and are installed into consumer projects by `setup-planning-v3.sh` and `update-skills.sh`.
+Eleven Claude Code skills live in the `skills/` directory and are installed into consumer projects by `setup-planning-v3.sh` and `update-skills.sh`.
 
 | Skill | Command | What it does |
 |-------|---------|-------------|
@@ -354,6 +383,10 @@ Seven Claude Code skills live in the `skills/` directory and are installed into 
 | `pf-test-plan.md` | `/pf-test-plan` | Creates `test_plan.md` from `specs.md` or `analysis.md` |
 | `pf-impl-plan.md` | `/pf-impl-plan` | Creates `implementation_plan.md` from `test_plan.md` |
 | `pf-execute.md` | `/pf-execute` | Begins implementation; requires complete pipeline |
+| `pf-test.md` | `/pf-test` | Runs automated tests, updates Status Tracker, generates `manual_test_checklist.md` |
+| `pf-qa.md` | `/pf-qa` | Runs QA checks from `.qa-workflow.md`, produces `qa_report.md` with PASS/FAIL verdict |
+| `pf-qa-setup.md` | `/pf-qa-setup` | Creates or updates `.qa-workflow.md` for the project |
+| `pf-close.md` | `/pf-close` | Merges issue branch to parent, archives issue folder, updates session-log |
 
 ### Updating Skills
 
@@ -373,6 +406,9 @@ Skills check prerequisites before running:
 - `/pf-test-plan` requires `specs.md` (feat/improve) or `analysis.md` (bug)
 - `/pf-impl-plan` requires `test_plan.md`
 - `/pf-execute` requires `implementation_plan.md`
+- `/pf-test` requires implementation to be underway or complete (checks for issue branch)
+- `/pf-qa` requires `manual_test_checklist.md` or runs directly from `.qa-workflow.md`
+- `/pf-close` requires `qa_report.md` with PASS verdict
 - `/pf-check` reports any missing or inconsistent documents
 
 If a prerequisite is missing, the skill explains what needs to be done first rather than proceeding with incomplete context.
@@ -395,7 +431,11 @@ project/
 │   ├── pf-check.md                      # /pf-check — consistency check
 │   ├── pf-test-plan.md                  # /pf-test-plan — create test plan
 │   ├── pf-impl-plan.md                  # /pf-impl-plan — create impl plan
-│   └── pf-execute.md                    # /pf-execute — begin implementation
+│   ├── pf-execute.md                    # /pf-execute — begin implementation
+│   ├── pf-test.md                       # /pf-test — run tests + manual checklist
+│   ├── pf-qa.md                         # /pf-qa — QA checks + qa_report.md
+│   ├── pf-qa-setup.md                   # /pf-qa-setup — create/update .qa-workflow.md
+│   └── pf-close.md                      # /pf-close — merge, archive, update log
 │
 ├── docs/
 │   ├── issues/
