@@ -58,6 +58,8 @@ Check which documents exist inside the issue folder (`docs/issues/open/<ISSUE-ID
 | `analysis.md` | ANALYSIS (bug type only) |
 | `test_plan.md` | TEST_PLAN |
 | `implementation_plan.md` | IMPL_PLAN |
+| `manual_test_checklist.md` | TESTING |
+| `qa_report.md` | QA |
 
 List all completed stages in order.
 
@@ -80,6 +82,9 @@ CREATE → /pf-brd → BRD → /pf-spec → SPEC → /pf-check → (check passes
 | TEST_PLAN + check passed | `/pf-impl-plan` |
 | IMPL_PLAN | `/pf-check` |
 | IMPL_PLAN + check passed | `/pf-execute` |
+| IMPL_PLAN | `/pf-test` |
+| TESTING | `/pf-qa` |
+| QA | `/pf-close` |
 
 ### improve workflow
 ```
@@ -94,6 +99,9 @@ CREATE → /pf-brd → BRD → /pf-check → (check passes) → /pf-test-plan �
 | TEST_PLAN | `/pf-check` |
 | TEST_PLAN + check passed | `/pf-impl-plan` |
 | IMPL_PLAN | `/pf-execute` |
+| IMPL_PLAN | `/pf-test` |
+| TESTING | `/pf-qa` |
+| QA | `/pf-close` |
 
 ### bug workflow
 ```
@@ -108,6 +116,9 @@ CREATE → ANALYSIS → /pf-check → (check passes) → /pf-test-plan → TEST_
 | TEST_PLAN | `/pf-check` |
 | TEST_PLAN + check passed | `/pf-impl-plan` |
 | IMPL_PLAN | `/pf-execute` |
+| IMPL_PLAN | `/pf-test` |
+| TESTING | `/pf-qa` |
+| QA | `/pf-close` |
 
 **Note on "check passed":** A check is considered passed when `test_plan.md` or `implementation_plan.md` exists at the stage where a check would have produced them. If the next document in sequence is already present, treat the check as having passed.
 

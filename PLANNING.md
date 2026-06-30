@@ -57,20 +57,20 @@ session-log.md
 
 ### feat
 ```
-CREATE → BRD → SPECS → [user check] → TEST_PLAN → IMPLEMENTATION → QA → CLOSE
+CREATE → BRD → SPEC → TEST_PLAN → IMPL_PLAN → /pf-execute → TESTING → /pf-qa → QA → /pf-close → CLOSED
 ```
 
 ### improve
 ```
-CREATE → BRD → [user check] → TEST_PLAN → IMPLEMENTATION → QA → CLOSE
+CREATE → BRD → TEST_PLAN → IMPL_PLAN → /pf-execute → TESTING → /pf-qa → QA → /pf-close → CLOSED
 ```
 
 ### bug
 ```
-CREATE → ANALYSIS → [user check] → TEST_PLAN → IMPLEMENTATION → QA → CLOSE
+CREATE → ANALYSIS → TEST_PLAN → IMPL_PLAN → /pf-execute → TESTING → /pf-qa → QA → /pf-close → CLOSED
 ```
 
-**[user check]** = confirm approach with user before writing code.
+**[user check]** = confirm approach with user before writing code (after BRD/ANALYSIS, before TEST_PLAN).
 
 ---
 

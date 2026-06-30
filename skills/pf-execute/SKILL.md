@@ -8,6 +8,17 @@ Determine the active issue from `docs/issues/open/`. Check prerequisites: `imple
 
 Read `docs/issues/open/[ACTIVE-ISSUE-ID]/implementation_plan.md`, `specs.md` (if present), and `test_plan.md`. All design and planning is complete.
 
+## Phase 0: Branch Setup
+
+1. Determine ISSUE-ID from the active issue folder name in `docs/issues/open/`
+2. Check if branch exists: `git branch --list issue/ISSUE-ID`
+3. If branch does not exist: `git checkout -b issue/ISSUE-ID`
+4. If branch exists: `git checkout issue/ISSUE-ID`
+5. If checkout fails (e.g. dirty working tree): stop with message "Cannot create/checkout issue branch. Commit or stash your changes first."
+6. After branch is ready, proceed to Phase 1.
+
+---
+
 ## Phase 1: Task Creation
 
 ### Before Creating Tasks
