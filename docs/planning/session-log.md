@@ -30,3 +30,5 @@
 ## Closed Issues
 
 [Claude Code] ✓ [20240127-feat-implement-v2](../issues/closed/20240127-feat-implement-v2/) - Implemented Planning Framework v2.0 with issue-based workflow, self-contained projects, multi-agent support, comprehensive templates, automation scripts, and complete documentation. 9 commits, 6 phases, 87.5% complete, tested and validated.
+[Claude Code] ✓ [20260622-feat-v3-planning-framework](../issues/closed/20260622-feat-v3-planning-framework/) - Implemented Planning Framework v3.0: skills-based workflow with /pf-* commands, BRD→spec→test plan→impl plan pipeline, 9 skills, multi-agent support.
+[Claude Code] ✓ [20260630-improve-add-testing-qa-close-phases](../issues/closed/20260630-improve-add-testing-qa-close-phases/) - Added TESTING, QA and CLOSE phases: /pf-test, /pf-qa, /pf-qa-setup, /pf-close skills; manual_test_checklist.md and qa_report.md templates; full lifecycle now covered.
