@@ -9,9 +9,9 @@ Determine the active issue from `docs/issues/open/`. Check prerequisites:
 - For bug issues: `analysis.md` must exist. If not, stop: "Write analysis.md (root cause analysis) before creating the test plan."
 If `test_plan.md` already exists, stop and inform the user — TEST_PLAN stage is already complete.
 
-Read `docs/issues/open/[ACTIVE-ISSUE-ID]/brd.md` and (if present) `specs.md`. For bug issues, read `analysis.md` instead.
+**Do not read these documents or draft the plan yourself.** Dispatch a single sub-agent (Agent tool, default/general-purpose type — no need for a fork) to do the reading, drafting, and writing. Give it the issue ID, which source document(s) to read (`brd.md` + `specs.md` if present for feat/improve, `analysis.md` for bug), and the full structure below (Steps 1-5). Instruct it to write the result directly to `docs/issues/open/[ACTIVE-ISSUE-ID]/test_plan.md` and return only a short summary (test case count, categories covered) — not the document contents, since the orchestrator does not need them.
 
-Create a comprehensive test plan that will verify the implementation matches the specs.
+The structure to pass to the sub-agent:
 
 ### Step 1: Identify Test Scenarios
 
@@ -85,3 +85,5 @@ Group test cases:
 Save the test plan to `docs/issues/open/[ACTIVE-ISSUE-ID]/test_plan.md`.
 
 Include: overview and objectives, prerequisites, test cases (10-20 typically), status tracker, known issues section.
+
+Once the sub-agent returns, relay its summary to the user.

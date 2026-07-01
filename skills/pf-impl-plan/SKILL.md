@@ -7,9 +7,9 @@ version: 3.0.0
 Determine the active issue from `docs/issues/open/`. Check prerequisites: `test_plan.md` must exist. If not, stop: "Test plan is required. Run /pf-test-plan first."
 If `implementation_plan.md` already exists, stop and inform the user — IMPL_PLAN stage is already complete.
 
-Read `docs/issues/open/[ISSUE-ID]/brd.md`, `specs.md` (if present), and `test_plan.md`. Specs are approved, test plan is ready. Now we need an implementation plan.
+**Do not read these documents, analyze the codebase, or draft the plan yourself.** Dispatch a single sub-agent (Agent tool, default/general-purpose type — no need for a fork) to do it. Give it the issue ID and the full task below. Instruct it to read `brd.md`, `specs.md` (if present), and `test_plan.md` itself, analyze the codebase as needed, write the result directly to `docs/issues/open/[ISSUE-ID]/implementation_plan.md`, and return only a short summary (task count, complexity estimate, files touched) — not the document contents, since the orchestrator does not need them.
 
-## Your Task
+## Task to pass to the sub-agent
 
 Create a detailed implementation plan that maps to the test cases.
 
@@ -67,3 +67,5 @@ Save the implementation plan to `docs/issues/open/[ISSUE-ID]/implementation_plan
 Every test case must map to a task. Tasks should be completable in one session.
 
 Where [ISSUE-ID] means: scan docs/issues/open/ and use the active issue folder name.
+
+Once the sub-agent returns, relay its summary to the user.
