@@ -6,6 +6,8 @@ version: 3.0.0
 
 Determine the active issue from `docs/issues/open/`. Check prerequisites: `manual_test_checklist.md` must exist inside the issue folder. If it does not exist, stop: "Testing stage is not complete. Run /pf-test first."
 
+**Documentation language:** read the `doc_language` field from `docs/issues/open/ISSUE-ID/prompt.md`'s YAML frontmatter (default: English if absent). Write prose in `qa_report.md` (blocker descriptions, notes) in that language, but keep the report's structural labels and the `**PASS**`/`**FAIL**` verdict markers in English exactly as specified below, since `/pf-close` parses them literally.
+
 ---
 
 ## Phase 0: Load QA Workflow

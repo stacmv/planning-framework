@@ -9,6 +9,8 @@ If `implementation_plan.md` already exists, stop and inform the user — IMPL_PL
 
 **Do not read these documents, analyze the codebase, or draft the plan yourself.** Dispatch a single sub-agent (Agent tool, default/general-purpose type — no need for a fork) to do it. Give it the issue ID and the full task below. Instruct it to read `brd.md`, `specs.md` (if present), and `test_plan.md` itself, analyze the codebase as needed, write the result directly to `docs/issues/open/[ISSUE-ID]/implementation_plan.md`, and return only a short summary (task count, complexity estimate, files touched) — not the document contents, since the orchestrator does not need them.
 
+Tell the sub-agent to also read the `doc_language` field from `prompt.md`'s YAML frontmatter (default: English if absent) and write the plan's prose content (overview, implementation notes, descriptions) in that language, keeping headings, file paths, and structural labels (e.g. `Task N`, `Mapped Test Cases`, `Acceptance Criteria`) in English/as-is so downstream tooling keeps working.
+
 ## Task to pass to the sub-agent
 
 Create a detailed implementation plan that maps to the test cases.

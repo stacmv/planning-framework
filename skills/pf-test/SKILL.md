@@ -99,6 +99,8 @@ For each Manual TC-ID collected in 5.1, find its full test case section in `test
 
 ### 5.3 Write manual_test_checklist.md
 
+Read the `doc_language` field from `docs/issues/open/[ISSUE-ID]/prompt.md`'s YAML frontmatter (default: English if absent). Write the checklist's prose (test names, steps, notes, the "How to use" section) in that language — this document goes to an external tester, so it should read naturally in their language. Keep the `[ ]` checkbox syntax as-is.
+
 Write `docs/issues/open/[ISSUE-ID]/manual_test_checklist.md` using this exact format:
 
 ```

@@ -15,6 +15,8 @@ Determine the active issue from `docs/issues/open/`. Identify the most recently 
 >
 > Group findings by priority: P0 (blocker), P1 (important), P2 (minor).
 >
+> Read the `doc_language` field from `docs/issues/open/[ISSUE-ID]/prompt.md`'s YAML frontmatter (default: English if absent) and write your findings in that language.
+>
 > Your reply is the only thing the orchestrator will see — it will not have read these documents. Return ONLY the prioritized findings (as your final message), not full document contents or restated context.
 
 Present the returned findings to the user as-is, then use AskUserQuestion to present these options:
@@ -24,5 +26,5 @@ Present the returned findings to the user as-is, then use AskUserQuestion to pre
 - **I'll fix manually** — You'll edit the document yourself, then run /pf-check again to re-verify.
 - **Skip and continue** — Proceed to the next pipeline stage despite the issues (not recommended for P0).
 
-If "Fix now": dispatch a second sub-agent (Agent tool, default/general-purpose type) to apply the fix. Give it: the target document path, the predecessor document paths, and the full P0/P1 findings list from the analysis step. Instruct it to read what it needs, use AskUserQuestion itself to ask clarifying questions until it is 95% confident (with a recommendation and reason below each option), edit the document directly, and return only a short summary of what changed. Relay that summary to the user.
+If "Fix now": dispatch a second sub-agent (Agent tool, default/general-purpose type) to apply the fix. Give it: the target document path, the predecessor document paths, and the full P0/P1 findings list from the analysis step. Instruct it to read what it needs, use AskUserQuestion itself to ask clarifying questions until it is 95% confident (with a recommendation and reason below each option), edit the document directly (honoring the same `doc_language` field for any prose it writes, keeping structural labels in English), and return only a short summary of what changed. Relay that summary to the user.
 If "I'll fix manually" or "Skip and continue": confirm the choice and state the next /pf-* command to run.

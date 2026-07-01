@@ -24,7 +24,7 @@ No open issues found.
 
 Tell me what you want to build or fix and I'll create the issue folder and prompt.md for you.
 ```
-Stop here.
+Stop here. When the user responds with the task description, follow "Creating prompt.md" below before writing the file.
 
 **Multiple issue folders found:**
 Output:
@@ -110,7 +110,7 @@ CREATE → ANALYSIS → /pf-check → (check passes) → /pf-test-plan → TEST_
 
 | Last completed stage | Next step |
 |---|---|
-| CREATE only (no analysis.md) | Ask the user to describe the bug, then write `analysis.md` (root cause, reproduction steps, impact) to the issue folder |
+| CREATE only (no analysis.md) | Ask the user to describe the bug, then write `analysis.md` (root cause, reproduction steps, impact) to the issue folder, in the language recorded in `prompt.md`'s `doc_language` frontmatter field (default English) |
 | ANALYSIS present | `/pf-check` |
 | ANALYSIS + check passed | `/pf-test-plan` |
 | TEST_PLAN | `/pf-check` |
@@ -133,10 +133,26 @@ Completed stages: <STAGE1>, <STAGE2>, ...
 Next step: /<next-command>
 ```
 
-If no stages are completed yet (only the folder exists with no documents), ask the user to describe the task, then create `prompt.md` in the issue folder and show:
+If no stages are completed yet (only the folder exists with no documents), ask the user to describe the task, then follow "Creating prompt.md" below and show:
 ```
 Planning Framework v<VERSION>
 Active issue: <ISSUE-ID>  (type: feat/improve/bug)
 Completed stages: (none — prompt.md created)
 Next step: /pf-brd
 ```
+
+## Creating prompt.md
+
+Whenever a new issue's `prompt.md` is about to be written (from either path above), first use AskUserQuestion to ask: **"What language should the planning documents for this issue be written in?"** with options English, Russian, and Other (free text). This choice only needs to be asked once per issue.
+
+Write `prompt.md` with a YAML frontmatter block recording the answer, followed by the task description:
+
+```
+---
+doc_language: English
+---
+
+<task description as given by the user>
+```
+
+Use the exact language name the user gave (e.g. `Russian`, or whatever they typed for "Other") as the `doc_language` value. Every downstream pf-* skill that produces a document reads this field and writes its prose content in that language, defaulting to English if the field is absent — see each skill's own instructions for specifics.
