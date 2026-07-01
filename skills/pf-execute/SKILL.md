@@ -10,12 +10,16 @@ Read `docs/issues/open/[ACTIVE-ISSUE-ID]/implementation_plan.md`, `specs.md` (if
 
 ## Phase 0: Branch Setup
 
-1. Determine ISSUE-ID from the active issue folder name in `docs/issues/open/`
-2. Check if branch exists: `git branch --list issue/ISSUE-ID`
-3. If branch does not exist: `git checkout -b issue/ISSUE-ID`
-4. If branch exists: `git checkout issue/ISSUE-ID`
-5. If checkout fails (e.g. dirty working tree): stop with message "Cannot create/checkout issue branch. Commit or stash your changes first."
-6. After branch is ready, proceed to Phase 1.
+1. Determine ISSUE-ID from the active issue folder name in `docs/issues/open/`.
+2. **Commit issue documentation to the current (parent) branch first.** The CREATE→IMPL_PLAN stages run before `/pf-execute`, so at this point you should still be on the parent branch (`develop`/`main`) with the issue's planning docs (`prompt.md`, `brd.md`, `specs.md`, `test_plan.md`, `implementation_plan.md`, etc.) sitting uncommitted or already committed there.
+   - Run `git status --porcelain -- docs/issues/open/ISSUE-ID/`.
+   - If it shows changes, run `git add docs/issues/open/ISSUE-ID/` then `git commit -m "docs: add planning docs for ISSUE-ID"`. This lands the planning docs on the parent branch immediately — they don't wait for the issue to be implemented and merged to become visible.
+   - If it shows nothing, skip — already committed.
+3. Check if branch exists: `git branch --list issue/ISSUE-ID`
+4. If branch does not exist: `git checkout -b issue/ISSUE-ID`
+5. If branch exists: `git checkout issue/ISSUE-ID`
+6. If checkout fails (e.g. dirty working tree from files outside `docs/issues/`): stop with message "Cannot create/checkout issue branch. Commit or stash your changes first."
+7. After branch is ready, proceed to Phase 1.
 
 ---
 
@@ -48,6 +52,10 @@ Execute tasks using sub-agents for parallel processing:
 1. **Group tasks into waves** based on dependencies
 2. **Run each task in its own sub-agent** - This keeps context usage low (~18% vs ~56%)
 3. **Process waves sequentially** - Wave N+1 starts only after Wave N completes
+4. **Commit after each wave, not inside sub-agents.** Sub-agents in a wave run concurrently and must NOT run `git commit` themselves (concurrent commits on the same branch race and corrupt each other). Once every task in a wave is confirmed complete via `TaskList`/`TaskGet`, the orchestrator runs, on the issue branch:
+   - `git add -A`
+   - `git commit -m "feat: <short wave summary> [ISSUE-ID]"` (mention the TC-IDs or task names covered)
+   - Only start the next wave after this commit succeeds.
 
 ### For Each Task (Sub-Agent Instructions)
 1. Use `TaskGet` to read full task details
@@ -68,6 +76,8 @@ Execute tasks using sub-agents for parallel processing:
 ---
 
 ## Phase 3: Completion Summary
+
+Before reporting, run `git status --porcelain`. If anything is still uncommitted (e.g. a final wave's changes), commit it: `git add -A` then `git commit -m "chore: finalize implementation [ISSUE-ID]"`. Every task's changes must be committed on the issue branch by the end of this phase.
 
 After all tasks are complete, provide:
 
@@ -94,3 +104,4 @@ After all tasks are complete, provide:
 - **Use `TaskList`** periodically to check overall progress
 - **Dependencies are critical** - ensure tasks don't start before their blockers complete
 - **Keep sub-agent context focused** - each sub-agent only needs info for its specific task
+- **Commits happen at wave boundaries, run by the orchestrator only** - never inside a parallel task sub-agent. This is the only point in the pipeline where code (as opposed to planning docs) gets committed, so don't skip it even for a single-wave plan.

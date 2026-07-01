@@ -82,7 +82,7 @@ Each issue gets its own branch, created before implementation begins:
 issue/YYYYMMDD-type-slug
 ```
 
-Issue files (`implementation_plan.md`, `session-log.md`) live on the issue branch and are only visible on the parent branch after the issue is merged at closure.
+Planning docs (`prompt.md`, `brd.md`, `specs.md`, `test_plan.md`, `implementation_plan.md`) are committed to the **parent branch** as soon as `/pf-execute` starts — before the issue branch is even created — so they're visible on `develop`/`main` right away rather than waiting for the issue to be merged. Only the code changes made while implementing the issue live on the issue branch, and become visible on the parent branch when the issue is merged at closure.
 
 **Parent branches:** `develop` or `main`
 **Merge at closure:** merge commit (preserves history)
