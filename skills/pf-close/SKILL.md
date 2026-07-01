@@ -32,6 +32,7 @@ This will:
   • Detect parent branch (from git config or fallback to develop/main)
   • Merge issue/ISSUE-ID into <parent-branch> with --no-ff
   • Move docs/issues/open/ISSUE-ID/ → docs/issues/closed/ISSUE-ID/
+  • Record LLM usage/cost in docs/issues/closed/ISSUE-ID/usage_report.md
   • Append a closure entry to docs/planning/session-log.md
   • Commit the archive changes
 
@@ -78,7 +79,52 @@ Run on the issue branch.
 
 ---
 
-## Phase 6: Update Session Log
+## Phase 6: Compute LLM Usage & Cost
+
+This phase produces `docs/issues/closed/ISSUE-ID/usage_report.md`, a best-effort record of which LLMs worked the issue and roughly how many tokens / dollars that took. Treat every number here as approximate — never invent a figure that isn't backed by real data.
+
+1. **Find the issue's start time.** Run:
+   ```
+   git log --reverse --format=%aI -- docs/issues/closed/ISSUE-ID | head -1
+   ```
+   This is START-TS. If it returns nothing, skip auto-computation (step 2) and go straight to step 3 with a note that the window could not be determined.
+
+2. **Auto-compute Claude usage from local transcripts.**
+   - Transcript directory: `~/.claude/projects/<cwd-with-slashes-replaced-by-dashes>/` (e.g. `pwd` of `/home/stac/dev/planning-framework` → `-home-stac-dev-planning-framework`). If this directory doesn't exist, skip to step 3.
+   - For every `*.jsonl` file in that directory, read each line as JSON, keep entries where `.type == "assistant"` and `.timestamp >= START-TS`, dedupe by `.message.id` (a single API response can appear more than once in the log), then group by `.message.model` and sum `.message.usage.input_tokens`, `.cache_creation_input_tokens`, `.cache_read_input_tokens`, and `.output_tokens`.
+   - A small inline Python (or `jq`) script run via Bash is the right tool for this — don't try to do the aggregation by eye.
+   - **Caveat to carry into the report:** this time-window heuristic captures *all* Claude Code activity in this project directory during the window, not just this issue. If the user worked on something else in parallel, note that the figure may be inflated.
+   - For pricing, invoke the `claude-api` skill to get current per-model $/Mtok rates and compute an approximate cost. If that skill is unavailable or a model's price can't be found, report the token counts only and mark cost as "unavailable — pricing table not found" rather than guessing.
+
+3. **Merge manual entries for other LLMs.** Check for `docs/issues/closed/ISSUE-ID/usage.md`. This is a convention where any agent (Gemini, Qwen, or a human) can append a session entry as work happens, e.g.:
+   ```
+   ## Session: 2026-06-25
+   - Model: gemini-2.5-pro
+   - Tokens: input 12000, output 3400
+   - Cost: ~$0.08
+   ```
+   If the file exists, parse and include its entries verbatim (labeled "manual") in the report. If it doesn't exist, note that no non-Claude usage was logged.
+
+4. **Write `docs/issues/closed/ISSUE-ID/usage_report.md`** with a table like:
+
+   ```
+   # LLM Usage — ISSUE-ID
+
+   | Source | Model | Input tok | Output tok | Cache tok | Approx cost | Notes |
+   |---|---|---|---|---|---|---|
+   | auto  | claude-sonnet-5 | 120,000 | 8,400 | 340,000 | ~$1.42 | window: 2026-06-25T.. → close |
+   | manual | gemini-2.5-pro  | 12,000  | 3,400 | —       | ~$0.08 | from usage.md |
+
+   **Total approx cost:** ~$1.50
+
+   _Auto figures cover all Claude Code activity in this project directory during the issue window, not solely this issue — treat as an upper bound if other work overlapped._
+   ```
+
+   If no data was available from either source, write the file stating that plainly instead of omitting it.
+
+---
+
+## Phase 7: Update Session Log
 
 1. Read `docs/planning/session-log.md`.
 2. Determine a one-line summary:
@@ -88,21 +134,22 @@ Run on the issue branch.
 3. Append the following line to `session-log.md` (at the end of the file):
 
    ```
-   [Claude Code] ✓ [ISSUE-ID](../issues/closed/ISSUE-ID/) — <one-line summary>
+   [Claude Code] ✓ [ISSUE-ID](../issues/closed/ISSUE-ID/) — <one-line summary> · LLM usage: see [usage_report.md](../issues/closed/ISSUE-ID/usage_report.md)
    ```
 
+   If Phase 6 found no usage data at all, omit the "LLM usage" clause.
 4. Write the updated content back to `docs/planning/session-log.md`.
 
 ---
 
-## Phase 7: Archive Commit
+## Phase 8: Archive Commit
 
 1. Run `git add docs/issues/ docs/planning/session-log.md`.
 2. Run `git commit -m "close: archive ISSUE-ID"`.
 
 ---
 
-## Phase 8: Report
+## Phase 9: Report
 
 Print the following closing report:
 
@@ -114,6 +161,7 @@ Two commits added to PARENT-BRANCH:
   2. close: archive ISSUE-ID  (archive commit)
 
 Issue folder moved to docs/issues/closed/ISSUE-ID/
+LLM usage recorded in docs/issues/closed/ISSUE-ID/usage_report.md
 
 Remote push: run `git push` when ready.
 ```
@@ -127,3 +175,5 @@ Remote push: run `git push` when ready.
 - **No-ff merge is required** — `--no-ff` preserves the issue branch history as a distinct line in the log.
 - **If merge fails for reasons other than conflict** (e.g. branch not found, wrong parent), report the git error verbatim and stop.
 - **Archive commit uses `docs/issues/`** not just `docs/issues/closed/` so that the removal of the `open/` entry is staged as well.
+- **Usage numbers are approximate, never fabricated.** Auto-computed Claude figures come only from real transcript data (`~/.claude/projects/.../*.jsonl`); non-Claude figures come only from a manually maintained `usage.md` in the issue folder. If a number can't be derived from one of those two sources, the report says so — it does not estimate or guess.
+- **The auto-computed window is a heuristic, not exact attribution** — it sums all Claude Code activity in this project directory between the issue's first commit and close time, so overlapping unrelated work will inflate it.
