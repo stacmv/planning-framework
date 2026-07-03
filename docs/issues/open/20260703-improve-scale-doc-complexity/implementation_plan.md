@@ -16,6 +16,8 @@ This plan implements size-tier-aware Planning Framework documentation, per `brd.
 - `skills/pf-execute/SKILL.md` — legacy-tier guard, oversized-predecessor guard, tier-branched prerequisite gate, tier-branched Phase 0 file-commit list, tier-branched Phase 1 task-parsing source.
 - `skills/pf-update/SKILL.md` — add `pf-size-tiers` to the "Managed Skills" list.
 - `scripts/update-skills.sh` — reference only, not modified (already generically syncs any `skills/` subfolder containing a `SKILL.md`, so `pf-size-tiers` is picked up automatically).
+- `.qa-workflow.md` (project root) — added during this issue's `/pf-qa`/`/pf-qa-setup` stages: redesigned so every QA item resolves to an automated command, a single AI-answerable yes/no check, or one atomic human action. Unrelated to size-tier scaling itself; see `specs.md` §0 addendum.
+- `skills/pf-qa-setup/SKILL.md` — added a standing "Core Rule" so future `/pf-qa-setup` runs generate `.qa-workflow.md` in the same atomic-check style by default. Same addendum as above.
 
 ### Implementation Tasks
 
