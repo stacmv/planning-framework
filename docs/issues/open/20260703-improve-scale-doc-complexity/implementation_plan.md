@@ -16,6 +16,8 @@ This plan implements size-tier-aware Planning Framework documentation, per `brd.
 - `skills/pf-execute/SKILL.md` — legacy-tier guard, oversized-predecessor guard, tier-branched prerequisite gate, tier-branched Phase 0 file-commit list, tier-branched Phase 1 task-parsing source.
 - `skills/pf-update/SKILL.md` — add `pf-size-tiers` to the "Managed Skills" list.
 - `scripts/update-skills.sh` — reference only, not modified (already generically syncs any `skills/` subfolder containing a `SKILL.md`, so `pf-size-tiers` is picked up automatically).
+- `.qa-workflow.md` (project root) — added during this issue's `/pf-qa`/`/pf-qa-setup` stages: redesigned so every QA item resolves to an automated command, a single AI-answerable yes/no check, or one atomic human action. Unrelated to size-tier scaling itself; see `specs.md` §0 addendum.
+- `skills/pf-qa-setup/SKILL.md` — added a standing "Core Rule" so future `/pf-qa-setup` runs generate `.qa-workflow.md` in the same atomic-check style by default. Same addendum as above.
 
 ### Implementation Tasks
 
@@ -33,7 +35,7 @@ This plan implements size-tier-aware Planning Framework documentation, per `brd.
 - This file has no functional prerequisites — it's a plain markdown reference doc, so it can technically be written at any point in the task sequence, but doing it first gives every other task a stable table to cite by section number instead of duplicating tier numbers inline.
 
 **Acceptance Criteria:**
-- [ ] `skills/pf-size-tiers/SKILL.md` exists with the four required table/section blocks and the "print the tables if invoked directly" instruction, ready to support TC-020 step 3.
+- [x] `skills/pf-size-tiers/SKILL.md` exists with the four required table/section blocks and the "print the tables if invoked directly" instruction, ready to support TC-020 step 3.
 
 ---
 
@@ -56,12 +58,12 @@ This plan implements size-tier-aware Planning Framework documentation, per `brd.
 - Order within this task: implement 3f/3g/3h (table edits and precedence rule) before 3c (new trivial table) since 3c's explanatory text directly references the 3f row and the "Note on 'check passed'" convention at the end of Step 6 — keeping them in the same edit pass avoids inconsistency.
 
 **Acceptance Criteria:**
-- [ ] TC-001 passes
-- [ ] TC-002 passes
-- [ ] TC-007 passes
-- [ ] TC-008 passes
-- [ ] TC-009 passes
-- [ ] TC-017 passes, specifically confirming (per 3h) that a **trivial-tier bug issue** never triggers the bug workflow's CREATE-only action (no user prompt to describe the bug, no `analysis.md` written) and is routed via the 3c trivial table (`/pf-brd` → `notes.md`) instead — this is the tier-before-type bypass check, distinct from TC-017's other steps which cover non-trivial-tier reconfirmation.
+- [x] TC-001 passes
+- [x] TC-002 passes
+- [x] TC-007 passes
+- [x] TC-008 passes
+- [x] TC-009 passes
+- [x] TC-017 passes, specifically confirming (per 3h) that a **trivial-tier bug issue** never triggers the bug workflow's CREATE-only action (no user prompt to describe the bug, no `analysis.md` written) and is routed via the 3c trivial table (`/pf-brd` → `notes.md`) instead — this is the tier-before-type bypass check, distinct from TC-017's other steps which cover non-trivial-tier reconfirmation.
 
 ---
 
@@ -80,9 +82,9 @@ This plan implements size-tier-aware Planning Framework documentation, per `brd.
 - This confirmation never applies to trivial tier (there's no `brd.md` to re-derive from) — explicitly guard against running it in the trivial branch.
 
 **Acceptance Criteria:**
-- [ ] TC-004 passes
-- [ ] TC-005 passes
-- [ ] TC-006 passes
+- [x] TC-004 passes
+- [x] TC-005 passes
+- [x] TC-006 passes
 
 ---
 
@@ -102,10 +104,10 @@ This plan implements size-tier-aware Planning Framework documentation, per `brd.
 - **If medium/large:** unchanged from today, including the existing >1500-line → 3-part split rule.
 
 **Acceptance Criteria:**
-- [ ] TC-003 passes
-- [ ] TC-011 passes
-- [ ] TC-012 passes
-- [ ] Verify: pf-spec's oversized-predecessor guard blocks proceeding (with a message naming `brd.md`, the tier, and pointing at `/pf-check`) when `brd.md` exceeds the ≤300-line small-tier budget adopted above. No existing TC-NNN covers this specific guard instance — TC-016 covers pf-test-plan's guard against `notes.md`; this is a local verification step for this task only.
+- [x] TC-003 passes
+- [x] TC-011 passes
+- [x] TC-012 passes
+- [x] Verify: pf-spec's oversized-predecessor guard blocks proceeding (with a message naming `brd.md`, the tier, and pointing at `/pf-check`) when `brd.md` exceeds the ≤300-line small-tier budget adopted above. No existing TC-NNN covers this specific guard instance — TC-016 covers pf-test-plan's guard against `notes.md`; this is a local verification step for this task only.
 
 ---
 
@@ -126,10 +128,10 @@ This plan implements size-tier-aware Planning Framework documentation, per `brd.
 - **If medium/large (TC-013, shared with Task 6):** unchanged — 10-20 test cases typical for medium, 20+ allowed for large, Known Issues table included, no regression from current behavior.
 
 **Acceptance Criteria:**
-- [ ] TC-010 passes
-- [ ] TC-013 passes (test-plan portion: medium/large counts and Known Issues table unchanged)
-- [ ] TC-016 passes
-- [ ] Verify: small-tier `pf-test-plan` output has 5-10 test cases and omits the Known Issues table (keeping the Status Tracker). No existing TC-NNN covers small-tier specifically — TC-010 covers trivial and TC-013 covers medium/large — so this is a local verification step for this task only.
+- [x] TC-010 passes
+- [x] TC-013 passes (test-plan portion: medium/large counts and Known Issues table unchanged)
+- [x] TC-016 passes
+- [x] Verify: small-tier `pf-test-plan` output has 5-10 test cases and omits the Known Issues table (keeping the Status Tracker). No existing TC-NNN covers small-tier specifically — TC-010 covers trivial and TC-013 covers medium/large — so this is a local verification step for this task only.
 
 ---
 
@@ -149,9 +151,9 @@ This plan implements size-tier-aware Planning Framework documentation, per `brd.
 - **If medium/large (TC-013, shared with Task 5):** unchanged from today — Dependencies and Complexity Estimate sections present, no line-count cap besides the existing behavior, large tier may include a phased-rollout section.
 
 **Acceptance Criteria:**
-- [ ] TC-013 passes (impl-plan portion: medium/large Dependencies/Complexity Estimate sections unchanged, large tier's phased-rollout allowance)
-- [ ] TC-014 passes
-- [ ] Verify: pf-impl-plan's oversized-predecessor guard blocks proceeding (with a message naming the offending file, the tier, and pointing at `/pf-check`) when `test_plan.md` exceeds its tier's case-count budget from specs.md §9b (trivial >4 cases, small >10 cases, medium >20 cases). This mirrors TC-016's scenario but for this skill's own guard instance — no existing TC-NNN covers pf-impl-plan's guard specifically, so this is a local verification step for this task only.
+- [x] TC-013 passes (impl-plan portion: medium/large Dependencies/Complexity Estimate sections unchanged, large tier's phased-rollout allowance)
+- [x] TC-014 passes
+- [x] Verify: pf-impl-plan's oversized-predecessor guard blocks proceeding (with a message naming the offending file, the tier, and pointing at `/pf-check`) when `test_plan.md` exceeds its tier's case-count budget from specs.md §9b (trivial >4 cases, small >10 cases, medium >20 cases). This mirrors TC-016's scenario but for this skill's own guard instance — no existing TC-NNN covers pf-impl-plan's guard specifically, so this is a local verification step for this task only.
 
 ---
 
@@ -169,7 +171,7 @@ This plan implements size-tier-aware Planning Framework documentation, per `brd.
 - Clarify (§9c, doc-only, no behavior change to the UI): pf-check's own "Fix now" / "I'll fix manually" / "Skip and continue" options are unchanged and the oversized-for-tier finding flows through them exactly like any other P0/P1 finding — this is what TC-015 step 3 checks (skip remains available, no special-cased blocking inside pf-check itself).
 
 **Acceptance Criteria:**
-- [ ] TC-015 passes
+- [x] TC-015 passes
 
 ---
 
@@ -189,9 +191,9 @@ This plan implements size-tier-aware Planning Framework documentation, per `brd.
 - **10c (TC-019 steps 2-3):** Branch Phase 1's "Before Creating Tasks" step 1 and "Create Tasks from Implementation Plan": for trivial, review `notes.md` completely and parse its `## Tasks` checklist, creating one `TaskCreate` call per unchecked `- [ ] Task N — ...` line (same per-task fields: description, mapped test cases from `test_plan.md`, `blocked_by`/`blocks`); for small/medium/large, review `implementation_plan.md` and parse it exactly as today. Leave Phase 2/3 (wave grouping, sub-agent execution, commit-per-wave discipline) entirely unchanged — only the source document and per-line-item granularity differ by tier.
 
 **Acceptance Criteria:**
-- [ ] TC-018 passes
-- [ ] TC-019 passes
-- [ ] Verify: pf-execute's oversized-predecessor guard blocks proceeding (with a message naming the offending file, the tier, and pointing at `/pf-check`) when `notes.md` (trivial, >~50 lines) or `implementation_plan.md` (small tier, >~150 lines) is still oversized for the recorded tier. No existing TC-NNN covers this guard instance — TC-016 covers pf-test-plan's guard against `notes.md`, and TC-018/TC-019 cover the prerequisite-*existence* gate, not the oversized-*size* gate — so this is a local verification step for this task only.
+- [x] TC-018 passes
+- [x] TC-019 passes
+- [x] Verify: pf-execute's oversized-predecessor guard blocks proceeding (with a message naming the offending file, the tier, and pointing at `/pf-check`) when `notes.md` (trivial, >~50 lines) or `implementation_plan.md` (small tier, >~150 lines) is still oversized for the recorded tier. No existing TC-NNN covers this guard instance — TC-016 covers pf-test-plan's guard against `notes.md`, and TC-018/TC-019 cover the prerequisite-*existence* gate, not the oversized-*size* gate — so this is a local verification step for this task only.
 
 ---
 
@@ -208,7 +210,7 @@ This plan implements size-tier-aware Planning Framework documentation, per `brd.
 - Depends on Task 1 existing (so the description text and the skill itself are consistent) but requires no code coordination since `update-skills.sh` needs no edits.
 
 **Acceptance Criteria:**
-- [ ] TC-020 passes
+- [x] TC-020 passes
 
 ---
 

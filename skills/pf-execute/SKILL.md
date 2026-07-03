@@ -4,14 +4,31 @@ description: Execute the implementation plan for the active issue using task-bas
 version: 3.0.0
 ---
 
-Determine the active issue from `docs/issues/open/`. Check prerequisites: `implementation_plan.md` must exist. If not, stop: "Implementation plan is required. Run /pf-impl-plan first."
+Determine the active issue from `docs/issues/open/`.
 
-Read `docs/issues/open/[ACTIVE-ISSUE-ID]/implementation_plan.md`, `specs.md` (if present), and `test_plan.md`. All design and planning is complete.
+Before checking any other prerequisite, read `prompt.md`'s frontmatter. If it has no `size_tier` field, ask the user via `AskUserQuestion` — same 4 tier options and descriptions as in `skills/pf-size-tiers/SKILL.md`, recommending medium ("matches today's default behavior") — then write the answer into `prompt.md`'s frontmatter before proceeding with the rest of this skill.
+
+**Oversized-predecessor guard.** Before creating tasks, recompute the oversized-for-tier check as a lightweight mechanical count (e.g. `wc -l`) — its own first action, before the full prerequisite read below:
+- If `size_tier: trivial`: count lines in `notes.md`. Budget is ~50 lines.
+- If `size_tier` is small: count lines in `implementation_plan.md`. Budget is ~150 lines.
+- If `size_tier` is medium/large: no cap, skip this check.
+
+If the relevant file exceeds its budget, stop: "`<file>` is oversized for this issue's declared tier (`<tier>`): <actual> lines vs ~<budget> lines. Run /pf-check, then trim or re-classify size_tier."
+
+(Note: `pf-execute` already reads `implementation_plan.md`/`specs.md`/`test_plan.md` itself today — unlike `pf-test-plan`/`pf-impl-plan`, it has no sub-agent-dispatch step for planning-document ingestion, so there is no literal "do not read yourself" text this guard conflicts with. It still uses a cheap mechanical count here, for consistency and to run before the full prerequisite read.)
+
+Read `size_tier` from `prompt.md`'s frontmatter. Check prerequisites:
+- **If `size_tier: trivial`:** `notes.md` must exist. If not, stop: "Notes document is required. Run /pf-brd first."
+- **If `size_tier` is small/medium/large (or absent):** `implementation_plan.md` must exist. If not, stop: "Implementation plan is required. Run /pf-impl-plan first."
+
+For `size_tier: trivial`, read `docs/issues/open/[ACTIVE-ISSUE-ID]/notes.md` and `test_plan.md`. All design and planning is complete.
+
+For `size_tier` small/medium/large, read `docs/issues/open/[ACTIVE-ISSUE-ID]/implementation_plan.md`, `specs.md` (if present), and `test_plan.md`. All design and planning is complete.
 
 ## Phase 0: Branch Setup
 
 1. Determine ISSUE-ID from the active issue folder name in `docs/issues/open/`.
-2. **Commit issue documentation to the current (parent) branch first.** The CREATE→IMPL_PLAN stages run before `/pf-execute`, so at this point you should still be on the parent branch (`develop`/`main`) with the issue's planning docs (`prompt.md`, `brd.md`, `specs.md`, `test_plan.md`, `implementation_plan.md`, etc.) sitting uncommitted or already committed there.
+2. **Commit issue documentation to the current (parent) branch first.** The CREATE→IMPL_PLAN stages run before `/pf-execute`, so at this point you should still be on the parent branch (`develop`/`main`) with the issue's planning docs — for `size_tier: trivial`: `prompt.md`, `notes.md`, `test_plan.md`; for small/medium/large: `prompt.md`, `brd.md`, `specs.md`, `test_plan.md`, `implementation_plan.md` — sitting uncommitted or already committed there.
    - Run `git status --porcelain -- docs/issues/open/ISSUE-ID/`.
    - If it shows changes, run `git add docs/issues/open/ISSUE-ID/` then `git commit -m "docs: add planning docs for ISSUE-ID"`. This lands the planning docs on the parent branch immediately — they don't wait for the issue to be implemented and merged to become visible.
    - If it shows nothing, skip — already committed.
@@ -26,13 +43,31 @@ Read `docs/issues/open/[ACTIVE-ISSUE-ID]/implementation_plan.md`, `specs.md` (if
 ## Phase 1: Task Creation
 
 ### Before Creating Tasks
+**If `size_tier: trivial`:**
+1. Review `notes.md` completely
+2. Understand test case expectations from `test_plan.md`
+3. Reference wireframe/prototype for UI (if applicable)
+4. Check design system for patterns (if available)
+
+**If `size_tier` is small/medium/large:**
 1. Review `implementation_plan.md` completely
 2. Understand test case expectations from `test_plan.md`
 3. Reference wireframe/prototype for UI (if applicable)
 4. Check design system for patterns (if available)
 
 ### Create Tasks from Implementation Plan
-Parse the implementation plan and use `TaskCreate` to create a task for each implementation item:
+
+**If `size_tier: trivial`:** Parse `notes.md`'s "## Tasks" checklist section and use `TaskCreate` to create one task per unchecked `- [ ] Task N — ...` line:
+
+1. **Extract all unchecked task lines** from `notes.md`'s "## Tasks" section
+2. **Identify dependencies** between tasks (what must be done before what)
+3. **Create each task** with:
+   - Clear description including the specific files to create/modify
+   - Mapped test cases (TCs) from `test_plan.md` that verify the task
+   - `blocked_by`: tasks that must complete first
+   - `blocks`: tasks that depend on this one
+
+**If `size_tier` is small/medium/large:** Parse the implementation plan and use `TaskCreate` to create a task for each implementation item:
 
 1. **Extract all tasks** from `implementation_plan.md`
 2. **Identify dependencies** between tasks (what must be done before what)
