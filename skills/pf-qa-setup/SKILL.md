@@ -31,6 +31,21 @@ Wait for user input before proceeding if either question is needed.
 
 ---
 
+## Core Rule: Every Checklist Item Must Resolve to a Single Boolean Check
+
+Every item this skill writes into `.qa-workflow.md` — in every phase below — must be one of exactly three kinds. There is no fourth kind ("use your judgment," "review generally," "seems fine") — if a natural checklist item doesn't fit one of these three, rephrase it until it does, or drop it.
+
+1. **`[Automated]`** — a shell command with a clear pass/fail exit code (or a `grep`/count whose output is unambiguous — e.g. "zero matches" = pass). State the exact command inline in the item, not just in a separate commands block.
+2. **`[AI check]`** — a single yes/no question a QA agent (running `/pf-qa`) answers by reading specific, named files or running a specific `git diff`/`git log` command — never "does this look right," always "does file X contain/satisfy Y — yes or no."
+3. **`[Human check]`** — one concrete action for a person (open this exact file, run this exact command, follow these exact repro steps) plus one yes/no question tied to it. Never a vague instruction like "test the feature" or "verify quality" — always something a person can do in one step and answer Yes or No to.
+
+Applying this rule changes how you fill in every phase below:
+- Where the original per-language guidance (Phase 2) or the template (Phase 4) shows a vague item like "Formatting consistent" or "Feature works as described," rewrite it as one of the three kinds above using the project's actual detected tools/files — e.g. `[Automated] <format command> --check exits 0` or `[AI check] read <issue's spec file> and the diff — does the diff implement every acceptance criterion? (Yes/No)`.
+- For `Project-Specific Checks` subsections that don't apply to the detected project type (e.g. Accessibility/Browser/Database for a project with no UI or database), do not leave "not applicable" placeholders or unactionable checkboxes. Instead, replace that whole subsection with a single `[Automated]` **scope guard**: a command that asserts the absence of that domain's files (e.g. `git diff --name-only develop...HEAD | grep -E '\.(tsx?|jsx?)$'` returns zero matches for a project with no frontend). If it ever starts failing, that's the signal the project's scope has grown and the full section should be restored.
+- For `Post-Merge Verification`/`Automation` sections, only include items if CI/CD or automation actually exists (detected via e.g. `.github/workflows/`, `.gitlab-ci.yml`, existing pre-commit config) — phrase what's found as `[Automated]` checks. If none exists, omit these sections entirely rather than listing unrunnable aspirational items.
+
+---
+
 ## Phase 2: Determine QA Commands
 
 Propose commands based on the detected project type. Read any relevant config files first to use actual script names.
@@ -106,7 +121,7 @@ Use today's date for `Last Updated`. Use the project root directory name as `[Pr
 # QA Workflow
 
 **Project:** <project name>
-**Version:** 2.0
+**Version:** 3.0
 **Last Updated:** <today's date YYYY-MM-DD>
 
 ---
@@ -115,12 +130,10 @@ Use today's date for `Last Updated`. Use the project root directory name as `[Pr
 
 Quality assurance checklist that **must pass** before closing any issue.
 
-This workflow ensures:
-- Code quality and consistency
-- Test coverage
-- Documentation completeness
-- No regressions
-- Security considerations
+Every item below is one of three kinds:
+- **[Automated]** — a shell command with a clear pass/fail exit code.
+- **[AI check]** — a single yes/no question answered by reading specific named files.
+- **[Human check]** — one concrete action plus one yes/no question.
 
 **Rule:** If QA fails, fix and retry. Don't close issue until all checks pass.
 
@@ -128,202 +141,99 @@ This workflow ensures:
 
 ## All Issues (Required)
 
-These checks apply to **every** issue regardless of type:
-
 ### Code Quality
-- [ ] **Linting passes** - Run linter, fix all errors/warnings
-- [ ] **Formatting consistent** - Code style matches project conventions
-- [ ] **No debug code** - Remove console.logs, debugger statements, print statements
-- [ ] **No commented code** - Remove commented-out code blocks
-- [ ] **No TODOs** - All TODOs resolved or documented as new issues
+- [ ] **[Automated] Linting passes** — `<lint command>` exits 0.
+- [ ] **[Automated] Formatting consistent** — `<format-check command>` exits 0. (Omit this item entirely if the project has no formatter.)
+- [ ] **[Automated] No debug code introduced** — `git diff develop...HEAD | grep -E "^\+.*(console\.log|debugger;|<language-specific print-debug pattern>)"` returns zero matches.
+- [ ] **[AI check] No commented-out code left in the diff** — read `git diff develop...HEAD` — is there any added line that reads as disabled/old code rather than an explanatory comment? (Yes/No)
+- [ ] **[Automated] No unresolved TODOs introduced by this issue** — `git diff develop...HEAD | grep -E "^\+.*TODO"` returns zero matches.
 
 **Commands:**
 ```bash
 <lint command>
-<format command, if applicable>
+<format-check command, if applicable>
+git diff develop...HEAD | grep -E "^\+.*(console\.log|debugger;|TODO)"
 ```
 
 ### Testing
-- [ ] **All existing tests pass** - No regressions introduced
-- [ ] **New tests added** - New functionality has test coverage
-- [ ] **Tests are meaningful** - Tests actually validate behavior
-- [ ] **Edge cases covered** - Test error paths and edge cases
+- [ ] **[Automated] Test suite passes** — `<test command>` exits 0.
+- [ ] **[Automated] Coverage tool runs clean** — `<coverage command>` exits 0. (Omit if no coverage tool exists.)
+- [ ] **[Automated] Every TC in this issue's test_plan.md is marked done** — `grep -c '| \[ \] *|' docs/issues/open/<ISSUE-ID>/test_plan.md` returns `0`.
+- [ ] **[Human check] Manual test checklist has been run** — open `docs/issues/open/<ISSUE-ID>/manual_test_checklist.md` — is every checkbox marked and every Result filled in (none left blank)? (Yes/No)
 
 **Commands:**
 ```bash
 <test command>
 <coverage command, if applicable>
+grep -c '| \[ \] *|' docs/issues/open/<ISSUE-ID>/test_plan.md
 ```
 
 ### Documentation
-- [ ] **Code comments updated** - Complex logic explained
-- [ ] **README updated** - If user-facing changes
-- [ ] **API docs updated** - If API changes
-- [ ] **Examples work** - Code examples still valid
+- [ ] **[AI check] Docs match the change** — read this issue's `prompt.md`/`brd.md` and `git diff --name-only develop...HEAD` — if a user-facing doc (e.g. README, API docs) is implied as needing an update, was it actually touched? (Yes/No — pass automatically if no doc update was implied)
 
 ### Security
-- [ ] **No security vulnerabilities** - Check for common issues:
-  - SQL injection risks
-  - XSS vulnerabilities
-  - Command injection
-  - Path traversal
-  - Authentication/authorization bypasses
-  - Secrets/credentials hardcoded
-- [ ] **Dependencies safe** - No known vulnerable dependencies
+- [ ] **[Automated] Dependency/security scanner passes** — `<security command>` exits 0.
+- [ ] **[Automated] No hardcoded secrets introduced** — `git diff develop...HEAD | grep -iE "^\+.*(api[_-]?key|secret|password|token)\s*=\s*['\"]"` returns zero matches.
 
 **Commands:**
 ```bash
 <security command>
+git diff develop...HEAD | grep -iE "^\+.*(api[_-]?key|secret|password|token)\s*=\s*['\"]"
 ```
 
 ---
 
 ## Feature Issues (feat, improve)
 
-Additional checks for features and improvements:
-
-### Functionality
-- [ ] **Feature works as described** - Matches requirements in prompt.md
-- [ ] **User flow tested** - Complete user journey works
-- [ ] **Error handling** - Graceful error messages
-
-### Integration
-- [ ] **Integration tests pass** - If applicable
-- [ ] **Works with existing features** - No conflicts
-- [ ] **Performance acceptable** - No major slowdowns
-
-**Commands:**
-```bash
-<integration/e2e test commands, if applicable>
-```
-
-### Documentation
-- [ ] **User documentation updated** - How to use the feature
-- [ ] **Screenshots/demos** - If UI changes
-- [ ] **Migration guide** - If breaking changes
+- [ ] **[AI check] Diff satisfies every acceptance criterion** — read this issue's `implementation_plan.md` (or `notes.md` for trivial-tier issues) — is every listed acceptance criterion actually satisfied by the diff? (Yes/No)
+- [ ] **[Automated] Integration/e2e suite passes** — `<integration/e2e command>` exits 0. (Omit if none exists.)
+- [ ] **[AI check] Diff matches declared scope** — compare `git diff --name-only develop...HEAD` against the "Files to Create/Modify" list in `specs.md`/`notes.md` — is every changed file accounted for there? (Yes/No)
+- [ ] **[AI check] User documentation updated if this is a user-facing change** — same check as the Documentation item above, restated for feature-specific docs (e.g. a changelog entry, a migration note for breaking changes).
 
 ---
 
 ## Bug Issues (bug)
 
-Additional checks specific to bug fixes:
-
-### Bug Resolution
-- [ ] **Failing test created** - Test that reproduces the bug
-- [ ] **Test now passes** - After bug fix
-- [ ] **Regression test added** - Prevent bug from returning
-- [ ] **Root cause understood** - Document in session-log.md
-
-### Verification
-- [ ] **Bug no longer reproduces** - Manual verification
-- [ ] **Related areas checked** - No similar bugs elsewhere
-- [ ] **User confirmed** - Reporter confirms fix
-
-### Documentation
-- [ ] **Bug documented** - Root cause in session-log or decisions.md
-- [ ] **Prevention notes** - How to avoid similar bugs
+- [ ] **[Human check] Bug no longer reproduces** — follow the original repro steps recorded in `analysis.md`/`notes.md` against the fixed code — does the bug still occur? (Yes = fail, No = pass)
+- [ ] **[AI check] Root cause addressed** — read `analysis.md`'s stated root cause and the diff — does the diff change the code path identified as the root cause? (Yes/No)
+- [ ] **[Automated] Regression test added and passes** — a new test targeting this bug exists and `<test command>` (scoped to it if possible) exits 0. (Omit if the project has no test framework — fall back to the Human check above only.)
 
 ---
 
 ## Pre-Merge Checklist
 
-Before merging issue branch to parent:
+- [ ] **[Automated] Working tree clean** — `git status --porcelain` returns empty output.
+- [ ] **[Automated] Branch is up to date with parent** — `git merge-base --is-ancestor <parent-branch> HEAD` exits 0.
+- [ ] **[AI check] Commit messages are descriptive** — read `git log --oneline <parent-branch>..HEAD` — does every commit message describe what changed (not "wip"/"fix"/"updates")? (Yes/No)
+- [ ] **[AI check] No unrelated changes** — same file-list-vs-scope check as the Feature Issues item above, repeated here as the merge gate.
 
-### Git
-- [ ] **All changes committed** - No uncommitted work
-- [ ] **Commit messages clear** - Descriptive commit messages
-- [ ] **No unrelated changes** - Only issue-related changes included
-- [ ] **Branch up to date** - Rebased/merged with parent branch
-
-### Integration
-- [ ] **Merge conflicts resolved** - If any
-- [ ] **Tests pass on parent branch** - After merge
-- [ ] **No breaking changes** - Or properly documented
-
----
-
-## Post-Merge Verification
-
-After merging to parent branch:
-
-- [ ] **CI/CD passes** - All automated checks pass
-- [ ] **Deployment successful** - If auto-deploy enabled
-- [ ] **Smoke tests pass** - Basic functionality works
-- [ ] **Monitoring normal** - No errors/alerts
+**Commands:**
+```bash
+git status --porcelain
+git merge-base --is-ancestor <parent-branch> HEAD
+```
 
 ---
 
 ## Project-Specific Checks
 
-[Customize for your project]
+For each of Performance / Accessibility / Browser-Platform / Database: if the detected project type genuinely involves that domain (a UI, a database, a browser-facing surface), replace this placeholder with real `[Automated]`/`[AI check]`/`[Human check]` items specific to it (e.g. a Lighthouse budget command, an axe-core accessibility scan, a migration-dry-run command). If it does NOT involve that domain, do not list unactionable "not applicable" items — instead write a single scope guard:
 
-### Performance
-- [ ] Load time acceptable
-- [ ] API response time <Xms
-- [ ] Database queries optimized
-- [ ] No N+1 queries introduced
+- [ ] **[Automated] No <domain> files introduced** — `git diff --name-only develop...HEAD | grep -E '<extension/path pattern for that domain>'` returns zero matches. If this ever fails, the project's scope has grown into that domain — expand this section with real domain-specific checks at that point.
 
-### Accessibility (if applicable)
-- [ ] Keyboard navigation works
-- [ ] Screen reader compatible
-- [ ] Color contrast sufficient
-- [ ] ARIA labels added
+---
 
-### Browser/Platform Compatibility (if applicable)
-- [ ] Works in Chrome
-- [ ] Works in Firefox
-- [ ] Works in Safari
-- [ ] Works on mobile
+## Post-Merge / Automation
 
-### Database (if applicable)
-- [ ] Migrations tested
-- [ ] Rollback tested
-- [ ] Indexes added where needed
-- [ ] No destructive changes
+Only include this section if CI/CD or pre-commit automation actually exists in the project (detected via `.github/workflows/`, `.gitlab-ci.yml`, `.pre-commit-config.yaml`, or similar). If found, phrase what exists as `[Automated]` items (e.g. "[Automated] CI workflow file is present and includes a test job — `grep -l 'test' .github/workflows/*.yml` returns at least one match"). If nothing exists, omit this section entirely rather than listing aspirational unrunnable items.
 
 ---
 
 ## Exemptions & Special Cases
 
 **When to skip certain checks:**
-- Documentation-only changes: Skip testing if no code changes
-- Hotfixes: May fast-track some checks (document reason)
-- Experimental branches: Different QA standards (mark clearly)
-
-**Document any exemptions:**
-[If skipping QA checks, document why in issue session-log.md]
-
----
-
-## QA Commands Reference
-
-```bash
-# Linting
-<lint command>
-
-# Testing
-<test command>
-<coverage command, if applicable>
-
-# Security
-<security command>
-
-# Build
-<build command, if applicable>
-```
-
----
-
-## Automation
-
-**Automated QA (if available):**
-- [ ] Pre-commit hooks run linting
-- [ ] CI/CD runs tests automatically
-- [ ] Automated security scanning
-- [ ] Automated dependency updates
-
-**Setup instructions:**
-[How to set up automated QA for this project]
+- Documentation-only changes: the Testing section's `[Automated]`/`[Human check]` items above already degrade gracefully (they only fail if a test/checklist genuinely exists and is incomplete) — no separate skip logic is needed.
+- Hotfixes/experimental branches: document any deliberately-skipped item in the issue's `session-log.md`, naming the item and the reason.
 
 ---
 
@@ -345,22 +255,16 @@ After merging to parent branch:
 
 ## Notes
 
-[Add project-specific QA notes here]
-
-**Quality Standards:**
-- Code coverage target: X%
-- Performance budget: [metrics]
-- Supported browsers: [list]
-- Accessibility level: WCAG [level]
+[Add project-specific QA notes here — e.g. required local tools like linters/scanners that must be installed for the Automated commands above to run.]
 
 ---
 
-**Version:** 2.0
+**Version:** 3.0
 **Project:** <project name>
 **Last Updated:** <today's date YYYY-MM-DD>
 ```
 
-Replace every `<...>` placeholder with the actual commands from Phase 2. If a command category does not apply (e.g. no build step in a Python CLI tool), omit that line rather than leaving a placeholder.
+Replace every `<...>` placeholder with the actual commands/paths from Phase 2 (and `<ISSUE-ID>`/`<parent-branch>` with the values `/pf-qa` resolves at run time — leave these two as literal placeholders in the saved file, since they're filled in per-run, not per-project-setup). If a command category does not apply (e.g. no build step in a Python CLI tool, no coverage tool, no integration suite), omit that entire item/line rather than leaving a placeholder — per the Core Rule above, never leave a vague or unrunnable item in the file.
 
 ---
 

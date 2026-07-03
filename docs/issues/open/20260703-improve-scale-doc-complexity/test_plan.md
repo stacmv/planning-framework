@@ -539,28 +539,28 @@ Because this feature is a set of markdown skill-instruction files rather than ex
 
 ## Status Tracker
 
-| TC     | Test Case                                                                 | Priority | Status | Remarks |
-| ------ | -------------------------------------------------------------------------- | -------- | ------ | ------- |
-| TC-001 | Tier question asked at issue creation                                      | Critical | [ ]    |         |
-| TC-002 | Legacy issue is classified on first pipeline-skill run                     | Critical | [ ]    |         |
-| TC-003 | Legacy guard fires identically when a non-/pf skill is run first           | High     | [ ]    |         |
-| TC-004 | BRD-content tier confirmation — heuristic disagrees with recorded tier     | Critical | [ ]    |         |
-| TC-005 | BRD-content tier confirmation — heuristic agrees, no prompt shown          | Medium   | [ ]    |         |
-| TC-006 | pf-brd on trivial tier produces notes.md directly, no sub-agent, no brd.md | Critical | [ ]    |         |
-| TC-007 | Trivial-tier routing table — document-presence-keyed lookup                | Critical | [ ]    |         |
-| TC-008 | Status output includes the tier                                            | Medium   | [ ]    |         |
-| TC-009 | Step 5 stage detection — notes.md collapse vs. routing decoupling          | High     | [ ]    |         |
-| TC-010 | pf-test-plan still dispatches its sub-agent at trivial tier, scaled counts | Critical | [ ]    |         |
-| TC-011 | pf-spec stops immediately for trivial tier                                 | High     | [ ]    |         |
-| TC-012 | pf-spec small-tier scaling — omits diagrams, targets ≤300 lines           | High     | [ ]    |         |
-| TC-013 | pf-test-plan / pf-impl-plan — medium/large tiers unchanged                | High     | [ ]    |         |
-| TC-014 | pf-impl-plan trivial stop and small-tier section omission                  | High     | [ ]    |         |
-| TC-015 | pf-check flags an oversized notes.md as a P0 finding                      | Critical | [ ]    |         |
-| TC-016 | Downstream skill blocks when predecessor is still oversized                | Critical | [ ]    |         |
-| TC-017 | Bug-issue tier confirmation happens inside /pf's analysis.md step          | High     | [ ]    |         |
-| TC-018 | pf-execute prerequisite gate branches correctly by tier                    | Critical | [ ]    |         |
-| TC-019 | pf-execute parses notes.md's Tasks checklist into TaskCreate calls          | High     | [ ]    |         |
-| TC-020 | pf-update lists pf-size-tiers as a managed skill                           | Medium   | [ ]    |         |
+| TC     | Test Case                                                                 | Type   | Priority | Status | Remarks |
+| ------ | -------------------------------------------------------------------------- | ------ | -------- | ------ | ------- |
+| TC-001 | Tier question asked at issue creation                                      | Manual | Critical | [ ]    |         |
+| TC-002 | Legacy issue is classified on first pipeline-skill run                     | Manual | Critical | [ ]    |         |
+| TC-003 | Legacy guard fires identically when a non-/pf skill is run first           | Manual | High     | [ ]    |         |
+| TC-004 | BRD-content tier confirmation — heuristic disagrees with recorded tier     | Manual | Critical | [ ]    |         |
+| TC-005 | BRD-content tier confirmation — heuristic agrees, no prompt shown          | Manual | Medium   | [ ]    |         |
+| TC-006 | pf-brd on trivial tier produces notes.md directly, no sub-agent, no brd.md | Manual | Critical | [ ]    |         |
+| TC-007 | Trivial-tier routing table — document-presence-keyed lookup                | Manual | Critical | [ ]    |         |
+| TC-008 | Status output includes the tier                                            | Manual | Medium   | [ ]    |         |
+| TC-009 | Step 5 stage detection — notes.md collapse vs. routing decoupling          | Manual | High     | [ ]    |         |
+| TC-010 | pf-test-plan still dispatches its sub-agent at trivial tier, scaled counts | Manual | Critical | [ ]    |         |
+| TC-011 | pf-spec stops immediately for trivial tier                                 | Manual | High     | [ ]    |         |
+| TC-012 | pf-spec small-tier scaling — omits diagrams, targets ≤300 lines           | Manual | High     | [ ]    |         |
+| TC-013 | pf-test-plan / pf-impl-plan — medium/large tiers unchanged                | Manual | High     | [ ]    |         |
+| TC-014 | pf-impl-plan trivial stop and small-tier section omission                  | Manual | High     | [ ]    |         |
+| TC-015 | pf-check flags an oversized notes.md as a P0 finding                      | Manual | Critical | [ ]    |         |
+| TC-016 | Downstream skill blocks when predecessor is still oversized                | Manual | Critical | [ ]    |         |
+| TC-017 | Bug-issue tier confirmation happens inside /pf's analysis.md step          | Manual | High     | [ ]    |         |
+| TC-018 | pf-execute prerequisite gate branches correctly by tier                    | Manual | Critical | [ ]    |         |
+| TC-019 | pf-execute parses notes.md's Tasks checklist into TaskCreate calls          | Manual | High     | [ ]    |         |
+| TC-020 | pf-update lists pf-size-tiers as a managed skill                           | Manual | Medium   | [ ]    |         |
 
 ## Known Issues
 
