@@ -83,12 +83,14 @@ Group test cases:
 
 ### Step 4: Create Status Tracker
 
+Each row must include a **Type** column: `Auto` if the test case is verified by running an automated test suite (e.g. a unit/integration test asserting behavior of executable code), or `Manual` if it can only be verified by a human following steps by hand (e.g. inspecting a generated document, running a CLI/skill interactively, checking prose content). `/pf-test` uses this column to decide which TCs gate on the automated test suite and which go into the manual test checklist — every TC must be marked one or the other, there is no unmarked/blank state.
+
 ```markdown
 ## Status Tracker
 
-| TC     | Test Case | Priority | Status | Remarks |
-| ------ | --------- | -------- | ------ | ------- |
-| TC-001 | [Name]    | High     | [ ]    |         |
+| TC     | Test Case | Type   | Priority | Status | Remarks |
+| ------ | --------- | ------ | -------- | ------ | ------- |
+| TC-001 | [Name]    | Auto/Manual | High | [ ]    |         |
 ```
 
 ### Step 5: Add Known Issues Section
