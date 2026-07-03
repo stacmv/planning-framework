@@ -9,6 +9,8 @@ Based on `brd.md`. Covers the concrete changes needed across the skill files to 
 - **`pf-execute` (§10) is required, not optional.** `pf-execute`'s prerequisite gate currently requires `implementation_plan.md` to exist. Trivial-tier issues never produce `implementation_plan.md` — they produce `notes.md` instead (§2, §4). Without updating `pf-execute`, a trivial-tier issue would complete CREATE → BRD → TEST_PLAN via the quick pipeline and then dead-end at the execute step with no way to proceed at all. Trivial tier would be unusable end-to-end, defeating the point of this issue.
 - **`pf-update` (§11) is a required bookkeeping consequence**, not new scope in its own right: §2 introduces a new skill file (`skills/pf-size-tiers/SKILL.md`), and `pf-update`'s existing "Managed Skills" list needs to know about it so `/pf-update` reports it correctly, the same way every other shipped skill is listed there today.
 
+**Addendum — QA workflow scope addition (added during `/pf-qa`/`/pf-qa-setup`, post-implementation):** this issue's diff also touches `.qa-workflow.md` (project root) and `skills/pf-qa-setup/SKILL.md`. This was not part of the original size-tier feature — it was an explicit, separate user request made mid-session to redesign this project's QA workflow so every checklist item resolves to an automated command, a single AI-answerable yes/no check, or one atomic human action, instead of open-ended judgment calls. It's unrelated to size-tier scaling itself but is bundled into this issue's branch/commits since it was requested and completed in the same working session. Recorded here so `specs.md`'s "Files to Create/Modify" lists (§10's implementation-plan equivalent) and the diff stay reconcilable.
+
 ## 1. Architecture Overview
 
 ```
