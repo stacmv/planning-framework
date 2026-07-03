@@ -23,6 +23,7 @@ The following skills are discovered and updated automatically:
 - `pf-qa-setup` — QA environment setup
 - `pf-close` — issue closure workflow
 - `pf-update` — this skill (self-updates)
+- `pf-size-tiers` — reference data: tier definitions and document budgets (not directly invoked)
 
 ## Step 1: Find the framework source
 
