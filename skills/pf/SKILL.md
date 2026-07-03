@@ -46,6 +46,10 @@ For the single issue folder found, extract TYPE from the folder name:
 - Folder starts with `YYYYMMDD-improve-` → type is **improve**
 - Folder starts with `YYYYMMDD-bug-` → type is **bug**
 
+## Legacy-tier guard (before Step 5)
+
+Before proceeding to Step 5, check the active issue's `prompt.md` frontmatter. If it has no `size_tier` field, ask the same tier question as in "Creating prompt.md" below (four options — trivial/small/medium/large, one-line descriptions, recommending medium by default), then write the answer back into `prompt.md`'s frontmatter before continuing. Do not re-ask once `size_tier` is already present.
+
 ## Step 5: Detect completed stages
 
 Check which documents exist inside the issue folder (`docs/issues/open/<ISSUE-ID>/`):
@@ -60,12 +64,33 @@ Check which documents exist inside the issue folder (`docs/issues/open/<ISSUE-ID
 | `implementation_plan.md` | IMPL_PLAN |
 | `manual_test_checklist.md` | TESTING |
 | `qa_report.md` | QA |
+| `notes.md` | BRD, SPEC, IMPL_PLAN (and ANALYSIS, for bug-type) — all at once |
 
-List all completed stages in order.
+List all completed stages in order. Note: the `notes.md` row is for the **completed-stages display line** only (this line, and Step 7's status block). Step 6's next-step decision for `size_tier: trivial` never uses this collapsed-stage view — see the precedence rule and trivial-tier routing table in Step 6.
 
 ## Step 6: Determine next step
 
-Use the type-specific workflow below. The "current position" is the last completed stage.
+**Precedence rule — check `size_tier` before selecting a workflow table.** Read `size_tier` from the issue's `prompt.md` frontmatter (by this point Step 5's legacy-tier guard has already ensured this field is present) *before* selecting any type-specific (feat/improve/bug) workflow table below. If `size_tier: trivial`, the trivial-tier routing table applies **exclusively**, regardless of issue type — do not consult the feat/improve/bug tables at all. In particular, for a trivial-tier bug issue, this means the bug workflow's entire "CREATE only (no analysis.md)" action (asking the user to describe the bug and writing `analysis.md`) is bypassed too, not just its reconfirmation sub-step: a trivial-tier bug issue never gets an `analysis.md`; it goes straight to `/pf-brd`, which produces `notes.md` instead (including the bug-only `## Root Cause / Context` section).
+
+If `size_tier` is small/medium/large, use the type-specific workflow below as before. The "current position" is the last completed stage.
+
+### trivial-tier workflow (all issue types)
+
+Applies whenever `size_tier: trivial`, superseding the feat/improve/bug tables below entirely:
+
+```
+CREATE → /pf-brd (produces notes.md) → /pf-check → /pf-test-plan → /pf-check → /pf-execute
+```
+
+This table is keyed on **which documents exist in the issue folder**, not on "last completed stage" — Step 5's `notes.md` row collapses BRD/SPEC/IMPL_PLAN (and ANALYSIS) into the completed-stages *display* line all at once, which would incorrectly suggest routing straight to `/pf-execute` if this table were keyed the same way. Keying on document presence avoids that: `/pf-test-plan` is never skipped just because `notes.md` also stands in for the earlier stages.
+
+| `size_tier: trivial` — documents present | Next step |
+|---|---|
+| `notes.md` does not exist yet | `/pf-brd` |
+| `notes.md` exists, `test_plan.md` does not | `/pf-check` (before `test_plan.md` exists), then `/pf-test-plan` (once check passed, per the "Note on 'check passed'" convention below) |
+| `notes.md` + `test_plan.md` both exist | `/pf-check` (before executing), then `/pf-execute` (once check passed) |
+
+`/pf-spec` and `/pf-impl-plan` must never appear as a next step when `size_tier: trivial`.
 
 ### feat workflow
 ```
@@ -82,7 +107,6 @@ CREATE → /pf-brd → BRD → /pf-spec → SPEC → /pf-check → (check passes
 | TEST_PLAN + check passed | `/pf-impl-plan` |
 | IMPL_PLAN | `/pf-check` |
 | IMPL_PLAN + check passed | `/pf-execute` |
-| IMPL_PLAN | `/pf-test` |
 | TESTING | `/pf-qa` |
 | QA | `/pf-close` |
 
@@ -99,7 +123,6 @@ CREATE → /pf-brd → BRD → /pf-check → (check passes) → /pf-test-plan �
 | TEST_PLAN | `/pf-check` |
 | TEST_PLAN + check passed | `/pf-impl-plan` |
 | IMPL_PLAN | `/pf-execute` |
-| IMPL_PLAN | `/pf-test` |
 | TESTING | `/pf-qa` |
 | QA | `/pf-close` |
 
@@ -110,13 +133,12 @@ CREATE → ANALYSIS → /pf-check → (check passes) → /pf-test-plan → TEST_
 
 | Last completed stage | Next step |
 |---|---|
-| CREATE only (no analysis.md) | Ask the user to describe the bug, then write `analysis.md` (root cause, reproduction steps, impact) to the issue folder, in the language recorded in `prompt.md`'s `doc_language` frontmatter field (default English) |
+| CREATE only (no analysis.md) | Ask the user to describe the bug, then write `analysis.md` (root cause, reproduction steps, impact) to the issue folder, in the language recorded in `prompt.md`'s `doc_language` frontmatter field (default English). Then re-read the saved `analysis.md` and holistically judge whether its actual scope (root cause complexity, blast radius, number of affected code paths) matches the recorded `size_tier`. If the judgment disagrees, ask the user via `AskUserQuestion` (recommend the model's own judgment, with reasoning) to confirm or override, then update `prompt.md`'s `size_tier` if changed. (This reconfirmation step never runs when `size_tier: trivial` — per the precedence rule above, trivial-tier bug issues never reach this row at all; they are routed via the trivial-tier table to `/pf-brd`, which produces `notes.md` instead.) |
 | ANALYSIS present | `/pf-check` |
 | ANALYSIS + check passed | `/pf-test-plan` |
 | TEST_PLAN | `/pf-check` |
 | TEST_PLAN + check passed | `/pf-impl-plan` |
 | IMPL_PLAN | `/pf-execute` |
-| IMPL_PLAN | `/pf-test` |
 | TESTING | `/pf-qa` |
 | QA | `/pf-close` |
 
@@ -128,7 +150,7 @@ Print the status block:
 
 ```
 Planning Framework v<VERSION>
-Active issue: <ISSUE-ID>  (type: feat/improve/bug)
+Active issue: <ISSUE-ID>  (type: feat/improve/bug, tier: trivial/small/medium/large)
 Completed stages: <STAGE1>, <STAGE2>, ...
 Next step: /<next-command>
 ```
@@ -136,7 +158,7 @@ Next step: /<next-command>
 If no stages are completed yet (only the folder exists with no documents), ask the user to describe the task, then follow "Creating prompt.md" below and show:
 ```
 Planning Framework v<VERSION>
-Active issue: <ISSUE-ID>  (type: feat/improve/bug)
+Active issue: <ISSUE-ID>  (type: feat/improve/bug, tier: trivial/small/medium/large)
 Completed stages: (none — prompt.md created)
 Next step: /pf-brd
 ```
@@ -145,14 +167,24 @@ Next step: /pf-brd
 
 Whenever a new issue's `prompt.md` is about to be written (from either path above), first use AskUserQuestion to ask: **"What language should the planning documents for this issue be written in?"** with options English, Russian, and Other (free text). This choice only needs to be asked once per issue.
 
-Write `prompt.md` with a YAML frontmatter block recording the answer, followed by the task description:
+Immediately after, use AskUserQuestion to ask a second question: **"How big is this task?"** with four options, one line each (from `skills/pf-size-tiers/SKILL.md`'s Tiers table), recommending **medium** by default ("today's standard full pipeline — pick this if unsure"):
+
+- **trivial** — One-liner or single obvious fix. 1 user story, ≤3 ACs.
+- **small** — Single focused change, clearly bounded. 2-3 user stories.
+- **medium** (recommended) — Today's framework default. 4-6 user stories.
+- **large** — Multi-subsystem or 7+ user stories.
+
+Write `prompt.md` with a YAML frontmatter block recording both answers, followed by the task description:
 
 ```
 ---
 doc_language: English
+size_tier: medium
 ---
 
 <task description as given by the user>
 ```
 
 Use the exact language name the user gave (e.g. `Russian`, or whatever they typed for "Other") as the `doc_language` value. Every downstream pf-* skill that produces a document reads this field and writes its prose content in that language, defaulting to English if the field is absent — see each skill's own instructions for specifics.
+
+Record the chosen tier (`trivial`, `small`, `medium`, or `large`) as `size_tier`, next to `doc_language`. Every downstream pf-* skill reads this field and scales document length/sections/routing accordingly — see `skills/pf-size-tiers/SKILL.md` for the full tables and each skill's own instructions for specifics.
