@@ -39,3 +39,6 @@ coverage/
 # Planning Framework - Keep these files versioned
 # docs/prd.md
 # docs/planning/
+
+# Manual Test UI - per-machine project list, never versioned
+tools/manual-test-ui/projects.json

@@ -1,0 +1,47 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Manual Test UI</title>
+<link rel="stylesheet" href="/style.css" />
+</head>
+<body>
+<div class="app">
+  <aside class="sidebar">
+    <h1>Manual Test UI</h1>
+
+    <div class="panel">
+      <h2>Project</h2>
+      <ul id="project-list" class="list"></ul>
+    </div>
+
+    <div class="panel">
+      <h2>Issue</h2>
+      <ul id="issue-list" class="list"></ul>
+    </div>
+  </aside>
+
+  <main class="content">
+    <div id="empty-state" class="empty-state">
+      Select a project and an issue to see its manual test checklist.
+    </div>
+
+    <div id="checklist-view" class="checklist-view" hidden>
+      <header class="checklist-header">
+        <h2 id="checklist-title"></h2>
+        <div id="checklist-progress" class="progress"></div>
+      </header>
+
+      <div id="checklist-banner" class="checklist-banner" hidden></div>
+
+      <div id="tc-container"></div>
+    </div>
+  </main>
+</div>
+
+<div id="toast" class="toast" hidden></div>
+
+<script src="/app.js"></script>
+</body>
+</html>
