@@ -32,10 +32,10 @@
 - Все проверки — синхронные `fs.existsSync`/`fs.readFileSync`, без сети.
 
 **Acceptance Criteria:**
-- [ ] TC-001 passes
-- [ ] TC-002 passes
-- [ ] TC-003 passes
-- [ ] TC-004 passes
+- [x] TC-001 passes
+- [x] TC-002 passes
+- [x] TC-003 passes
+- [x] TC-004 passes
 
 ---
 
@@ -50,10 +50,10 @@
 - Покрыть отдельным кейсом и P0-1 fallback (только `docs/issues/{open,closed}` + `session-log.md`, без `PLANNING.md`) → `v3`.
 
 **Acceptance Criteria:**
-- [ ] TC-001 passes (unit test in `detect.test.js`)
-- [ ] TC-002 passes (unit test in `detect.test.js`)
-- [ ] TC-003 passes (unit test in `detect.test.js`)
-- [ ] TC-004 passes (unit test in `detect.test.js`)
+- [x] TC-001 passes (unit test in `detect.test.js`)
+- [x] TC-002 passes (unit test in `detect.test.js`)
+- [x] TC-003 passes (unit test in `detect.test.js`)
+- [x] TC-004 passes (unit test in `detect.test.js`)
 
 ---
 
@@ -70,8 +70,8 @@
 - `q` в любом меню — корректный выход (`rl.close()`, `process.exit(0)`).
 
 **Acceptance Criteria:**
-- [ ] TC-005 passes
-- [ ] TC-009 passes
+- [x] TC-005 passes
+- [x] TC-009 passes
 
 ---
 
@@ -87,7 +87,7 @@
 - Туториал не должен ничего блокировать: выход в меню и немедленный выбор "Install v3.0" должны работать без прохождения всех экранов.
 
 **Acceptance Criteria:**
-- [ ] TC-006 passes
+- [x] TC-006 passes
 
 ---
 
@@ -108,8 +108,8 @@
 - Не дублировать и не переписывать бизнес-логику `.sh`-скриптов — только вызов.
 
 **Acceptance Criteria:**
-- [ ] TC-007 passes
-- [ ] TC-008 passes
+- [x] TC-007 passes
+- [x] TC-008 passes
 
 ---
 
@@ -134,4 +134,4 @@
 - Проверить вручную, что `make help`, `make setup-v3`, `make migrate-v2-to-v3`, `make update-skills`, `make migrate-v1-to-v2`, `make setup-v2`, `make issue-status` работают как до изменения (сравнение с веткой `develop`).
 
 **Acceptance Criteria:**
-- [ ] TC-010 passes
+- [x] TC-010 passes

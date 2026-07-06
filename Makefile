@@ -1,6 +1,6 @@
 PORT ?=
 
-.PHONY: help test-ui update-skills issue-status migrate-v1-to-v2 migrate-v2-to-v3 setup-v2 setup-v3
+.PHONY: help test-ui update-skills issue-status migrate-v1-to-v2 migrate-v2-to-v3 setup-v2 setup-v3 tui
 
 help:
 	@echo "Planning Framework - Commands"
@@ -15,6 +15,8 @@ help:
 	@echo "  make migrate-v2-to-v3             Migrate a consumer project from v2.0 to v3.0"
 	@echo "  make setup-v2                     Interactive v2.0 setup for a new consumer project"
 	@echo "  make setup-v3                     Interactive v3.0 setup for a new consumer project"
+	@echo "  make tui                           Launch the interactive onboarding/update wizard"
+	@echo "  make tui TARGET=<path>             Run against a specific target project directory"
 
 test-ui:
 	@if [ ! -f tools/manual-test-ui/projects.json ]; then \
@@ -42,3 +44,6 @@ setup-v2:
 
 setup-v3:
 	bash scripts/setup-planning-v3.sh
+
+tui:
+	node tools/onboarding-tui/cli.js $(if $(TARGET),--target $(TARGET),)
