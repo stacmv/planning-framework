@@ -20,13 +20,13 @@ Run `/pf` at any time to see where you are and what to do next.
 ## Workflow by issue type
 
 **Feature** (`feat`):
-> BRD → Spec → ✓ Check → Test Plan → ✓ Check → Implementation Plan → ✓ Check → Execute
+> BRD → Spec → ✓ Check → Test Plan → ✓ Check → Implementation Plan → ✓ Check → Execute → Test → QA → Close
 
 **Improvement** (`improve`):
-> BRD → ✓ Check → Test Plan → ✓ Check → Implementation Plan → ✓ Check → Execute
+> BRD → ✓ Check → Test Plan → ✓ Check → Implementation Plan → ✓ Check → Execute → Test → QA → Close
 
 **Bug fix** (`bug`):
-> Root Cause Analysis → ✓ Check → Test Plan → ✓ Check → Implementation Plan → ✓ Check → Execute
+> Root Cause Analysis → ✓ Check → Test Plan → ✓ Check → Implementation Plan → ✓ Check → Execute → Test → QA → Close
 
 ## Skills
 
@@ -39,6 +39,11 @@ Run `/pf` at any time to see where you are and what to do next.
 | `/pf-test-plan` | Create a test plan with TC-NNN test cases |
 | `/pf-impl-plan` | Create an implementation plan mapped to test cases |
 | `/pf-execute` | Execute the implementation plan using sub-agents |
+| `/pf-test` | Run tests, update the Status Tracker, generate `manual_test_checklist.md` |
+| `/pf-manual-test` | Launch the local Manual Test UI to fill in the manual test checklist |
+| `/pf-qa-setup` | Create or update `.qa-workflow.md` for this project |
+| `/pf-qa` | Run QA checks, confirm manual items, produce `qa_report.md` (PASS/FAIL) |
+| `/pf-close` | Close the issue — merge branch, archive folder, update session-log |
 | `/pf-update` | Update all skills to the latest version |
 | `/pf-help` | Show this help |
 
@@ -48,14 +53,15 @@ Run `/pf` at any time to see where you are and what to do next.
 2. Run `/pf` — if no issue exists, describe what you want to build and the AI creates the issue folder
 3. Follow the next step shown by `/pf` at each stage
 4. Run `/pf-check` after each document before moving to the next stage
+5. After `/pf-execute`, run `/pf-test` then `/pf-qa` — QA must pass before `/pf-close`
 
 ## Issue folder contents
 
 | Type | Documents |
 |---|---|
-| feat | `prompt.md`, `brd.md`, `specs.md`, `test_plan.md`, `implementation_plan.md` |
-| improve | `prompt.md`, `brd.md`, `test_plan.md`, `implementation_plan.md` |
-| bug | `prompt.md`, `analysis.md`, `test_plan.md`, `implementation_plan.md` |
+| feat | `prompt.md`, `brd.md`, `specs.md`, `test_plan.md`, `implementation_plan.md`, `session-log.md`, `manual_test_checklist.md`, `qa_report.md` |
+| improve | `prompt.md`, `brd.md`, `test_plan.md`, `implementation_plan.md`, `session-log.md`, `manual_test_checklist.md`, `qa_report.md` |
+| bug | `prompt.md`, `analysis.md`, `test_plan.md`, `implementation_plan.md`, `session-log.md`, `manual_test_checklist.md`, `qa_report.md` |
 
 ## Installing in a new project
 
