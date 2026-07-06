@@ -13,6 +13,11 @@
 - `tools/onboarding-tui/lib/actions.js` — обёртки spawn над `scripts/*.sh`
 - `tools/onboarding-tui/test/detect.test.js` — `node:test`-тесты для `detect.js` (TC-001..004)
 - `Makefile` — новая цель `tui` + две строки в `help` (существующие цели не трогаются)
+- `scripts/setup-planning-v3.sh` — модификация: новый шаг установки шима `pf` (Task 6)
+- `scripts/update-skills.sh` — модификация: новый шаг установки шима `pf` (Task 6)
+- `scripts/install.sh` — новый файл: однокомандный установщик фреймворка для Linux/macOS (Task 7)
+- `scripts/install.ps1` — новый файл: однокомандный установщик фреймворка для Windows (Task 8)
+- `README.md` — модификация: секция одно-командной установки (Task 9)
 
 ### Implementation Tasks
 
@@ -135,3 +140,127 @@
 
 **Acceptance Criteria:**
 - [x] TC-010 passes
+
+---
+
+#### Task 6: Глобальный шим `pf` в `setup-planning-v3.sh` и `update-skills.sh`
+
+**Mapped Test Cases:** TC-011, TC-012, TC-013
+**Files:**
+- `scripts/setup-planning-v3.sh` - новый шаг после установки скиллов: создать `~/.claude/bin` (если отсутствует), записать `~/.claude/bin/pf`, `chmod +x`, проверить `PATH`. Этот шаг относится только к существующему сценарию «установить фреймворк в проект-потребитель» — не связан с `install.sh`/`install.ps1` (Task 7/8), которые устанавливают шим самостоятельно, без вызова этого скрипта.
+- `scripts/update-skills.sh` - тот же шаг установки шима, добавленный после существующего цикла обновления скиллов; шим не зависит от `--source`/консьюмер-таргета — всегда указывает на `FRAMEWORK_DIR` (директорию, где лежит сам `update-skills.sh`)
+
+**Implementation Notes:**
+- Шаблон файла шима — точно по specs.md ("Глобальный шим `pf` (AC-6)"):
+  ```sh
+  #!/usr/bin/env sh
+  exec node "<FRAMEWORK_ROOT>/tools/onboarding-tui/cli.js" --target "$(pwd)" "$@"
+  ```
+  `<FRAMEWORK_ROOT>` подставляется во время установки как `$FRAMEWORK_DIR` (в `setup-planning-v3.sh` уже вычислен как `SCRIPT_DIR/..`; в `update-skills.sh` вычислить аналогично через `SCRIPT_DIR/..`) — абсолютный путь, не вычисляется динамически из `$0` шима.
+- Запись шима — идемпотентно перезаписывать файл целиком (`cat > "$GLOBAL_BIN_DIR/pf" <<EOF ... EOF`), не дописывать/не создавать `.bak`/`.old` (TC-012): один и тот же путь кода на первом и повторном запуске, без вопроса подтверждения перезаписи.
+- После записи — `chmod +x "$GLOBAL_BIN_DIR/pf"`.
+- Проверка `PATH`: `case ":$PATH:" in *":$HOME/.claude/bin:"*) ;; *) echo 'warning: add to PATH: export PATH="$HOME/.claude/bin:$PATH"' ;; esac` — печатать точную строку `export PATH="$HOME/.claude/bin:$PATH"`, не пытаться редактировать `.bashrc`/`.zshrc` (TC-013). Не печатать предупреждение, если директория уже в `PATH`.
+- `GLOBAL_BIN_DIR="$HOME/.claude/bin"`, создать через `mkdir -p` при отсутствии.
+- Не менять существующую бизнес-логику установки скиллов/шаблонов в обоих скриптах — шаг добавляется как новый блок в конце соответствующего скрипта (после текущего шага 6/финального summary в `setup-planning-v3.sh`, после финального счётчика в `update-skills.sh`).
+- Флаг `--self` не добавляется: этот Task касается исключительно существующего сценария «установить фреймворк в проект-потребитель», интерактивные шаги 1-2 (`read -rp`) остаются без изменений.
+
+**Acceptance Criteria:**
+- [ ] TC-011 passes
+- [ ] TC-012 passes
+- [ ] TC-013 passes
+
+**Dependencies:** Нет (первая новая задача; Task 9 не зависит от неё напрямую — см. общий раздел "Dependencies" ниже).
+**Complexity Estimate:** Medium — два независимых bash-скрипта, новая логика идемпотентной записи файла + проверка PATH, но без внешних зависимостей и сети.
+
+---
+
+#### Task 7: `scripts/install.sh` — однокомандный установщик для Linux/macOS
+
+**Mapped Test Cases:** TC-014, TC-015
+**Files:**
+- `scripts/install.sh` - новый POSIX-совместимый bash-скрипт, точка входа для `curl -fsSL .../install.sh | sh`
+
+**Implementation Notes:**
+- Шаги строго по specs.md ("Однокомандный установщик фреймворка (AC-7, AC-8)"):
+  1. Проверить `command -v git` и `command -v node`; при отсутствии — сообщение на stderr с названием отсутствующей программы и ссылкой на установку (`https://git-scm.com/downloads`, `https://nodejs.org/`), `exit 1`. Не вызывать `apt`/`brew`/etc.
+  2. `INSTALL_DIR="$HOME/.claude/planning-framework"`.
+  3. Если `"$INSTALL_DIR/.git"` существует — `git -C "$INSTALL_DIR" pull --ff-only`; иначе `git clone https://github.com/stacmv/planning-framework.git "$INSTALL_DIR"`. Один и тот же путь кода в обоих случаях, без интерактивного вопроса о переустановке (US-6, AC-8).
+  4. Установка шима и скиллов для самого фреймворка — инлайн-шагами внутри `install.sh`, **без вызова `setup-planning-v3.sh`** (см. P0-обоснование в разделе "Dependencies" ниже):
+     - Скиллы: динамически обнаружить все директории с `SKILL.md` в `$INSTALL_DIR/skills/`, зеркаля механизм обнаружения из `scripts/update-skills.sh` (`find "$SOURCE_DIR" -mindepth 1 -maxdepth 1 -type d -print0`, отфильтрованный по `[[ -f "$d/SKILL.md" ]]`), и скопировать каждую найденную директорию в `~/.claude/skills/<имя>/` (`mkdir -p "$dst"` + `cp -r "$src/." "$dst/"`).
+     - Шим: записать `~/.claude/bin/pf` тем же шаблоном, что и в Task 6 (`<FRAMEWORK_ROOT>` = `$INSTALL_DIR`), `mkdir -p "$HOME/.claude/bin"` при отсутствии, `chmod +x`, та же проверка `PATH` (тот же `case ":$PATH:" in ...` паттерн, что в Task 6) — реализуется как собственный код `install.sh`, не переиспользуя код Task 6 напрямую (bash-скрипты не импортируют функции друг друга без `source`), но используя идентичный шаблон/логику.
+  5. Итоговое сообщение: путь установки (`$INSTALL_DIR`), напоминание про `PATH`, если `~/.claude/bin` там не найдено (тот же паттерн проверки, что и в шаге 4 выше).
+- Оба сценария (первая установка / повторный запуск) должны завершаться успешно и без интерактивных вопросов (TC-014).
+- Проверки зависимостей — до любого создания/изменения файлов в `$INSTALL_DIR` (TC-015, шаг 4: `~/.claude/planning-framework` не создан при отсутствующих зависимостях).
+- `set -e` в начале скрипта; явные проверки зависимостей должны идти до `set -e`-чувствительных шагов, чтобы сообщение об ошибке было понятным, а не голым нулевым/ненулевым кодом от `command -v`.
+
+**Acceptance Criteria:**
+- [ ] TC-014 passes
+- [ ] TC-015 passes
+
+**Dependencies:** Не зависит от Task 6 архитектурно (`install.sh` больше не вызывает `setup-planning-v3.sh`) — но должен использовать тот же шаблон файла шима, что и Task 6 (см. раздел "Dependencies" ниже), не вызывая при этом сам скрипт Task 6.
+**Complexity Estimate:** Medium — новый скрипт; собственная новая логика — dependency-check, git clone/pull, динамическое обнаружение скиллов (по образцу `update-skills.sh`) и запись шима.
+
+---
+
+#### Task 8: `scripts/install.ps1` — однокомандный установщик для Windows
+
+**Mapped Test Cases:** TC-016
+**Files:**
+- `scripts/install.ps1` - новый PowerShell-скрипт, точка входа для `irm .../install.ps1 | iex`
+
+**Implementation Notes:**
+- Шаги — тот же порядок, что в `install.sh` (Task 7), средствами PowerShell, по specs.md ("`scripts/install.ps1` (Windows)"):
+  1. `Get-Command git -ErrorAction SilentlyContinue` / `Get-Command node -ErrorAction SilentlyContinue`; при отсутствии — `Write-Error` с названием отсутствующей программы и ссылкой на установку, `exit 1`.
+  2. `$InstallDir = "$HOME\.claude\planning-framework"`.
+  3. Если `Test-Path "$InstallDir\.git"` — `git -C $InstallDir pull --ff-only`; иначе `git clone https://github.com/stacmv/planning-framework.git $InstallDir`.
+  4. Установка шима: на Windows POSIX-шим неприменим — создать `~/.claude/bin/pf.cmd` с содержимым, эквивалентным `node "<FRAMEWORK_ROOT>\tools\onboarding-tui\cli.js" --target "%CD%" %*` (`<FRAMEWORK_ROOT>` = `$InstallDir`, подставляется во время установки, не вычисляется динамически). Идемпотентная перезапись файла (`Set-Content`, не `Add-Content`), без резервных копий.
+  5. Проверка `PATH`: `[Environment]::GetEnvironmentVariable('PATH','User')` — если `$HOME\.claude\bin` отсутствует в результирующей строке, вывести предупреждение с рекомендацией добавить эту директорию через "System Properties > Environment Variables" (Windows-эквивалент строки `export PATH=...` из POSIX-версии — не пытаться автоматически изменить реестр/переменную).
+  6. Итоговое сообщение с путём установки и напоминанием про `PATH`, аналогично `install.sh`.
+- Это отдельный скрипт от Task 6 (там — только POSIX `setup-planning-v3.sh`/`update-skills.sh`) и не вызывает bash-скрипты; как и Task 7 (`install.sh`), реализует установку шима/скиллов инлайн, средствами PowerShell — оба однокомандных установщика (Task 7 и Task 8) теперь симметричны: ни один не делегирует в `setup-planning-v3.sh`, оба используют динамическое обнаружение скиллов (без хардкод-списка), что даёт одинаковый и полный набор скиллов на обеих платформах.
+- Скиллы устанавливаются в тот же `~/.claude/skills` — динамическое обнаружение директорий с `SKILL.md` в `$InstallDir\skills\` (`Get-ChildItem -Directory` + фильтр по наличию `SKILL.md`, зеркаля механизм `update-skills.sh`), копирование каждой найденной директории средствами `Copy-Item -Recurse -Force`.
+
+**Acceptance Criteria:**
+- [ ] TC-016 passes
+
+**Dependencies:** Не зависит от Task 6/7 напрямую (отдельная Windows-реализация под PowerShell, симметричная Task 7 по подходу — динамическое обнаружение скиллов + инлайн-установка шима); логически идёт после Task 7 как парный установщик.
+**Complexity Estimate:** Medium — новая PowerShell-логика (dependency-check, git clone/pull, `.cmd`-шим, User-scope PATH), без переиспользования bash-кода.
+
+---
+
+#### Task 9: README.md — секция одно-командной установки
+
+**Mapped Test Cases:** нет отдельного TC (документационное изменение, покрывается качественным ревью по AC-7)
+**Files:**
+- `README.md` - добавить два блока кода рядом с существующим описанием установки
+
+**Implementation Notes:**
+- Разместить оба блока около текущего описания установки в начале README (там, где сегодня описан `setup-planning-v3.sh`/клонирование репозитория вручную), с одной строкой пояснения к каждому — по specs.md ("Общие ограничения установщика": "README получает два блока кода... рядом друг с другом, с одной строкой пояснения к каждому").
+- Linux/macOS:
+  ```sh
+  curl -fsSL https://raw.githubusercontent.com/stacmv/planning-framework/main/scripts/install.sh | sh
+  ```
+- Windows:
+  ```powershell
+  irm https://raw.githubusercontent.com/stacmv/planning-framework/main/scripts/install.ps1 | iex
+  ```
+- Не удалять существующее описание ручной установки (`git clone` + `setup-planning-v3.sh`) — однокомандные снипеты добавляются как более простая альтернатива, ручной способ остаётся для тех, кто хочет установить в нестандартное место.
+
+**Acceptance Criteria:**
+- [ ] README reviewed for accuracy
+
+**Dependencies:** Требует Task 7 и Task 8 (документирует их конечные точки входа).
+**Complexity Estimate:** Simple — только документация, без кода.
+
+### Dependencies
+
+- Task 6 (шим-логика в `setup-planning-v3.sh`/`update-skills.sh`) архитектурно **не блокирует** Task 7 (`install.sh`) — `install.sh` не вызывает `setup-planning-v3.sh` и не зависит от её кода. Task 6 и Task 7 связаны только «мягкой» зависимостью: оба должны использовать один и тот же шаблон файла шима (см. Task 6, "Шаблон файла шима"), чтобы `pf`, установленный любым из путей, вёл себя одинаково — но Task 7 не вызывает скрипт Task 6.
+- **Принятое решение (вместо открытого вопроса в specs.md):** `install.sh` НЕ вызывает `setup-planning-v3.sh --self`; флаг `--self` не добавляется вовсе. Вместо этого `install.sh` устанавливает шим и скиллы для самого фреймворка собственными инлайн-шагами, используя то же динамическое обнаружение скиллов, что и `update-skills.sh`.
+  - Причина (P0, cp-same-file баг): `setup-planning-v3.sh` копирует шаблоны командой `cp -r "$TEMPLATES_SRC/." "$TEMPLATES_DST/"`, где `TEMPLATES_SRC="$FRAMEWORK_DIR/docs/planning/templates"`. При `--self` (`TARGET="$FRAMEWORK_DIR"`) `TEMPLATES_DST` совпадает с `TEMPLATES_SRC` — `cp -r a/. a/` завершается ошибкой «are the same file» с ненулевым кодом, а `set -e` в начале скрипта прерывает выполнение прямо на этом шаге, ещё до шага установки шима (который по плану добавляется в самом конце скрипта). То есть `--self` в реальности никогда не доходил бы до установки шима.
+  - Причина (P1, паритет скиллов): при `--self` через `setup-planning-v3.sh` устанавливались бы только 7 скиллов, хардкоженных в массиве `SKILLS=(pf pf-brd pf-spec pf-check pf-test-plan pf-impl-plan pf-execute)`, тогда как `install.ps1` (Task 8) с самого начала проектировался на переиспользование динамического обнаружения `update-skills.sh` (все 15 скиллов в `skills/`). Это давало Linux/macOS-пользователям 7 скиллов против 15 у пользователей Windows.
+  - Новое решение устраняет обе проблемы разом: `install.sh` и `install.ps1` используют один и тот же принцип — динамическое обнаружение всех директорий с `SKILL.md`, без хардкод-списка и без обращения к `setup-planning-v3.sh` — что даёт одинаковый полный набор скиллов на обеих платформах и не завязано на `TARGET`/`TEMPLATES_DST` совпадение путей.
+- Task 8 (`install.ps1`) — Windows-аналог, не может переиспользовать bash-скрипты; реализует шим/скилл-логику самостоятельно на PowerShell, тем же принципом динамического обнаружения, что и Task 7. Не блокируется Task 6/7, но логически следует за ними как парный установщик.
+- Task 9 (README) документирует конечные точки входа Task 7/8 — идёт последней.
+
+### Complexity Estimate
+
+**Medium** — 4 новые задачи (Task 6-9): в основном bash/PowerShell-скрипты без внешних зависимостей. Task 6 расширяет существующие `setup-planning-v3.sh`/`update-skills.sh`; Task 7 и Task 8 — самостоятельные однокомандные установщики (не делегируют в `setup-planning-v3.sh`), оба зеркалят механизм динамического обнаружения скиллов из `update-skills.sh`, каждый на своей платформе; документация (Task 9) — тривиальна.
