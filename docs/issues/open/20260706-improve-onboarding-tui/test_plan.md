@@ -313,10 +313,10 @@ size_tier: small
 
 | TC     | Test Case | Type   | Priority | Status | Remarks |
 | ------ | --------- | ------ | -------- | ------ | ------- |
-| TC-001 | Определение состояния `none` | Auto | Critical | [ ] |  |
-| TC-002 | Определение состояния `v3` (включая `CLAUDE.md` рядом) | Auto | Critical | [ ] |  |
-| TC-003 | Определение состояния `v2-or-older` | Auto | High | [ ] |  |
-| TC-004 | Определение состояния `unknown` (нестандартная структура + `PLANNING.md` без маркера 3.x) | Auto | High | [ ] |  |
+| TC-001 | Определение состояния `none` | Auto | Critical | ✓ |  |
+| TC-002 | Определение состояния `v3` (включая `CLAUDE.md` рядом) | Auto | Critical | ✓ |  |
+| TC-003 | Определение состояния `v2-or-older` | Auto | High | ✓ |  |
+| TC-004 | Определение состояния `unknown` (нестандартная структура + `PLANNING.md` без маркера 3.x) | Auto | High | ✓ |  |
 | TC-005 | Ветвление меню по состоянию проекта | Manual | Critical | [ ] |  |
 | TC-006 | Навигация по туториалу (вперёд/назад/выход) | Manual | High | [ ] |  |
 | TC-007 | Делегирование установки в `setup-planning-v3.sh` через spawn | Manual | Critical | [ ] |  |
