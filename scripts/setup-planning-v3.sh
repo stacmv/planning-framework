@@ -111,6 +111,27 @@ done
 
 # ─── 7. Success summary ───────────────────────────────────────────────────────
 
+# ─── 8. Install global `pf` shim ───────────────────────────────────────────────
+
+GLOBAL_BIN_DIR="$HOME/.claude/bin"
+mkdir -p "$GLOBAL_BIN_DIR"
+
+cat > "$GLOBAL_BIN_DIR/pf" <<SHIM
+#!/usr/bin/env sh
+exec node "$FRAMEWORK_DIR/tools/onboarding-tui/cli.js" --target "\$(pwd)" "\$@"
+SHIM
+chmod +x "$GLOBAL_BIN_DIR/pf"
+echo ""
+echo "  installed  $GLOBAL_BIN_DIR/pf"
+
+case ":$PATH:" in
+  *":$GLOBAL_BIN_DIR:"*) ;;
+  *)
+    echo "  NOTE: $GLOBAL_BIN_DIR is not on your PATH."
+    echo "        Add this to your shell profile: export PATH=\"$GLOBAL_BIN_DIR:\$PATH\""
+    ;;
+esac
+
 echo ""
 echo "✓ Planning Framework v3.0 installed"
 echo "  Project : $TARGET"

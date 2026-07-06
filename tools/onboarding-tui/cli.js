@@ -24,7 +24,7 @@ const actions = require("./lib/actions");
  * not provided (P1-6).
  */
 function parseTargetDir(argv) {
-  const idx = argv.indexOf("--target");
+  const idx = argv.lastIndexOf("--target");
   if (idx !== -1 && argv[idx + 1]) {
     return argv[idx + 1];
   }
