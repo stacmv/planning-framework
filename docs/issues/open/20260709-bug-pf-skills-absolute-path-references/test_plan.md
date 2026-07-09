@@ -74,7 +74,7 @@
 
 | TC     | Type   | Test Case                                                              | Priority | Status | Remarks |
 | ------ | ------ | ---------------------------------------------------------------------- | -------- | ------ | ------- |
-| TC-001 | Manual | Все 10 вхождений относительного пути заменены на абсолютный            | Critical | [ ]    |         |
-| TC-002 | Auto   | Формулировка `docs/issues/open/` в pf/SKILL.md имеет CWD-привязку      | Critical | [ ]    |         |
-| TC-003 | Auto   | Контрольные grep'ы возвращают пусто                                    | Critical | [ ]    |         |
-| TC-004 | Auto   | Установленные копии синхронизированы с исходниками                     | Critical | [ ]    |         |
+| TC-001 | Manual | Все 10 вхождений относительного пути заменены на абсолютный            | Critical | ✓      | verified programmatically via T9 grep chain (10/10); manual checklist generated separately |
+| TC-002 | Auto   | Формулировка `docs/issues/open/` в pf/SKILL.md имеет CWD-привязку      | Critical | ✓      | grep -v returns empty |
+| TC-003 | Auto   | Контрольные grep'ы возвращают пусто                                    | Critical | ✓*     | extended audit finds 1 expected hit in own notes.md (historical bug context) |
+| TC-004 | Auto   | Установленные копии синхронизированы с исходниками                     | Critical | ✓      | diff -q silent for all 7 |

@@ -4,7 +4,7 @@ description: Generate a comprehensive test plan for the active issue based on BR
 version: 3.0.0
 ---
 
-Before checking any other prerequisite, read `prompt.md`'s frontmatter. If it has no `size_tier` field, ask the user via `AskUserQuestion` — same 4 tier options and descriptions as in `skills/pf-size-tiers/SKILL.md`, recommending medium ("matches today's default behavior") — then write the answer into `prompt.md`'s frontmatter before proceeding with the rest of this skill.
+Before checking any other prerequisite, read `prompt.md`'s frontmatter. If it has no `size_tier` field, ask the user via `AskUserQuestion` — same 4 tier options and descriptions as in `~/.claude/skills/pf-size-tiers/SKILL.md`, recommending medium ("matches today's default behavior") — then write the answer into `prompt.md`'s frontmatter before proceeding with the rest of this skill.
 
 Determine the active issue from `docs/issues/open/`. Read `size_tier` from `prompt.md`'s frontmatter (default: medium if absent). Check prerequisites:
 - **If `size_tier: trivial`:** `notes.md` must exist. If not, stop: "Notes document is required. Run /pf-brd first."

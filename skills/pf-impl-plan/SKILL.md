@@ -4,7 +4,7 @@ description: Create the implementation plan (implementation_plan.md) for the act
 version: 3.0.0
 ---
 
-Determine the active issue from `docs/issues/open/`. Before checking any other prerequisite, read `prompt.md`'s frontmatter. If it has no `size_tier` field, ask the user via `AskUserQuestion` — same 4 tier options and descriptions as in `skills/pf-size-tiers/SKILL.md`, recommending medium ("matches today's default behavior") — then write the answer into `prompt.md`'s frontmatter before proceeding with the rest of this skill.
+Determine the active issue from `docs/issues/open/`. Before checking any other prerequisite, read `prompt.md`'s frontmatter. If it has no `size_tier` field, ask the user via `AskUserQuestion` — same 4 tier options and descriptions as in `~/.claude/skills/pf-size-tiers/SKILL.md`, recommending medium ("matches today's default behavior") — then write the answer into `prompt.md`'s frontmatter before proceeding with the rest of this skill.
 
 Check prerequisites: `test_plan.md` must exist. If not, stop: "Test plan is required. Run /pf-test-plan first."
 If `implementation_plan.md` already exists, stop and inform the user — IMPL_PLAN stage is already complete.

@@ -4,7 +4,7 @@ description: Write the technical spec (specs.md) for the active issue, based on 
 version: 3.0.0
 ---
 
-Before checking any other prerequisite, read `prompt.md`'s frontmatter. If it has no `size_tier` field, ask the user via `AskUserQuestion` — options **trivial** / **small** / **medium** / **large**, same descriptions as in `skills/pf-size-tiers/SKILL.md` — recommending medium ("matches today's default behavior") — then write the answer into `prompt.md`'s frontmatter before proceeding with the rest of this skill.
+Before checking any other prerequisite, read `prompt.md`'s frontmatter. If it has no `size_tier` field, ask the user via `AskUserQuestion` — options **trivial** / **small** / **medium** / **large**, same descriptions as in `~/.claude/skills/pf-size-tiers/SKILL.md` — recommending medium ("matches today's default behavior") — then write the answer into `prompt.md`'s frontmatter before proceeding with the rest of this skill.
 
 Check that `docs/issues/open/[ISSUE-ID]/brd.md` exists. If it does not, stop and tell the user: "BRD is required before writing the spec. Run /pf-brd first."
 If `specs.md` already exists, stop and inform the user — SPEC stage is already complete.
