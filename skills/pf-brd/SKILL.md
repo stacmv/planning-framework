@@ -6,7 +6,7 @@ version: 3.0.0
 
 Determine the active issue by scanning `docs/issues/open/` for [ISSUE-ID].
 
-**Legacy-tier guard (runs first, before any other prerequisite check):** read `docs/issues/open/[ISSUE-ID]/prompt.md`'s YAML frontmatter. If it has no `size_tier` field, ask the user via `AskUserQuestion` — "How big is this task?" with the four options **trivial** / **small** / **medium** / **large** (one-line descriptions from `skills/pf-size-tiers/SKILL.md`'s Tiers table), recommending **medium** ("matches today's default behavior") — then write the answer into `prompt.md`'s frontmatter, next to `doc_language`, before proceeding with the rest of this skill.
+**Legacy-tier guard (runs first, before any other prerequisite check):** read `docs/issues/open/[ISSUE-ID]/prompt.md`'s YAML frontmatter. If it has no `size_tier` field, ask the user via `AskUserQuestion` — "How big is this task?" with the four options **trivial** / **small** / **medium** / **large** (one-line descriptions from `~/.claude/skills/pf-size-tiers/SKILL.md`'s Tiers table), recommending **medium** ("matches today's default behavior") — then write the answer into `prompt.md`'s frontmatter, next to `doc_language`, before proceeding with the rest of this skill.
 
 Read `docs/issues/open/[ISSUE-ID]/prompt.md` to understand the project description. If `notes.md` OR `brd.md` already exists in the same folder, stop and inform the user — BRD stage is already complete.
 
@@ -18,7 +18,7 @@ Read `size_tier` from `prompt.md`'s frontmatter (set by the guard above if it wa
 
 I want to build [read description from prompt.md]. Run a condensed version of the clarifying-questions loop below: same 95%-confidence bar and recommendation-with-reason pattern as the full Q&A, but shorter — fewer questions, scoped to what's needed for a one-liner or single obvious fix (what & why, acceptance criteria, the handful of files/tasks involved). Use the AskUserQuestion tool, adding your recommendation (with reason why) below the options for each question.
 
-Once confident, write `docs/issues/open/[ISSUE-ID]/notes.md` directly using the `notes.md` template from `skills/pf-size-tiers/SKILL.md` (the "What & Why" / "Acceptance Criteria" / "Root Cause / Context" [bug issues only, omit for feat/improve] / "Tasks" sections, target under ~50 lines total). Write it directly — no sub-agent dispatch (this skill never dispatched one anyway). Do not create `brd.md`.
+Once confident, write `docs/issues/open/[ISSUE-ID]/notes.md` directly using the `notes.md` template from `~/.claude/skills/pf-size-tiers/SKILL.md` (the "What & Why" / "Acceptance Criteria" / "Root Cause / Context" [bug issues only, omit for feat/improve] / "Tasks" sections, target under ~50 lines total). Write it directly — no sub-agent dispatch (this skill never dispatched one anyway). Do not create `brd.md`.
 
 ## If `size_tier` is small/medium/large
 
