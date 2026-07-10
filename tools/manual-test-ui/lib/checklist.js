@@ -8,9 +8,12 @@
 
 const TC_HEADING_RE = /^##\s+TC-(\d+):\s*(.+?)\s*$/;
 const META_RE = /^\*\*(.+?):\*\*\s*(.*)$/;
-const PREREQ_LABEL_RE = /^\*\*Prerequisites:\*\*\s*$/;
-const STEPS_HEADER_RE = /^\|\s*Step\s*\|/i;
-const NOTES_LABEL_RE = /^\*\*Notes:\*\*\s*(.*)$/;
+// pf-test writes checklists in the issue's doc_language — accept both the
+// English and the Russian labels it generates.
+const PREREQ_LABEL_RE = /^\*\*(?:Prerequisites|Предварительные условия):\*\*\s*$/;
+const STEPS_HEADER_RE = /^\|\s*(?:Step|Шаг)\s*\|/i;
+const NOTES_LABEL_RE = /^\*\*(?:Notes|Заметки):\*\*\s*(.*)$/;
+const RESULT_COL_NAMES = ["result", "результат"];
 const RESULT_CELL_RE = /^\[([ xX])\]\s*(.*)$/;
 
 function detectEol(text) {
@@ -82,7 +85,7 @@ function parseChecklist(content) {
       if (STEPS_HEADER_RE.test(line)) {
         // line = header, line+1 = "|---|---|---|---|" separator, then rows.
         const headerCells = splitCells(line).map((c) => c.toLowerCase());
-        const resultCol = headerCells.indexOf("result");
+        const resultCol = headerCells.findIndex((c) => RESULT_COL_NAMES.includes(c));
         if (resultCol === -1) {
           tc.parseWarnings.push("steps table has no Result column — skipped");
           continue;

@@ -149,6 +149,19 @@ This phase produces `docs/issues/closed/ISSUE-ID/usage_report.md`, a best-effort
 
 ---
 
+## Phase 8.5: Push Parent Branch (safe auto-push)
+
+After the archive commit, push PARENT-BRANCH to its remote automatically — but only when it is safe. This step never aborts the closure: the issue is already closed locally, so any push problem is reported in Phase 9, not fatal.
+
+1. **Safety guard — skip the push (and record the reason for the Phase 9 report) if either holds:**
+   - PARENT-BRANCH is `main` or `master` — release branches are pushed by the user manually, never automatically.
+   - No git remote is configured (`git remote` prints nothing).
+2. **Resolve the remote:** use PARENT-BRANCH's configured remote (`git config branch.PARENT-BRANCH.remote`); if unset, use `origin` when it exists, otherwise skip per the guard above.
+3. **Push, safely:** run `git push <remote> PARENT-BRANCH` (add `-u` if the branch has no upstream yet). Never use `--force` / `--force-with-lease`, never `--no-verify`.
+4. **On push failure** (auth, non-fast-forward, network): do NOT abort — the closure is already committed locally. Capture the git error and surface it in the Phase 9 report with an instruction to push manually once resolved.
+
+---
+
 ## Phase 9: Report
 
 Print the following closing report:
@@ -163,14 +176,18 @@ Two commits added to PARENT-BRANCH:
 Issue folder moved to docs/issues/closed/ISSUE-ID/
 LLM usage recorded in docs/issues/closed/ISSUE-ID/usage_report.md
 
-Remote push: run `git push` when ready.
+Remote push: <report the Phase 8.5 outcome, one of>
+  - pushed PARENT-BRANCH to <remote>
+  - skipped — PARENT-BRANCH is main/master; push manually for releases
+  - skipped — no remote configured; add one and run `git push` when ready
+  - FAILED — <git error>; run `git push` manually after resolving
 ```
 
 ---
 
 ## Important Notes
 
-- **Do NOT push automatically** — always leave `git push` to the user.
+- **Auto-push the parent branch on close, but only when safe** (Phase 8.5) — push PARENT-BRANCH to its remote automatically if a remote is configured AND the parent is not `main`/`master`. Never force-push, never `--no-verify`. If no remote exists or the parent is a release branch, skip with a note; if the push errors, report it but keep the closure (already committed locally). Releases to `main`/`master` are always pushed by the user manually.
 - **Verdict check is strict** — only `**PASS**` (bold, exact casing) in the Verdict section satisfies the prerequisite. A commented-out or unchecked PASS does not count.
 - **No-ff merge is required** — `--no-ff` preserves the issue branch history as a distinct line in the log.
 - **If merge fails for reasons other than conflict** (e.g. branch not found, wrong parent), report the git error verbatim and stop.

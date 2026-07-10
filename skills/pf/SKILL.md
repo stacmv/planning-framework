@@ -12,7 +12,7 @@ Read the file `~/.claude/skills/pf/SKILL.md` and extract the value of the `versi
 
 ## Step 2: Scan for open issues
 
-List the contents of `docs/issues/open/` (if it exists). Collect all subdirectories whose names match the pattern `YYYYMMDD-TYPE-SLUG` where TYPE is one of `feat`, `improve`, or `bug` and YYYYMMDD is an 8-digit date.
+List the contents of the `docs/issues/open/` directory of the active project (relative to /pf's CWD) (if it exists). Collect all subdirectories whose names match the pattern `YYYYMMDD-TYPE-SLUG` where TYPE is one of `feat`, `improve`, or `bug` and YYYYMMDD is an 8-digit date.
 
 ## Step 3: Handle zero or multiple issues
 
@@ -52,7 +52,7 @@ Before proceeding to Step 5, check the active issue's `prompt.md` frontmatter. I
 
 ## Step 5: Detect completed stages
 
-Check which documents exist inside the issue folder (`docs/issues/open/<ISSUE-ID>/`):
+Check which documents exist inside the issue folder at `<ISSUE-ID>/` in the `docs/issues/open/` directory of the active project (relative to /pf's CWD):
 
 | Document present | Stage completed |
 |---|---|
@@ -167,7 +167,7 @@ Next step: /pf-brd
 
 Whenever a new issue's `prompt.md` is about to be written (from either path above), first use AskUserQuestion to ask: **"What language should the planning documents for this issue be written in?"** with options English, Russian, and Other (free text). This choice only needs to be asked once per issue.
 
-Immediately after, use AskUserQuestion to ask a second question: **"How big is this task?"** with four options, one line each (from `skills/pf-size-tiers/SKILL.md`'s Tiers table), recommending **medium** by default ("today's standard full pipeline — pick this if unsure"):
+Immediately after, use AskUserQuestion to ask a second question: **"How big is this task?"** with four options, one line each (from `~/.claude/skills/pf-size-tiers/SKILL.md`'s Tiers table), recommending **medium** by default ("today's standard full pipeline — pick this if unsure"):
 
 - **trivial** — One-liner or single obvious fix. 1 user story, ≤3 ACs.
 - **small** — Single focused change, clearly bounded. 2-3 user stories.
@@ -187,4 +187,4 @@ size_tier: medium
 
 Use the exact language name the user gave (e.g. `Russian`, or whatever they typed for "Other") as the `doc_language` value. Every downstream pf-* skill that produces a document reads this field and writes its prose content in that language, defaulting to English if the field is absent — see each skill's own instructions for specifics.
 
-Record the chosen tier (`trivial`, `small`, `medium`, or `large`) as `size_tier`, next to `doc_language`. Every downstream pf-* skill reads this field and scales document length/sections/routing accordingly — see `skills/pf-size-tiers/SKILL.md` for the full tables and each skill's own instructions for specifics.
+Record the chosen tier (`trivial`, `small`, `medium`, or `large`) as `size_tier`, next to `doc_language`. Every downstream pf-* skill reads this field and scales document length/sections/routing accordingly — see `~/.claude/skills/pf-size-tiers/SKILL.md` for the full tables and each skill's own instructions for specifics.
