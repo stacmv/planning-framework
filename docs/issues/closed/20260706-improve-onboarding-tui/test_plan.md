@@ -521,10 +521,10 @@ size_tier: medium
 | TC-008 | Делегирование миграции и обновления скиллов | Manual | High | ✓ |  |
 | TC-009 | Состояние `unknown` никогда не выбирает действие автоматически | Manual | Critical | ✓ |  |
 | TC-010 | Существующие make-цели продолжают работать без изменений (AC-4) | Manual | Critical | ✓ |  |
-| TC-011 | Установка глобального шима `pf` скриптами `setup-planning-v3.sh` и `update-skills.sh` | Auto | Critical | [ ] |  |
-| TC-012 | Идемпотентность повторной установки шима `pf` | Auto | High | [ ] |  |
-| TC-013 | Предупреждение о `PATH` при установке/обновлении шима | Auto | Medium | [ ] |  |
-| TC-014 | `scripts/install.sh` — установка с нуля и идемпотентное обновление | Manual | Critical | [ ] |  |
-| TC-015 | `scripts/install.sh` — отсутствие `git`/`node` даёт понятную ошибку без автоустановки | Auto | Critical | [ ] |  |
-| TC-016 | `scripts/install.ps1` — установка, идемпотентное обновление и проверка зависимостей на Windows | Manual | High | [ ] |  |
-| TC-017 | `pf --target <path>` переопределяет текущую директорию (P1-1, POSIX + Windows) | Manual | High | [ ] | Регрессия на double-`--target` first-wins в шиме |
+| TC-011 | Установка глобального шима `pf` скриптами `setup-planning-v3.sh` и `update-skills.sh` | Auto | Critical | ✓ | Прогон в scratch-HOME (`/tmp/pfqa/home`); реальный `~/.claude` не затронут |
+| TC-012 | Идемпотентность повторной установки шима `pf` | Auto | High | ✓ | `cmp -s` byte-identical; нет `.bak`/`.old`; смена `FRAMEWORK_ROOT` через repoB |
+| TC-013 | Предупреждение о `PATH` при установке/обновлении шима | Auto | Medium | ✓ | Точная строка `export PATH="$HOME/.claude/bin:$PATH"` показывается только при отсутствии `~/.claude/bin` на PATH |
+| TC-014 | `scripts/install.sh` — установка с нуля и идемпотентное обновление | Manual | Critical | ✓ | Прогон с локальной подменой `REPO_URL` (github недоступен из тестовой среды); клон на `main`, шим + скиллы установлены; dirty-правка откатывается `reset --hard` без ошибок |
+| TC-015 | `scripts/install.sh` — отсутствие `git`/`node` даёт понятную ошибку без автоустановки | Auto | Critical | ✓ | Friendly error с ссылками на скачивание; `INSTALL_DIR` не создаётся; нет попыток `apt`/`brew`/`choco` |
+| TC-016 | `scripts/install.ps1` — установка, идемпотентное обновление и проверка зависимостей на Windows | Manual | High | ⚠ logic-review | Логика проверена код-ревью (PowerShell-идиомы эквивалентны `install.sh`); runtime-прогон требует Windows-host с `pwsh` — недоступен в текущей среде |
+| TC-017 | `pf --target <path>` переопределяет текущую директорию (P1-1, POSIX + Windows) | Manual | High | ✓ (POSIX) / ⚠ review (Windows) | POSIX end-to-end: bare `pf` из `DIR_A` → `Detected: none`; `pf --target DIR_B` → `Detected: v2-or-older`. Windows-часть — code-review шаблона `pf.cmd` (нет `--target "%CD%"`) |

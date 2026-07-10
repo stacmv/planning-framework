@@ -1,9 +1,9 @@
 # Чек-лист ручного тестирования
 
-**Название функции:** Интерактивный мастер установки/обновления (`make tui`)
+**Название функции:** Глобальный шим `pf`, однокомандный установщик (`install.sh` / `install.ps1`), README — реопен (Tasks 6–9, AC-6/7/8)
 **Issue ID:** 20260706-improve-onboarding-tui
-**Дата:** 2026-07-06
-**Тестировщик:** Claude (автономный прогон, см. заметку ниже)
+**Дата:** 2026-07-10 (реопен); TC-005..010 от 2026-07-06 (исходный scope, `make tui`) сохранены ниже для полноты
+**Тестировщик:** Claude (автономный прогон в scratch-HOME `/tmp/pfqa/home`; реальный `~/.claude` не затронут — см. заметки к TC-011..017)
 
 ---
 
@@ -135,5 +135,145 @@
 | 6 | Сравнить поведение и вывод каждой из прежних команд с тем, как они работали до появления мастера | Отличий в поведении или выводе не обнаружено (кроме ожидаемых различий, связанных с состоянием тестовой папки) | [x] |
 
 **Заметки:**
+
+---
+
+## TC-011: Глобальный шим `pf` ставится обоими скриптами (`setup-planning-v3.sh` + `update-skills.sh`)
+
+**Предварительные условия:**
+- Изолированный `$HOME=/tmp/pfqa/home` (реальный `~/.claude` не трогается); сим-ссылки `/usr/bin/git`/`node` сохранены на `PATH`.
+- До тестов `~/.claude/bin` не существует.
+
+**Шаги (все выполнены скриптом `/tmp/pfqa_harness.sh`):**
+
+| Шаг | Действие | Ожидаемый результат | Результат |
+|------|--------|---------------------|-----------|
+| 1 | `printf '%s\nY\n' "$QA/target" \| bash scripts/setup-planning-v3.sh` | Скрипт завершается без ошибок; в конце создан `$HOME/.claude/bin/pf` | [x] |
+| 2 | `test -x $HOME/.claude/bin/pf` | Файл исполняем (`chmod +x` применён) | [x] |
+| 3 | `grep` содержимого `pf` | Содержит ровно `exec node "<FRAMEWORK_DIR>/tools/onboarding-tui/cli.js" "$@"`, где `<FRAMEWORK_DIR>` = абсолютный путь к репозиторию | [x] |
+| 4 | `rm -f ~/.claude/bin/pf`, затем `bash scripts/update-skills.sh` | `update-skills.sh` (пере)создаёт `pf` с тем же содержимым и правами | [x] |
+| 5 | `grep` содержимого восстановленного `pf` | Идентично содержимому после шага 3 | [x] |
+
+**Заметки:** Прогон в scratch-HOME — реальный `~/.claude` не модифицирован. Шаблоны шима в `setup-planning-v3.sh` и `update-skills.sh` намеренно идентичны и НЕ содержат `--target "$(pwd)"` (P1-1): `cli.js` по умолчанию использует `process.cwd()`, а жёстко зашитый `--target` сделал бы `pf --target <dir>` молча игнорируемым (двойной `--target`, first-wins в `parseTargetDir`). Регрессия покрыта TC-017.
+
+---
+
+## TC-012: Идемпотентность повторной установки шима
+
+**Предварительные условия:**
+- Изолированный `$HOME=/tmp/pfqa/home`; шим уже установлен и указывает на `FRAMEWORK_ROOT_A` (на `/home/stac/dev/planning-framework`) после TC-011.
+
+**Шаги:**
+
+| Шаг | Действие | Ожидаемый результат | Результат |
+|------|--------|---------------------|-----------|
+| 1 | Повторно выполнить `setup-planning-v3.sh` с тем же `TARGET` | `pf` перезаписан; побайтово идентичен (`cmp -s pf pf.first`); `.bak`/`.old` не созданы | [x] |
+| 2 | `ls $HOME/.claude/bin` | Только `pf`; дублей и резервных копий нет | [x] |
+| 3 | Скопировать репозиторий в `$QA/repoB`, создать `$QA/targetB`, запустить `bash $QA/repoB/scripts/setup-planning-v3.sh` с этим `TARGET_B` | Скрипт завершается без ошибок и без подтверждения перезаписи | [x] |
+| 4 | `grep` `pf` на наличие `repoB/tools/onboarding-tui/cli.js` | `FRAMEWORK_ROOT` обновился на `repoB` | [x] |
+
+**Заметки:** Запись `pf` реализована как идемпотентный `cat > ... <<EOF` (полная перезапись, без дописывания/бэкапов). Один и тот же путь кода на первом и повторном запуске.
+
+---
+
+## TC-013: Предупреждение о `PATH`
+
+**Предварительные условия:**
+- Два сценария окружения с одним scratch-HOME: (a) `PATH=/usr/bin:/bin` (нет `~/.claude/bin`); (b) `PATH=$HOME/.claude/bin:/usr/bin:/bin`.
+
+**Шаги:**
+
+| Шаг | Действие | Ожидаемый результат | Результат |
+|------|--------|---------------------|-----------|
+| 1 | Прогон `setup-planning-v3.sh` в окружении (a) | На stdout выводится точная строка `export PATH="$HOME/.claude/bin:$PATH"` (как warning) | [x] |
+| 2 | Тот же скрипт в окружении (b) | Эта строка НЕ выводится | [x] |
+| 3 | Сравнить остальной вывод | Единственное различие между (a) и (b) — наличие/отсутствие строки warning | [x] |
+
+**Заметки:** Реализовано через `case ":$PATH:" in *":$HOME/.claude/bin:"*) ;; *) echo 'warning: ...' ;; esac`. Скрипт не пытается редактировать `.bashrc`/`.zshrc` (AC-6: «не делать автоматические правки rc-файлов»).
+
+---
+
+## TC-014: `scripts/install.sh` — установка с нуля и идемпотентное обновление
+
+**Предварительные условия:**
+- Изолированный scratch-HOME; чистый `$HOME/.claude/` (без `planning-framework`, `skills`, `bin`).
+- Для воспроизводимости — локальная копия `install.sh` с подменённым `REPO_URL` на локальный путь `/home/stac/dev/planning-framework` (внешний github-сетевой доступ из тестовой среды недоступен; подмена эквивалентна — проверяется вся логика клона/обновления/скиллов/шима).
+
+**Шаги:**
+
+| Шаг | Действие | Ожидаемый результат | Результат |
+|------|--------|---------------------|-----------|
+| 1 | `sh install.local.sh` на чистом scratch-HOME | Скрипт проверяет git/node (оба найдены), клонирует репозиторий в `$HOME/.claude/planning-framework` | [x] |
+| 2 | `test -d $HOME/.claude/planning-framework/.git && git -C ... rev-parse --abbrev-ref HEAD = main` | Клон создан, HEAD на ветке `main` | [x] |
+| 3 | `test -x $HOME/.claude/bin/pf` | Шим `pf` установлен и исполняем | [x] |
+| 4 | `ls $HOME/.claude/skills` | Содержит ожидаемые `pf-*` скиллы (`pf/` присутствует — проверено; остальные тоже, т.к. используется динамическое обнаружение, как в `update-skills.sh`) | [x] |
+| 5 | `echo "dirty" >> $HOME/.claude/planning-framework/README.md`, повторно `sh install.local.sh` | Скрипт обнаруживает `.git`, делает `fetch origin main && reset --hard origin/main` без интерактивного запроса; dirty-правка откатывается; exit 0 | [x] |
+| 6 | `grep "proceed\|confirm\|overwrite" inst2.out` | Пусто (никаких подтверждений) | [x] |
+
+**Заметки:** Логика `reset --hard` вместо `pull --ff-only` (P1-3) подтверждена: dirty-правка откатывается, `set -e` не роняет скрипт. Полный прогон с реальным `curl | sh` против github не делался (нет внешнего сетевого доступа из тестовой среды); проверена эквивалентная локальная ветка. GitHub-URL в `install.sh` — корректный (`https://github.com/stacmv/planning-framework.git`, ветка `main`).
+
+---
+
+## TC-015: `install.sh` отказывает при отсутствии `git`/`node`
+
+**Предварительные условия:**
+- Изолированный scratch-HOME с двумя ограниченными `PATH`: (a) `emptybin` (только `sh`); (b) `gitonlybin` (`sh` + `git`, без `node`).
+
+**Шаги:**
+
+| Шаг | Действие | Ожидаемый результат | Результат |
+|------|--------|---------------------|-----------|
+| 1 | `PATH=emptybin sh install.local.sh` | Exit ≠ 0; stderr явно называет `git` как отсутствующую программу | [x] |
+| 2 | `test -d $HOME/.claude/planning-framework` | Не создан (проверки зависимостей идут ДО любых действий с файлами) | [x] |
+| 3 | `PATH=gitonlybin sh install.local.sh` | Exit ≠ 0; stderr явно называет `node` как отсутствующую программу | [x] |
+| 4 | `grep -E 'apt\|brew\|choco' nogit.out nonode.out` | Пусто (нет попыток автоустановки через системный пакетный менеджер) | [x] |
+
+**Заметки:** Сообщения об ошибках содержат ссылки на `https://git-scm.com/downloads` и `https://nodejs.org/` — пользователь знает, куда идти ставить.
+
+---
+
+## TC-016: `scripts/install.ps1` — Windows-эквивалент `install.sh`
+
+**Предварительные условия:**
+- Windows-машина с PowerShell, `git` и `node` на `PATH`. На тестовой Linux-машине PowerShell отсутствует, поэтому runtime-прогон невозможен.
+
+**Шаги (логика проверена код-ревью; runtime — на Windows):**
+
+| Шаг | Действие | Ожидаемый результат | Результат |
+|------|--------|---------------------|-----------|
+| 1 | Code-review: `Get-Command git/node` с `ErrorAction SilentlyContinue`, при отсутствии — `Write-Error` со ссылками и `exit 1` (строки 22-30 `install.ps1`) | Дружелюбный отказ без побочных эффектов | [x] (review) |
+| 2 | Code-review: `$ErrorActionPreference = 'Stop'` + `Invoke-Git` (проверяет `$LASTEXITCODE` и бросает) | Ошибки git — фатальные, как и в bash-версии под `set -e` | [x] (review) |
+| 3 | Code-review: динамическое обнаружение скиллов через `Get-ChildItem -Directory \| Where Test-Path SKILL.md` + `Copy-Item -Recurse -Force` | Симметрично bash-версии; полный набор скиллов | [x] (review) |
+| 4 | Code-review: `Set-Content pf.cmd` с `@node "<InstallDir>\tools\onboarding-tui\cli.js" %*` — без `--target "%CD%"` (P1-1) | Шим Windows эквивалентен POSIX; регрессия P1-1 не повторится | [x] (review) |
+| 5 | Code-review: PATH-проверка через `[Environment]::GetEnvironmentVariable('PATH','User')` с разделением по `;` и нормализацией trailing `\` | Предупреждение показывается только когда `~/.claude/bin` отсутствует в user-PATH | [x] (review) |
+| 6 | Runtime (на Windows): `irm https://raw.githubusercontent.com/stacmv/planning-framework/main/scripts/install.ps1 \| iex` | Полный аналог TC-014 | [ ] (нет Windows-host) |
+
+**Заметки:** Без Windows-хоста / `pwsh` runtime-прогон невозможен. Логика зеркалит `install.sh` построчно; единственное принципиальное отличие — `.cmd`-шим и PowerShell-идиомы. При первом же доступе к Windows-машине стоит прогнать полный сценарий.
+
+---
+
+## TC-017: `pf --target <path>` переопределяет текущую директорию (P1-1, AC-6)
+
+**Предварительные условия (POSIX):**
+- Шим `pf` установлен в scratch-HOME (`$HOME/.claude/bin`), `$HOME/.claude/bin` на `PATH`.
+- Подготовлены две директории: `DIR_A` (пустая → `none`) и `DIR_B` (`CLAUDE.md` без `PLANNING.md` → `v2-or-older`).
+- Текущая директория — `DIR_A`.
+
+**Шаги (POSIX `pf`):**
+
+| Шаг | Действие | Ожидаемый результат | Результат |
+|------|--------|---------------------|-----------|
+| 1 | `grep -- '--target "$(pwd)"' $HOME/.claude/bin/pf` | Пусто (только `exec node ".../cli.js" "$@"`) | [x] |
+| 2 | `cd DIR_A; printf 'q\n' \| pf --target DIR_B` → grep "Detected:" | `Detected: v2-or-older` (DIR_B), а НЕ `none` — пользовательский `--target` корректно переопределил цель | [x] |
+| 3 | `cd DIR_A; printf 'q\n' \| pf` (bare) → grep "Detected:" | `Detected: none` — дефолт `process.cwd()` сохранён | [x] |
+
+**Шаги (Windows `pf.cmd` — отдельный прогон на Windows):**
+
+| Шаг | Действие | Ожидаемый результат | Результат |
+|------|--------|---------------------|-----------|
+| 4 | `cd DIR_A; pf --target DIR_B` | TUI открывается с `Detected: v2-or-older` (`DIR_B`) | [ ] (нет Windows-host) |
+| 5 | `cat pf.cmd` | Не содержит `--target "%CD%"` (только `node "...\cli.js" %*`) | [x] (review — шаблон проверен в `install.ps1`) |
+
+**Заметки:** Ключевая регрессия P1-1 (двойной `--target`, first-wins в `parseTargetDir`) проверена в POSIX-части end-to-end: переданный пользователем `--target DIR_B` дошёл до `cli.js.parseTargetDir` и был использован (`Detected: v2-or-older`). Шаблон шима в `install.ps1` зеркалит POSIX — никакого `--target` жёстко не зашивается.
 
 ---
