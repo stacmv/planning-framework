@@ -63,6 +63,24 @@ Planning Framework v2.0 uses an **issue-based workflow**:
 
 ## Quick Start (5 Minutes)
 
+### One-Command Install
+
+The fastest way to get the framework — clones it, installs the global `pf` command and all skills:
+
+**Linux / macOS** (requires `git` and `node` on your `PATH`):
+```sh
+curl -fsSL https://raw.githubusercontent.com/stacmv/planning-framework/main/scripts/install.sh | sh
+```
+
+**Windows** (PowerShell, requires `git` and `node` on your `PATH`):
+```powershell
+irm https://raw.githubusercontent.com/stacmv/planning-framework/main/scripts/install.ps1 | iex
+```
+
+Re-running the same command later updates an existing install in place (no prompts).
+
+> The installer pulls from the `main` (release) branch; `develop` is the active-development trunk. To install into a custom location instead, use the manual steps below, or explore the framework interactively with `make tui`.
+
 ### For New Projects
 
 ```bash
@@ -210,9 +228,15 @@ Session logs track which agent did what:
 
 ## Scripts & Automation
 
+**One-command installer** (Linux/macOS/Windows — clones the framework, installs `pf` + skills):
+```bash
+curl -fsSL https://raw.githubusercontent.com/stacmv/planning-framework/main/scripts/install.sh | sh   # Linux/macOS
+irm https://raw.githubusercontent.com/stacmv/planning-framework/main/scripts/install.ps1 | iex        # Windows
+```
+
 **Setup:**
 ```bash
-./scripts/setup-planning-v3.sh      # Interactive setup (includes skills)
+./scripts/setup-planning-v3.sh      # Interactive setup (includes skills + global pf shim)
 ```
 
 **Migration:**

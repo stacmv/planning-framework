@@ -127,3 +127,28 @@ echo "  /pf-execute   — execute implementation plan"
 echo ""
 echo "Next: Open Claude Code in your project and run /pf"
 echo ""
+
+# ─── 8. Install global `pf` shim (AC-6) ───────────────────────────────────────
+# Idempotent: rewrites ~/.claude/bin/pf wholesale on every run (TC-012); no
+# .bak/.old, no overwrite prompt. The shim intentionally does NOT inject
+# --target "$(pwd)": cli.js defaults to process.cwd(), and a hardcoded
+# --target would make `pf --target <dir>` silently ignored (P1-1: double
+# --target, first-wins in parseTargetDir). Applies only to the consumer
+# install path — install.sh/install.ps1 install the shim themselves.
+GLOBAL_BIN_DIR="$HOME/.claude/bin"
+mkdir -p "$GLOBAL_BIN_DIR"
+cat > "$GLOBAL_BIN_DIR/pf" <<EOF
+#!/usr/bin/env sh
+# Installed by Planning Framework — delegates to the onboarding TUI.
+# Regenerated on every setup/update; safe to remove.
+exec node "$FRAMEWORK_DIR/tools/onboarding-tui/cli.js" "\$@"
+EOF
+chmod +x "$GLOBAL_BIN_DIR/pf"
+echo "Installed global command: pf  ->  $GLOBAL_BIN_DIR/pf"
+case ":$PATH:" in
+  *":$HOME/.claude/bin:"*) ;;
+  *)
+    echo 'warning: add to PATH: export PATH="$HOME/.claude/bin:$PATH"'
+    ;;
+esac
+echo ""
