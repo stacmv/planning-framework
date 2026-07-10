@@ -115,12 +115,13 @@ help:
 - Файл `~/.claude/bin/pf` — исполняемый POSIX shell-скрипт:
   ```sh
   #!/usr/bin/env sh
-  exec node "<FRAMEWORK_ROOT>/tools/onboarding-tui/cli.js" --target "$(pwd)" "$@"
+  exec node "<FRAMEWORK_ROOT>/tools/onboarding-tui/cli.js" "$@"
   ```
   `<FRAMEWORK_ROOT>` подставляется во время установки как абсолютный путь к папке фреймворка (там, где лежит `setup-planning-v3.sh`), не вычисляется динамически из `$0` — упрощает скрипт и не ломается при симлинках.
+  - **(P1-1)** Шим НЕ подставляет `--target "$(pwd)"`: `cli.js` (`parseTargetDir`) по умолчанию и так работает против `process.cwd()`, а `exec node …` не меняет рабочую директорию, так что `process.cwd()` совпадает с директорией вызова `pf`. Жёстко зашитый `--target "$(pwd)"` привёл бы к double-`--target` при вызове `pf --target <path>` (`[--target, <cwd>, --target, <path>]`), а `parseTargetDir` использует `indexOf("--target")` (first-wins) и молча отбросил бы пользовательский путь. Без него bare `pf` работает против текущей директории, а `pf --target <path>` корректно её переопределяет.
 - Устанавливающий шаг: `chmod +x` после записи файла; если `~/.claude/bin` не входит в `PATH` пользователя, скрипт установки печатает предупреждение с точной строкой для добавления (`export PATH="$HOME/.claude/bin:$PATH"`) — не пытается автоматически редактировать `.bashrc`/`.zshrc`.
 - Идемпотентность: повторный запуск установки/обновления перезаписывает `~/.claude/bin/pf` (обновляя `<FRAMEWORK_ROOT>`, если фреймворк переустановлен в другое место) — без запроса подтверждения.
-- `pf` без аргументов эквивалентен `make tui TARGET=$(pwd)`, запущенному из директории фреймворка; дополнительные аргументы (`--target <path>`) проходят через как есть, переопределяя `$(pwd)`.
+- `pf` без аргументов эквивалентен `make tui TARGET=$(pwd)`, запущенному из директории фреймворка; дополнительные аргументы (`--target <path>`) проходят через как есть, переопределяя текущую директорию.
 
 ## Однокомандный установщик фреймворка (AC-7, AC-8)
 
@@ -132,11 +133,12 @@ help:
 ```sh
 curl -fsSL https://raw.githubusercontent.com/stacmv/planning-framework/main/scripts/install.sh | sh
 ```
+> Модель ветвления (P0-1, Option B): `develop` — trunk для активной разработки; `main` — release-ветка, создаваемая из `develop` (релизы — мерджем `develop`→`main`). Все raw-URL установщика и `git clone`/`fetch`/`reset` нацелены на `main`, чтобы `curl|sh` раздавал стабильное release-состояние.
 
 Шаги:
 1. Проверить наличие `git` и `node` в `PATH` (`command -v git`, `command -v node`); если что-то отсутствует — вывести на stderr понятное сообщение с названием отсутствующей программы и ссылкой на её установку, завершиться с ненулевым кодом. Не пытаться ставить их автоматически через apt/brew/etc (вне рамок, см. BRD).
 2. `INSTALL_DIR="$HOME/.claude/planning-framework"`.
-3. Если `$INSTALL_DIR/.git` существует — `git -C "$INSTALL_DIR" pull --ff-only` (обновление); иначе — `git clone https://github.com/stacmv/planning-framework.git "$INSTALL_DIR"` (первая установка). Оба случая — один и тот же путь кода, без интерактивного вопроса «уже установлено, переустановить?» (US-6, AC-8).
+3. Если `$INSTALL_DIR/.git` существует — детерминированное обновление: `git -C "$INSTALL_DIR" fetch origin main && git -C "$INSTALL_DIR" reset --hard origin/main` (обновление); иначе — `git clone -b main https://github.com/stacmv/planning-framework.git "$INSTALL_DIR"` (первая установка). Установщик нацелен на release-ветку `main` (`develop` — trunk для разработки; P0-1, Option B), поэтому `-b main` обязательно. `reset --hard` вместо `pull --ff-only` гарантирует безошибочное обновление под `set -e` (AC-8): не падает на локальных правках, force-push/rebase апстрима или detached HEAD, а клон принадлежит установщику и его безопасно выровнять принудительно. Оба случая — один и тот же путь кода, без интерактивного вопроса «уже установлено, переустановить?» (US-6, AC-8).
 4. Установить шим и скиллы **для самого фреймворка** самостоятельно, внутри `install.sh`, без вызова `setup-planning-v3.sh` (см. P0-обоснование ниже):
    - Скиллы: динамически найти все директории, содержащие `SKILL.md`, в `$INSTALL_DIR/skills/` (тем же способом, что и `update-skills.sh` — `find "$INSTALL_DIR/skills" -mindepth 1 -maxdepth 1 -type d`, отфильтровав по наличию `SKILL.md`), и скопировать каждую в `~/.claude/skills/<имя>/` (`mkdir -p` + `cp -r "$src/." "$dst/"`). Так `install.sh` всегда ставит полный и актуальный набор скиллов, без хардкода списка в третьем месте.
    - Шим: записать `~/.claude/bin/pf` по тому же шаблону, что и в разделе "Глобальный шим `pf`" выше (`<FRAMEWORK_ROOT>` = `$INSTALL_DIR`), `chmod +x`, проверить `PATH` тем же способом (предупреждение с `export PATH="$HOME/.claude/bin:$PATH"`, без автоправки `.bashrc`/`.zshrc`).
@@ -153,13 +155,13 @@ irm https://raw.githubusercontent.com/stacmv/planning-framework/main/scripts/ins
 Та же последовательность шагов, что и `install.sh`, средствами PowerShell:
 1. `Get-Command git`/`Get-Command node` — при отсутствии, понятная ошибка через `Write-Error` и `exit 1`.
 2. `$InstallDir = "$HOME\.claude\planning-framework"`.
-3. `git -C $InstallDir pull --ff-only`, если `$InstallDir\.git` существует, иначе `git clone ... $InstallDir`.
-4. Установка скиллов и шима — тем же способом динамического обнаружения, что и `install.sh` (шаг 4 выше): найти все директории с `SKILL.md` в `$InstallDir\skills\` (`Get-ChildItem -Directory` + фильтр по наличию `SKILL.md`) и скопировать каждую в `~\.claude\skills\<имя>` через `Copy-Item -Recurse -Force`. Оба установщика (`install.sh` и `install.ps1`) ставят один и тот же полный набор скиллов одним и тем же способом обнаружения — без хардкод-списка и без расхождения между платформами. Шим: на Windows `~/.claude/bin/pf` не может быть POSIX shell-скриптом — устанавливается `~/.claude/bin/pf.cmd` (или `.ps1`), делающий эквивалент `node "<FRAMEWORK_ROOT>\tools\onboarding-tui\cli.js" --target "%CD%" %*`. `PATH` на Windows проверяется через переменную окружения пользователя (`[Environment]::GetEnvironmentVariable('PATH','User')`), с тем же предупреждением-подсказкой при отсутствии `~/.claude/bin` в нём.
+3. Если `$InstallDir\.git` существует — `git -C $InstallDir fetch origin main` затем `git -C $InstallDir reset --hard origin/main`; иначе — `git clone -b main https://github.com/stacmv/planning-framework.git $InstallDir`. Те же обоснования, что для `install.sh` шаг 3: установщик нацелен на release-ветку `main` (`develop` — trunk для разработки; P0-1, Option B), `reset --hard` гарантирует безошибочное обновление (AC-8).
+4. Установка скиллов и шима — тем же способом динамического обнаружения, что и `install.sh` (шаг 4 выше): найти все директории с `SKILL.md` в `$InstallDir\skills\` (`Get-ChildItem -Directory` + фильтр по наличию `SKILL.md`) и скопировать каждую в `~\.claude\skills\<имя>` через `Copy-Item -Recurse -Force`. Оба установщика (`install.sh` и `install.ps1`) ставят один и тот же полный набор скиллов одним и тем же способом обнаружения — без хардкод-списка и без расхождения между платформами. Шим: на Windows `~/.claude/bin/pf` не может быть POSIX shell-скриптом — устанавливается `~/.claude/bin/pf.cmd` (или `.ps1`), делающий эквивалент `node "<FRAMEWORK_ROOT>\tools\onboarding-tui\cli.js" %*`. Как и в POSIX-версии, `--target` явно НЕ подставляется (P1-1): `cli.js` по умолчанию работает против `process.cwd()`, а жёстко зашитый `--target "%CD%"` заставил бы `pf --target <path>` молча игнорироваться (double-`--target`, first-wins в `parseTargetDir`). `PATH` на Windows проверяется через переменную окружения пользователя (`[Environment]::GetEnvironmentVariable('PATH','User')`), с тем же предупреждением-подсказкой при отсутствии `~/.claude/bin` в нём.
 5. Итоговое сообщение аналогично `install.sh`.
 
 ### Общие ограничения установщика
 
-- Оба скрипта идемпотентны: второй запуск — это `git pull` + переустановка шима, без дополнительных вопросов (US-6, AC-8).
+- Оба скрипта идемпотентны: второй запуск — это `git fetch origin main && git reset --hard origin/main` + переустановка шима, без дополнительных вопросов (US-6, AC-8).
 - Ни один скрипт не устанавливает `git`/`node` сам — только проверяет и сообщает (вне рамок, см. BRD «Вне рамок»).
 - README получает два блока кода (один для Linux/macOS, один для Windows) рядом друг с другом, с одной строкой пояснения к каждому.
 
@@ -174,4 +176,4 @@ irm https://raw.githubusercontent.com/stacmv/planning-framework/main/scripts/ins
 | AC-5 | `lib/tutorial.js` — пошаговый туториал по концепциям внутри TUI |
 | AC-6 | Глобальный шим `~/.claude/bin/pf`, устанавливаемый setup/update-скриптами фреймворка |
 | AC-7 | `scripts/install.sh` + `scripts/install.ps1` — однокомандная кросс-платформенная установка |
-| AC-8 | `git pull --ff-only` + переустановка шима при повторном запуске install-скриптов |
+| AC-8 | `git fetch origin main && git reset --hard origin/main` (детерминированное выравнивание клона к release-ветке `main`, не `pull --ff-only`) + переустановка шима при повторном запуске install-скриптов |

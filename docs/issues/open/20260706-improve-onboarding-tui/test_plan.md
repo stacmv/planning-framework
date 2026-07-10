@@ -315,7 +315,7 @@ size_tier: medium
 
 ### TC-011: Установка глобального шима `pf` скриптами `setup-planning-v3.sh` и `update-skills.sh`
 
-**Description:** Проверяет, что оба скрипта (`setup-planning-v3.sh` для установки/самоустановки фреймворка, `update-skills.sh` для обновления) создают файл `~/.claude/bin/pf`, что он исполняем, содержит корректный `<FRAMEWORK_ROOT>` (абсолютный путь к директории, где лежит `setup-planning-v3.sh`), и что вызов `pf` из произвольной директории (не из корня фреймворка) корректно делегирует в TUI с `--target`, равным текущей директории вызова.
+**Description:** Проверяет, что оба скрипта (`setup-planning-v3.sh` в обычном сценарии установки фреймворка в проект-потребитель и `update-skills.sh` при обновлении) создают файл `~/.claude/bin/pf`, что он исполняем, содержит корректный `<FRAMEWORK_ROOT>` (абсолютный путь к директории, где лежит сам скрипт — `FRAMEWORK_DIR`), и что вызов `pf` из произвольной директории (не из корня фреймворка) корректно делегирует в TUI для текущей директории вызова. Флаг `--self` в плане не предусмотрен: шим ставится тем же шагом установки/обновления, что и скиллы.
 
 **Preconditions:**
 - Репозиторий `planning-framework` склонирован в известный абсолютный путь `FRAMEWORK_ROOT`.
@@ -325,11 +325,11 @@ size_tier: medium
 
 | Step | Action | Expected Result |
 |------|--------|-----------------|
-| 1 | Выполнить установку/самоустановку шима через `setup-planning-v3.sh` (режим для самого фреймворка) | Скрипт завершается без ошибок; файл `~/.claude/bin/pf` создан |
+| 1 | Запустить `bash scripts/setup-planning-v3.sh`, ответив на два интерактивных промпта (целевая директория = тестовая фикстура; подтвердить) | Скрипт завершается без ошибок; в конце скрипта создаётся `~/.claude/bin/pf`, указывающий на `FRAMEWORK_DIR` (директорию, где лежит сам `setup-planning-v3.sh`) |
 | 2 | Проверить права доступа файла (`test -x ~/.claude/bin/pf`) | Файл исполняем (`chmod +x` применён) |
-| 3 | Прочитать содержимое `~/.claude/bin/pf` | Содержит `exec node "<FRAMEWORK_ROOT>/tools/onboarding-tui/cli.js" --target "$(pwd)" "$@"`, где `<FRAMEWORK_ROOT>` — абсолютный путь к склонированному репозиторию |
+| 3 | Прочитать содержимое `~/.claude/bin/pf` | Содержит `exec node "<FRAMEWORK_ROOT>/tools/onboarding-tui/cli.js" "$@"`, где `<FRAMEWORK_ROOT>` — абсолютный путь к `FRAMEWORK_DIR` (шим намеренно НЕ подставляет `--target "$(pwd)"` — P1-1, см. TC-017) |
 | 4 | Удалить файл `~/.claude/bin/pf`, затем выполнить `bash scripts/update-skills.sh` | `update-skills.sh` также (пере)создаёт `~/.claude/bin/pf` с тем же содержимым и правами |
-| 5 | Перейти (`cd`) в произвольную временную директорию, не связанную с `FRAMEWORK_ROOT`, и выполнить `pf` (с `~/.claude/bin` на `PATH`) | `pf` запускает `cli.js` из корректного `FRAMEWORK_ROOT` с `--target`, равным текущей произвольной директории |
+| 5 | Перейти (`cd`) в произвольную временную директорию, не связанную с `FRAMEWORK_ROOT`, и выполнить `pf` (с `~/.claude/bin` на `PATH`) | `pf` запускает `cli.js` из корректного `FRAMEWORK_ROOT`; TUI работает против текущей директории вызова (cli.js по умолчанию использует `process.cwd()`) |
 
 **Test Data:**
 - `FRAMEWORK_ROOT` — путь к тестовому клону репозитория
@@ -393,11 +393,44 @@ size_tier: medium
 
 ---
 
+### TC-017: `pf --target <path>` переопределяет текущую директорию (P1-1, AC-6)
+
+**Description:** Проверяет регрессию P1-1: шим `pf` намеренно НЕ подставляет `--target "$(pwd)"` / `--target "%CD%"` (POSIX и Windows соответственно), чтобы пользовательский `--target <path>` не молчаливо игнорировался. Раньше шаблон шима `exec node "<FRAMEWORK_ROOT>/tools/onboarding-tui/cli.js" --target "$(pwd)" "$@"` при вызове `pf --target /other` давал argv `[--target, <cwd>, --target, /other]`, а `cli.js` (`parseTargetDir`, `indexOf("--target")` — first-wins) брал первое `--target` и тихо отбрасывал пользовательский путь. Теперь шим передаёт только `"$@"` / `%*`, и `cli.js` по умолчанию использует `process.cwd()`, а явный `--target <path>` — единственный и корректно переопределяет цель. TC покрывает обе платформы: POSIX-шим (`~/.claude/bin/pf`) и Windows `.cmd` (`~/.claude/bin/pf.cmd`).
+
+**Preconditions:**
+- Шим `pf` установлен (POSIX — через TC-011/TC-014; Windows `.cmd` — через TC-016) и `~/.claude/bin` на `PATH`.
+- Подготовлены две директории-фикстуры с разным состоянием, различимым на глаз: `DIR_A` (пустая → состояние `none`) и `DIR_B` (с `CLAUDE.md` без `PLANNING.md` → состояние `v2-or-older`). Текущая директория вызова — `DIR_A`.
+
+**Steps (POSIX `pf`):**
+
+| Step | Action | Expected Result |
+|------|--------|-----------------|
+| 1 | `cd "$DIR_A"`, затем `pf --target "$DIR_B"` | TUI открывается с `Detected: v2-or-older` (состояние `DIR_B`), а НЕ `none` (состояние `DIR_A`) — пользовательский `--target` не проигнорирован |
+| 2 | `cd "$DIR_A"`, затем `pf` (без аргументов) | TUI открывается с `Detected: none` (текущая директория `DIR_A`) — умолчание `process.cwd()` сохранено |
+| 3 | Прочитать `~/.claude/bin/pf` | Не содержит жёстко зашитого `--target "$(pwd)"` (только `exec node "<FRAMEWORK_ROOT>/tools/onboarding-tui/cli.js" "$@"`) |
+
+**Steps (Windows `pf.cmd` — отдельный прогон на Windows-машине):**
+
+| Step | Action | Expected Result |
+|------|--------|-----------------|
+| 4 | `cd $DIR_A`, затем `pf --target $DIR_B` | TUI открывается с `Detected: v2-or-older` (`DIR_B`), НЕ `none` |
+| 5 | Прочитать `~/.claude/bin/pf.cmd` | Не содержит жёстко зашитого `--target "%CD%"` (только `node "<FRAMEWORK_ROOT>\tools\onboarding-tui\cli.js" %*`) |
+
+**Test Data:**
+- `DIR_A` — пустая директория (состояние `none`)
+- `DIR_B` — директория с `CLAUDE.md` без `PLANNING.md` (состояние `v2-or-older`)
+
+**Expected Outcome:** `pf --target <path>` надёжно переопределяет текущую директорию на обеих платформах, а bare `pf` работает против текущей директории (AC-6, P1-1).
+
+**Priority:** High
+
+---
+
 ### Integration — однокомандный установщик фреймворка (AC-7, AC-8)
 
 ### TC-014: `scripts/install.sh` — установка с нуля и идемпотентное обновление
 
-**Description:** Проверяет полный сценарий `install.sh`: первый запуск проверяет наличие `git`/`node`, клонирует репозиторий в `~/.claude/planning-framework`, устанавливает шим и скиллы; повторный запуск того же скрипта выполняет `git pull --ff-only` и переустанавливает шим/скиллы без вопросов (идемпотентное обновление, AC-8).
+**Description:** Проверяет полный сценарий `install.sh`: первый запуск проверяет наличие `git`/`node`, клонирует репозиторий (`git clone -b main`) в `~/.claude/planning-framework`, устанавливает шим и скиллы; повторный запуск того же скрипта выполняет детерминированное обновление (`git fetch origin main && git reset --hard origin/main`) и переустанавливает шим/скиллы без вопросов (идемпотентное обновление, AC-8). Установщик нацелен на release-ветку `main` (`develop` — trunk для разработки; P0-1, Option B).
 
 **Preconditions:**
 - Чистая тестовая машина/контейнер с доступом в интернет, установленными `git` и `node`, без предустановленного `~/.claude/planning-framework`.
@@ -408,11 +441,11 @@ size_tier: medium
 | Step | Action | Expected Result |
 |------|--------|-----------------|
 | 1 | Выполнить `curl -fsSL <install.sh URL> \| sh` (или локально `bash scripts/install.sh`) на чистой машине | Скрипт проверяет наличие `git` и `node` (успешно), клонирует репозиторий в `~/.claude/planning-framework` |
-| 2 | Проверить, что `~/.claude/planning-framework/.git` существует и `HEAD` соответствует ожидаемой ветке | Клонирование выполнено корректно |
+| 2 | Проверить, что `~/.claude/planning-framework/.git` существует и `HEAD` соответствует ветке `main` | Клонирование выполнено корректно (`-b main`) |
 | 3 | Проверить, что `~/.claude/bin/pf` установлен, исполняем и указывает на `~/.claude/planning-framework` | Шим установлен как часть первичной установки |
 | 4 | Проверить, что скиллы установлены (`~/.claude/skills` содержит ожидаемые `pf-*` скиллы) | Скиллы установлены |
-| 5 | Внести изменение в апстрим (или дождаться нового коммита) и повторно выполнить тот же `install.sh` | Скрипт обнаруживает, что `~/.claude/planning-framework/.git` уже существует, выполняет `git pull --ff-only` без интерактивного запроса подтверждения |
-| 6 | Проверить, что локальный клон обновлён до последнего коммита апстрима | `git log` показывает актуальный коммит |
+| 5 | Внести изменение в апстрим (или дождаться нового коммита) и повторно выполнить тот же `install.sh` | Скрипт обнаруживает, что `~/.claude/planning-framework/.git` уже существует, выполняет `git fetch origin main && git reset --hard origin/main` без интерактивного запроса подтверждения (даже если локальный клон имеет незакоммиченные правки — `reset --hard` выравнивает его без ошибки) |
+| 6 | Проверить, что локальный клон обновлён до последнего коммита апстрима | `git log` показывает актуальный коммит `origin/main` |
 | 7 | Проверить, что шим и скиллы переустановлены на шаге 5 | Файлы шима/скиллов актуальны, ручных действий не требуется |
 
 **Test Data:**
@@ -451,7 +484,7 @@ size_tier: medium
 
 ### TC-016: `scripts/install.ps1` — установка, идемпотентное обновление и проверка зависимостей на Windows
 
-**Description:** Проверяет, что `install.ps1` воспроизводит на Windows те же гарантии, что и `install.sh`: проверку `git`/`node` через `Get-Command`, клонирование/`git pull --ff-only` в `$HOME\.claude\planning-framework`, установку шима (`pf.cmd`, Windows-эквивалент POSIX-шима) и скиллов, идемпотентное обновление при повторном запуске без запроса подтверждения, и понятную ошибку через `Write-Error`/`exit 1` при отсутствии `git` или `node`.
+**Description:** Проверяет, что `install.ps1` воспроизводит на Windows те же гарантии, что и `install.sh`: проверку `git`/`node` через `Get-Command`, клонирование (`git clone -b main`)/детерминированное обновление (`git fetch origin main && git reset --hard origin/main`) в `$HOME\.claude\planning-framework`, установку шима (`pf.cmd`, Windows-эквивалент POSIX-шима) и скиллов, идемпотентное обновление при повторном запуске без запроса подтверждения, и понятную ошибку через `Write-Error`/`exit 1` при отсутствии `git` или `node`. Та же модель ветвления, что в TC-014 (P0-1, Option B): установщик нацелен на release-ветку `main`.
 
 **Preconditions:**
 - Чистая тестовая машина Windows (или Windows-контейнер/VM) с PowerShell и доступом в интернет.
@@ -462,8 +495,8 @@ size_tier: medium
 | Step | Action | Expected Result |
 |------|--------|-----------------|
 | 1 | На чистой Windows-машине с установленными `git` и `node` выполнить `irm <install.ps1 URL> \| iex` (или локально `.\scripts\install.ps1`) | Скрипт проверяет наличие `git` и `node` (успешно), клонирует репозиторий в `$HOME\.claude\planning-framework` |
-| 2 | Проверить, что установлен шим `~/.claude/bin/pf.cmd`, содержащий эквивалент `node "<FRAMEWORK_ROOT>\tools\onboarding-tui\cli.js" --target "%CD%" %*`, и что скиллы установлены | Шим и скиллы установлены аналогично Linux/macOS-варианту |
-| 3 | Повторно выполнить `install.ps1` на той же машине | Выполняется `git pull --ff-only` без запроса подтверждения, шим/скиллы переустановлены |
+| 2 | Проверить, что установлен шим `~/.claude/bin/pf.cmd`, содержащий эквивалент `node "<FRAMEWORK_ROOT>\tools\onboarding-tui\cli.js" %*` (без `--target "%CD%"` — см. P1-1 и TC-017), и что скиллы установлены | Шим и скиллы установлены аналогично Linux/macOS-варианту |
+| 3 | Повторно выполнить `install.ps1` на той же машине | Выполняется `git fetch origin main && git reset --hard origin/main` без запроса подтверждения, шим/скиллы переустановлены |
 | 4 | Проверить предупреждение о `PATH` через `[Environment]::GetEnvironmentVariable('PATH','User')` — сначала без `~/.claude/bin` в пользовательском `PATH`, затем с ним | Предупреждение показывается только в первом случае, аналогично поведению `install.sh`/шима на POSIX (см. TC-013) |
 | 5 | В окружении без `Get-Command git` (или без `node`) выполнить `install.ps1` | Скрипт завершается через `Write-Error` с понятным сообщением об отсутствующей программе и `exit 1`, без попытки автоустановки |
 
@@ -494,3 +527,4 @@ size_tier: medium
 | TC-014 | `scripts/install.sh` — установка с нуля и идемпотентное обновление | Manual | Critical | [ ] |  |
 | TC-015 | `scripts/install.sh` — отсутствие `git`/`node` даёт понятную ошибку без автоустановки | Auto | Critical | [ ] |  |
 | TC-016 | `scripts/install.ps1` — установка, идемпотентное обновление и проверка зависимостей на Windows | Manual | High | [ ] |  |
+| TC-017 | `pf --target <path>` переопределяет текущую директорию (P1-1, POSIX + Windows) | Manual | High | [ ] | Регрессия на double-`--target` first-wins в шиме |
