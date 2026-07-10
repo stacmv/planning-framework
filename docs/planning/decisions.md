@@ -2,7 +2,7 @@
 
 **Project:** MyProject
 **Started:** 2025-11-06
-**Last Updated:** 2025-11-06
+**Last Updated:** 2026-07-10
 
 ---
 
@@ -39,7 +39,7 @@ Quick reference to all decisions:
 | ADR | Title | Status | Date |
 |-----|-------|--------|------|
 | [ADR-001](#adr-001-decision-title) | [Decision Title] | Accepted | 2025-11-06 |
-| [ADR-002](#adr-002-decision-title) | [Decision Title] | Accepted | 2025-11-06 |
+| [ADR-002](#adr-002-release-branch-model--develop-trunk--main-release-installed-via-main) | Release branch model — `develop` (trunk) + `main` (release), installed via `main` | Accepted | 2026-07-10 |
 | [ADR-003](#adr-003-decision-title) | [Decision Title] | Superseded | 2025-11-06 |
 
 ---
@@ -138,6 +138,68 @@ Quick reference to all decisions:
 ### ADR-002: [Next Decision]
 
 [Repeat structure above]
+
+---
+
+---
+
+### ADR-002: Release branch model — `develop` (trunk) + `main` (release), installed via `main`
+
+**Date:** 2026-07-10
+**Status:** Accepted (created in issue [20260706-improve-onboarding-tui](../issues/closed/20260706-improve-onboarding-tui/))
+
+#### Context
+
+Until 2026-07-10 the repository had a single branch `develop` (CLAUDE.md: "Trunk branch: `develop`"). When the one-command installer (`curl -fsSL https://raw.githubusercontent.com/stacmv/planning-framework/main/scripts/install.sh | sh`) was designed, it had to choose which branch to clone from. Two models are common for projects that ship a `curl|sh` installer:
+
+1. The installer clones the trunk (`develop` in our case) — every `curl|sh` always gets the absolute latest commit, including in-progress merges.
+2. The installer clones a dedicated release branch (e.g. `main`) that only receives merges from the trunk, so `curl|sh` always gets a stable, post-merge snapshot.
+
+The same question applied to the `update` step (`git fetch && git reset --hard origin/<branch>`) and to the README snippets (`raw.githubusercontent.com/.../<branch>/scripts/install.sh`).
+
+`develop` is currently GitHub's default branch and PRs target it (per the project's workflow: feature branches merge to `develop`).
+
+#### Options Considered
+
+**Option 1 (recommended):** Keep `develop` as trunk (PRs, day-to-day development), create a dedicated `main` branch as the release branch. Installer URLs, `git clone -b`, `fetch origin`/`reset --hard origin` all target `main`. Releases are performed by merging `develop` → `main`. `develop` remains the GitHub default branch so PRs keep targeting it.
+- Pros: Stable `curl|sh` payload (mid-merge trunk states never leak to installer users); minimal change to existing workflow (no PR-routing change); `git clone` (no `-b`) still gets the active development copy.
+- Cons: Requires an explicit `release` step (merge `develop` → `main`) when shipping — adds one manual action per release.
+
+**Option 2:** Installer targets `develop` directly.
+- Pros: Zero release overhead; users always get the freshest code.
+- Cons: A `curl|sh` running during a merge into `develop` may pull a half-merged state; the very motivation for `curl|sh` (zero-friction install) is undermined by an unstable payload.
+
+**Option 3:** Make `main` the GitHub default branch; use `develop` as a long-lived feature branch.
+- Pros: Symmetric with GitHub-flow conventions.
+- Cons: PRs would target `main` by default in the GitHub UI, contradicting the existing trunk model where feature branches merge to `develop`. Larger disruption.
+
+#### Decision
+
+**We chose Option 1.** `develop` remains the trunk (feature branches are created from and merged back into `develop`; PRs target `develop`). A new branch `main` was created on 2026-07-10 pointing at the same commit as `develop` at creation time (`027d310`). The installer, README snippets, and `git fetch origin main && git reset --hard origin/main` all pin to `main`. Releases are performed by merging `develop` → `main`.
+
+The branch model is documented in `README.md` ("One-Command Install" section) and in the implementation plan / spec for the issue.
+
+#### Rationale
+
+The `curl|sh` payload is the project's most visible artifact to a first-time user. Stability of that artifact matters more than release overhead. Keeping `develop` as the default branch preserves the established workflow with no PR-targeting change.
+
+#### Consequences
+
+**Positive:**
+- Stable installer: `curl|sh` always resolves to a known release commit.
+- No PR-routing change; existing `feature-branch → develop` workflow unchanged.
+- `reset --hard origin/main` (instead of `pull --ff-only`) gives idempotent, error-free updates under `set -e`, even if the local clone has drifted (AC-8 of the issue).
+
+**Negative:**
+- Releases require an explicit `git checkout main && git merge develop && git push origin main` step.
+- The `main` branch must be kept in sync — if a feature ships to `develop` but `develop` is not merged to `main`, the installer ships the previous release.
+
+**Mitigation:** Issue / checklist for releases should include "merge `develop` → `main` and push" as the last step.
+
+#### Related Decisions
+
+- Relates to issue [20260706-improve-onboarding-tui](../issues/closed/20260706-improve-onboarding-tui/) (Tasks 6–9: installer + shim + README).
+- Conflicts with a hypothetical "Option 3" future where `main` becomes the default branch — explicitly rejected above.
 
 ---
 
@@ -314,4 +376,4 @@ Create an ADR when deciding:
 ---
 
 **Log Started:** 2025-11-06
-**Last Updated:** 2025-11-06
+**Last Updated:** 2026-07-10
