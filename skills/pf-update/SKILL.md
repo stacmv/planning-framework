@@ -8,7 +8,9 @@ Update the installed Planning Framework skills to the latest version.
 
 ## Managed Skills
 
-The following skills are discovered and updated automatically:
+The update script **discovers skills by globbing `skills/*/SKILL.md` in the framework repo** — it never reads the list below, and a new skill is picked up without editing this file. The list is documentation only; keep it in sync, but the script is the source of truth.
+
+All 15 skills:
 
 - `pf` — orchestrator: shows active issue status and next step
 - `pf-help` — framework overview and quick-start
@@ -19,6 +21,7 @@ The following skills are discovered and updated automatically:
 - `pf-impl-plan` — implementation plan creation
 - `pf-execute` — implementation execution via sub-agents
 - `pf-test` — run tests for the active issue
+- `pf-manual-test` — local Manual Test UI for `manual_test_checklist.md`
 - `pf-qa` — QA checklist execution
 - `pf-qa-setup` — QA environment setup
 - `pf-close` — issue closure workflow
@@ -43,6 +46,18 @@ bash <path-to-planning-framework>/scripts/update-skills.sh
 
 Show the output to the user ([new], [updated], [unchanged] per skill).
 
-## Step 3: Report
+## Step 3: Reconcile the project's `.pf-version`
 
-Tell the user which skills were updated and confirm they are now active in this session.
+Updating the skills without touching `.pf-version` lets the marker drift silently: the project claims one framework version while running another. So, after the update:
+
+1. Read the framework version from the framework repo — `PF_VERSION` in `scripts/converge-to-v3.sh`.
+2. Read the current project's `.pf-version` (the file at the repo root of the project `/pf-update` was invoked in).
+3. Compare:
+   - **Match** — say so in one line and move on. Nothing to do.
+   - **Mismatch or `.pf-version` missing entirely** — do **not** rewrite the file yourself: the marker is written by convergence, together with the layout and documents it stands for. Print a recommendation instead, naming both versions:
+     "This project's `.pf-version` says `<project-version>`, the framework is `<framework-version>`. Run convergence to bring the project up to date: `make converge` in the project, or `bash <path-to-planning-framework>/scripts/converge-to-v3.sh --target <project-path>`."
+     (If `.pf-version` is absent, say "This project has no `.pf-version` marker" and give the same recommendation.)
+
+## Step 4: Report
+
+Tell the user which skills were updated, report the `.pf-version` verdict from Step 3, and confirm the skills are now active in this session.

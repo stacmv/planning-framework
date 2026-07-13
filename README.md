@@ -13,22 +13,33 @@
 **BRD Pipeline** - feat/improve issues follow BRD → spec → test plan → implementation plan before any code
 **Pipeline Enforcement** - Skills refuse to run if prerequisites are missing, keeping documents consistent
 **`/pf-check`** - Verifies consistency across all pipeline documents at any point
+**One entry point** - `make converge` installs, migrates or tops up a project from *any* starting state
 **`scripts/update-skills.sh`** - Propagate skill updates to all consumer projects from one place
 
-### Skill Commands
+## Skills
+
+Fifteen Claude Code skills live in `skills/`, one directory per skill (`skills/<name>/SKILL.md`). Converge installs all of them into `~/.claude/skills/`.
 
 | Command | Purpose |
 |---------|---------|
 | `/pf` | Show active issue status and next step |
-| `/pf-brd` | Create Business Requirements Document for an issue |
-| `/pf-spec` | Generate spec from BRD |
-| `/pf-check` | Verify consistency between pipeline documents |
-| `/pf-test-plan` | Generate test plan from spec |
-| `/pf-impl-plan` | Generate implementation plan from test plan |
-| `/pf-execute` | Begin implementation (requires complete pipeline) |
+| `/pf-help` | Framework overview and quick start |
+| `/pf-brd` | Create the Business Requirements Document for an issue |
+| `/pf-spec` | Write the technical spec from the BRD |
+| `/pf-test-plan` | Generate the test plan from the spec (or the analysis, for bugs) |
+| `/pf-impl-plan` | Create the implementation plan from the test plan |
+| `/pf-check` | Review the most recent pipeline document for problems |
+| `/pf-execute` | Execute the implementation plan via sub-agents |
+| `/pf-test` | Run tests, update the Status Tracker, build the manual test checklist |
+| `/pf-manual-test` | Fill in the manual test checklist interactively |
+| `/pf-qa` | Run QA checks from `.qa-workflow.md`, produce `qa_report.md` |
+| `/pf-qa-setup` | Create or update `.qa-workflow.md` for the project |
+| `/pf-close` | Merge the issue branch, archive the issue, update the session log |
+| `/pf-update` | Update the installed skills from the framework repo |
+| `/pf-size-tiers` | Reference data (size tiers, document budgets) — read by the other skills |
 
 ### Upgrading from v2.0?
-See **[MIGRATION-GUIDE.md](docs/planning/MIGRATION-GUIDE.md)** for step-by-step instructions, or run `./scripts/migrate-v2-to-v3.sh`.
+Run `make converge TARGET=/path/to/your-project`. See **[MIGRATION-GUIDE-V3.md](docs/planning/MIGRATION-GUIDE-V3.md)** for what it does to your issues, the backup, and `--dry-run`.
 
 ---
 
@@ -81,34 +92,32 @@ Re-running the same command later updates an existing install in place (no promp
 
 > The installer pulls from the `main` (release) branch; `develop` is the active-development trunk. To install into a custom location instead, use the manual steps below, or explore the framework interactively with `make tui`.
 
-### For New Projects
+### Manual Install / Upgrade — one command for every case
 
 ```bash
 # 1. Clone planning framework
 git clone https://github.com/[your-org]/planning-framework
 cd planning-framework
 
-# 2. Run interactive setup (installs framework + skills)
-./scripts/setup-planning-v3.sh
-# Follow prompts: project name, issue types, QA requirements
+# 2. Converge your project on v3
+make converge TARGET=/path/to/your-project
+# Works whatever the project starts from: no framework, v1, v2,
+# half-migrated, or an incomplete v3 install. Idempotent.
 
-# 3. Commit the framework
-git add .
-git commit -m "Setup Planning Framework v3.0"
+# 3. Review and commit
+cd /path/to/your-project && git status && git add . && git commit -m "Planning Framework v3.0"
 
-# 4. Create first issue
-# Ask your AI agent: "Create an issue to [add feature]"
+# 4. Set up QA gates and create the first issue
+# In Claude Code: /pf-qa-setup, then "Create an issue to [add feature]"
 ```
 
-### For Existing v2.0 Projects
+Not sure what it would do? Add `--dry-run`:
 
 ```bash
-# Migrate from v2.0 to v3.0
-./scripts/migrate-v2-to-v3.sh
-# Backs up v2.0, installs skills, updates structure, generates report
+./scripts/converge-to-v3.sh --target /path/to/your-project --dry-run
 ```
 
-**See [QUICKSTART.md](docs/planning/QUICKSTART.md) for complete 5-minute guide.**
+**See [QUICKSTART.md](docs/planning/QUICKSTART.md) for the complete 5-minute guide and [MIGRATION-GUIDE-V3.md](docs/planning/MIGRATION-GUIDE-V3.md) for upgrades.**
 
 ---
 
@@ -203,8 +212,9 @@ your-project/
 
 - 📖 **[Complete Guide](docs/planning/FRAMEWORK.md)** - Full documentation
 - ⚡ **[Quick Start](docs/planning/QUICKSTART.md)** - 5-minute setup
-- 🔄 **[Migration Guide](docs/planning/MIGRATION-GUIDE.md)** - v1.0 → v2.0
+- 🔄 **[Migration Guide](docs/planning/MIGRATION-GUIDE-V3.md)** - Converge any project on v3.0
 - 📁 **[Templates](docs/planning/templates/)** - All templates
+- 🗄️ **[v1.0 Archive](docs/planning/v1.0-archive/)** - Historical v1/v2 documents (not executable)
 
 ---
 
@@ -234,14 +244,18 @@ curl -fsSL https://raw.githubusercontent.com/stacmv/planning-framework/main/scri
 irm https://raw.githubusercontent.com/stacmv/planning-framework/main/scripts/install.ps1 | iex        # Windows
 ```
 
-**Setup:**
+**Install / migrate / top up — one script:**
 ```bash
-./scripts/setup-planning-v3.sh      # Interactive setup (includes skills + global pf shim)
+make converge                       # Converge the current directory on v3
+make converge TARGET=<path>         # ...or a specific project
+./scripts/converge-to-v3.sh --dry-run --target <path>   # Show the plan, change nothing
 ```
 
-**Migration:**
+Installs the framework + skills + the global `pf` shim, migrates v1/v2 layouts, and tops up an incomplete v3 install. Same script for all of it.
+
+**Interactive:**
 ```bash
-./scripts/migrate-v2-to-v3.sh       # Migrate from v2.0
+make tui                            # Onboarding/update wizard (also available as `pf`)
 ```
 
 **Skills maintenance:**
@@ -368,7 +382,7 @@ See [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines.
 
 - 📖 **Documentation:** [FRAMEWORK.md](docs/planning/FRAMEWORK.md)
 - ⚡ **Quick Help:** [QUICKSTART.md](docs/planning/QUICKSTART.md)
-- 🔄 **Migration:** [MIGRATION-GUIDE.md](docs/planning/MIGRATION-GUIDE.md)
+- 🔄 **Migration:** [MIGRATION-GUIDE-V3.md](docs/planning/MIGRATION-GUIDE-V3.md)
 - 🐛 **Issues:** [GitHub Issues](https://github.com/[your-org]/planning-framework/issues)
 - 💬 **Discussions:** [GitHub Discussions](https://github.com/[your-org]/planning-framework/discussions)
 

@@ -8,7 +8,14 @@ Determine the active issue by scanning `docs/issues/open/` for [ISSUE-ID].
 
 **Legacy-tier guard (runs first, before any other prerequisite check):** read `docs/issues/open/[ISSUE-ID]/prompt.md`'s YAML frontmatter. If it has no `size_tier` field, ask the user via `AskUserQuestion` — "How big is this task?" with the four options **trivial** / **small** / **medium** / **large** (one-line descriptions from `~/.claude/skills/pf-size-tiers/SKILL.md`'s Tiers table), recommending **medium** ("matches today's default behavior") — then write the answer into `prompt.md`'s frontmatter, next to `doc_language`, before proceeding with the rest of this skill.
 
-Read `docs/issues/open/[ISSUE-ID]/prompt.md` to understand the project description. If `notes.md` OR `brd.md` already exists in the same folder, stop and inform the user — BRD stage is already complete.
+Read `docs/issues/open/[ISSUE-ID]/prompt.md` to understand the project description.
+
+**Output gate — `notes.md` / `brd.md` already present (regenerate / keep / cancel).** If `notes.md` OR `brd.md` already exists in the same folder, do **not** stop outright. First judge the existing document against the shared definition of "stage complete" in `~/.claude/skills/pf-size-tiers/SKILL.md` ("Stage completion") — do not restate the criterion here. Then ask the user via `AskUserQuestion`, stating whether the document is complete or an incomplete stub, with three options:
+- **regenerate** — overwrite it with a freshly generated document (recommend this when it is **not** complete: an empty file, a stub carrying the stub marker, or one left behind by a migration);
+- **keep** — leave it untouched and stop, reporting that the BRD stage is already complete (recommend this when it **is** complete);
+- **cancel** — stop and change nothing.
+
+A stub must never lock its own owner out of the stage that produces it.
 
 Read `size_tier` from `prompt.md`'s frontmatter (set by the guard above if it was missing).
 

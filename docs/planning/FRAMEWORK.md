@@ -77,32 +77,33 @@ Planning Framework v3.0 solves these problems through:
 
 ### Quick Setup (5 Minutes)
 
-**For new projects:**
+**One command, whatever the project starts from** — no framework, v1, v2, half-migrated, or an incomplete v3 install:
 
 ```bash
 # 1. Get Planning Framework
 git clone https://github.com/[your-org]/planning-framework
 cd planning-framework
 
-# 2. Run interactive setup (installs framework + skills)
-./scripts/setup-planning-v3.sh
-# Follow prompts: project name, issue types, QA requirements
+# 2. Converge the project on v3 (installs framework + skills + the `pf` shim,
+#    migrates v1/v2 layouts, tops up whatever is missing — idempotent)
+make converge TARGET=/path/to/your-project
 
 # 3. Commit the framework
-git add .
-git commit -m "Setup Planning Framework v3.0"
+cd /path/to/your-project
+git add . && git commit -m "Setup Planning Framework v3.0"
 
 # 4. Start working!
-# Ask your AI agent to create your first issue, or run /pf
+# Run /pf-qa-setup to create .qa-workflow.md, then ask your AI agent for your
+# first issue, or run /pf
 ```
 
-**For existing v2.0 projects:**
+Preview without changing anything:
 
 ```bash
-# Migrate from v2.0 to v3.0
-./scripts/migrate-v2-to-v3.sh
-# Backs up v2.0, installs skills, updates structure, generates report
+./scripts/converge-to-v3.sh --target /path/to/your-project --dry-run
 ```
+
+There is no separate setup or migration script — `converge` is the single entry point. For what it does to existing issues, the backup and the flags, see [MIGRATION-GUIDE-V3.md](MIGRATION-GUIDE-V3.md).
 
 ### What Gets Created
 
@@ -372,21 +373,25 @@ git commit -m "Close issue 20240127-feat-add-auth: Added JWT authentication"
 
 ## Skills
 
-Eleven Claude Code skills live in the `skills/` directory and are installed into consumer projects by `setup-planning-v3.sh` and `update-skills.sh`.
+Fifteen Claude Code skills live in the `skills/` directory — one directory per skill, each holding a `SKILL.md`. They are installed into `~/.claude/skills/` by `converge-to-v3.sh` and refreshed by `update-skills.sh`.
 
 | Skill | Command | What it does |
 |-------|---------|-------------|
-| `pf.md` | `/pf` | Shows active issue, current pipeline stage, and next recommended action |
-| `pf-brd.md` | `/pf-brd` | Creates `brd.md` for a feat/improve issue |
-| `pf-spec.md` | `/pf-spec` | Creates `specs.md` from `brd.md` |
-| `pf-check.md` | `/pf-check` | Verifies consistency between all pipeline documents |
-| `pf-test-plan.md` | `/pf-test-plan` | Creates `test_plan.md` from `specs.md` or `analysis.md` |
-| `pf-impl-plan.md` | `/pf-impl-plan` | Creates `implementation_plan.md` from `test_plan.md` |
-| `pf-execute.md` | `/pf-execute` | Begins implementation; requires complete pipeline |
-| `pf-test.md` | `/pf-test` | Runs automated tests, updates Status Tracker, generates `manual_test_checklist.md` |
-| `pf-qa.md` | `/pf-qa` | Runs QA checks from `.qa-workflow.md`, produces `qa_report.md` with PASS/FAIL verdict |
-| `pf-qa-setup.md` | `/pf-qa-setup` | Creates or updates `.qa-workflow.md` for the project |
-| `pf-close.md` | `/pf-close` | Merges issue branch to parent, archives issue folder, updates session-log |
+| `pf/` | `/pf` | Shows active issue, current pipeline stage, and next recommended action |
+| `pf-help/` | `/pf-help` | Framework overview, skill descriptions, quick start for new users |
+| `pf-brd/` | `/pf-brd` | Creates `brd.md` for a feat/improve issue (or `notes.md` at the trivial tier) |
+| `pf-spec/` | `/pf-spec` | Creates `specs.md` from `brd.md` |
+| `pf-check/` | `/pf-check` | Reviews the most recent pipeline document for problems |
+| `pf-test-plan/` | `/pf-test-plan` | Creates `test_plan.md` from `specs.md` or `analysis.md` |
+| `pf-impl-plan/` | `/pf-impl-plan` | Creates `implementation_plan.md` from `test_plan.md` |
+| `pf-execute/` | `/pf-execute` | Executes the implementation plan via sub-agents; requires a complete pipeline |
+| `pf-test/` | `/pf-test` | Runs automated tests, updates the Status Tracker, generates `manual_test_checklist.md` |
+| `pf-manual-test/` | `/pf-manual-test` | Launches the local Manual Test UI to fill in `manual_test_checklist.md` |
+| `pf-qa/` | `/pf-qa` | Runs QA checks from `.qa-workflow.md`, produces `qa_report.md` with a PASS/FAIL verdict |
+| `pf-qa-setup/` | `/pf-qa-setup` | Creates or updates `.qa-workflow.md` for the project |
+| `pf-close/` | `/pf-close` | Merges the issue branch to parent, archives the issue folder, updates session-log |
+| `pf-update/` | `/pf-update` | Updates the installed skills from the framework source repo |
+| `pf-size-tiers/` | `/pf-size-tiers` | Reference data: size-tier definitions and document budgets, read by the other skills |
 
 ### Updating Skills
 
@@ -419,56 +424,76 @@ If a prerequisite is missing, the skill explains what needs to be done first rat
 
 ### Complete Directory Structure
 
+**In your project:**
+
 ```
 project/
 ├── PLANNING.md                          # Framework config
-├── .qa-workflow.md                      # QA requirements
+├── .pf-version                          # Framework version stamp
+├── CLAUDE.md                            # With one <!-- pf:begin --> … <!-- pf:end --> section
+├── .qa-workflow.md                      # QA requirements — written by /pf-qa-setup
 │
-├── skills/                              # Claude Code skills
-│   ├── pf.md                            # /pf — status + next step
-│   ├── pf-brd.md                        # /pf-brd — create BRD
-│   ├── pf-spec.md                       # /pf-spec — create spec
-│   ├── pf-check.md                      # /pf-check — consistency check
-│   ├── pf-test-plan.md                  # /pf-test-plan — create test plan
-│   ├── pf-impl-plan.md                  # /pf-impl-plan — create impl plan
-│   ├── pf-execute.md                    # /pf-execute — begin implementation
-│   ├── pf-test.md                       # /pf-test — run tests + manual checklist
-│   ├── pf-qa.md                         # /pf-qa — QA checks + qa_report.md
-│   ├── pf-qa-setup.md                   # /pf-qa-setup — create/update .qa-workflow.md
-│   └── pf-close.md                      # /pf-close — merge, archive, update log
-│
-├── docs/
-│   ├── issues/
-│   │   ├── open/                        # Active issues
-│   │   │   └── 20240127-feat-add-auth/
-│   │   │       ├── prompt.md            # Original request
-│   │   │       ├── brd.md               # Business requirements (feat/improve)
-│   │   │       ├── specs.md             # Technical spec (feat/improve)
-│   │   │       ├── analysis.md          # Analysis (bug)
-│   │   │       ├── test_plan.md         # Test plan (all types)
-│   │   │       ├── implementation_plan.md  # Task breakdown
-│   │   │       ├── session-log.md       # Progress log
-│   │   │       └── decisions.md         # (optional) Issue decisions
-│   │   │
-│   │   └── closed/                      # Completed issues (archived)
-│   │       └── 20240126-feat-user-dashboard/
-│   │           └── [same structure as open issues]
-│   │
-│   └── planning/
-│       ├── implementation-plan.md       # Roadmap + issue links
-│       ├── session-log.md               # One-line timeline
-│       ├── decisions.md                 # Global ADRs
-│       │
-│       └── templates/                   # Framework templates
-│           ├── issue/                   # Issue file templates
-│           ├── global/                  # Global planning templates
-│           ├── config/                  # Config templates
-│           └── README.md
-│
+└── docs/
+    ├── issues/
+    │   ├── open/                        # Active issues
+    │   │   └── 20240127-feat-add-auth/
+    │   │       ├── prompt.md            # Original request
+    │   │       ├── brd.md               # Business requirements (feat/improve)
+    │   │       ├── specs.md             # Technical spec (feat/improve)
+    │   │       ├── analysis.md          # Analysis (bug)
+    │   │       ├── test_plan.md         # Test plan (all types)
+    │   │       ├── implementation_plan.md  # Task breakdown
+    │   │       ├── session-log.md       # Progress log
+    │   │       └── decisions.md         # (optional) Issue decisions
+    │   │
+    │   └── closed/                      # Completed issues (archived)
+    │       └── 20240126-feat-user-dashboard/
+    │           └── [same structure as open issues]
+    │
+    └── planning/
+        ├── implementation-plan.md       # Roadmap + issue links
+        ├── session-log.md               # One-line timeline
+        ├── decisions.md                 # Global ADRs
+        │
+        └── templates/                   # Framework templates (mirrors the framework's)
+            ├── issue/                   # Issue file templates
+            ├── global/                  # Global planning templates
+            ├── config/                  # Config templates
+            └── README.md
+```
+
+**In your home directory** — installed by `converge` (skills are per-user, not per-project):
+
+```
+~/.claude/
+├── bin/
+│   └── pf                               # Global shim → the onboarding TUI
+└── skills/                              # 15 skills — one directory per skill
+    ├── pf/SKILL.md                      # /pf — status + next step
+    ├── pf-help/SKILL.md                 # /pf-help — overview + quick start
+    ├── pf-brd/SKILL.md                  # /pf-brd — create BRD
+    ├── pf-spec/SKILL.md                 # /pf-spec — create spec
+    ├── pf-check/SKILL.md                # /pf-check — review latest document
+    ├── pf-test-plan/SKILL.md            # /pf-test-plan — create test plan
+    ├── pf-impl-plan/SKILL.md            # /pf-impl-plan — create impl plan
+    ├── pf-execute/SKILL.md              # /pf-execute — execute the plan
+    ├── pf-test/SKILL.md                 # /pf-test — run tests + manual checklist
+    ├── pf-manual-test/SKILL.md          # /pf-manual-test — Manual Test UI
+    ├── pf-qa/SKILL.md                   # /pf-qa — QA checks + qa_report.md
+    ├── pf-qa-setup/SKILL.md             # /pf-qa-setup — create/update .qa-workflow.md
+    ├── pf-close/SKILL.md                # /pf-close — merge, archive, update log
+    ├── pf-update/SKILL.md               # /pf-update — refresh installed skills
+    └── pf-size-tiers/SKILL.md           # Reference data (tiers, budgets)
+```
+
+**In the framework repo:**
+
+```
+planning-framework/
 └── scripts/
-    ├── setup-planning-v3.sh             # Interactive setup (includes skills)
-    ├── migrate-v2-to-v3.sh              # v2.0 → v3.0 migration
-    └── update-skills.sh                 # Propagate skill updates
+    ├── converge-to-v3.sh                # The single entry point: install / migrate / top up
+    ├── update-skills.sh                 # Propagate skill updates
+    └── issue-status.sh                  # Issue status across remote branches
 ```
 
 ---
@@ -529,7 +554,7 @@ project/
 
 ## Best Practices
 
-See [FRAMEWORK.md](FRAMEWORK.md) for complete best practices guide including:
+Best practices covered in this guide and in [QUICKSTART.md](QUICKSTART.md):
 - When to create issues
 - Writing good analysis
 - Breaking down tasks
@@ -595,13 +620,14 @@ See complete FAQ in full documentation.
 
 **Documentation:**
 - [QUICKSTART.md](QUICKSTART.md) - 5-minute getting started
-- [MIGRATION-GUIDE.md](MIGRATION-GUIDE.md) - v1.0 → v2.0 migration
+- [MIGRATION-GUIDE-V3.md](MIGRATION-GUIDE-V3.md) - Converge any project on v3.0
 - [templates/README.md](templates/README.md) - Template usage
+- [v1.0-archive/MIGRATION-GUIDE-v1-to-v2.md](v1.0-archive/MIGRATION-GUIDE-v1-to-v2.md) - Historical v1.0 → v2.0 guide (do not execute)
 
 **Scripts:**
-- `scripts/setup-planning-v3.sh` - Interactive setup (includes skills)
-- `scripts/migrate-v2-to-v3.sh` - Migration tool
+- `scripts/converge-to-v3.sh` - The single entry point: install, migrate or top up
 - `scripts/update-skills.sh` - Propagate skill updates to consumer projects
+- `scripts/issue-status.sh` - Issue status across remote branches
 
 ---
 

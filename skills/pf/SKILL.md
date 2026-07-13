@@ -52,9 +52,13 @@ Before proceeding to Step 5, check the active issue's `prompt.md` frontmatter. I
 
 ## Step 5: Detect completed stages
 
-Check which documents exist inside the issue folder at `<ISSUE-ID>/` in the `docs/issues/open/` directory of the active project (relative to /pf's CWD):
+Check which documents inside the issue folder at `<ISSUE-ID>/` in the `docs/issues/open/` directory of the active project (relative to /pf's CWD) are **complete**.
 
-| Document present | Stage completed |
+**A document counts only when its stage is complete** — apply the shared definition of "stage complete" in `~/.claude/skills/pf-size-tiers/SKILL.md` ("Stage completion" section): the file exists, **and** it has a real body carrying no stub marker, **and** every preceding stage of its pipeline is complete. A document that fails any conjunct is treated as **absent** here. This gate does not restate the criterion — it reads it from `~/.claude/skills/pf-size-tiers/SKILL.md`.
+
+The criterion applies to **every row** of the table below — `notes.md`, `manual_test_checklist.md` and `qa_report.md` included — not to `test_plan.md` alone.
+
+| Document complete (per `~/.claude/skills/pf-size-tiers/SKILL.md`) | Stage completed |
 |---|---|
 | `prompt.md` | CREATE |
 | `brd.md` | BRD |
@@ -72,7 +76,9 @@ List all completed stages in order. Note: the `notes.md` row is for the **comple
 
 **Precedence rule — check `size_tier` before selecting a workflow table.** Read `size_tier` from the issue's `prompt.md` frontmatter (by this point Step 5's legacy-tier guard has already ensured this field is present) *before* selecting any type-specific (feat/improve/bug) workflow table below. If `size_tier: trivial`, the trivial-tier routing table applies **exclusively**, regardless of issue type — do not consult the feat/improve/bug tables at all. In particular, for a trivial-tier bug issue, this means the bug workflow's entire "CREATE only (no analysis.md)" action (asking the user to describe the bug and writing `analysis.md`) is bypassed too, not just its reconfirmation sub-step: a trivial-tier bug issue never gets an `analysis.md`; it goes straight to `/pf-brd`, which produces `notes.md` instead (including the bug-only `## Root Cause / Context` section).
 
-If `size_tier` is small/medium/large, use the type-specific workflow below as before. The "current position" is the last completed stage.
+If `size_tier` is small/medium/large, use the type-specific workflow below as before.
+
+**Routing rule — every table below keys on the FIRST INCOMPLETE stage** of the issue's pipeline, per the shared definition of "stage complete" in `~/.claude/skills/pf-size-tiers/SKILL.md` ("Stage completion"). "Current position" therefore means: the last stage that is complete *with every stage before it also complete*. A document that exists further down the pipeline never advances the position past a hole behind it — a migrated v2 issue carrying a real `implementation_plan.md` but no `test_plan.md` is routed to `/pf-test-plan`, not to `/pf-execute`.
 
 ### trivial-tier workflow (all issue types)
 
@@ -82,13 +88,15 @@ Applies whenever `size_tier: trivial`, superseding the feat/improve/bug tables b
 CREATE → /pf-brd (produces notes.md) → /pf-check → /pf-test-plan → /pf-check → /pf-execute
 ```
 
-This table is keyed on **which documents exist in the issue folder**, not on "last completed stage" — Step 5's `notes.md` row collapses BRD/SPEC/IMPL_PLAN (and ANALYSIS) into the completed-stages *display* line all at once, which would incorrectly suggest routing straight to `/pf-execute` if this table were keyed the same way. Keying on document presence avoids that: `/pf-test-plan` is never skipped just because `notes.md` also stands in for the earlier stages.
+This table is keyed on **which documents in the issue folder are complete**, not on "last completed stage" — Step 5's `notes.md` row collapses BRD/SPEC/IMPL_PLAN (and ANALYSIS) into the completed-stages *display* line all at once, which would incorrectly suggest routing straight to `/pf-execute` if this table were keyed the same way. Keying on the documents avoids that: `/pf-test-plan` is never skipped just because `notes.md` also stands in for the earlier stages.
 
-| `size_tier: trivial` — documents present | Next step |
+"Complete" here is **not** "the file exists": it is the shared definition in `~/.claude/skills/pf-size-tiers/SKILL.md`. A stub `test_plan.md` left on disk by an old migration is **not** complete, so the middle row applies and the next step is `/pf-test-plan` — the last row cannot be reached against a stub.
+
+| `size_tier: trivial` — documents complete (per `~/.claude/skills/pf-size-tiers/SKILL.md`) | Next step |
 |---|---|
-| `notes.md` does not exist yet | `/pf-brd` |
-| `notes.md` exists, `test_plan.md` does not | `/pf-check` (before `test_plan.md` exists), then `/pf-test-plan` (once check passed, per the "Note on 'check passed'" convention below) |
-| `notes.md` + `test_plan.md` both exist | `/pf-check` (before executing), then `/pf-execute` (once check passed) |
+| `notes.md` is not complete | `/pf-brd` |
+| `notes.md` complete, `test_plan.md` not complete | `/pf-check` (before a complete `test_plan.md` exists), then `/pf-test-plan` (once check passed, per the "Note on 'check passed'" convention below) |
+| `notes.md` + `test_plan.md` both complete | `/pf-check` (before executing), then `/pf-execute` (once check passed) |
 
 `/pf-spec` and `/pf-impl-plan` must never appear as a next step when `size_tier: trivial`.
 
@@ -97,7 +105,9 @@ This table is keyed on **which documents exist in the issue folder**, not on "la
 CREATE → /pf-brd → BRD → /pf-spec → SPEC → /pf-check → (check passes) → /pf-test-plan → TEST_PLAN → /pf-check → (check passes) → /pf-impl-plan → IMPL_PLAN → /pf-check → (check passes) → /pf-execute
 ```
 
-| Last completed stage | Next step |
+Stages are complete per `~/.claude/skills/pf-size-tiers/SKILL.md`; the first incomplete stage governs.
+
+| Position (first incomplete stage governs) | Next step |
 |---|---|
 | CREATE only | `/pf-brd` |
 | BRD | `/pf-spec` |
@@ -105,8 +115,9 @@ CREATE → /pf-brd → BRD → /pf-spec → SPEC → /pf-check → (check passes
 | SPEC + check passed (no blocking issues noted) | `/pf-test-plan` |
 | TEST_PLAN | `/pf-check` |
 | TEST_PLAN + check passed | `/pf-impl-plan` |
-| IMPL_PLAN | `/pf-check` |
+| IMPL_PLAN (every preceding stage complete) | `/pf-check` |
 | IMPL_PLAN + check passed | `/pf-execute` |
+| **`implementation_plan.md` exists, but BRD / SPEC / TEST_PLAN is not complete** (a migrated v2 issue, or a stub `test_plan.md`) | Go **back to the first incomplete stage**: `/pf-brd` if `brd.md` is not complete, else `/pf-spec` if `specs.md` is not complete, else `/pf-test-plan`. Never `/pf-execute`. |
 | TESTING | `/pf-qa` |
 | QA | `/pf-close` |
 
@@ -115,14 +126,17 @@ CREATE → /pf-brd → BRD → /pf-spec → SPEC → /pf-check → (check passes
 CREATE → /pf-brd → BRD → /pf-check → (check passes) → /pf-test-plan → TEST_PLAN → /pf-check → (check passes) → /pf-impl-plan → IMPL_PLAN → /pf-execute
 ```
 
-| Last completed stage | Next step |
+Stages are complete per `~/.claude/skills/pf-size-tiers/SKILL.md`; the first incomplete stage governs.
+
+| Position (first incomplete stage governs) | Next step |
 |---|---|
 | CREATE only | `/pf-brd` |
 | BRD | `/pf-check` |
 | BRD + check passed | `/pf-test-plan` |
 | TEST_PLAN | `/pf-check` |
 | TEST_PLAN + check passed | `/pf-impl-plan` |
-| IMPL_PLAN | `/pf-execute` |
+| IMPL_PLAN (every preceding stage complete) | `/pf-execute` |
+| **`implementation_plan.md` exists, but BRD / TEST_PLAN is not complete** (a migrated v2 issue, or a stub `test_plan.md`) | Go **back to the first incomplete stage**: `/pf-brd` if `brd.md` is not complete, else `/pf-test-plan`. Never `/pf-execute`. |
 | TESTING | `/pf-qa` |
 | QA | `/pf-close` |
 
@@ -131,18 +145,22 @@ CREATE → /pf-brd → BRD → /pf-check → (check passes) → /pf-test-plan �
 CREATE → ANALYSIS → /pf-check → (check passes) → /pf-test-plan → TEST_PLAN → /pf-check → (check passes) → /pf-impl-plan → IMPL_PLAN → /pf-execute
 ```
 
-| Last completed stage | Next step |
+Stages are complete per `~/.claude/skills/pf-size-tiers/SKILL.md`; the first incomplete stage governs.
+
+| Position (first incomplete stage governs) | Next step |
 |---|---|
-| CREATE only (no analysis.md) | Ask the user to describe the bug, then write `analysis.md` (root cause, reproduction steps, impact) to the issue folder, in the language recorded in `prompt.md`'s `doc_language` frontmatter field (default English). Then re-read the saved `analysis.md` and holistically judge whether its actual scope (root cause complexity, blast radius, number of affected code paths) matches the recorded `size_tier`. If the judgment disagrees, ask the user via `AskUserQuestion` (recommend the model's own judgment, with reasoning) to confirm or override, then update `prompt.md`'s `size_tier` if changed. (This reconfirmation step never runs when `size_tier: trivial` — per the precedence rule above, trivial-tier bug issues never reach this row at all; they are routed via the trivial-tier table to `/pf-brd`, which produces `notes.md` instead.) |
+| CREATE only (no complete analysis.md) | Ask the user to describe the bug, then write `analysis.md` (root cause, reproduction steps, impact) to the issue folder, in the language recorded in `prompt.md`'s `doc_language` frontmatter field (default English). Then re-read the saved `analysis.md` and holistically judge whether its actual scope (root cause complexity, blast radius, number of affected code paths) matches the recorded `size_tier`. If the judgment disagrees, ask the user via `AskUserQuestion` (recommend the model's own judgment, with reasoning) to confirm or override, then update `prompt.md`'s `size_tier` if changed. (This reconfirmation step never runs when `size_tier: trivial` — per the precedence rule above, trivial-tier bug issues never reach this row at all; they are routed via the trivial-tier table to `/pf-brd`, which produces `notes.md` instead.) |
 | ANALYSIS present | `/pf-check` |
 | ANALYSIS + check passed | `/pf-test-plan` |
 | TEST_PLAN | `/pf-check` |
 | TEST_PLAN + check passed | `/pf-impl-plan` |
-| IMPL_PLAN | `/pf-execute` |
+| IMPL_PLAN (every preceding stage complete) | `/pf-execute` |
+| **`implementation_plan.md` exists, but `test_plan.md` is missing or not complete** (the migrated v2 bug issue: `analysis.md` + a renamed `implementation_plan.md`, no test plan) | `/pf-test-plan`. Never `/pf-execute` — there is no test plan to implement against. |
+| **`implementation_plan.md` or `test_plan.md` exists, but `analysis.md` is not complete** | Back to the first incomplete stage — the "CREATE only" row's action (write `analysis.md`). |
 | TESTING | `/pf-qa` |
 | QA | `/pf-close` |
 
-**Note on "check passed":** A check is considered passed when `test_plan.md` or `implementation_plan.md` exists at the stage where a check would have produced them. If the next document in sequence is already present, treat the check as having passed.
+**Note on "check passed":** A check counts as passed only when the document it was run against is **complete** per the shared definition in `~/.claude/skills/pf-size-tiers/SKILL.md` ("Stage completion") **and** the next document in sequence is complete as well. Mere existence of the next file is **not** enough: an empty or stub document (one that fails the shared definition) never counts as a passed check — it is treated as absent, and the next step is the skill that produces it.
 
 ## Step 7: Output
 

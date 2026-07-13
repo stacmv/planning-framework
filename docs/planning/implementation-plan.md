@@ -166,7 +166,7 @@
 **Important Links:**
 - [FRAMEWORK.md](FRAMEWORK.md) - Complete guide
 - [QUICKSTART.md](QUICKSTART.md) - 5-minute start
-- [MIGRATION-GUIDE.md](MIGRATION-GUIDE.md) - v1.0 → v2.0
+- [MIGRATION-GUIDE-V3.md](MIGRATION-GUIDE-V3.md) - Converge any project on v3.0
 - [Templates](templates/) - All templates
 
 ---

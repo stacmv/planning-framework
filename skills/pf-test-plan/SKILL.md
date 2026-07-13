@@ -6,12 +6,16 @@ version: 3.0.0
 
 Before checking any other prerequisite, read `prompt.md`'s frontmatter. If it has no `size_tier` field, ask the user via `AskUserQuestion` — same 4 tier options and descriptions as in `~/.claude/skills/pf-size-tiers/SKILL.md`, recommending medium ("matches today's default behavior") — then write the answer into `prompt.md`'s frontmatter before proceeding with the rest of this skill.
 
-Determine the active issue from `docs/issues/open/`. Read `size_tier` from `prompt.md`'s frontmatter (default: medium if absent). Check prerequisites:
-- **If `size_tier: trivial`:** `notes.md` must exist. If not, stop: "Notes document is required. Run /pf-brd first."
+Determine the active issue from `docs/issues/open/`. Read `size_tier` from `prompt.md`'s frontmatter (default: medium if absent). Check prerequisites — "exists" below always means **complete** per the shared definition of "stage complete" in `~/.claude/skills/pf-size-tiers/SKILL.md` ("Stage completion"); a stub does not satisfy a prerequisite:
+- **If `size_tier: trivial`:** `notes.md` must be complete. If not, stop: "Notes document is required. Run /pf-brd first."
 - **If `size_tier` is small/medium/large (or absent):**
-  - For feat/improve issues: `brd.md` must exist. If not, stop: "BRD is required. Run /pf-brd first."
-  - For bug issues: `analysis.md` must exist. If not, stop: "Write analysis.md (root cause analysis) before creating the test plan."
-If `test_plan.md` already exists, stop and inform the user — TEST_PLAN stage is already complete.
+  - For feat/improve issues: `brd.md` must be complete. If not, stop: "BRD is required. Run /pf-brd first."
+  - For bug issues: `analysis.md` must be complete. If not, stop: "Write analysis.md (root cause analysis) before creating the test plan."
+
+**Output gate — `test_plan.md` already present (regenerate / keep / cancel).** If `test_plan.md` already exists, do **not** stop outright — this is the gate that used to trap the owner of a migrated issue behind a stub it would not let them replace. Judge the existing file against the same shared definition in `~/.claude/skills/pf-size-tiers/SKILL.md`, then ask the user via `AskUserQuestion`, stating whether it is complete or an incomplete stub:
+- **regenerate** — dispatch the sub-agent below and overwrite it with a fresh test plan (recommend this when it is not complete — e.g. a migration stub whose whole body is the stub marker);
+- **keep** — leave it untouched and stop, reporting that the TEST_PLAN stage is already complete (recommend this when it is complete);
+- **cancel** — stop and change nothing.
 
 **Oversized-predecessor guard.** Before dispatching the sub-agent, recompute the oversized-for-tier check against the predecessor document(s) that will be handed to the sub-agent:
 - `size_tier: trivial` → `notes.md`, budget ~50 lines.
