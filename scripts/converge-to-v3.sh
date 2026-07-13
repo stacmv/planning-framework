@@ -4,8 +4,8 @@
 #
 # Converges a consumer project on the v3 target state (T1–T11) from ANY starting
 # state: no framework / v1 / v2 / half-migrated / already-v3-but-incomplete.
-# It supersedes setup-planning-v3.sh, migrate-v2-to-v3.sh, setup-planning-v2.sh
-# and migrate-v1-to-v2.sh — installation is simply its last phase.
+# It supersedes the former per-version setup and migration scripts (all removed):
+# installation is simply its last phase.
 #
 # Phases:
 #   1  detect the starting state and print it
@@ -819,9 +819,9 @@ phase5_delete() {
 # ══════════════════════════════════════════════════════════════════════════════
 #
 # Convergence is a TOP-UP, not "no-op if it already looks like v3" (Р11). A
-# project installed by yesterday's setup-planning-v3.sh reports 'v3' through the
-# structural fingerprint yet has no .pf-version, no PLANNING.md, no CLAUDE.md
-# section and 7 skills out of 15. It must get all of them.
+# project installed by an older v3 installer reports 'v3' through the structural
+# fingerprint yet has no .pf-version, no PLANNING.md, no CLAUDE.md section and
+# 7 skills out of 15. It must get all of them.
 #
 # Asymmetry (KI-11): FRAMEWORK artifacts (.pf-version, PLANNING.md, the CLAUDE.md
 # section, docs/planning/templates/, the skills, the shim) are always rewritten.
@@ -1236,8 +1236,8 @@ fi
 check_worktree
 
 # ─── Confirmation — cancellation is NEVER exit 0 (KI-6) ───────────────────────
-# migrate-v2-to-v3.sh:94 answers an empty CONFIRM with `exit 0`. On that contract
-# every automated test is green while nothing at all has been migrated.
+# The old v2→v3 migration script answered an empty CONFIRM with `exit 0`. On that
+# contract every automated test is green while nothing at all has been migrated.
 if [ "$BACKUP_WANTED" -eq 1 ] && [ "$ASSUME_YES" -eq 0 ] && [ "$FORCE" -eq 0 ]; then
   say ""
   say "This will transfer ${#P3_SOURCES[@]} file(s) out of planning/ and then delete"

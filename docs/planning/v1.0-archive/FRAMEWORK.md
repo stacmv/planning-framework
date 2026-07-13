@@ -1,5 +1,11 @@
 # Project Planning Framework
 
+> **⚠️ HISTORICAL — v1.1. Archived, not maintained.**
+> Kept for reference only. The `templates/` directory and the
+> `setup-planning-framework.sh` script it describes were removed in v3.0.
+> The current guide is [`docs/planning/FRAMEWORK.md`](../FRAMEWORK.md); the
+> single install/upgrade path is `make converge` (`scripts/converge-to-v3.sh`).
+
 **Version:** 1.1
 **Created:** 2025-11-04
 **Last Updated:** 2025-11-12

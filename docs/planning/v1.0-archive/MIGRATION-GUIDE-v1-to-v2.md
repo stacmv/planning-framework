@@ -1,5 +1,12 @@
 # Migration Guide: v1.0 → v2.0
 
+> **⚠️ HISTORICAL — v1.0 → v2.0. Archived, not maintained.**
+> Kept for reference only. `migrate-v1-to-v2.sh` no longer exists, and v2.0 is
+> no longer a supported target. To bring a project of **any** age (v1, v2,
+> half-migrated, or none) to the current v3 state, run `make converge`
+> (`scripts/converge-to-v3.sh`) — it supersedes every per-version migration
+> script. See `docs/planning/MIGRATION-GUIDE-V3.md`.
+
 **Planning Framework Migration**
 **Version:** 2.0.0
 **Last Updated:** 2024-01-27

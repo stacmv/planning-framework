@@ -1,5 +1,12 @@
 # Planning Framework - Quick Reference
 
+> **⚠️ HISTORICAL — v1.x. Archived, not maintained.**
+> Kept for reference only. The scripts, `templates/` directory and workflow it
+> describes no longer exist. The current framework is **v3.0**: see
+> [`docs/planning/FRAMEWORK.md`](../FRAMEWORK.md) and
+> [`docs/planning/QUICKSTART.md`](../QUICKSTART.md); the single install/upgrade
+> path is `make converge` (`scripts/converge-to-v3.sh`).
+
 **One-page cheat sheet for the Planning Framework**
 
 ---

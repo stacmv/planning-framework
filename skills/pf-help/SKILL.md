@@ -65,9 +65,14 @@ Run `/pf` at any time to see where you are and what to do next.
 
 ## Installing in a new project
 
+One command handles every case — a fresh project, an older (v1/v2) one, or an
+incomplete v3 one. Run it from the project directory:
+
 ```bash
-bash ~/dev/planning-framework/scripts/setup-planning-v3.sh
+bash ~/dev/planning-framework/scripts/converge-to-v3.sh
 ```
+
+Or, from the framework repository: `make converge TARGET=/path/to/project`
 
 ## Updating skills
 
