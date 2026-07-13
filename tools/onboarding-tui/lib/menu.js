@@ -22,21 +22,32 @@ const path = require("node:path");
  * Per-state menu item definitions. Each item maps the key the user types
  * to a label to print and an action token to return.
  *
+ * Install and migration collapsed into ONE action token — `converge` (П1-4).
+ * Convergence is idempotent and source-agnostic: it brings a project to the
+ * v3 target state from no-PF, v1, v2, half-migrated or incomplete-v3 alike,
+ * so the three "productive" states differ only in the label they show.
+ *
+ * `v3` carries a converge item too (Р11): convergence is a TOP-UP, not a
+ * no-op-if-already-v3. A project installed by the old v3 setup script detects
+ * as `v3` yet has no .pf-version, no PLANNING.md, no CLAUDE.md section and
+ * only 7 of the 15 skills — without this item it could never top itself up.
+ *
  * IMPORTANT: `unknown` intentionally has exactly one item, and that item
- * never triggers install/migrate/update — it only prints diagnostics.
+ * never triggers convergence/update — it only prints diagnostics.
  */
 const MENUS = {
   none: [
     { key: "1", label: "What is Planning Framework? (tutorial)", action: "tutorial" },
-    { key: "2", label: "Install v3.0 into this project", action: "install" },
+    { key: "2", label: "Install v3.0 into this project", action: "converge" },
   ],
   "v2-or-older": [
-    { key: "1", label: "Migrate this project to v3.0", action: "migrate" },
+    { key: "1", label: "Migrate this project to v3.0", action: "converge" },
     { key: "2", label: "What changed in v3.0? (short overview)", action: "changelog" },
   ],
   v3: [
-    { key: "1", label: "Update skills to latest version", action: "update-skills" },
-    { key: "2", label: "Show active issue status (/pf equivalent)", action: "issue-status" },
+    { key: "1", label: "Top up this project to the full v3.0 target state", action: "converge" },
+    { key: "2", label: "Update skills to latest version", action: "update-skills" },
+    { key: "3", label: "Show active issue status (/pf equivalent)", action: "issue-status" },
   ],
   unknown: [
     { key: "1", label: "Show detected files and let me choose manually", action: "diagnose" },
@@ -62,11 +73,18 @@ function ask(rl, prompt) {
 
 /**
  * Print the diagnostics used by the `unknown` state's [1] option: which of
- * docs/issues/, PLANNING.md, CLAUDE.md were found in the target dir.
+ * .pf-version, docs/issues/, PLANNING.md, CLAUDE.md were found in the target
+ * dir.
+ *
+ * Diagnostics are the user's ONLY way out of the `unknown` state, so they must
+ * not lag behind the detector: `.pf-version` is the machine-readable version
+ * marker detect.js keys on, and it is printed WITH ITS VALUE when present and
+ * as an explicit "not found" line when absent — never silently omitted.
  */
 function printDiagnostics(targetDir) {
   const dir = targetDir || process.cwd();
   const checks = [
+    { label: ".pf-version", rel: ".pf-version", showValue: true },
     { label: "docs/issues/", rel: "docs/issues" },
     { label: "PLANNING.md", rel: "PLANNING.md" },
     { label: "CLAUDE.md", rel: "CLAUDE.md" },
@@ -77,7 +95,19 @@ function printDiagnostics(targetDir) {
   for (const check of checks) {
     const full = path.join(dir, check.rel);
     const found = fs.existsSync(full);
-    console.log(`  [${found ? "x" : " "}] ${check.label} — ${found ? "found" : "not found"}`);
+
+    let status = found ? "found" : "not found";
+    if (found && check.showValue) {
+      let value = "";
+      try {
+        value = fs.readFileSync(full, "utf8").trim();
+      } catch {
+        value = "";
+      }
+      status = value ? `found — ${value}` : "found — (empty)";
+    }
+
+    console.log(`  [${found ? "x" : " "}] ${check.label} — ${status}`);
   }
   console.log("");
 }
@@ -102,9 +132,8 @@ function renderMenu(state, items) {
  *
  * @param {"none"|"v2-or-older"|"v3"|"unknown"} state
  * @param {{ targetDir?: string, rl?: readline.Interface }} [opts]
- * @returns {Promise<string>} action token, e.g. "tutorial", "install",
- *   "migrate", "changelog", "update-skills", "issue-status", "diagnose",
- *   or "quit".
+ * @returns {Promise<string>} action token, e.g. "tutorial", "converge",
+ *   "changelog", "update-skills", "issue-status", "diagnose", or "quit".
  */
 async function showMenu(state, opts = {}) {
   const items = MENUS[state];

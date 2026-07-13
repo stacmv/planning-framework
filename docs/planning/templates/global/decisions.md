@@ -1,6 +1,7 @@
 # Architecture Decision Log
 
 **Project:** MyProject
+**Version:** 3.0
 **Started:** 2025-11-06
 **Last Updated:** 2025-11-06
 
@@ -313,5 +314,6 @@ Create an ADR when deciding:
 
 ---
 
+**Version:** 3.0
 **Log Started:** 2025-11-06
 **Last Updated:** 2025-11-06

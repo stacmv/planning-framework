@@ -8,8 +8,12 @@
  *   - lib/detect.js    -> figure out the target project's current state
  *   - lib/menu.js      -> render a state-branched menu, collect a choice
  *   - lib/tutorial.js  -> the "what is Planning Framework?" walkthrough
- *   - lib/actions.js   -> delegate install/migrate/update-skills to the
- *                         existing shell scripts via child_process.spawn
+ *   - lib/actions.js   -> delegate convergence / update-skills to the
+ *                         repository's shell scripts via child_process.spawn
+ *
+ * Install and migration are a single action: `converge`. It is offered from
+ * the `none`, `v2-or-older` and `v3` states alike (an incomplete v3 project
+ * tops itself up with the very same run).
  *
  * No npm dependencies.
  */
@@ -87,13 +91,8 @@ async function main() {
       continue;
     }
 
-    if (action === "install") {
-      await actions.runSetupV3(targetDir);
-      return;
-    }
-
-    if (action === "migrate") {
-      await actions.runMigrateV2ToV3(targetDir);
+    if (action === "converge") {
+      await actions.runConverge(targetDir);
       return;
     }
 

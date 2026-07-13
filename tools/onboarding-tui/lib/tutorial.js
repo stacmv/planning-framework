@@ -45,18 +45,24 @@ Each stage of the lifecycle has a matching skill/command. You don't need
 to memorize every one — just the pattern: "/pf-<stage>" drives that
 stage of the pipeline for the active issue.
 
-  /pf          - show active issue status and what to do next
-  /pf-brd      - generate the Business Requirements Document
-  /pf-spec     - write the technical spec
-  /pf-test-plan- generate the test plan
-  /pf-impl-plan- create the implementation plan
-  /pf-check    - review the most recent document for problems
-  /pf-execute  - execute the implementation plan via sub-agents
-  /pf-test     - run tests and build the manual test checklist
-  /pf-qa       - run QA checks and produce qa_report.md
-  /pf-close    - merge, archive, and close the issue
+  /pf              - show active issue status and what to do next
+  /pf-brd          - generate the Business Requirements Document
+  /pf-spec         - write the technical spec
+  /pf-test-plan    - generate the test plan
+  /pf-impl-plan    - create the implementation plan
+  /pf-check        - review the most recent document for problems
+  /pf-execute      - execute the implementation plan via sub-agents
+  /pf-test         - run tests and build the manual test checklist
+  /pf-manual-test  - fill in the manual test checklist interactively
+  /pf-qa           - run QA checks and produce qa_report.md
+  /pf-qa-setup     - create/update .qa-workflow.md for this project
+  /pf-close        - merge, archive, and close the issue
+  /pf-help         - framework overview and quick start
+  /pf-update       - update the installed skills from the framework repo
+  /pf-size-tiers   - reference data (size tiers, document budgets); read by
+                     the other skills, not normally invoked directly
 
-  ...and a few more (this is not an exhaustive list).`,
+That is all 15 of them.`,
 
   // Screen 4: pointers to more detail.
   `Screen 4/4 — Where to learn more

@@ -17,9 +17,13 @@ If the relevant file exceeds its budget, stop: "`<file>` is oversized for this i
 
 (Note: `pf-execute` already reads `implementation_plan.md`/`specs.md`/`test_plan.md` itself today — unlike `pf-test-plan`/`pf-impl-plan`, it has no sub-agent-dispatch step for planning-document ingestion, so there is no literal "do not read yourself" text this guard conflicts with. It still uses a cheap mechanical count here, for consistency and to run before the full prerequisite read.)
 
-Read `size_tier` from `prompt.md`'s frontmatter. Check prerequisites:
-- **If `size_tier: trivial`:** `notes.md` must exist. If not, stop: "Notes document is required. Run /pf-brd first."
-- **If `size_tier` is small/medium/large (or absent):** `implementation_plan.md` must exist. If not, stop: "Implementation plan is required. Run /pf-impl-plan first."
+Read `size_tier` from `prompt.md`'s frontmatter. Check prerequisites — **these are hard stops, and they stay hard stops.** "Exists" always means **complete** per the shared definition of "stage complete" in `~/.claude/skills/pf-size-tiers/SKILL.md` ("Stage completion") — do not restate the criterion here. Its third conjunct is what matters most at this gate: a document is complete only if every preceding stage of its pipeline is complete too, so `implementation_plan.md` is not an input while `test_plan.md` is missing or a stub.
+- **If `size_tier: trivial`:** `notes.md` must be complete, and so must `test_plan.md` (it precedes execution). If not, stop: "Notes document is required. Run /pf-brd first." — or, when `test_plan.md` is the incomplete one: "Test plan is required. Run /pf-test-plan first."
+- **If `size_tier` is small/medium/large (or absent):** `implementation_plan.md` must be complete — which includes every preceding stage (`brd.md`/`specs.md` or `analysis.md`, and `test_plan.md`). If not, stop: "Implementation plan is required. Run /pf-impl-plan first." — or, when an earlier stage is the incomplete one, name that stage instead and stop there ("Test plan is required. Run /pf-test-plan first.").
+
+Never execute against a stub or a missing test plan. If a document exists but is not complete, this skill stops; replacing it is the job of the skill that produces it.
+
+> **Run the check, do not recall it.** Your FIRST action at this gate is a tool call — `ls -1 docs/issues/open/<ISSUE-ID>/` — and you judge from its output, not from any document already in your context. Manual testing found this gate silently failing to fire when `implementation_plan.md` had been **deleted**: the file was gone from disk but still present in the session's context, so execution proceeded anyway. This skill is the last one before code gets written; a gate that can be satisfied from memory is not a gate. See "Evaluating it is a MECHANICAL check" in `~/.claude/skills/pf-size-tiers/SKILL.md`.
 
 For `size_tier: trivial`, read `docs/issues/open/[ACTIVE-ISSUE-ID]/notes.md` and `test_plan.md`. All design and planning is complete.
 

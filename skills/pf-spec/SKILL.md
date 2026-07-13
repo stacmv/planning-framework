@@ -6,8 +6,12 @@ version: 3.0.0
 
 Before checking any other prerequisite, read `prompt.md`'s frontmatter. If it has no `size_tier` field, ask the user via `AskUserQuestion` — options **trivial** / **small** / **medium** / **large**, same descriptions as in `~/.claude/skills/pf-size-tiers/SKILL.md` — recommending medium ("matches today's default behavior") — then write the answer into `prompt.md`'s frontmatter before proceeding with the rest of this skill.
 
-Check that `docs/issues/open/[ISSUE-ID]/brd.md` exists. If it does not, stop and tell the user: "BRD is required before writing the spec. Run /pf-brd first."
-If `specs.md` already exists, stop and inform the user — SPEC stage is already complete.
+Check that `docs/issues/open/[ISSUE-ID]/brd.md` is **complete** per the shared definition of "stage complete" in `~/.claude/skills/pf-size-tiers/SKILL.md` ("Stage completion"). If it does not exist, or exists but is not complete (empty, or carrying the stub marker), stop and tell the user: "BRD is required before writing the spec. Run /pf-brd first."
+
+**Output gate — `specs.md` already present (regenerate / keep / cancel).** If `specs.md` already exists, do **not** stop outright. Judge it against the same shared definition in `~/.claude/skills/pf-size-tiers/SKILL.md`, then ask the user via `AskUserQuestion`, stating whether it is complete or an incomplete stub:
+- **regenerate** — overwrite it with a freshly written spec (recommend this when it is not complete);
+- **keep** — leave it untouched and stop, reporting that the SPEC stage is already complete (recommend this when it is complete);
+- **cancel** — stop and change nothing.
 
 Read `size_tier` from `prompt.md`'s frontmatter.
 

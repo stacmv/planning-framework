@@ -105,16 +105,19 @@ Enhance setup scripts and automation:
 
 3. **Test your changes:**
    ```bash
-   # Create a test project
-   mkdir ../test-project
+   # Run the test suite
+   make test
 
-   # Run setup script
-   cd templates
-   ./setup-planning-framework.sh ../test-project "TestProject"
+   # Try the framework end-to-end on a throwaway project
+   mkdir ../test-project
+   make converge TARGET=../test-project
 
    # Verify it works
    ls -la ../test-project/docs/planning/
    ```
+
+   `converge` is the single entry point: it installs into a fresh project,
+   upgrades an older one, and tops up an incomplete v3 one.
 
 ---
 
@@ -352,7 +355,7 @@ Before submitting PR:
 
 ### Getting Help
 
-- 📖 **Documentation:** Read [FRAMEWORK.md](FRAMEWORK.md) and [QUICK-REFERENCE.md](QUICK-REFERENCE.md)
+- 📖 **Documentation:** Read [FRAMEWORK.md](docs/planning/FRAMEWORK.md) and [QUICKSTART.md](docs/planning/QUICKSTART.md)
 - 💬 **Discussions:** Use [GitHub Discussions](https://github.com/yourusername/planning-framework/discussions)
 - 🐛 **Issues:** Report bugs via [GitHub Issues](https://github.com/yourusername/planning-framework/issues)
 

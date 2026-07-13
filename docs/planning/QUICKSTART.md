@@ -21,24 +21,22 @@ Planning Framework v3.0 helps AI agents work on your project across multiple ses
 ### Step 1: Install (1 min)
 
 ```bash
-# In your project directory
 git clone https://github.com/[your-org]/planning-framework /tmp/planning-fw
 cd /tmp/planning-fw
-./scripts/setup-planning-v3.sh
+make converge TARGET=/path/to/your-project
 ```
 
-Answer prompts:
-- Project name: `your-project`
-- Issue types: `Enter` (use defaults: feat, bug, improve)
-- QA checks: `Enter` (use all)
-- Agent: `4` (all agents)
+`converge` is the single entry point: the same command installs into a fresh project, upgrades a v1 or v2 one, finishes a half-migrated one, and tops up an incomplete v3 one. It is idempotent — re-run it any time. Add `--dry-run` to see the plan without changing anything.
 
 **Created:**
 - `PLANNING.md` - Framework instructions
-- `.qa-workflow.md` - Quality gates
-- `skills/` - Claude Code skills (`/pf`, `/pf-brd`, `/pf-spec`, `/pf-check`, `/pf-test-plan`, `/pf-impl-plan`, `/pf-execute`, `/pf-test`, `/pf-qa`, `/pf-qa-setup`, `/pf-close`)
+- `.pf-version` - Framework version stamp
+- `CLAUDE.md` - With a `<!-- pf:begin -->` / `<!-- pf:end -->` framework section
+- 15 skills in `~/.claude/skills/` (`/pf`, `/pf-help`, `/pf-brd`, `/pf-spec`, `/pf-check`, `/pf-test-plan`, `/pf-impl-plan`, `/pf-execute`, `/pf-test`, `/pf-manual-test`, `/pf-qa`, `/pf-qa-setup`, `/pf-close`, `/pf-update`, `/pf-size-tiers`) and the `pf` shim in `~/.claude/bin/`
 - `docs/issues/open/` and `/closed/` - Issue folders
-- `docs/planning/` - Global planning files
+- `docs/planning/` - Global planning files + templates
+
+**Not created:** `.qa-workflow.md`. QA gates are project-specific, so there is no template — run `/pf-qa-setup` in Claude Code and it writes one fitted to your project.
 
 ### Step 2: Commit (30 sec)
 
@@ -418,20 +416,26 @@ This copies the latest skill files from the framework source into your project's
 
 ---
 
-## Migrating from v2
+## Migrating from v1 or v2
 
 ```bash
-./scripts/migrate-v2-to-v3.sh
+make converge TARGET=/path/to/your-project
 ```
 
-This script:
-1. Backs up your current setup
-2. Installs the `skills/` directory
-3. Renames any `implementation-plan.md` files in issue folders to `implementation_plan.md`
-4. Updates `PLANNING.md` to v3.0 essentials
-5. Generates a migration report
+The same command as a fresh install — there is no separate migration script. It:
+1. Detects the starting state (none / v1 / v2 / half-migrated / incomplete v3)
+2. Backs up `planning/` to `planning-backup-<timestamp>/` before touching anything
+3. Moves your issues and global documents from `planning/` into `docs/`
+4. Renames `implementation-plan.md` → `implementation_plan.md` inside issue folders
+5. Deletes v1/v2 framework artifacts **by whitelist** (never `rm -rf planning/`)
+6. Tops up to the v3 target state: `.pf-version`, `PLANNING.md`, the `CLAUDE.md` section, templates, all 15 skills, the `pf` shim
+7. Prints a report — including, per issue, which v3 documents are still missing
 
-After migrating, existing open issues without a `brd.md` / `specs.md` will continue to work — the pipeline only applies to newly created issues. Bug issues follow the analysis + test plan path and are unaffected.
+Run it with `--dry-run` first to see the plan.
+
+Open issues keep working: no stub documents are minted, `/pf` simply routes you to the first incomplete stage. Closed issues are never rewritten — they get a `brd.md` pointer to their legacy documents. Bug issues follow the analysis + test plan path and are unaffected.
+
+Full detail: **[MIGRATION-GUIDE-V3.md](MIGRATION-GUIDE-V3.md)**.
 
 ---
 
@@ -480,7 +484,7 @@ cat docs/issues/open/[issue-id]/implementation-plan.md
 ### Learn More
 
 - **[FRAMEWORK.md](FRAMEWORK.md)** - Complete guide (all features, best practices, FAQ)
-- **[MIGRATION-GUIDE.md](MIGRATION-GUIDE.md)** - Upgrading from v1.0
+- **[MIGRATION-GUIDE-V3.md](MIGRATION-GUIDE-V3.md)** - Converging any project on v3.0
 - **[templates/README.md](templates/README.md)** - Template documentation
 
 ### Get Help
@@ -501,8 +505,8 @@ Love Planning Framework? Share it:
 ## Quick Reference Card
 
 ```
-SETUP:       ./scripts/setup-planning-v3.sh
-MIGRATE v2:  ./scripts/migrate-v2-to-v3.sh
+CONVERGE:    make converge TARGET=<path>   (install / migrate / top up — one command)
+PREVIEW:     ./scripts/converge-to-v3.sh --target <path> --dry-run
 UPDATE:      ./scripts/update-skills.sh
 
 SESSION:     /pf → shows status and next step (Claude Code)

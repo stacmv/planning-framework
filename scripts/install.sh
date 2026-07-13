@@ -64,9 +64,12 @@ echo ""
 # Mirrors scripts/update-skills.sh: every directory under skills/ that
 # contains a SKILL.md is copied. No hardcoded skill list — so all current
 # skills are installed and future ones are picked up automatically. This is
-# the same discovery install.ps1 uses, giving full skill parity across
-# platforms (the reason install.sh does NOT delegate to setup-planning-v3.sh,
-# which only knows a fixed 7-skill list).
+# the same discovery install.ps1 and converge-to-v3.sh use, giving full skill
+# parity across platforms.
+#
+# install.sh installs the framework ITSELF (clone + skills + `pf` shim); it
+# writes nothing into a consumer project. Onboarding a project is a separate,
+# explicit step: `pf` (the TUI) or `converge-to-v3.sh`.
 
 echo "Installing skills to: $GLOBAL_SKILLS_DIR"
 for src in "$INSTALL_DIR"/skills/*/; do
@@ -81,7 +84,7 @@ done
 echo ""
 
 # ─── 4. Install global `pf` shim (AC-6) ───────────────────────────────────────
-# Same template as setup-planning-v3.sh / update-skills.sh, with
+# Same template as update-skills.sh / converge-to-v3.sh, with
 # <FRAMEWORK_ROOT> = $INSTALL_DIR. Idempotent (wholesale rewrite, no backups).
 # The shim does NOT inject --target "$(pwd)": cli.js defaults to process.cwd(),
 # and a hardcoded --target would make `pf --target <dir>` silently ignored
@@ -111,6 +114,7 @@ case ":$PATH:" in
     ;;
   *)
     echo "$GLOBAL_BIN_DIR is not on your PATH. Add it, then run 'pf':"
+    # shellcheck disable=SC2016  # literal text for the user to copy; must not expand
     echo '  export PATH="$HOME/.claude/bin:$PATH"'
     echo ""
     echo "(Add that line to your ~/.bashrc, ~/.zshrc, or equivalent to make it permanent.)"

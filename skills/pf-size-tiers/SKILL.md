@@ -7,6 +7,93 @@ version: 3.0.0
 This skill is reference data for other Planning Framework skills. It is not meant
 to be run directly. If invoked directly, just print the tables below.
 
+## Stage completion — the shared definition
+
+This section is the **single definition** of "stage complete" for the whole
+framework. Every gate in every `pf-*` skill **references** this section; no skill
+restates the criterion in its own words. (Seven independent copies of the
+criterion are exactly how the skills drifted apart in the first place — see "Why"
+below.)
+
+### Evaluating it is a MECHANICAL check, never a memory exercise
+
+**Before judging any stage, you MUST run a tool call against the filesystem and
+judge from its output.** Do not answer from a document you read earlier in this
+session, and do not answer from what you believe the issue folder contains — the
+file may have been deleted, emptied or replaced since you last looked, and it is
+precisely that case the gate exists to catch.
+
+The minimum evidence, gathered fresh at every gate:
+
+```bash
+ls -1 docs/issues/open/<ISSUE-ID>/                  # which documents exist AT ALL
+wc -c docs/issues/open/<ISSUE-ID>/<doc>             # non-empty?
+grep -c 'TODO: Run /pf-' docs/issues/open/<ISSUE-ID>/<doc>   # a stub?
+```
+
+This mirrors the oversized-predecessor guard, which already mandates a mechanical
+count (`wc -l`, counting `### TC-` headings) rather than a semantic read — and
+which works for exactly that reason.
+
+**Why this paragraph exists.** Manual testing of the very issue that introduced
+this section found the input gates failing to fire when a prerequisite document
+had been **deleted**: `/pf-impl-plan` and `/pf-execute` both proceeded, because
+the model was reasoning from a copy of the document still sitting in its context
+rather than from the disk. The instruction was correct; it simply did not compel
+anyone to look. A gate that can be satisfied from memory is not a gate.
+
+**A stage is complete IF AND ONLY IF all three conjuncts hold:**
+
+1. **The document exists** — the file is present in the issue folder.
+2. **The document is real, not a stub** — the file has a non-empty body beyond
+   its heading, **and** the stub marker `TODO: Run /pf-` occurs nowhere in it
+   (search the **whole file**, not the first N lines).
+3. **Every preceding stage of its pipeline is itself complete** — by this same
+   definition, applied recursively. A stage is never complete while an earlier
+   stage of its pipeline is incomplete, however real its own document looks.
+
+If any conjunct fails, the stage is **not complete**, and its document must be
+treated as **absent** — for the completed-stages display, for routing, and for
+every prerequisite gate.
+
+### Pipelines — what "preceding stage" means
+
+| Pipeline | Stage order |
+|---|---|
+| `size_tier: trivial` (all issue types) | CREATE (`prompt.md`) → BRD/SPEC/IMPL_PLAN collapsed into NOTES (`notes.md`) → TEST_PLAN (`test_plan.md`) → TESTING (`manual_test_checklist.md`) → QA (`qa_report.md`) |
+| feat (small/medium/large) | CREATE → BRD (`brd.md`) → SPEC (`specs.md`) → TEST_PLAN → IMPL_PLAN (`implementation_plan.md`) → TESTING → QA |
+| improve (small/medium/large) | CREATE → BRD → TEST_PLAN → IMPL_PLAN → TESTING → QA |
+| bug (small/medium/large) | CREATE → ANALYSIS (`analysis.md`) → TEST_PLAN → IMPL_PLAN → TESTING → QA |
+
+Routing keys on the **first incomplete stage** of the pipeline — never on the
+last document that happens to sit on disk. A migrated v2 issue can carry a
+perfectly real `implementation_plan.md` and no `test_plan.md` at all: its first
+incomplete stage is TEST_PLAN, so its next step is `/pf-test-plan`, never
+`/pf-execute`.
+
+### Scope
+
+- The criterion applies to **every** document of an issue, not to `test_plan.md`
+  alone: `prompt.md`, `notes.md`, `brd.md`, `specs.md`, `analysis.md`,
+  `test_plan.md`, `implementation_plan.md`, `manual_test_checklist.md`,
+  `qa_report.md`.
+- It applies to issues under `docs/issues/open/` — those are the only ones the
+  pipeline routes. Issues under `docs/issues/closed/` are archive: the pointer
+  `brd.md` that convergence leaves in a closed legacy issue (it links to the
+  surviving `prompt.md` / `analysis.md` / `definition-of-done.md`) is a pointer,
+  not an unfinished document. It deliberately carries no `TODO: Run /pf-` marker,
+  and this criterion never fires on it.
+
+### Why this exists (history — do not delete)
+
+The old v2→v3 migration wrote a `test_plan.md` whose entire body was the stub
+marker. Because the skills judged "stage complete" purely by file existence,
+`/pf` reported `Completed stages: CREATE, TEST_PLAN, IMPL_PLAN` and routed
+straight to `/pf-execute` — implementation against a test plan that did not
+exist. That happened on a real project. Seven independent gates each carried
+their own copy of the criterion, so mending one mended nothing. Hence: one
+definition, here; references, everywhere else.
+
 ## Tiers
 
 | Tier    | Typical scope                                             |

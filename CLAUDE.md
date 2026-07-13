@@ -13,10 +13,12 @@ Planning Framework v3.0 uses **`PLANNING.md`** for all AI agents (Claude, Gemini
 **v2.0 → v3.0 Changes:**
 - Skills-based workflow via `/pf` and related commands
 - BRD → spec → test plan → implementation plan pipeline
-- `skills/` directory with 7 Claude Code skills
+- `skills/` directory with 15 Claude Code skills
+- Single entry point: `make converge` (installs, migrates or tops up — from any starting state)
 - See `PLANNING.md` for new workflow
 
-**For v2.0 projects:** Run `./scripts/migrate-v2-to-v3.sh` to upgrade.
+**For v2.0 projects:** Run `make converge TARGET=/path/to/project`.
+See **[MIGRATION-GUIDE-V3.md](docs/planning/MIGRATION-GUIDE-V3.md)**.
 
 ---
 
@@ -31,7 +33,7 @@ Planning Framework v3.0 uses **`PLANNING.md`** for all AI agents (Claude, Gemini
 **Key Files:**
 - `PLANNING.md` - Framework instructions (**READ THIS**)
 - `.qa-workflow.md` - QA requirements
-- `skills/` - Claude Code skills (`/pf`, `/pf-brd`, `/pf-spec`, `/pf-check`, `/pf-test-plan`, `/pf-impl-plan`, `/pf-execute`)
+- `skills/` - 15 Claude Code skills (`/pf`, `/pf-help`, `/pf-brd`, `/pf-spec`, `/pf-check`, `/pf-test-plan`, `/pf-impl-plan`, `/pf-execute`, `/pf-test`, `/pf-manual-test`, `/pf-qa`, `/pf-qa-setup`, `/pf-close`, `/pf-update`, `/pf-size-tiers`)
 - `docs/planning/implementation-plan.md` - Roadmap
 - `docs/planning/session-log.md` - Timeline
 - `docs/planning/decisions.md` - Architectural decisions
@@ -90,7 +92,7 @@ CREATE → ANALYZE → PLAN → IMPLEMENT → QA → CLOSE
 - **[PLANNING.md](PLANNING.md)** - **START HERE** - Complete framework config
 - **[FRAMEWORK.md](docs/planning/FRAMEWORK.md)** - Full documentation
 - **[QUICKSTART.md](docs/planning/QUICKSTART.md)** - 5-minute guide
-- **[MIGRATION-GUIDE.md](docs/planning/MIGRATION-GUIDE.md)** - v2.0 → v3.0 upgrade
+- **[MIGRATION-GUIDE-V3.md](docs/planning/MIGRATION-GUIDE-V3.md)** - upgrade any project to v3.0 with `converge`
 
 ---
 
@@ -100,8 +102,12 @@ This file kept for backwards compatibility. New v3.0 projects use `PLANNING.md`.
 
 **To upgrade your v2.0 project:**
 ```bash
-./scripts/migrate-v2-to-v3.sh
+make converge TARGET=/path/to/your-project
 ```
+
+`converge` is the only install/upgrade path — it handles a fresh project, v1, v2,
+a half-migrated one and an incomplete v3 one alike. See
+[MIGRATION-GUIDE-V3.md](docs/planning/MIGRATION-GUIDE-V3.md).
 
 ---
 
