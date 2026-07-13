@@ -1259,12 +1259,12 @@ Issue перестал быть «починкой 5 дефектов мигра
 | TC-042 | [Static] Единое определение «стадия завершена» (мера 2) | Auto | Critical | ✓ | Auto-половина бывшего TC-038 |
 | TC-043 | [Static] ЧЕТЫРЕ таблицы маршрутизации, а не три (мера 3, Р12) | Auto | Critical | ✓ | Auto-половина бывшего TC-037 |
 | TC-044 | [Static] Р9 — 4 выходных гейта дают выбор, 2 входных — stop | Auto | High | ✓ | Auto-половина бывшего TC-039 |
-| TC-045 | `/pf` на мигрированном v2-bug-issue не ведёт в `/pf-execute` (Р12) | Manual | Critical | [ ] | Живая сессия Claude Code |
-| TC-046 | `/pf` не засчитывает stub-`test_plan.md` (мера 2) | Manual | Critical | [ ] | Живая сессия Claude Code |
-| TC-047 | `/pf` при ответе `trivial` не ведёт в `/pf-execute` против заглушки | Manual | Critical | [ ] | Живая сессия; закрытая дверь TC-043 |
-| TC-048 | Гейты «файл существует» дают regenerate / keep / cancel (Р9) | Manual | High | [ ] | Интерактивный промпт |
-| TC-049 | End-to-end через TUI на настоящем v2-проекте | Manual | High | [ ] | Требует настоящего `$HOME`; сделать бэкап `~/.claude/` |
-| TC-050 | `/pf-qa` проходит на этом issue целиком | Manual | High | [ ] | Живая сессия Claude Code |
+| TC-045 | `/pf` на мигрированном v2-bug-issue не ведёт в `/pf-execute` (Р12) | Manual | Critical | ✓ | Живая сессия Claude Code |
+| TC-046 | `/pf` не засчитывает stub-`test_plan.md` (мера 2) | Manual | Critical | ✓ | Живая сессия Claude Code |
+| TC-047 | `/pf` при ответе `trivial` не ведёт в `/pf-execute` против заглушки | Manual | Critical | ✓ | Живая сессия; закрытая дверь TC-043 |
+| TC-048 | Гейты «файл существует» дают regenerate / keep / cancel (Р9) | Manual | High | ✗ | шаги 6-7 провалены: гейты не сработали на удалённый документ. Починено (механическая проверка), нужен перепрогон
+| TC-049 | End-to-end через TUI на настоящем v2-проекте | Manual | High | ✓ | Требует настоящего `$HOME`; сделать бэкап `~/.claude/` |
+| TC-050 | `/pf-qa` проходит на этом issue целиком | Manual | High | ✓ | прогон /pf-qa, эта сессия
 | TC-051 | Один и тот же ID в разных статусах — оба направления (П1-4) | Auto | Critical | ✓ | |
 | TC-052 | Коллизия имён в одном issue — суффикс `.v2.md` | Auto | Critical | ✓ | |
 | TC-053 | Порядок «переименование → детект коллизии» | Auto | Critical | ✓ | |

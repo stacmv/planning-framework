@@ -15,6 +15,33 @@ restates the criterion in its own words. (Seven independent copies of the
 criterion are exactly how the skills drifted apart in the first place — see "Why"
 below.)
 
+### Evaluating it is a MECHANICAL check, never a memory exercise
+
+**Before judging any stage, you MUST run a tool call against the filesystem and
+judge from its output.** Do not answer from a document you read earlier in this
+session, and do not answer from what you believe the issue folder contains — the
+file may have been deleted, emptied or replaced since you last looked, and it is
+precisely that case the gate exists to catch.
+
+The minimum evidence, gathered fresh at every gate:
+
+```bash
+ls -1 docs/issues/open/<ISSUE-ID>/                  # which documents exist AT ALL
+wc -c docs/issues/open/<ISSUE-ID>/<doc>             # non-empty?
+grep -c 'TODO: Run /pf-' docs/issues/open/<ISSUE-ID>/<doc>   # a stub?
+```
+
+This mirrors the oversized-predecessor guard, which already mandates a mechanical
+count (`wc -l`, counting `### TC-` headings) rather than a semantic read — and
+which works for exactly that reason.
+
+**Why this paragraph exists.** Manual testing of the very issue that introduced
+this section found the input gates failing to fire when a prerequisite document
+had been **deleted**: `/pf-impl-plan` and `/pf-execute` both proceeded, because
+the model was reasoning from a copy of the document still sitting in its context
+rather than from the disk. The instruction was correct; it simply did not compel
+anyone to look. A gate that can be satisfied from memory is not a gate.
+
 **A stage is complete IF AND ONLY IF all three conjuncts hold:**
 
 1. **The document exists** — the file is present in the issue folder.

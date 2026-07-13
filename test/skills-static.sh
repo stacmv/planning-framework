@@ -416,4 +416,37 @@ fi
 
 assert_repo_untouched
 
+# ─── TC-048 (static half): the input gates COMPEL a filesystem check ──────────
+# Added after manual testing: /pf-impl-plan and /pf-execute both proceeded when
+# their prerequisite document had been DELETED. The instruction was correct prose
+# ("must be complete ... stop"), but it compelled no tool call, so in a live
+# session the model judged from a copy still sitting in its context. The
+# oversized-predecessor guard right next to it mandates a mechanical count and
+# works for exactly that reason. A gate that can be satisfied from memory is not
+# a gate — so assert that the compulsion is present and stays present.
+
+echo ""
+echo "=== TC-048 (static): input gates mandate a mechanical check"
+
+size_tiers="$REPO_ROOT/skills/pf-size-tiers/SKILL.md"
+if grep -qiE 'MECHANICAL check, never a memory exercise' "$size_tiers"; then
+  pf_pass "the shared definition carries the mechanical-check rule (single home)"
+else
+  pf_fail "pf-size-tiers has no mechanical-check rule — the gates can be satisfied from memory"
+fi
+
+for gate in pf-impl-plan pf-execute; do
+  f="$REPO_ROOT/skills/$gate/SKILL.md"
+  if grep -qiE 'Run the check, do not recall it' "$f"; then
+    pf_pass "$gate: the input gate compels a filesystem check before judging"
+  else
+    pf_fail "$gate: the input gate no longer compels a filesystem check (TC-048 steps 6-7 regress)"
+  fi
+  if grep -qF 'ls -1 docs/issues/open/' "$f"; then
+    pf_pass "$gate: the compelled tool call is named explicitly"
+  else
+    pf_fail "$gate: no explicit tool call named — prose alone did not fire in manual testing"
+  fi
+done
+
 pf_summary

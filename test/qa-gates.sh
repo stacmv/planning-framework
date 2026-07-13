@@ -15,8 +15,16 @@ QA_FILE="$REPO_ROOT/.qa-workflow.md"
 TMP_REPO="$(pf_repo_copy)"
 
 # The amended TODO gate, verbatim, executed inside the repo copy.
+#
+# NOTE — the exclusion of `.qa-workflow.md` itself is load-bearing, and was
+# learned the hard way: that file is prose ABOUT the gates, so its text
+# necessarily contains the very literals the gates hunt for. Without this
+# pathspec, every edit to a gate's own wording trips that gate, and the QA of
+# the commit that fixes a gate can never go green. It turned `make test` red once.
+TODO_GATE_PATHSPECS=(':!docs/issues/' ':!test/' ':!.qa-workflow.md')
+
 todo_gate() {
-  git -C "$TMP_REPO" diff develop...HEAD -- . ':!docs/issues/' ':!test/' |
+  git -C "$TMP_REPO" diff develop...HEAD -- . "${TODO_GATE_PATHSPECS[@]}" |
     grep -E "^\+.*TODO" |
     grep -v 'TODO: Run /pf-' || true
 }
@@ -33,6 +41,29 @@ if [ -z "$matches" ]; then
 else
   pf_fail "step 1: amended TODO gate still fires"
   printf '%s\n' "$matches" | head -10 >&2
+fi
+
+# ─── Step 1b: this test's copy of the gate has not drifted from the real one ──
+# The test above DUPLICATES the gate command instead of referencing it — the same
+# two-sources-of-truth drift this whole issue exists to remove, one level up. We
+# cannot eval markdown, so the next best thing is to fail loudly the moment the
+# two copies disagree: every pathspec the test uses must appear on the gate's own
+# line in .qa-workflow.md, and vice versa.
+
+gate_line="$(grep -F 'No unresolved TODOs' "$QA_FILE" || true)"
+drift=""
+for ps in "${TODO_GATE_PATHSPECS[@]}"; do
+  case "$gate_line" in
+    *"$ps"*) ;;
+    *) drift="$drift $ps" ;;
+  esac
+done
+if [ -z "$gate_line" ]; then
+  pf_fail "step 1b: could not find the TODO gate's line in .qa-workflow.md"
+elif [ -n "$drift" ]; then
+  pf_fail "step 1b: this test's pathspecs have drifted from the gate in .qa-workflow.md —${drift}"
+else
+  pf_pass "step 1b: the test's copy of the TODO gate matches .qa-workflow.md (no drift)"
 fi
 
 # ─── Step 2: the gate still catches a genuine stray TODO ──────────────────────

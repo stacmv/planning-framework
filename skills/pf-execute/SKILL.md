@@ -23,6 +23,8 @@ Read `size_tier` from `prompt.md`'s frontmatter. Check prerequisites — **these
 
 Never execute against a stub or a missing test plan. If a document exists but is not complete, this skill stops; replacing it is the job of the skill that produces it.
 
+> **Run the check, do not recall it.** Your FIRST action at this gate is a tool call — `ls -1 docs/issues/open/<ISSUE-ID>/` — and you judge from its output, not from any document already in your context. Manual testing found this gate silently failing to fire when `implementation_plan.md` had been **deleted**: the file was gone from disk but still present in the session's context, so execution proceeded anyway. This skill is the last one before code gets written; a gate that can be satisfied from memory is not a gate. See "Evaluating it is a MECHANICAL check" in `~/.claude/skills/pf-size-tiers/SKILL.md`.
+
 For `size_tier: trivial`, read `docs/issues/open/[ACTIVE-ISSUE-ID]/notes.md` and `test_plan.md`. All design and planning is complete.
 
 For `size_tier` small/medium/large, read `docs/issues/open/[ACTIVE-ISSUE-ID]/implementation_plan.md`, `specs.md` (if present), and `test_plan.md`. All design and planning is complete.
