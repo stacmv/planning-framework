@@ -45,6 +45,7 @@ Issue перестал быть «починкой пяти дефектов м�
 | `test/converge-normalize.sh` | TC-010, TC-012, TC-020, TC-021, TC-023, TC-058 |
 | `test/converge-safety.sh` | TC-025…TC-029, TC-051…TC-055 |
 | `test/skills-static.sh` | TC-042, TC-043, TC-044 |
+| `test/docs-refs.sh` | TC-039, TC-040. **Добавлен на стадии `/pf-qa`:** имя файла придумал исполнитель Task 11, в Create-таблице его не было. Гейт «No unrelated changes» (`.qa-workflow.md:84`) объявляет эти таблицы **нормативными** — файл в дифе, отсутствующий в них, валит гейт. Файл законный (это и есть требуемый планом тест на отсутствие живых ссылок на удалённое), пробел был в таблице |
 | `test/fixtures/no-pf-bare/`, `no-pf-claude/`, `v1-project/`, `v2-project/`, `v2-with-stub/`, `v3-incomplete/`, `mixed-layout/`, `collision-same-id/`, `collision-file-dir/`, `v2-latin/`, `planning-with-user-files/` | 11 рукотворных замороженных фикстур, коммитятся, **без вложенного `.git`** (KI-8) |
 | `test/fixtures/README.md` | По одной строке на фикстуру — что именно она моделирует (требование Task 2) |
 | `docs/planning/templates/config/CLAUDE.md` | **Новый** шаблон (сегодня не существует нигде — проверено): тело размеченной секции `<!-- pf:begin/end -->` и файл «с нуля» (Р8) |
