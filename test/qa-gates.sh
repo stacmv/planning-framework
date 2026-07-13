@@ -130,12 +130,31 @@ fi
 test_plan="$(find "$REPO_ROOT/docs/issues/open" -mindepth 2 -maxdepth 2 \
   -name test_plan.md 2>/dev/null | LC_ALL=C sort | head -1)"
 if [ -n "$test_plan" ]; then
-  rows="$(grep -cE '\| \[[ x]\] *\|' "$test_plan" || true)"
+  # The Testing gate must be able to see BOTH failure modes, and this assertion
+  # is what proves it can. `/pf-test` rewrites a processed row's Status from
+  # `[ ]` to `✓` OR `✗` — so once it has run, zero `[ ]` remain *whatever the
+  # outcome*. A gate that only counts `[ ]` therefore goes green on a test plan
+  # full of failures: meaninglessly green, passing because the tests were RUN,
+  # not because they PASSED. The gate counts both, so this asserts both.
+  #
+  # (An earlier version of this step demanded the tracker still use `[ ]`/`[x]`
+  # syntax. That contradicted /pf-test's own documented behaviour and turned red
+  # the moment the tracker was legitimately filled in — the assertion was wrong,
+  # not the tracker.)
   open_rows="$(grep -c '| \[ \] *|' "$test_plan" || true)"
-  if [ "${rows:-0}" -gt 0 ]; then
-    pf_pass "step 6: Status Tracker uses the [ ]/[x] syntax the Testing gate greps for (${rows} rows, ${open_rows} still open)"
+  failed_rows="$(grep -c '| ✗ *|' "$test_plan" || true)"
+  done_rows="$(grep -c '| ✓ *|' "$test_plan" || true)"
+
+  if [ "${open_rows:-0}" -eq 0 ]; then
+    pf_pass "step 6: no unprocessed rows left in the Status Tracker (${done_rows} passed)"
   else
-    pf_fail "step 6: Status Tracker does not use [ ]/[x] — the Testing gate would be meaninglessly green"
+    pf_fail "step 6: ${open_rows} row(s) still unprocessed — the Testing gate would block closure"
+  fi
+
+  if [ "${failed_rows:-0}" -eq 0 ]; then
+    pf_pass "step 6b: no FAILED rows in the Status Tracker — the gate can see ✗, not just [ ]"
+  else
+    pf_fail "step 6b: ${failed_rows} row(s) marked ✗ — a gate that only counts [ ] would miss these"
   fi
 else
   pf_note "step 6: no docs/issues/open/*/test_plan.md — nothing to check"
