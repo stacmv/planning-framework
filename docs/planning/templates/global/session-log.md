@@ -1,7 +1,7 @@
 # Session Log
 
 **Project:** [Project Name]
-**Version:** 2.0
+**Version:** 3.0
 **Started:** YYYY-MM-DD
 **Last Updated:** YYYY-MM-DD
 
@@ -134,6 +134,6 @@ Lightweight session history tracking. This log captures:
 
 ---
 
-**Version:** 2.0
+**Version:** 3.0
 **Started:** YYYY-MM-DD
 **Last Updated:** YYYY-MM-DD

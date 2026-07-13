@@ -1,7 +1,7 @@
 # Implementation Plan
 
 **Project:** [Project Name]
-**Version:** 2.0
+**Version:** 3.0
 **Started:** YYYY-MM-DD
 **Last Updated:** YYYY-MM-DD
 
@@ -164,5 +164,5 @@
 
 ---
 
-**Version:** 2.0
+**Version:** 3.0
 **Last Updated:** YYYY-MM-DD
