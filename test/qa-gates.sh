@@ -114,4 +114,49 @@ fi
 
 assert_repo_untouched
 
+# ─── TC-038: the Makefile exposes converge and nothing else ───────────────────
+# Added at /pf-test time: TC-038 is typed Auto in the Status Tracker but Task 9
+# verified it by hand and left no test behind. An Auto row with no automation is
+# the same silent hole this whole issue exists to close, so it gets one.
+
+echo ""
+echo "=== TC-038: Makefile targets"
+
+mk_dryrun="$(make -C "$REPO_ROOT" -n converge TARGET=/tmp/pf-tc038 2>/dev/null || true)"
+case "$mk_dryrun" in
+  *--target\ /tmp/pf-tc038*) pf_pass "step 1: make converge TARGET=<dir> forwards --target" ;;
+  *)                         pf_fail "step 1: make converge TARGET=<dir> did not forward --target (got: ${mk_dryrun})" ;;
+esac
+
+mk_bare="$(make -C "$REPO_ROOT" -n converge 2>/dev/null || true)"
+case "$mk_bare" in
+  *--target*) pf_fail "step 2: bare 'make converge' must not invent a --target (got: ${mk_bare})" ;;
+  *converge*) pf_pass "step 2: bare 'make converge' runs the script with no --target" ;;
+  *)          pf_fail "step 2: bare 'make converge' does not run the convergence script" ;;
+esac
+
+for dead in setup-v2 setup-v3 migrate-v1-to-v2 migrate-v2-to-v3; do
+  if make -C "$REPO_ROOT" -n "$dead" >/dev/null 2>&1; then
+    pf_fail "step 3: target '${dead}' still exists — it was deleted in Phase IV"
+  else
+    pf_pass "step 3: target '${dead}' is gone"
+  fi
+done
+
+if grep -qE '^\.PHONY:.*\bconverge\b' "$REPO_ROOT/Makefile"; then
+  pf_pass "step 4: converge is declared .PHONY"
+else
+  pf_fail "step 4: converge is missing from .PHONY"
+fi
+
+# NB: capture first, then match. lib.sh runs with `set -o pipefail`, and
+# `make … | grep -q` fails with rc 141 precisely WHEN it matches: grep -q closes
+# the pipe on the first hit, make takes SIGPIPE, and pipefail surfaces make's
+# 141 instead of grep's 0. The harder the assertion bites, the redder it goes.
+mk_help="$(make -C "$REPO_ROOT" help 2>/dev/null || true)"
+case "$mk_help" in
+  *converge*) pf_pass "step 5: make help advertises converge" ;;
+  *)          pf_fail "step 5: make help does not mention converge" ;;
+esac
+
 pf_summary
