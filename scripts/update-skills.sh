@@ -89,6 +89,7 @@ echo "Installed global command: pf  ->  $GLOBAL_BIN_DIR/pf"
 case ":$PATH:" in
   *":$HOME/.claude/bin:"*) ;;
   *)
+    # shellcheck disable=SC2016  # literal text for the user to copy; must not expand
     echo 'warning: add to PATH: export PATH="$HOME/.claude/bin:$PATH"'
     ;;
 esac

@@ -111,6 +111,7 @@ case ":$PATH:" in
     ;;
   *)
     echo "$GLOBAL_BIN_DIR is not on your PATH. Add it, then run 'pf':"
+    # shellcheck disable=SC2016  # literal text for the user to copy; must not expand
     echo '  export PATH="$HOME/.claude/bin:$PATH"'
     echo ""
     echo "(Add that line to your ~/.bashrc, ~/.zshrc, or equivalent to make it permanent.)"

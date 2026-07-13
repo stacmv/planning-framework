@@ -133,8 +133,8 @@ Tag every session-log entry and every commit with your agent name.
 
 **Session log:**
 ```
-[Claude Code] 2024-01-27: Implemented auth endpoint, 3/5 tasks done
-[Gemini CLI]  2024-01-28: Fixed token refresh bug
+[Claude Code] <date>: Implemented auth endpoint, 3/5 tasks done
+[Gemini CLI]  <date>: Fixed token refresh bug
 [Qwen Code]   ✓ Closed issue 20240127-feat-add-authentication
 ```
 
