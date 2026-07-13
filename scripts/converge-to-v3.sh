@@ -328,17 +328,97 @@ collect_phase5_paths() {
   done
 }
 
+# Cross-status merge map: issue id -> the status its files must land in, which is
+# NOT necessarily the status they sit in under planning/.
+#
+# It is computed HERE, in the parent shell, and deliberately NOT inside
+# map_destination — which is only ever reached through `$(map_destination …)`,
+# i.e. a subshell. A `warn` raised in there prints to stderr but its append to
+# WARNINGS is thrown away with the subshell, so the merge never appears in the
+# final WARNINGS block of the report (it also fired once per FILE rather than
+# once per issue). TC-051 step 6 wants exactly these events, once each, in the
+# report.
+declare -A ISSUE_STATUS_REMAP=()
+
+# The v3 location is authoritative: if the ID already lives under docs/ in the
+# OTHER status, its v2 files merge into that one. A second directory for the same
+# ID is never created — /pf scans open/ only and would otherwise resurrect closed
+# work (or hide open work in closed/).
+compute_status_remap() {
+  local src rel rest status id rstatus
+  local -A seen=()
+
+  for src in ${P3_SOURCES[@]+"${P3_SOURCES[@]}"}; do
+    # Only <status>/<id>/<file…> carries an issue ID; a .gitkeep sitting directly
+    # under planning/issues/ or planning/issues/<status>/ does not.
+    case "$src" in
+      "$TARGET"/planning/issues/*/*/*) ;;
+      *) continue ;;
+    esac
+
+    rel="${src#"$TARGET"/planning/issues/}"
+    status="${rel%%/*}"
+    rest="${rel#*/}"
+    id="${rest%%/*}"
+
+    [ -n "${seen["$status/$id"]:-}" ] && continue
+    seen["$status/$id"]=1
+
+    rstatus="$status"
+    if [ -d "$TARGET/docs/issues/open/$id" ]; then
+      rstatus="open"
+    elif [ -d "$TARGET/docs/issues/closed/$id" ]; then
+      rstatus="closed"
+    fi
+
+    if [ "$rstatus" != "$status" ]; then
+      ISSUE_STATUS_REMAP["$id"]="$rstatus"
+      warn "issue $id is '$status' under planning/ but '$rstatus' under docs/ — merging into docs/issues/$rstatus/$id (the v3 location wins; no second directory for the same ID is ever created)"
+    fi
+  done
+}
+
 # Where does a phase-3 source file belong in the v3 layout?
+#
+# PURE: no warnings, no side effects — it runs in a command substitution, where a
+# side effect would be silently discarded (see compute_status_remap above).
 map_destination() {
-  local src="$1" rel status id tail tail_dir tail_base rstatus
+  local src="$1" rel rest status id tail tail_dir tail_base rstatus
 
   case "$src" in
     "$TARGET"/planning/issues/*)
       rel="${src#"$TARGET"/planning/issues/}"
+
+      # NOT every file under planning/issues/ belongs to an issue. A .gitkeep is
+      # how an empty open/ or closed/ stays alive in git — v2 projects are full of
+      # them — and a stray README.md sits one level higher still. Such a file has
+      # no issue ID, so it keeps its place verbatim under docs/issues/.
+      #
+      # Without these two guards the first path component is taken for an issue
+      # ID: `.gitkeep` becomes a DIRECTORY named `.gitkeep` holding a file called
+      # `.gitkeep`, i.e. a phantom issue that /pf would list as real work (and
+      # that phase 4 would then try to normalise).
+      case "$rel" in
+        */*) ;;
+        *)
+          printf '%s' "$TARGET/docs/issues/$rel"
+          return 0
+          ;;
+      esac
+
       status="${rel%%/*}"
-      rel="${rel#*/}"
-      id="${rel%%/*}"
-      tail="${rel#*/}"
+      rest="${rel#*/}"
+
+      case "$rest" in
+        */*) ;;
+        *)
+          printf '%s' "$TARGET/docs/issues/$status/$rest"
+          return 0
+          ;;
+      esac
+
+      id="${rest%%/*}"
+      tail="${rest#*/}"
 
       tail_dir="$(dirname "$tail")"
       tail_base="$(basename "$tail")"
@@ -347,18 +427,8 @@ map_destination() {
       [ "$tail_base" = "implementation-plan.md" ] && tail_base="implementation_plan.md"
       [ "$tail_dir" = "." ] && tail_dir=""
 
-      # The v3 location is authoritative: if this ID already lives under docs/ in
-      # the OTHER status, merge into that one. A second directory for the same ID
-      # is never created — /pf scans open/ only and would resurrect closed work.
-      rstatus="$status"
-      if [ -d "$TARGET/docs/issues/open/$id" ]; then
-        rstatus="open"
-      elif [ -d "$TARGET/docs/issues/closed/$id" ]; then
-        rstatus="closed"
-      fi
-      if [ "$rstatus" != "$status" ]; then
-        warn "issue $id is '$status' under planning/ but '$rstatus' under docs/ — merging into docs/issues/$rstatus/$id (the v3 location wins)"
-      fi
+      # Decided once, in the parent shell, by compute_status_remap.
+      rstatus="${ISSUE_STATUS_REMAP[$id]:-$status}"
 
       if [ -n "$tail_dir" ]; then
         printf '%s' "$TARGET/docs/issues/$rstatus/$id/$tail_dir/$tail_base"
@@ -452,9 +522,20 @@ git_stage_footprint() {
 # repository, and a backup invisible to git is a backup nobody can restore.
 
 make_backup() {
-  local stamp
+  local stamp n
   stamp="$(date +%Y%m%d-%H%M%S)"
   BACKUP_DIR="$TARGET/planning-backup-$stamp"
+
+  # The stamp has one-second resolution, and an interrupted run followed straight
+  # away by a recovery run (D-F, TC-055) lands inside the same second. Reusing the
+  # directory would make `cp -a planning "$BACKUP_DIR/planning"` copy INTO the
+  # existing backup — yielding planning-backup-…/planning/planning/ and quietly
+  # ruining the only rollback artifact. Never overwrite a backup; take a new one.
+  n=2
+  while [ -e "$BACKUP_DIR" ]; do
+    BACKUP_DIR="$TARGET/planning-backup-$stamp-$n"
+    n=$((n + 1))
+  done
 
   if [ "$GIT_OK" -eq 1 ] && git -C "$TARGET" check-ignore -q "$BACKUP_DIR" 2>/dev/null; then
     warn "the backup path is ignored by this project's .gitignore: $(basename "$BACKUP_DIR")/ — it will still be created, but git will not see it"
@@ -547,7 +628,10 @@ phase3_transfer() {
     MOVED_COUNT=$((MOVED_COUNT + 1))
 
     case "$src" in
-      "$TARGET"/planning/issues/*)
+      "$TARGET"/planning/issues/*/*/*)
+        # <status>/<id>/<file…> — only THIS shape carries an issue ID. A file
+        # lying directly under planning/issues/ or planning/issues/<status>/ (a
+        # .gitkeep, say) is not an issue and must not be reported as one.
         issue_id="${src#"$TARGET"/planning/issues/}"
         issue_id="${issue_id#*/}"
         issue_id="${issue_id%%/*}"
@@ -933,25 +1017,63 @@ check_qa_workflow() {
   fi
 }
 
-# What is still missing from each open issue, so the report can say it out loud
-# instead of minting a stub (defect 5, measure 1).
+# Which v3 documents does this issue still owe? Keyed on the issue TYPE, which is
+# the second dash-separated field of the ID (<date>-<type>-<slug>) — the same
+# convention /pf routes on. A notes.md on disk means the trivial tier, whose
+# pipeline is notes.md -> test_plan.md and which has no BRD, spec or plan.
+#
+# size_tier is NOT inspected, and cannot be: converge deliberately does not write
+# it (Р5), precisely so that /pf's legacy-tier guard asks the user instead of
+# inheriting a machine's guess.
+required_docs() {
+  local dir="$1" id="$2" type
+  if [ -f "$dir/notes.md" ]; then
+    printf '%s\n' test_plan.md
+    return 0
+  fi
+  type="${id#*-}"
+  type="${type%%-*}"
+  case "$type" in
+    feat | improve) printf '%s\n' brd.md specs.md test_plan.md implementation_plan.md ;;
+    *) printf '%s\n' test_plan.md implementation_plan.md ;;
+  esac
+}
+
+skill_for_doc() {
+  case "$1" in
+    brd.md | notes.md) printf '/pf-brd' ;;
+    specs.md) printf '/pf-spec' ;;
+    test_plan.md) printf '/pf-test-plan' ;;
+    implementation_plan.md) printf '/pf-impl-plan' ;;
+    *) printf '/pf' ;;
+  esac
+}
+
+# What is still missing from each open issue, so the report can say it out loud —
+# by name, and with the skill that writes it — instead of minting a stub
+# (defect 5, measure 1). A file that is absent is an unfinished stage, stated
+# honestly; a file that is present but is a STUB is the same thing wearing a
+# document's name, and is called out as such (measure 2).
 collect_missing_docs() {
-  local dir id missing f
+  local dir id doc f entry
   [ -d "$TARGET/docs/issues/open" ] || return 0
   while IFS= read -r -d '' dir; do
     id="$(basename "$dir")"
-    missing=""
-    for f in test_plan.md implementation_plan.md; do
-      [ -f "$dir/$f" ] || missing="$missing $f"
-    done
-    # A stub on disk (from an old migration) does not count as a document.
+    entry=""
+    while IFS= read -r doc; do
+      [ -f "$dir/$doc" ] && continue
+      entry="${entry:+$entry, }$doc ($(skill_for_doc "$doc"))"
+    done < <(required_docs "$dir" "$id")
+
     for f in "$dir"/*.md; do
       [ -f "$f" ] || continue
       if grep -q -F -- "$STUB_MARKER" "$f"; then
-        missing="$missing $(basename "$f")(stub)"
+        doc="$(basename "$f")"
+        entry="${entry:+$entry, }$doc [a stub, not a document — re-run $(skill_for_doc "$doc")]"
       fi
     done
-    [ -n "$missing" ] && REPORT_MISSING_DOCS+=("$id:$missing")
+
+    [ -n "$entry" ] && REPORT_MISSING_DOCS+=("$id: $entry")
   done < <(find "$TARGET/docs/issues/open" -mindepth 1 -maxdepth 1 -type d -print0 2>/dev/null | LC_ALL=C sort -z)
 }
 
@@ -1092,6 +1214,9 @@ print_state
 
 collect_phase3_sources
 collect_phase5_paths
+# Before ANY destination is mapped — and before --dry-run prints the plan, which
+# must show the merged destinations and the warnings that go with them.
+compute_status_remap
 
 BACKUP_WANTED=0
 if [ ${#P3_SOURCES[@]} -gt 0 ] || [ ${#P5_PATHS[@]} -gt 0 ]; then
@@ -1118,7 +1243,13 @@ if [ "$BACKUP_WANTED" -eq 1 ] && [ "$ASSUME_YES" -eq 0 ] && [ "$FORCE" -eq 0 ]; 
   say "This will transfer ${#P3_SOURCES[@]} file(s) out of planning/ and then delete"
   say "${#P5_PATHS[@]} whitelisted path(s). A backup of planning/ is taken first."
   printf 'Proceed? [y/N] '
-  if ! IFS= read -r REPLY_CONFIRM; then
+  # `read` returns non-zero at EOF even when it DID read data — a final line with
+  # no trailing newline (`printf 'y' | converge`, a heredoc, an editor that does
+  # not end files with \n). Treating that as "could not ask" would cancel a run
+  # the user plainly agreed to. "Could not ask" is the case where nothing arrived
+  # at all, so test the payload, not just the return code.
+  REPLY_CONFIRM=""
+  if ! IFS= read -r REPLY_CONFIRM && [ -z "$REPLY_CONFIRM" ]; then
     say ""
     say "Converge cancelled — stdin is closed and --yes was not given. Nothing was changed."
     exit 4
