@@ -3,14 +3,17 @@
 /**
  * lib/actions.js
  *
- * Thin wrappers around the existing, already-working shell scripts
- * (scripts/setup-planning-v3.sh, scripts/migrate-v2-to-v3.sh,
- * scripts/update-skills.sh). This module intentionally does NOT
- * re-implement any of their business logic — it only spawns them as
- * child processes with inherited stdio, so the user sees/interacts with
- * exactly the same prompts and output as running them directly (e.g. via
- * the Makefile's `make setup-v3`, `make migrate-v2-to-v3`, `make
- * update-skills` targets).
+ * Thin wrappers around the repository's shell scripts
+ * (scripts/converge-to-v3.sh, scripts/update-skills.sh). This module
+ * intentionally does NOT re-implement any of their business logic — it
+ * only spawns them as child processes with inherited stdio, so the user
+ * sees/interacts with exactly the same prompts and output as running them
+ * directly (e.g. via the Makefile's `make converge` / `make update-skills`
+ * targets).
+ *
+ * Install and migration are ONE action here, as they are everywhere else:
+ * convergence is idempotent and source-agnostic, so the TUI has a single
+ * delegate for it — runConverge().
  *
  * No npm dependencies — only node:child_process, node:path.
  */
@@ -61,36 +64,21 @@ function runScript(scriptPath, args = [], spawnOpts = {}) {
 }
 
 /**
- * Delegate to scripts/setup-planning-v3.sh.
+ * Delegate to scripts/converge-to-v3.sh — the single entry point for
+ * installing, migrating and topping up a project. The target directory is
+ * passed explicitly as `--target <dir>`; the script accepts it in any flag
+ * position and defaults to `$(pwd)` when omitted.
  *
- * NOTE (P2-7, accepted trade-off): setup-planning-v3.sh always prompts
- * interactively for its own target directory via `read -rp`, defaulting
- * to `$(pwd)`. We can't pass targetDir to it as an argument (it doesn't
- * accept one) — the best we can do is run the script with
- * `cwd: targetDir`, so that its own default matches the directory the
- * user picked in the TUI. The script will still prompt the user once
- * more to confirm/override that same directory; this is expected, not a
- * bug — the TUI never suppresses or auto-answers the script's prompts.
+ * No flags are auto-answered or suppressed: the TUI does NOT pass `--yes`,
+ * so the script's own confirmation prompt reaches the user unchanged (a
+ * declined prompt is a cancellation, never a silent proceed).
  *
  * @param {string} targetDir
  * @returns {Promise<number|null>}
  */
-function runSetupV3(targetDir) {
-  const scriptPath = path.join(repoRoot, "scripts", "setup-planning-v3.sh");
-  return runScript(scriptPath, [], { cwd: targetDir });
-}
-
-/**
- * Delegate to scripts/migrate-v2-to-v3.sh, passing targetDir as the
- * script's positional $1 (it supports this natively, defaulting to `.`
- * when omitted).
- *
- * @param {string} targetDir
- * @returns {Promise<number|null>}
- */
-function runMigrateV2ToV3(targetDir) {
-  const scriptPath = path.join(repoRoot, "scripts", "migrate-v2-to-v3.sh");
-  return runScript(scriptPath, [targetDir]);
+function runConverge(targetDir) {
+  const scriptPath = path.join(repoRoot, "scripts", "converge-to-v3.sh");
+  return runScript(scriptPath, ["--target", targetDir]);
 }
 
 /**
@@ -121,8 +109,7 @@ function killActiveChild() {
 }
 
 module.exports = {
-  runSetupV3,
-  runMigrateV2ToV3,
+  runConverge,
   runUpdateSkills,
   killActiveChild,
 };
