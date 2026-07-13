@@ -1,10 +1,11 @@
 PORT ?=
 
-.PHONY: help test-ui update-skills issue-status migrate-v1-to-v2 migrate-v2-to-v3 setup-v2 setup-v3 tui
+.PHONY: help test test-ui update-skills issue-status migrate-v1-to-v2 migrate-v2-to-v3 setup-v2 setup-v3 tui
 
 help:
 	@echo "Planning Framework - Commands"
 	@echo ""
+	@echo "  make test                         Run the whole suite: test/*.sh + node --test"
 	@echo "  make test-ui                      Launch the Manual Test UI (see tools/manual-test-ui/README.md)"
 	@echo "  make test-ui PORT=4400            Launch it on a specific port"
 	@echo "  make update-skills                Propagate skills/ to ~/.claude/skills/ for all consumer projects"
@@ -17,6 +18,36 @@ help:
 	@echo "  make setup-v3                     Interactive v3.0 setup for a new consumer project"
 	@echo "  make tui                           Launch the interactive onboarding/update wizard"
 	@echo "  make tui TARGET=<path>             Run against a specific target project directory"
+
+# `test` is .PHONY on purpose: a directory named test/ exists, and without it
+# make would consider the target already up to date and run nothing.
+# test/lib.sh is a sourced library, not a suite — it is skipped.
+test:
+	@rc=0; ran=0; \
+	for t in test/*.sh; do \
+		[ -f "$$t" ] || continue; \
+		case "$$t" in */lib.sh) continue ;; esac; \
+		ran=$$((ran + 1)); \
+		printf '\n=== %s\n' "$$t"; \
+		bash "$$t" || rc=1; \
+	done; \
+	if [ "$$ran" -eq 0 ]; then \
+		printf '\n=== test/*.sh\n'; \
+		echo "  no bash test suites yet — nothing to run"; \
+	fi; \
+	nodetests=0; \
+	for t in tools/onboarding-tui/test/*.test.js; do \
+		[ -f "$$t" ] && nodetests=1; \
+	done; \
+	printf '\n=== node --test tools/onboarding-tui/test/\n'; \
+	if [ "$$nodetests" -eq 1 ]; then \
+		node --test "tools/onboarding-tui/test/*.test.js" || rc=1; \
+	else \
+		echo "  no node test suites yet — nothing to run"; \
+	fi; \
+	printf '\n'; \
+	if [ "$$rc" -eq 0 ]; then echo "make test: OK"; else echo "make test: FAILED"; fi; \
+	exit $$rc
 
 test-ui:
 	@if [ ! -f tools/manual-test-ui/projects.json ]; then \
