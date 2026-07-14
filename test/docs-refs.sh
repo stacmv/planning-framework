@@ -281,8 +281,8 @@ if grep -qiE '\b(eleven|seven)\b .*skills' docs/planning/FRAMEWORK.md; then
 else
   pf_pass "step 2: docs/planning/FRAMEWORK.md has no spelled-out stale count"
 fi
-pf_assert "step 2: docs/planning/FRAMEWORK.md states the real count (Fifteen)" \
-  grep -qi "fifteen Claude Code skills" docs/planning/FRAMEWORK.md
+pf_assert "step 2: docs/planning/FRAMEWORK.md states the real count (Sixteen)" \
+  grep -qi "sixteen Claude Code skills" docs/planning/FRAMEWORK.md
 assert_lists_every_skill docs/planning/FRAMEWORK.md "step 2: docs/planning/FRAMEWORK.md"
 assert_lists_every_skill docs/planning/QUICKSTART.md "step 2: docs/planning/QUICKSTART.md"
 pf_assert "step 2: docs/planning/QUICKSTART.md states the real count ($N_SKILLS)" \

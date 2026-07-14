@@ -44,6 +44,7 @@ Run `/pf` at any time to see where you are and what to do next.
 | `/pf-qa-setup` | Create or update `.qa-workflow.md` for this project |
 | `/pf-qa` | Run QA checks, confirm manual items, produce `qa_report.md` (PASS/FAIL) |
 | `/pf-close` | Close the issue — merge branch, archive folder, update session-log |
+| `/pf-autopilot` | Drive the active issue to `/pf-close` autonomously (self-resume schedule survives session limits) |
 | `/pf-update` | Update all skills to the latest version |
 | `/pf-help` | Show this help |
 

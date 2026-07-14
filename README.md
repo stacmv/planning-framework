@@ -18,7 +18,7 @@
 
 ## Skills
 
-Fifteen Claude Code skills live in `skills/`, one directory per skill (`skills/<name>/SKILL.md`). Converge installs all of them into `~/.claude/skills/`.
+Sixteen Claude Code skills live in `skills/`, one directory per skill (`skills/<name>/SKILL.md`). Converge installs all of them into `~/.claude/skills/`.
 
 | Command | Purpose |
 |---------|---------|
@@ -35,6 +35,7 @@ Fifteen Claude Code skills live in `skills/`, one directory per skill (`skills/<
 | `/pf-qa` | Run QA checks from `.qa-workflow.md`, produce `qa_report.md` |
 | `/pf-qa-setup` | Create or update `.qa-workflow.md` for the project |
 | `/pf-close` | Merge the issue branch, archive the issue, update the session log |
+| `/pf-autopilot` | Drive the active issue to `/pf-close` autonomously (self-resume schedule survives session limits) |
 | `/pf-update` | Update the installed skills from the framework repo |
 | `/pf-size-tiers` | Reference data (size tiers, document budgets) — read by the other skills |
 

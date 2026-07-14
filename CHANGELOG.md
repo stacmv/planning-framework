@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [Unreleased]
+
+### Added
+- `/pf-autopilot` skill — drives the active issue to `/pf-close` autonomously: creates a self-resume schedule (CronCreate) before starting work, retries a sub-agent once after a connection drop, proceeds with recommended defaults only after 3 unanswered `AskUserQuestion` attempts (logging each as `[autopilot default]` in the issue session-log), and removes the schedule on closure
+
+---
+
 ## [3.0.0] - 2026-06-24
 
 ### Added

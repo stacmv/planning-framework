@@ -32,7 +32,7 @@ make converge TARGET=/path/to/your-project
 - `PLANNING.md` - Framework instructions
 - `.pf-version` - Framework version stamp
 - `CLAUDE.md` - With a `<!-- pf:begin -->` / `<!-- pf:end -->` framework section
-- 15 skills in `~/.claude/skills/` (`/pf`, `/pf-help`, `/pf-brd`, `/pf-spec`, `/pf-check`, `/pf-test-plan`, `/pf-impl-plan`, `/pf-execute`, `/pf-test`, `/pf-manual-test`, `/pf-qa`, `/pf-qa-setup`, `/pf-close`, `/pf-update`, `/pf-size-tiers`) and the `pf` shim in `~/.claude/bin/`
+- 16 skills in `~/.claude/skills/` (`/pf`, `/pf-help`, `/pf-brd`, `/pf-spec`, `/pf-check`, `/pf-test-plan`, `/pf-impl-plan`, `/pf-execute`, `/pf-test`, `/pf-manual-test`, `/pf-qa`, `/pf-qa-setup`, `/pf-close`, `/pf-autopilot`, `/pf-update`, `/pf-size-tiers`) and the `pf` shim in `~/.claude/bin/`
 - `docs/issues/open/` and `/closed/` - Issue folders
 - `docs/planning/` - Global planning files + templates
 

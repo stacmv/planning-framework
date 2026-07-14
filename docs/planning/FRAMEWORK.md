@@ -373,7 +373,7 @@ git commit -m "Close issue 20240127-feat-add-auth: Added JWT authentication"
 
 ## Skills
 
-Fifteen Claude Code skills live in the `skills/` directory — one directory per skill, each holding a `SKILL.md`. They are installed into `~/.claude/skills/` by `converge-to-v3.sh` and refreshed by `update-skills.sh`.
+Sixteen Claude Code skills live in the `skills/` directory — one directory per skill, each holding a `SKILL.md`. They are installed into `~/.claude/skills/` by `converge-to-v3.sh` and refreshed by `update-skills.sh`.
 
 | Skill | Command | What it does |
 |-------|---------|-------------|
@@ -390,6 +390,7 @@ Fifteen Claude Code skills live in the `skills/` directory — one directory per
 | `pf-qa/` | `/pf-qa` | Runs QA checks from `.qa-workflow.md`, produces `qa_report.md` with a PASS/FAIL verdict |
 | `pf-qa-setup/` | `/pf-qa-setup` | Creates or updates `.qa-workflow.md` for the project |
 | `pf-close/` | `/pf-close` | Merges the issue branch to parent, archives the issue folder, updates session-log |
+| `pf-autopilot/` | `/pf-autopilot` | Drives the active issue to `/pf-close` autonomously; a self-resume schedule survives session limits and connection drops |
 | `pf-update/` | `/pf-update` | Updates the installed skills from the framework source repo |
 | `pf-size-tiers/` | `/pf-size-tiers` | Reference data: size-tier definitions and document budgets, read by the other skills |
 
@@ -468,7 +469,7 @@ project/
 ~/.claude/
 ├── bin/
 │   └── pf                               # Global shim → the onboarding TUI
-└── skills/                              # 15 skills — one directory per skill
+└── skills/                              # 16 skills — one directory per skill
     ├── pf/SKILL.md                      # /pf — status + next step
     ├── pf-help/SKILL.md                 # /pf-help — overview + quick start
     ├── pf-brd/SKILL.md                  # /pf-brd — create BRD

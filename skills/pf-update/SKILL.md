@@ -10,7 +10,7 @@ Update the installed Planning Framework skills to the latest version.
 
 The update script **discovers skills by globbing `skills/*/SKILL.md` in the framework repo** — it never reads the list below, and a new skill is picked up without editing this file. The list is documentation only; keep it in sync, but the script is the source of truth.
 
-All 15 skills:
+All 16 skills:
 
 - `pf` — orchestrator: shows active issue status and next step
 - `pf-help` — framework overview and quick-start
@@ -25,6 +25,7 @@ All 15 skills:
 - `pf-qa` — QA checklist execution
 - `pf-qa-setup` — QA environment setup
 - `pf-close` — issue closure workflow
+- `pf-autopilot` — autonomous drive of the active issue to `/pf-close` with a self-resume schedule
 - `pf-update` — this skill (self-updates)
 - `pf-size-tiers` — reference data: tier definitions and document budgets (not directly invoked)
 

@@ -57,12 +57,13 @@ stage of the pipeline for the active issue.
   /pf-qa           - run QA checks and produce qa_report.md
   /pf-qa-setup     - create/update .qa-workflow.md for this project
   /pf-close        - merge, archive, and close the issue
+  /pf-autopilot    - drive the active issue to /pf-close autonomously
   /pf-help         - framework overview and quick start
   /pf-update       - update the installed skills from the framework repo
   /pf-size-tiers   - reference data (size tiers, document budgets); read by
                      the other skills, not normally invoked directly
 
-That is all 15 of them.`,
+That is all 16 of them.`,
 
   // Screen 4: pointers to more detail.
   `Screen 4/4 — Where to learn more
