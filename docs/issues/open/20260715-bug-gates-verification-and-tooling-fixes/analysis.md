@@ -30,9 +30,11 @@
 
 > Run `git config branch.issue/ISSUE-ID.merge`. If this returns a value such as `refs/heads/develop`…
 
-`branch.<name>.merge` — **ветка отслеживания на remote (upstream)**, а не родитель. При пуше ветки issue с `-u` (что делает `/pf-execute`/пользователь) команда возвращает `refs/heads/issue/<ID>` — саму себя. Фолбэк на `develop` в Phase 3 не срабатывает: команда вернула значение, просто неверное. **Наблюдалось вживую** при закрытии `20260713-...`; родителя пришлось определять через `git merge-base --is-ancestor develop HEAD`.
+`branch.<name>.merge` — **ветка отслеживания на remote (upstream)**, а не родитель. Как только ветку issue запушили с `-u`, команда возвращает `refs/heads/issue/<ID>` — саму себя. Фолбэк на `develop` в Phase 3 не срабатывает: команда вернула значение, просто неверное. **Наблюдалось вживую** при закрытии `20260713-...`; родителя пришлось определять через `git merge-base --is-ancestor develop HEAD`.
 
-**Что нужно.** Определять родителя не по upstream. Рекомендуемо: фолбэк-детект — первая из `develop`/`main`, являющаяся предком HEAD (`git merge-base --is-ancestor <cand> HEAD`); опционально `branch.<name>.pf-parent`, проставляемый `/pf-execute` при создании ветки. **Проверить `/pf-autopilot`** (`skills/pf-autopilot/SKILL.md`) — Step 3 зовёт `/pf-close`; он наследует ту же сломанную Phase 3.
+> **Уточнение (по итогам /pf-check).** `-u`-пуш ветки issue делает **не** `/pf-execute` — тот только создаёт ветку локально (`git checkout -b issue/ISSUE-ID`, Phase 0, `pf-execute/SKILL.md:40`), `push` в нём отсутствует (grep — ноль). Первый `-u`-пуш ветки issue приходит от `/pf-autopilot` (Step 2, п.3 «commit … and push the issue branch») или от пользователя вручную; `/pf-close` пушит `-u` только PARENT-ветку (`:160`). Поэтому репродукция «прогнать `/pf-execute` и проверить `-u`» неверна — писать её не надо.
+
+**Что нужно.** Определять родителя не по upstream. Рекомендуемо: фолбэк-детект — первая из `develop`/`main`, являющаяся предком HEAD (`git merge-base --is-ancestor <cand> HEAD`); опционально `branch.<name>.pf-parent`, проставляемый `/pf-execute` **при создании ветки** (`checkout -b` действительно делает `/pf-execute`). **Проверить `/pf-autopilot`** (`skills/pf-autopilot/SKILL.md`): `/pf-close` вызывается в его **Step 2 (Work loop)** как стадия пайплайна (Step 3 «Completion» лишь реагирует на уже случившееся закрытие). Дублирующей логики детекта родителя в `/pf-autopilot` **нет** (grep по `branch.*merge`/`merge-base`/`pf-parent` — только `pf-close/SKILL.md`), так что фикс — только в `pf-close`; от `/pf-autopilot` нужна лишь проверка, что он не наследует баг через вызов `/pf-close`.
 
 ## Находка 3 — Manual Test UI: два дефекта парсинга (`tools/manual-test-ui/lib/checklist.js`)
 
@@ -40,7 +42,9 @@
 
 **3b. Секции не в форме `## TC-NNN` не отображаются.** `:9` — `TC_HEADING_RE = /^##\s+TC-(\d+):/`; парсер (`:48-49`) пропускает любой не-TC заголовок. Отдельная секция вроде «Общая подготовка» до тестировщика не доезжает. **Наблюдалось вживую:** раздел подготовки был невидим, пока я не переименовал его в `## TC-000`.
 
-**Что нужно.** (3a) распознавать `\|` при разбиении (замена на плейсхолдер перед split, восстановление после). (3b) решить: показывать не-TC секции отдельными карточками либо хотя бы не терять их содержимое. Учесть локализованные заголовки (тест `checklist-ru.test.js` уже проверяет русские секции — расширить его).
+> **Уточнение (эмпирически, /pf-check).** Не-TC контент между TC-блоками **тихо теряется из разбора целиком** — он НЕ перетекает ни в `meta`, ни в предыдущий TC (`prerequisites`/`notes`), `parseWarnings` при этом пуст. Регресс-тест должен утверждать именно **полную потерю** контента, а не «попал в предыдущий TC».
+
+**Что нужно.** (3a) распознавать `\|` при разбиении (замена на плейсхолдер перед split, восстановление после). (3b) решить: показывать не-TC секции отдельными карточками либо хотя бы не терять их содержимое (сейчас теряется молча и полностью). Учесть локализованные заголовки (тест `checklist-ru.test.js` уже проверяет русские секции — расширить его).
 
 ## Находка 4 — `make converge` не умеет передавать `--yes`
 
@@ -51,9 +55,9 @@ converge:
 	bash scripts/converge-to-v3.sh $(if $(TARGET),--target $(TARGET),)
 ```
 
-Проброса `--yes` нет → цель не автоматизируется: `make converge TARGET=…` не из терминала справедливо отменяется («Converge cancelled — stdin is closed»). **Наблюдалось вживую** при подготовке фикстур ручного теста. Прецедент проброса в `Makefile` есть — `make tui` использует `$(if $(TARGET),--target $(TARGET),)`.
+Проброса `--yes` нет → цель не автоматизируется: `make converge TARGET=…` не из терминала справедливо отменяется («Converge cancelled — stdin is closed and --yes was not given. Nothing was changed.», `scripts/converge-to-v3.sh:1254`). **Наблюдалось вживую** при подготовке фикстур ручного теста. Прецедент проброса в `Makefile` есть — `make tui` использует `$(if $(TARGET),--target $(TARGET),)`.
 
-**Что нужно.** Добавить `$(if $(YES),--yes,)`, чтобы `make converge TARGET=/tmp/x YES=1` работал неинтерактивно.
+**Что нужно.** Добавить `$(if $(YES),--yes,)`, чтобы `make converge TARGET=/tmp/x YES=1` работал неинтерактивно. Заодно (по итогам /pf-check): в блоке `help:` (`Makefile:5-18`) добавить строку про `make converge TARGET=<path> YES=1` — по прецеденту парных строк `tui`. Документация (`README.md`, `CLAUDE.md`, `CONTRIBUTING.md`, `docs/planning/{FRAMEWORK,QUICKSTART,MIGRATION-GUIDE-V3}.md`) упоминает `make converge TARGET=…` в 10+ местах и нигде не документирует `YES=1` — не блокер (собственный `test/docs-refs.sh` синхронность `help`↔флаги не проверяет), но impl-plan не должен упустить это как «мелочь вне acceptance».
 
 ---
 
@@ -66,11 +70,11 @@ converge:
 | Файл | Находка | Правка |
 |---|---|---|
 | `skills/pf-impl-plan/SKILL.md`, `skills/pf-execute/SKILL.md`, `skills/pf-size-tiers/SKILL.md`, `test/skills-static.sh` | 1 | уже исправлены (`d865899`) — только верификация |
-| `skills/pf-close/SKILL.md` (Phase 3, `:58-66`) | 2 | детект родителя не по upstream |
-| `skills/pf-autopilot/SKILL.md` | 2 | проверить/исправить наследование Phase 3 |
-| `tools/manual-test-ui/lib/checklist.js` (`:9`, `:25`, `:30`, `:48-49`) | 3 | `\|` + не-TC секции |
+| `skills/pf-close/SKILL.md` (Phase 3, `:58-66`) | 2 | детект родителя не по upstream (единственный носитель бага) |
+| `skills/pf-autopilot/SKILL.md` | 2 | только **верификация** — дублирующей логики нет, чинить нечего; убедиться, что вызов `/pf-close` не наследует баг |
+| `tools/manual-test-ui/lib/checklist.js` (`:9`, `:24-26`, `:30`, `:48-49`) | 3 | `\|` + не-TC секции (тихо теряются целиком) |
 | `tools/manual-test-ui/test/checklist-ru.test.js` | 3 | покрыть оба дефекта |
-| `Makefile` (цель `converge`) | 4 | проброс `--yes` |
+| `Makefile` (цель `converge` `:69-70`, `help:` `:5-18`) | 4 | проброс `$(if $(YES),--yes,)` + строка в `help:` |
 
 ## Условия приёмки
 
