@@ -91,7 +91,7 @@ Test UI (`tools/manual-test-ui/lib/checklist.js`) — экранированны
 **Steps:**
 | Step | Action | Expected Result |
 |------|--------|-----------------|
-| 1 | `grep -n 'branch\..*\.merge' skills/pf-close/SKILL.md`. | Пусто (инструкция больше не читает upstream как источник родителя) — или, если строка осталась, она относится не к определению родителя, а к чему-то иному (проверить вручную при находке). |
+| 1 | Ограничить проверку разделом Phase 3 (чтобы остаться чисто булевой, без ручной развилки): `awk '/^## Phase 3/{f=1;next} /^## Phase 4/{f=0} f' skills/pf-close/SKILL.md` и в его выводе `grep -c 'branch.*\.merge'`. | `0` — Phase 3 больше не читает upstream (`branch.<name>.merge`) как источник родителя. |
 | 2 | `grep -n 'merge-base --is-ancestor' skills/pf-close/SKILL.md`. | Найдена строка в разделе «Phase 3: Detect Parent Branch», перебирающая `develop`/`main` через `--is-ancestor`. |
 **Expected Outcome:** Phase 3 в `pf-close/SKILL.md` детектит родителя через `merge-base --is-ancestor`, не через `branch.<name>.merge`.
 **Priority:** Critical
@@ -102,7 +102,7 @@ Test UI (`tools/manual-test-ui/lib/checklist.js`) — экранированны
 **Steps:**
 | Step | Action | Expected Result |
 |------|--------|-----------------|
-| 1 | `grep -nE 'branch\..*\.merge\|merge-base\|pf-parent' skills/pf-autopilot/SKILL.md`. | Пустой вывод — никакой логики детекта родителя в `pf-autopilot/SKILL.md` нет. |
+| 1 | Три ОТДЕЛЬНЫЕ проверки (без ERE-альтернации `\|` — это ровно тот `\|`, что чинит Находка 3, и в ERE он значит литеральный «пайп», а не «или»): `grep -c 'branch.*\.merge' skills/pf-autopilot/SKILL.md`, `grep -c 'merge-base' …`, `grep -c 'pf-parent' …`. | Все три возвращают `0` — в `pf-autopilot/SKILL.md` нет ни одной формы логики детекта родителя. |
 | 2 | `grep -n '/pf-close' skills/pf-autopilot/SKILL.md`. | `/pf-close` упомянут как обычная стадия пайплайна (Step 2, «Work loop»), без встроенной альтернативной логики детекта. |
 **Expected Outcome:** Единственный носитель логики детекта родителя — `pf-close/SKILL.md`; `/pf-autopilot` наследует фикс через вызов `/pf-close`, не копирует его.
 **Priority:** Medium
@@ -148,8 +148,8 @@ Test UI (`tools/manual-test-ui/lib/checklist.js`) — экранированны
 **Steps:**
 | Step | Action | Expected Result |
 |------|--------|-----------------|
-| 1 | `make help \| grep -F 'YES=1'`. | Найдена строка, документирующая `make converge TARGET=<path> YES=1` (неинтерактивный запуск). |
-| 2 | `make help \| grep -F 'make converge'`. | Присутствуют обе строки: базовая (`make converge`) и с `TARGET=`/`YES=1`, по аналогии с существующей парой строк `make tui`. |
+| 1 | Захватить вывод в переменную (без пайпа в ячейке — это и есть урок Находки 3): `out=$(make help)`; проверить, что `$out` содержит подстроку `YES=`. | В выводе `make help` есть строка, документирующая `make converge TARGET=<path> YES=1` (неинтерактивный запуск). |
+| 2 | В том же `$out` — что есть строки про `make converge` (базовая и форма с `TARGET=`/`YES=1`). | Присутствуют обе строки, по аналогии с существующей парой строк `make tui`. |
 **Expected Outcome:** `make help` перестаёт умалчивать про единственный способ запустить `converge` неинтерактивно.
 **Priority:** Low
 
