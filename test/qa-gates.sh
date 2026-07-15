@@ -29,11 +29,29 @@ todo_gate() {
     grep -v 'TODO: Run /pf-' || true
 }
 
+# ─── Are we even on an issue branch? ─────────────────────────────────────────
+# The whole gate is defined over `git diff develop...HEAD` — the changes THIS
+# ISSUE introduces. On `develop` itself (i.e. after the issue is merged and
+# closed) that diff is empty by construction: there is no issue diff to gate.
+# Steps 1-2 then become meaningless — step 2 in particular plants a probe TODO
+# and asserts the gate catches it, which it cannot, because the probe is not in
+# an empty diff. Without this guard the suite goes red on the trunk forever
+# after the first close. Skip them honestly rather than assert something false.
+
+ON_ISSUE_BRANCH=1
+if [ -z "$(git -C "$TMP_REPO" diff develop...HEAD --name-only 2>/dev/null)" ]; then
+  ON_ISSUE_BRANCH=0
+fi
+
 # ─── Step 1: the amended TODO gate is clean on this branch ────────────────────
 # The literal `TODO: Run /pf-` is the stub-recognition rule (defect 5, measure 2)
 # and legitimately appears in skills/, in this issue's planning documents and in
 # the v2-with-stub fixture. The gate excludes the literal (not skills/ wholesale)
-# plus the docs/issues/ and test/ pathspecs.
+# plus the docs/issues/, test/ and .qa-workflow.md pathspecs.
+
+if [ "$ON_ISSUE_BRANCH" -eq 0 ]; then
+  pf_note "steps 1-2: no issue diff against develop — not on an issue branch, nothing to gate"
+fi
 
 matches="$(todo_gate)"
 if [ -z "$matches" ]; then
@@ -70,7 +88,13 @@ fi
 # Proves the exclusion is the literal, not the skills/ directory as a whole.
 
 probe_skill="$TMP_REPO/skills/pf-check/SKILL.md"
-if [ -f "$probe_skill" ]; then
+if [ "$ON_ISSUE_BRANCH" -eq 0 ]; then
+  # On develop, HEAD *is* develop — so committing the probe moves `develop` along
+  # with `HEAD`, and `develop...HEAD` is empty again. The probe is undetectable
+  # not because the gate is blind but because there is no branch to diff against.
+  # Asserting anything here would be asserting a property of git, not of the gate.
+  :
+elif [ -f "$probe_skill" ]; then
   printf '\nTODO: refactor later\n' >>"$probe_skill"
   git -C "$TMP_REPO" add skills/pf-check/SKILL.md
   git -C "$TMP_REPO" \

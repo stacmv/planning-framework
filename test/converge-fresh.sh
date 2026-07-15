@@ -204,10 +204,11 @@ expected="$(
   for p in */SKILL.md; do [ -f "$p" ] && printf '%s\n' "${p%/SKILL.md}"; done | LC_ALL=C sort
 )"
 n_installed="$(printf '%s\n' "$installed" | grep -c .)"
-if [ "$n_installed" -eq 15 ]; then
-  pf_pass "step 2: 15 skills installed"
+n_expected="$(printf '%s\n' "$expected" | grep -c .)"   # derive from skills/, never hardcode
+if [ "$n_installed" -eq "$n_expected" ]; then
+  pf_pass "step 2: $n_installed skills installed (matches the repo's skills/ count)"
 else
-  pf_fail "step 2: $n_installed skills installed (want 15)"
+  pf_fail "step 2: $n_installed skills installed (want $n_expected — the repo's skill count)"
 fi
 
 if [ "$installed" = "$expected" ]; then
@@ -238,10 +239,12 @@ unset PF_FRAMEWORK_ROOT
 assert_exit_code 0 "$rc" "step 4: converge run out of the repo copy"
 
 n_installed="$(find "$TMP_HOME/.claude/skills" -mindepth 2 -maxdepth 2 -name SKILL.md | wc -l)"
-if [ "$n_installed" -eq 16 ] && [ -f "$TMP_HOME/.claude/skills/pf-zz-probe/SKILL.md" ]; then
-  pf_pass "step 4: 16 skills installed from the copy, pf-zz-probe among them — discovery is dynamic"
+# repo skill count + 1 for the pf-zz-probe we added to the copy — derived, not hardcoded
+n_expected="$(( $(find "$REPO_ROOT/skills" -mindepth 2 -maxdepth 2 -name SKILL.md | wc -l) + 1 ))"
+if [ "$n_installed" -eq "$n_expected" ] && [ -f "$TMP_HOME/.claude/skills/pf-zz-probe/SKILL.md" ]; then
+  pf_pass "step 4: $n_installed skills installed from the copy (repo + pf-zz-probe) — discovery is dynamic"
 else
-  pf_fail "step 4: $n_installed skills installed from the copy (want 16, including pf-zz-probe)"
+  pf_fail "step 4: $n_installed skills installed from the copy (want $n_expected, incl. pf-zz-probe)"
 fi
 assert_target_state "$TMP_WORK" "$TMP_HOME" "$TMP_REPO"
 
