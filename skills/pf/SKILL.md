@@ -12,6 +12,13 @@ Read the file `~/.claude/skills/pf/SKILL.md` and extract the value of the `versi
 
 ## Step 2: Scan for open issues
 
+**Sync with remote first.** `docs/issues/open/` is tracked in git — if another session or machine created or advanced an issue and pushed it, the local working tree can be stale, and a purely local scan would miss it or show it as less complete than it really is. Before listing:
+
+1. Run `git remote`. If it prints nothing (no remote configured), skip straight to the listing below.
+2. Run `git fetch origin`. If this fails (offline, auth), proceed with the local view as-is and note in Step 7's output: "Remote check failed — showing local view only."
+3. Run `git branch --show-current` to get CURRENT-BRANCH, then `git rev-list --count HEAD..origin/CURRENT-BRANCH` (skip this and the next point if `origin/CURRENT-BRANCH` doesn't exist).
+4. If the count is 0, local is already up to date. If it is greater than 0, run `git pull --ff-only` so any remote-only issue folders or document updates are brought in before scanning. If `--ff-only` fails (history has diverged), do not force anything — proceed with the local view and note in Step 7's output: "N unpulled commit(s) on origin/CURRENT-BRANCH — run `git pull` manually."
+
 List the contents of the `docs/issues/open/` directory of the active project (relative to /pf's CWD) (if it exists). Collect all subdirectories whose names match the pattern `YYYYMMDD-TYPE-SLUG` where TYPE is one of `feat`, `improve`, or `bug` and YYYYMMDD is an 8-digit date.
 
 ## Step 3: Handle zero or multiple issues
@@ -172,6 +179,8 @@ Active issue: <ISSUE-ID>  (type: feat/improve/bug, tier: trivial/small/medium/la
 Completed stages: <STAGE1>, <STAGE2>, ...
 Next step: /<next-command>
 ```
+
+If Step 2's remote sync produced a note (fetch failed, or unpulled commits remain), append it as one extra line at the end of the block, e.g. `Note: N unpulled commit(s) on origin/CURRENT-BRANCH — run \`git pull\` manually.` Omit the line entirely when the sync was clean.
 
 If no stages are completed yet (only the folder exists with no documents), ask the user to describe the task, then follow "Creating prompt.md" below and show:
 ```
