@@ -1,0 +1,3 @@
+TC-020 step 4: this file must exist here and be non-empty.
+TC-020 step 5: open the checklist page of this issue and start from step 1.
+Nothing here needs editing — the run only reads it.

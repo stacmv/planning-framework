@@ -191,6 +191,205 @@ assert_states \
   "$TEST_SKILL" 'Do not include' '"BRD"' '"specs\.md"' '"/pf"' '"SKILL\.md"' \
   '"issue branch"' '"Status Tracker"' '"implementation plan"'
 
+# ══════════════════════════════════════════════════════════════════════════════
+printf '\n=== TC-015: the tool needs no additional dependencies\n'
+# ══════════════════════════════════════════════════════════════════════════════
+#
+# "Clone it and run it" is a property of the tool, and one that a single
+# `require("express")` destroys silently: nothing breaks on the machine where
+# the package happens to be installed. Hence the subject here is the *composition*
+# of the repository — no manifest, no lockfile, no vendored modules, and no
+# module specifier that names anything but a Node builtin or a file of the tool
+# itself. Step 4 then proves the claim end to end: the server serves with
+# nothing installed at all.
+
+UI_DIR="$REPO_ROOT/tools/manual-test-ui"
+SETUP_TEMPLATE="$REPO_ROOT/skills/pf-test/templates/setup.mjs"
+
+# A quote of either kind, and anything that is not one. Built as variables
+# because both regex and shell quoting want the same two characters, and
+# spelling them inline four times is how one of the four ends up wrong.
+SPEC_Q='["'"'"']'
+SPEC_BODY='[^"'"'"']+'
+
+# module_specifiers <file> — every module the file asks for, one per line.
+#
+# Four forms and deliberately no fifth: `require("x")`, a dynamic `import("x")`,
+# `import … from "x"` / `export … from "x"`, and a bare `import "x"`. The two
+# statement forms are anchored to the start of a line so that prose inside a
+# comment — the word "from" followed by a quoted phrase, of which these files
+# have several — is never mistaken for a dependency.
+module_specifiers() {
+  local file="$1"
+  {
+    grep -oE "require\([[:space:]]*${SPEC_Q}${SPEC_BODY}${SPEC_Q}" "$file"
+    grep -oE "import\([[:space:]]*${SPEC_Q}${SPEC_BODY}${SPEC_Q}" "$file"
+    grep -oE "^[[:space:]]*(import|export)[^;]*[[:space:]]from[[:space:]]*${SPEC_Q}${SPEC_BODY}${SPEC_Q}" "$file"
+    grep -oE "^[[:space:]]*import[[:space:]]*${SPEC_Q}${SPEC_BODY}${SPEC_Q}" "$file"
+  } 2>/dev/null | sed -E "s/.*${SPEC_Q}(${SPEC_BODY})${SPEC_Q}.*/\1/" | sort -u
+}
+
+# free_port — a port nobody is listening on, from Node itself (bind :0, read
+# the number, release it). Hard-coding 4317 would collide with the developer's
+# own `make test-ui` session, which is exactly the machine this suite runs on.
+free_port() {
+  node -e 'const s=require("node:net").createServer();s.listen(0,"127.0.0.1",()=>{const p=s.address().port;s.close(()=>process.stdout.write(String(p)));});'
+}
+
+# ─── Step 1: no manifest, no lockfile, no vendored modules ────────────────────
+# Searched recursively rather than at the top level: a package.json one
+# directory down is just as much a dependency as one at the root, and a
+# node_modules/ under public/ would be served to the browser as well.
+
+manifests="$(find "$UI_DIR" \
+  \( -name package.json -o -name package-lock.json -o -name node_modules \) \
+  -print 2>/dev/null)"
+
+if [ -z "$manifests" ]; then
+  pf_pass "step 1: manual-test-ui carries no package manifest and no node_modules"
+else
+  pf_fail "step 1: manual-test-ui carries a package manifest or node_modules"
+  printf '%s\n' "$manifests" >&2
+fi
+
+# ─── Step 2: every specifier is a builtin or a file of the tool ───────────────
+
+foreign_specs=""
+spec_count=0
+for js in "$UI_DIR"/server.js "$UI_DIR"/lib/*.js "$UI_DIR"/public/*.js; do
+  [ -f "$js" ] || continue
+  while IFS= read -r spec; do
+    [ -n "$spec" ] || continue
+    spec_count=$((spec_count + 1))
+    case "$spec" in
+      node:* | ./* | ../*) ;;
+      *) foreign_specs="${foreign_specs}${js#"$REPO_ROOT"/}: $spec"$'\n' ;;
+    esac
+  done <<<"$(module_specifiers "$js")"
+done
+
+# The count is not decoration: an extractor that silently matches nothing would
+# make this step pass on a tool that imports half of npm.
+if [ -n "$foreign_specs" ]; then
+  pf_fail "step 2: a module specifier names neither a node: builtin nor a file of the tool"
+  printf '%s' "$foreign_specs" >&2
+elif [ "$spec_count" -eq 0 ]; then
+  pf_fail "step 2: no module specifier was found at all — the scan matched nothing"
+else
+  pf_pass "step 2: every import is a node: builtin or a relative path inside the tool"
+fi
+
+# ─── Step 3: the generated setup.mjs, and every instance of it ────────────────
+# The template is what /pf-test copies into every issue, so a dependency added
+# here is a dependency added to every issue that is prepared from then on. The
+# instances already in the tree are checked with it: the template's promise is
+# only worth what its copies keep. Builtins only — a setup script has no tool of
+# its own to import from.
+
+setup_scripts=("$SETUP_TEMPLATE")
+while IFS= read -r found; do
+  [ -n "$found" ] && setup_scripts+=("$found")
+done <<<"$(find "$REPO_ROOT/docs/issues" -name setup.mjs -print 2>/dev/null)"
+
+setup_foreign=""
+setup_count=0
+for mjs in "${setup_scripts[@]}"; do
+  if [ ! -f "$mjs" ]; then
+    setup_foreign="${setup_foreign}${mjs#"$REPO_ROOT"/}: no such file"$'\n'
+    continue
+  fi
+  while IFS= read -r spec; do
+    [ -n "$spec" ] || continue
+    setup_count=$((setup_count + 1))
+    case "$spec" in
+      node:*) ;;
+      *) setup_foreign="${setup_foreign}${mjs#"$REPO_ROOT"/}: $spec"$'\n' ;;
+    esac
+  done <<<"$(module_specifiers "$mjs")"
+done
+
+if [ -n "$setup_foreign" ]; then
+  pf_fail "step 3: a setup.mjs imports something other than a node: builtin"
+  printf '%s' "$setup_foreign" >&2
+elif [ "$setup_count" -eq 0 ]; then
+  pf_fail "step 3: no import was found in any setup.mjs — the scan matched nothing"
+else
+  pf_pass "step 3: setup.mjs imports node: builtins only"
+fi
+
+# ─── Step 4: it serves, with nothing installed ────────────────────────────────
+# The whole claim, exercised rather than read: a throwaway projects.json, a
+# fixture repository in a temp directory, `node server.js`, and an answer. No
+# install step anywhere — if one were needed, this is where the tool would say
+# "Cannot find module".
+#
+# The fixture repository carries a checklist so that the answer proves the
+# server walked git (issueCount counts issues whose checklist exists), not
+# merely echoed the configuration back.
+
+TC015_ISSUE="20260101-improve-manual-test-ui-fixture"
+TC015_PROJECT="pf-fixture-project"
+
+tc015_root="$(pf_mktemp_d)" || exit 1
+tc015_repo="$tc015_root/$TC015_PROJECT"
+tc015_issue_dir="$tc015_repo/docs/issues/open/$TC015_ISSUE"
+mkdir -p "$tc015_issue_dir"
+printf '# Issue\n\n**Type:** improve\n**Size Tier:** small\n' >"$tc015_issue_dir/prompt.md"
+printf '# Manual Test Checklist\n\n**Feature Name:** fixture\n' >"$tc015_issue_dir/manual_test_checklist.md"
+
+git -C "$tc015_repo" init -q
+# The default branch of `git init` is a per-machine setting; the tool resolves
+# develop → main → master, so the fixture pins the first of them explicitly
+# instead of inheriting whatever this machine calls its first branch.
+git -C "$tc015_repo" symbolic-ref HEAD refs/heads/develop
+pf_git_init "$tc015_repo"
+
+tc015_config="$tc015_root/projects.json"
+printf '{"projects":[{"name":"%s","path":"%s","defaultBranch":"develop"}]}\n' \
+  "$TC015_PROJECT" "$tc015_repo" >"$tc015_config"
+
+tc015_port="$(free_port)"
+tc015_log="$tc015_root/server.log"
+
+# PLANNING_TEST_UI_MEMORY_ROOT is pointed at the temp tree as well: nothing in
+# this suite may read the developer's real ~/.claude.
+PLANNING_TEST_UI_CONFIG="$tc015_config" \
+  PLANNING_TEST_UI_MEMORY_ROOT="$tc015_root/memory" \
+  node "$UI_DIR/server.js" --port "$tc015_port" >"$tc015_log" 2>&1 &
+tc015_pid=$!
+
+# Up to ~10s, and abandoned early if the process dies: a server that failed
+# for want of a module exits immediately, and waiting out the full timeout for
+# it would only slow the suite down.
+tc015_up=0
+tc015_waited=0
+while [ "$tc015_waited" -lt 100 ]; do
+  if grep -q "http://localhost:$tc015_port" "$tc015_log" 2>/dev/null; then
+    tc015_up=1
+    break
+  fi
+  kill -0 "$tc015_pid" 2>/dev/null || break
+  sleep 0.1
+  tc015_waited=$((tc015_waited + 1))
+done
+
+tc015_body=""
+if [ "$tc015_up" -eq 1 ]; then
+  tc015_body="$(curl -sS --max-time 10 "http://127.0.0.1:$tc015_port/api/projects" 2>&1)"
+fi
+
+kill "$tc015_pid" 2>/dev/null
+wait "$tc015_pid" 2>/dev/null
+
+if [ "$tc015_up" -eq 1 ] &&
+  printf '%s' "$tc015_body" | grep -qF -- "\"name\":\"$TC015_PROJECT\"" &&
+  printf '%s' "$tc015_body" | grep -qF -- '"issueCount":1'; then
+  pf_pass "step 4: the server starts with zero installs and lists the configured projects"
+else
+  pf_fail "step 4: the server did not start or did not list the configured project"
+  printf 'log:\n%s\nbody:\n%s\n' "$(cat "$tc015_log" 2>/dev/null)" "$tc015_body" >&2
+fi
+
 assert_repo_untouched
 
 pf_summary
