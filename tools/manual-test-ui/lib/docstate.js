@@ -508,6 +508,238 @@ function classifyMemory(listed) {
   };
 }
 
+// ---------------------------------------------------------------------------
+// Preparing test data: classify the need, then apply the priority rule
+// ---------------------------------------------------------------------------
+//
+// Two steps, and keeping them apart is the whole point (AC-06c). First the
+// *need* is classified from the checklist alone — the parser hands over one
+// of three values per case:
+//
+//   "declared" — the case lists the data it needs;
+//   "none"     — the case says, in as many words, that it needs none;
+//   "unknown"  — the checklist says nothing, because it was written before a
+//                checklist could say anything (a legacy issue).
+//
+// Only then is the action's visibility decided, and the order of that rule is
+// what the three states are for:
+//
+//   * known not to need data  → the action is not offered at all. Knowing
+//     something about the case beats the issue merely having a `test-data/`
+//     directory: offering "prepare" for a case that needs nothing is an
+//     invitation to run a script for no reason;
+//   * known to need data, not preparable (no `test-data/setup.mjs`)
+//     → offered, disabled, and the reason names what is missing. Never
+//     silently hidden: "there is nothing here" and "there is something here
+//     you cannot use yet" are different answers and a tester acts on them
+//     differently;
+//   * not known                → treated exactly as the previous case. A
+//     legacy issue must look like an issue whose data cannot be prepared,
+//     never like one that needs nothing — the difference between "we know it
+//     needs nothing" and "we do not know" is the difference between a tool
+//     that is confident and one that is wrong.
+//
+// Nothing else about the issue may quietly override this, but two things
+// legitimately come first: a closed issue is an archive (AC-04i), and an
+// issue whose checklist does not exist yet has no cases to classify at all.
+// And a checklist that lives only on the issue's branch is offered but held
+// until the branch is checked out (AC-04h) — the data is prepared *for* a
+// checked-out issue.
+//
+// The function is pure: every fact it needs is passed in, so the rule can be
+// asserted directly, and so the role listing (what the UI offers) and the
+// prepare route (what the server accepts) are one decision instead of two.
+
+const DATA_STATUS = { DECLARED: "declared", NONE: "none", UNKNOWN: "unknown" };
+
+// Machine-readable outcomes of the rule. The refusal codes double as the
+// `error`/`reason` of the prepare route, and `NO_SETUP_SCRIPT` is spelled the
+// way lib/prepare.js spells it: the route may refuse before starting the
+// engine, and a caller must not have to tell the two refusals apart.
+const PREPARE_CODE = {
+  ISSUE_CLOSED: "issue_closed",
+  NO_CHECKLIST: "checklist_not_found",
+  DATA_NOT_REQUIRED: "data_not_required",
+  NOT_CHECKED_OUT: "not_checked_out",
+  NO_SETUP_SCRIPT: "no-setup-script",
+  DATA_NEED_UNKNOWN: "data_need_unknown",
+};
+
+const PREPARE_STAGE = "/pf-test";
+const SETUP_SCRIPT_REL = "test-data/setup.mjs";
+
+/**
+ * Anything that is not one of the two *known* answers is "unknown".
+ *
+ * Deliberately not `value || "unknown"`: an absent field and an explicit
+ * "none" must not collapse into each other, so only the exact strings the
+ * parser produces are honoured.
+ */
+function normalizeDataStatus(value) {
+  return value === DATA_STATUS.DECLARED || value === DATA_STATUS.NONE ? value : DATA_STATUS.UNKNOWN;
+}
+
+/**
+ * The data need of a whole checklist, folded from its cases.
+ *
+ * "Some case needs data" beats "some case says nothing" beats "every case
+ * says it needs none" — the strongest claim wins, because the issue-level
+ * action prepares every case at once. An empty or unparsable checklist is
+ * `unknown`, never `none`: no cases is not the same as no data needed.
+ */
+function aggregateDataStatus(tcs) {
+  const list = Array.isArray(tcs) ? tcs : [];
+  let sawNone = false;
+  let sawUnknown = false;
+  for (const tc of list) {
+    const status = normalizeDataStatus(tc && tc.dataStatus);
+    if (status === DATA_STATUS.DECLARED) return DATA_STATUS.DECLARED;
+    if (status === DATA_STATUS.NONE) sawNone = true;
+    else sawUnknown = true;
+  }
+  if (sawUnknown || !sawNone) return DATA_STATUS.UNKNOWN;
+  return DATA_STATUS.NONE;
+}
+
+/**
+ * Whether the prepare action is offered, whether it can be run, and why not.
+ *
+ * @param {object} facts
+ * @param {string}  facts.issueId          For the wording only.
+ * @param {"open"|"closed"} facts.issueStatus
+ * @param {"here"|"on_branch"|"missing"} facts.checklistStatus
+ * @param {string}  facts.dataStatus       "declared" | "none" | "unknown".
+ * @param {boolean} facts.hasSetupScript
+ * @param {string|null} [facts.tcId]       Null for the whole issue.
+ * @param {string|null} [facts.branch]     The issue branch, when there is one.
+ * @param {string|null} [facts.scriptPath]  Absolute path, for the wording.
+ * @returns {{offered: boolean, enabled: boolean, requiresCheckout: boolean,
+ *            status: "present"|"not_applicable"|"missing", stage: string|null,
+ *            code: string|null, dataStatus: string, tcId: string|null,
+ *            reason: string|null, message: string}}
+ */
+function prepareVisibility(facts = {}) {
+  const {
+    issueId = null,
+    issueStatus = "open",
+    checklistStatus = "missing",
+    dataStatus,
+    hasSetupScript = false,
+    tcId = null,
+    branch = null,
+    scriptPath = null,
+  } = facts;
+
+  const need = normalizeDataStatus(dataStatus);
+  const subject = tcId ? tcId : "this issue";
+  const script = scriptPath || SETUP_SCRIPT_REL;
+  const base = { requiresCheckout: false, stage: null, dataStatus: need, tcId: tcId || null };
+
+  // An archive is read, never re-run.
+  if (issueStatus === "closed") {
+    return {
+      ...base,
+      offered: false,
+      enabled: false,
+      status: "not_applicable",
+      code: PREPARE_CODE.ISSUE_CLOSED,
+      reason: "a closed issue is an archive — preparing its test data is not offered here",
+      message: "This issue is closed; the prepare action is not offered for it.",
+    };
+  }
+
+  // No checklist means no cases, and so nothing to classify.
+  if (checklistStatus === "missing") {
+    return {
+      ...base,
+      offered: false,
+      enabled: false,
+      status: "missing",
+      stage: PREPARE_STAGE,
+      code: PREPARE_CODE.NO_CHECKLIST,
+      reason: "there is no manual_test_checklist.md to prepare data for yet",
+      message: `There is no manual_test_checklist.md to prepare data for yet — ${PREPARE_STAGE} creates it.`,
+    };
+  }
+
+  // What the checklist says about the case beats what the issue's directory
+  // happens to contain.
+  if (need === DATA_STATUS.NONE) {
+    return {
+      ...base,
+      offered: false,
+      enabled: false,
+      status: "not_applicable",
+      code: PREPARE_CODE.DATA_NOT_REQUIRED,
+      reason: `${subject} is marked in the checklist as needing no prepared test data`,
+      message: tcId
+        ? `${tcId} states that it needs no prepared test data, so there is nothing to prepare for it.`
+        : "Every case of this checklist states that it needs no prepared test data.",
+    };
+  }
+
+  // Data is prepared for a checked-out issue, so the switch comes first —
+  // offered all the same, so the reader learns that it exists.
+  if (checklistStatus === "on_branch") {
+    return {
+      ...base,
+      offered: true,
+      enabled: false,
+      requiresCheckout: true,
+      status: "present",
+      code: PREPARE_CODE.NOT_CHECKED_OUT,
+      reason: `the checklist lives on ${branch || "the issue branch"}, which is not checked out`,
+      message: `Check out ${branch || "the issue branch"} first — test data is prepared into the checked-out issue.`,
+    };
+  }
+
+  // Visible and unavailable, with the missing piece named. The legacy case
+  // lands here too whenever the issue has no script, and says so as well:
+  // "nothing declares data here" is more useful than either half alone.
+  if (!hasSetupScript) {
+    const legacy =
+      need === DATA_STATUS.UNKNOWN
+        ? " This checklist predates declared test data, so what its cases need is not recorded either."
+        : "";
+    return {
+      ...base,
+      offered: true,
+      enabled: false,
+      status: "present",
+      code: PREPARE_CODE.NO_SETUP_SCRIPT,
+      reason: `this issue has no ${SETUP_SCRIPT_REL}, so its test data cannot be prepared`,
+      message: `no prepared data is declared for ${issueId || "this issue"}: ${script} does not exist.${legacy}`,
+    };
+  }
+
+  // The script is there, but the checklist does not say this case needs it.
+  if (need === DATA_STATUS.UNKNOWN) {
+    return {
+      ...base,
+      offered: true,
+      enabled: false,
+      status: "present",
+      code: PREPARE_CODE.DATA_NEED_UNKNOWN,
+      reason: `the checklist does not record whether ${subject} needs prepared test data`,
+      message:
+        `The checklist does not say what data ${subject} needs — it predates declared test data. ` +
+        `Re-run ${PREPARE_STAGE} to record it, and the action becomes available.`,
+    };
+  }
+
+  return {
+    ...base,
+    offered: true,
+    enabled: true,
+    status: "present",
+    code: null,
+    reason: null,
+    message: tcId
+      ? `The declared test data of ${tcId} can be prepared.`
+      : "Test data can be prepared for the cases of this issue.",
+  };
+}
+
 module.exports = {
   PIPELINES,
   ISSUE_DOC_STAGES,
@@ -526,4 +758,11 @@ module.exports = {
   classifyProjectDoc,
   classifyInstructions,
   classifyMemory,
+  DATA_STATUS,
+  PREPARE_CODE,
+  PREPARE_STAGE,
+  SETUP_SCRIPT_REL,
+  normalizeDataStatus,
+  aggregateDataStatus,
+  prepareVisibility,
 };

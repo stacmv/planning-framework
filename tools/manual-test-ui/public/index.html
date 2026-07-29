@@ -7,41 +7,48 @@
 <link rel="stylesheet" href="/style.css" />
 </head>
 <body>
-<div class="app">
-  <aside class="sidebar">
-    <h1>Manual Test UI</h1>
-
-    <div class="panel">
-      <h2>Project</h2>
-      <ul id="project-list" class="list"></ul>
+<div class="shell">
+  <!-- Roles are the top level of the whole tool: the tab strip sits above
+       everything else and stays reachable at any moment, with any document
+       open. What the three tabs are is asked of the server, never written
+       down here. -->
+  <header class="topbar">
+    <div class="brand">
+      <h1>Manual Test UI</h1>
+      <span id="context-label" class="context-label"></span>
     </div>
+    <nav id="role-tabs" class="role-tabs" aria-label="Roles"></nav>
+  </header>
 
-    <div class="panel">
-      <h2>Issue</h2>
-      <ul id="issue-list" class="list"></ul>
-    </div>
-  </aside>
+  <div class="app">
+    <!-- One chain, top to bottom: project → issue → the current role's
+         entries. There is no second list of documents anywhere. -->
+    <aside class="sidebar">
+      <div class="panel">
+        <h2>Project</h2>
+        <ul id="project-list" class="list"></ul>
+      </div>
 
-  <main class="content">
-    <div id="empty-state" class="empty-state">
-      Select a project and an issue to see its manual test checklist.
-    </div>
+      <div class="panel">
+        <h2>Issue</h2>
+        <ul id="issue-list" class="list"></ul>
+      </div>
 
-    <div id="checklist-view" class="checklist-view" hidden>
-      <header class="checklist-header">
-        <h2 id="checklist-title"></h2>
-        <div id="checklist-progress" class="progress"></div>
-      </header>
+      <div class="panel" id="role-panel" hidden>
+        <h2 id="role-panel-title">Role</h2>
+        <ul id="role-item-list" class="list items"></ul>
+      </div>
+    </aside>
 
-      <div id="checklist-banner" class="checklist-banner" hidden></div>
-
-      <div id="tc-container"></div>
-    </div>
-  </main>
+    <main class="content" id="content"></main>
+  </div>
 </div>
 
 <div id="toast" class="toast" hidden></div>
 
+<!-- The same renderer the Node test suite drives; the client has no second
+     implementation of it. -->
+<script src="/lib/markdown.js"></script>
 <script src="/app.js"></script>
 </body>
 </html>

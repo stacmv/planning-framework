@@ -413,6 +413,13 @@ const FIXTURE_ISSUES = {
         steps: 2,
         extraSections: { "TC-001": ["**Test Data:**", "- `case-a/input.txt`", "- `case-a/second.txt`"] },
       }),
+      // The script is what makes this the *positive* control: declared data
+      // and a way to prepare it, so it can be told apart from the noscript
+      // fixture below, where only the script is missing (TC-018 steps 3, 6).
+      "test-data/setup.mjs": renderSetupScript({
+        issueId: "20260109-feat-fixture-declared",
+        cases: { "TC-001": ["case-a/input.txt", "case-a/second.txt"] },
+      }),
       "test-data/fixtures/case-a/input.txt": "declared fixture\n",
       "test-data/fixtures/case-a/second.txt": "second declared fixture\n",
     }),

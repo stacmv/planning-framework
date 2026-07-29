@@ -76,6 +76,24 @@ const PREPARE_STATUS_BY_REASON = {
   "spawn-error": 500,
 };
 
+// How a *refusal* is reported — the answers the route gives before any script
+// is started, one per outcome of the visibility rule (lib/docstate.js). Every
+// one of them is a 4xx with a body: none of the five configurations of an
+// issue may come back as a 500 or as silence (TC-018).
+//   * "not offered" splits by why: an archive and an unresolved conflict are
+//     409, a checklist (or a case) that is not there is 404;
+//   * "offered but not runnable" is 409 when the caller can fix it (check the
+//     branch out, record the data need) and 404 when the script simply is not
+//     there — the same 404 the engine gives for the same fact.
+const PREPARE_REFUSAL_STATUS = {
+  [docstate.PREPARE_CODE.ISSUE_CLOSED]: 409,
+  [docstate.PREPARE_CODE.NO_CHECKLIST]: 404,
+  [docstate.PREPARE_CODE.DATA_NOT_REQUIRED]: 409,
+  [docstate.PREPARE_CODE.NOT_CHECKED_OUT]: 409,
+  [docstate.PREPARE_CODE.NO_SETUP_SCRIPT]: 404,
+  [docstate.PREPARE_CODE.DATA_NEED_UNKNOWN]: 409,
+};
+
 // Reasons that mean the script did start and then went wrong, as opposed to
 // never having been started (a missing script, a rejected argument, a process
 // that could not be spawned).
@@ -379,71 +397,67 @@ function endpointForItem(projectName, entry, item, state) {
   }
 }
 
-// State of the "prepare this case's test data" entry of the tester role.
+// What the checklist says a case needs — "declared", "none" or "unknown".
+//
+// Read from the checklist wherever it lives, the branch-only preview
+// included, so a case is classified by what the issue says about it rather
+// than by whether the branch happens to be checked out. A case the checklist
+// does not mention is `unknown` for the same reason a legacy checklist is:
+// the tool has not been told, and must not pretend it has.
+function checklistDataStatus(entry, tcId, parsed) {
+  let doc = parsed;
+  if (!doc) {
+    const content = readChecklistContent(entry);
+    doc = content === null ? null : parseChecklist(content);
+  }
+  if (!doc) return docstate.DATA_STATUS.UNKNOWN;
+  if (!tcId) return docstate.aggregateDataStatus(doc.tcs);
+  const tc = doc.tcs.find((t) => t.id === tcId);
+  return tc ? tc.dataStatus : docstate.DATA_STATUS.UNKNOWN;
+}
+
+// State of the "prepare test data" action — for one case when `tcId` is
+// given, for the issue as a whole when it is not.
 //
 // It is an action, not a document, but it is an entry of a role and so has
-// to carry one of the same three states (TC-007 step 6). It tracks the
-// checklist, which is what the data is prepared *for*:
-//   * closed issue          → not offered at all (AC-04i);
-//   * no checklist yet      → missing, and /pf-test is what creates it;
-//   * checklist on a branch → offered, disabled, and the reason says the
-//     branch has to be checked out first (AC-04h, TC-007 step 5);
-//   * checklist on disk     → offered and enabled.
-// The per-case refinement (declared / none / unknown test data) is layered
-// on top of this by a later task; the shape is already the one it returns.
-function prepareActionState(projectName, entry) {
-  const common = { location: null, readonly: true, branch: null, checkout: null, reason: null };
-  if (entry.status === "closed") {
-    return {
-      ...common,
-      status: "not_applicable",
-      stage: null,
-      offered: false,
-      enabled: false,
-      requiresCheckout: false,
-      reason: "a closed issue is an archive — preparing its test data is not offered here",
-      message: "This issue is closed; the prepare action is not offered for it.",
-    };
-  }
-  if (entry.checklistStatus === "missing") {
-    return {
-      ...common,
-      status: "missing",
-      stage: "/pf-test",
-      offered: false,
-      enabled: false,
-      requiresCheckout: false,
-      message: "There is no manual_test_checklist.md to prepare data for yet — /pf-test creates it.",
-    };
-  }
-  if (entry.checklistStatus === "on_branch") {
-    return {
-      ...common,
-      status: "present",
-      stage: null,
-      offered: true,
-      enabled: false,
-      requiresCheckout: true,
-      branch: entry.branch,
-      checkout: {
-        required: true,
-        branch: entry.branch,
-        endpoint: `${issueApiBase(projectName, entry.issueId)}/checklist/checkout`,
-        method: "POST",
-        message: `Checking out ${entry.branch} happens only on your explicit confirmation.`,
-      },
-      reason: `the checklist lives on ${entry.branch}, which is not checked out`,
-      message: `Check out ${entry.branch} first — test data is prepared into the checked-out issue.`,
-    };
-  }
+// to carry one of the same three states (TC-007 step 6). The decision itself
+// belongs to `docstate.prepareVisibility`, which is pure; this function's
+// job is to gather the facts that decision needs — where the checklist is,
+// what it says about the data, whether the issue has a setup script — and to
+// dress the verdict in the endpoints a client needs. Both the tester role
+// (what the UI offers) and the prepare route (what the server accepts) come
+// through here, so they cannot disagree.
+function prepareActionState(projectName, projectRoot, entry, options = {}) {
+  const { tcId = null, parsed = null } = options;
+  const scriptLocation = { projectRoot, status: entry.status, issueId: entry.issueId };
+
+  const verdict = docstate.prepareVisibility({
+    issueId: entry.issueId,
+    issueStatus: entry.status,
+    checklistStatus: entry.checklistStatus,
+    dataStatus: checklistDataStatus(entry, tcId, parsed),
+    hasSetupScript: prepare.hasSetupScript(scriptLocation),
+    scriptPath: prepare.setupScriptPath(scriptLocation),
+    branch: entry.branch,
+    tcId,
+  });
+
   return {
-    ...common,
-    status: "present",
-    stage: null,
-    offered: true,
-    enabled: true,
-    requiresCheckout: false,
-    message: "Test data can be prepared for the cases of this issue.",
+    ...verdict,
+    location: null,
+    readonly: true,
+    branch: verdict.requiresCheckout ? entry.branch : null,
+    checkout: verdict.requiresCheckout
+      ? {
+          required: true,
+          branch: entry.branch,
+          endpoint: `${issueApiBase(projectName, entry.issueId)}/checklist/checkout`,
+          method: "POST",
+          message: `Checking out ${entry.branch} happens only on your explicit confirmation.`,
+        }
+      : null,
+    endpoint: `${issueApiBase(projectName, entry.issueId)}/prepare`,
+    method: "POST",
   };
 }
 
@@ -470,7 +484,7 @@ function buildRoleContents(projectName, projectRoot, entry, roleId) {
         state = docstate.classifyMemory(memory.listProjectMemory(projectRoot, process.env));
         break;
       case roles.KIND.ACTION:
-        state = prepareActionState(projectName, entry);
+        state = prepareActionState(projectName, projectRoot, entry);
         method = "POST";
         break;
       default:
@@ -717,35 +731,37 @@ async function handlePrepare(req, res, projectName, projectRoot, entry) {
     }));
   }
 
-  // The same state the tester role publishes for its prepare entry, so "the
-  // UI offered it" and "the route accepts it" are one decision, not two.
-  const action = prepareActionState(projectName, entry);
-  if (!action.offered) {
-    const closed = entry.status === "closed";
-    return sendJson(res, closed ? 409 : 404, prepareEnvelope(projectName, entry, {
-      error: closed ? "issue_closed" : "checklist_not_found",
-      reason: action.reason,
-      message: action.message,
-    }));
-  }
-  if (!action.enabled) {
-    return sendJson(res, 409, prepareEnvelope(projectName, entry, {
-      error: "not_checked_out",
-      reason: action.reason,
-      branch: action.branch,
-      checkout: action.checkout,
-      message: action.message,
-    }));
-  }
-
   // The only value the caller contributes. Validated against the engine's own
   // pattern rather than a second copy of it, so "what the route accepts" and
-  // "what the script is asked for" cannot drift apart.
+  // "what the script is asked for" cannot drift apart. Decided before the
+  // visibility rule because the rule is per case whenever a case is named.
   const rawTcId = body.tcId === undefined || body.tcId === null ? null : body.tcId;
   if (rawTcId !== null && (typeof rawTcId !== "string" || !prepare.TC_ID_RE.test(rawTcId))) {
     return sendJson(res, 400, prepareEnvelope(projectName, entry, {
       error: "invalid_tc_id",
       message: `Not a test case id: ${JSON.stringify(rawTcId)}. Expected something like "TC-001", or omit it to prepare the whole issue.`,
+    }));
+  }
+
+  // The same state the tester role publishes for its prepare entry — for this
+  // case when one was named — so "the UI offered it" and "the route accepts
+  // it" are one decision, not two. Anything the UI would show greyed out is
+  // refused here with the same code and the same sentence, never with a 500
+  // and never with silence.
+  const action = prepareActionState(projectName, projectRoot, entry, { tcId: rawTcId });
+  if (!action.offered || !action.enabled) {
+    return sendJson(res, PREPARE_REFUSAL_STATUS[action.code] || 409, prepareEnvelope(projectName, entry, {
+      tcId: rawTcId,
+      // The code is the `reason` as well: a refusal before the engine starts
+      // and one the engine reports have to be told apart by nobody.
+      reason: action.code,
+      error: action.code,
+      offered: action.offered,
+      enabled: action.enabled,
+      branch: action.branch,
+      checkout: action.checkout,
+      detail: action.reason,
+      message: action.message,
     }));
   }
 
@@ -941,6 +957,15 @@ async function handleApi(req, res, parts, projects, query) {
     const parsed = parseChecklist(content);
     parsed.checklistStatus = entry.checklistStatus;
     parsed.branch = entry.branch;
+    // The prepare verdict travels with the checklist, for the issue and for
+    // every case, from the same function the tester role and the prepare
+    // route use. The client renders what it is given: it never re-derives
+    // "this case needs no data" from the parsed fields, so there is one rule
+    // in one place (AC-06c).
+    parsed.prepare = prepareActionState(projectName, projectRoot, entry, { parsed });
+    for (const tc of parsed.tcs) {
+      tc.prepare = prepareActionState(projectName, projectRoot, entry, { tcId: tc.id, parsed });
+    }
     return sendJson(res, 200, parsed);
   }
 
