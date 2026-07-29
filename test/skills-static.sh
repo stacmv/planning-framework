@@ -587,6 +587,7 @@ else
   pf_fail "step 4: nothing prevents two autopilots racing for one working tree"
 fi
 
+# shellcheck disable=SC2016  # backticks are markdown in a grep pattern, not command substitution
 if grep -qiE 'newest by the `YYYYMMDD` date|newest by date' "$AUTO"; then
   pf_pass "step 5: the no-ID timeout fallback is defined (newest by date, logged as a default)"
 else

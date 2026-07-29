@@ -67,6 +67,7 @@ assert_states() {
 }
 
 # ══════════════════════════════════════════════════════════════════════════════
+# shellcheck disable=SC2016  # backticks are markdown in a printed label, not command substitution
 printf '=== TC-016: `make test` runs the Manual Test UI node suites\n'
 # ══════════════════════════════════════════════════════════════════════════════
 

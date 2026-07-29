@@ -165,7 +165,7 @@ Issue состоит из двух равнозначных частей, и п�
   волнах — параллельная запись в этот файл запрещена.
 
 **Acceptance Criteria:**
-- [ ] TC-016 passes
+- [x] TC-016 passes
 
 ---
 
@@ -200,7 +200,7 @@ Issue состоит из двух равнозначных частей, и п�
   этих глобалей нет).
 
 **Acceptance Criteria:**
-- [ ] TC-009 passes
+- [x] TC-009 passes
 
 ---
 
@@ -252,7 +252,7 @@ Issue состоит из двух равнозначных частей, и п�
   строки прежние» даст ложный провал на выравнивании, которое `patchStepResult` не сохраняет.
 
 **Acceptance Criteria:**
-- [ ] TC-013 passes
+- [x] TC-013 passes
 
 ---
 
@@ -289,7 +289,7 @@ Issue состоит из двух равнозначных частей, и п�
 - Регресс: `checklist-ru.test.js` и `checklist-patch.test.js` обязаны проходить без правок.
 
 **Acceptance Criteria:**
-- [ ] TC-018 (шаг 1) passes — окончательный вердикт по TC-018 даёт Task 10
+- [x] TC-018 (шаг 1) passes — окончательный вердикт по TC-018 даёт Task 10
 
 ---
 
@@ -354,9 +354,9 @@ Issue состоит из двух равнозначных частей, и п�
   его `test-data/setup.mjs` — экземпляр шаблона.
 
 **Acceptance Criteria:**
-- [ ] TC-002 passes
-- [ ] TC-003 passes
-- [ ] TC-004 passes
+- [x] TC-002 passes
+- [x] TC-003 passes
+- [x] TC-004 passes
 
 ---
 
@@ -406,8 +406,8 @@ Issue состоит из двух равнозначных частей, и п�
   копии инструмента, а не в репозитории.
 
 **Acceptance Criteria:**
-- [ ] TC-008 passes
-- [ ] TC-011 passes
+- [x] TC-008 passes
+- [x] TC-011 passes
 
 ---
 
@@ -446,7 +446,7 @@ Issue состоит из двух равнозначных частей, и п�
   этой волне пишет только она.
 
 **Acceptance Criteria:**
-- [ ] TC-001 passes
+- [x] TC-001 passes
 
 ---
 
@@ -499,8 +499,8 @@ Issue состоит из двух равнозначных частей, и п�
 - В этой волне `server.js` правит только эта задача.
 
 **Acceptance Criteria:**
-- [ ] TC-006 passes
-- [ ] TC-007 passes
+- [x] TC-006 passes
+- [x] TC-007 passes
 
 ---
 
@@ -543,8 +543,8 @@ Issue состоит из двух равнозначных частей, и п�
 - В этой волне `server.js` правит только эта задача.
 
 **Acceptance Criteria:**
-- [ ] TC-005 passes
-- [ ] TC-010 passes
+- [x] TC-005 passes
+- [x] TC-010 passes
 
 ---
 
@@ -579,7 +579,7 @@ Issue состоит из двух равнозначных частей, и п�
 - В этой волне `server.js` правит только эта задача.
 
 **Acceptance Criteria:**
-- [ ] TC-018 passes
+- [x] TC-018 passes
 
 ---
 
@@ -614,8 +614,8 @@ Issue состоит из двух равнозначных частей, и п�
 - Задача не трогает `server.js` и потому идёт параллельно серверной задаче своей волны.
 
 **Acceptance Criteria:**
-- [ ] TC-019 passes (Manual)
-- [ ] TC-006 (шаг 7, клиентская часть) passes
+- [x] TC-019 passes (Manual)
+- [x] TC-006 (шаг 7, клиентская часть) passes
 
 ---
 
@@ -643,7 +643,7 @@ Issue состоит из двух равнозначных частей, и п�
   `helpers/fixtures.js`.
 
 **Acceptance Criteria:**
-- [ ] TC-014 passes
+- [x] TC-014 passes
 
 ---
 
@@ -669,7 +669,7 @@ Issue состоит из двух равнозначных частей, и п�
   `manual_test_checklist.md`.
 
 **Acceptance Criteria:**
-- [ ] TC-012 passes
+- [x] TC-012 passes
 
 ---
 
@@ -694,7 +694,7 @@ Issue состоит из двух равнозначных частей, и п�
 - Если что-то из этого не работает, чинится код соответствующей задачи — проверка не ослабляется.
 
 **Acceptance Criteria:**
-- [ ] TC-017 passes
+- [x] TC-017 passes
 
 ---
 
@@ -726,7 +726,7 @@ Issue состоит из двух равнозначных частей, и п�
   README он не проходит.
 
 **Acceptance Criteria:**
-- [ ] TC-015 passes
+- [x] TC-015 passes
 
 ---
 
@@ -754,8 +754,8 @@ Issue состоит из двух равнозначных частей, и п�
   порождает `/pf-test` по новым правилам (Task 7) — руками этот файл в рамках задачи не пишется.
 
 **Acceptance Criteria:**
-- [ ] TC-020 passes (Manual)
-- [ ] TC-019 (данные для шагов 4-5) готовы
+- [x] TC-020 passes (Manual)
+- [x] TC-019 (данные для шагов 4-5) готовы
 
 ---
 
