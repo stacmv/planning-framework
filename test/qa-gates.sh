@@ -151,6 +151,63 @@ fi
 # is the *syntax*: the Status column uses `[ ]`/`[x]`. Counting only unchecked
 # rows would, by construction, go red once the tracker is fully filled in.
 
+# What this step must NOT do is assert that some live issue is fully tested.
+# It used to: it took the first `docs/issues/open/*/test_plan.md` by sort order
+# and failed when that tracker still had `[ ]` rows. But an issue sitting at the
+# test-plan stage is a normal, healthy state, so the suite went red because work
+# was in progress — a false positive by construction, and one that also punished
+# having more than one issue open at a time. Worse, which issue it judged
+# depended on alphabetical order, so the verdict moved as issues came and went.
+#
+# The property that must hold for all time belongs to the GATE, not to any
+# issue: the Testing gate counts BOTH `| [ ] |` and `| ✗ |`. That is asserted
+# below against `.qa-workflow.md` itself, and the two patterns are then proven
+# to work against synthetic trackers — deterministic, and independent of
+# whatever happens to be open.
+
+testing_gate="$(sed -n '/^### Testing/,/^### /p' "$QA_FILE")"
+
+if printf '%s' "$testing_gate" | grep -qF "grep -c '| \\[ \\] *|'"; then
+  pf_pass "step 6: the Testing gate counts unprocessed rows"
+else
+  pf_fail "step 6: the Testing gate no longer counts unprocessed rows"
+fi
+
+if printf '%s' "$testing_gate" | grep -qF "grep -c '| ✗ *|'"; then
+  pf_pass "step 6: the Testing gate counts FAILED rows too — it cannot go green on a plan full of ✗"
+else
+  pf_fail "step 6: the Testing gate counts only [ ] — it would pass a test plan full of failures"
+fi
+
+# The patterns are load-bearing, so prove them rather than trusting them. Three
+# synthetic trackers, one per outcome, in a temp dir outside the repository.
+tracker_dir="$(mktemp -d)"
+printf '| TC-001 | a | Auto | High | [ ]    | |\n' >"$tracker_dir/unprocessed.md"
+printf '| TC-001 | a | Auto | High | ✗      | |\n' >"$tracker_dir/failed.md"
+printf '| TC-001 | a | Auto | High | ✓      | |\n' >"$tracker_dir/passed.md"
+
+open_probe="$(grep -c '| \[ \] *|' "$tracker_dir/unprocessed.md" || true)"
+failed_probe="$(grep -c '| ✗ *|' "$tracker_dir/failed.md" || true)"
+clean_open="$(grep -c '| \[ \] *|' "$tracker_dir/passed.md" || true)"
+clean_failed="$(grep -c '| ✗ *|' "$tracker_dir/passed.md" || true)"
+rm -rf "$tracker_dir"
+
+if [ "${open_probe:-0}" -eq 1 ] && [ "${failed_probe:-0}" -eq 1 ]; then
+  pf_pass "step 6: both patterns match the row they are meant to catch"
+else
+  pf_fail "step 6: a gate pattern does not match its own row (unprocessed=$open_probe, failed=$failed_probe)"
+fi
+
+if [ "${clean_open:-0}" -eq 0 ] && [ "${clean_failed:-0}" -eq 0 ]; then
+  pf_pass "step 6: neither pattern fires on a fully passing tracker"
+else
+  pf_fail "step 6: a pattern fires on a passing row — the gate would never let an issue close"
+fi
+
+# ─── Step 6b: the same gate, read against whatever is actually open ───────────
+# Informational only. A tracker with open rows means an issue is mid-flight, not
+# that the framework is broken, so this reports and never fails.
+
 test_plan="$(find "$REPO_ROOT/docs/issues/open" -mindepth 2 -maxdepth 2 \
   -name test_plan.md 2>/dev/null | LC_ALL=C sort | head -1)"
 if [ -n "$test_plan" ]; then
@@ -169,19 +226,13 @@ if [ -n "$test_plan" ]; then
   failed_rows="$(grep -c '| ✗ *|' "$test_plan" || true)"
   done_rows="$(grep -c '| ✓ *|' "$test_plan" || true)"
 
-  if [ "${open_rows:-0}" -eq 0 ]; then
-    pf_pass "step 6: no unprocessed rows left in the Status Tracker (${done_rows} passed)"
-  else
-    pf_fail "step 6: ${open_rows} row(s) still unprocessed — the Testing gate would block closure"
-  fi
-
-  if [ "${failed_rows:-0}" -eq 0 ]; then
-    pf_pass "step 6b: no FAILED rows in the Status Tracker — the gate can see ✗, not just [ ]"
-  else
-    pf_fail "step 6b: ${failed_rows} row(s) marked ✗ — a gate that only counts [ ] would miss these"
+  issue_name="$(basename "$(dirname "$test_plan")")"
+  pf_note "step 6b: $issue_name — ${done_rows} passed, ${failed_rows} failed, ${open_rows} unprocessed"
+  if [ "${open_rows:-0}" -gt 0 ]; then
+    pf_note "step 6b: that issue is mid-pipeline; /pf-qa is what blocks ITS closure, not this suite"
   fi
 else
-  pf_note "step 6: no docs/issues/open/*/test_plan.md — nothing to check"
+  pf_note "step 6b: no docs/issues/open/*/test_plan.md — nothing to report"
 fi
 
 # ─── Step 7: the real working tree was never touched (S-5) ────────────────────
