@@ -35,6 +35,8 @@ const { execFileSync } = require("node:child_process");
 
 const TOOL_DIR = path.resolve(__dirname, "..", "..");
 const FIXTURES_DIR = path.join(__dirname, "..", "fixtures");
+const REPO_ROOT = path.resolve(TOOL_DIR, "..", "..");
+const SETUP_TEMPLATE_PATH = path.join(REPO_ROOT, "skills", "pf-test", "templates", "setup.mjs");
 
 // ---------------------------------------------------------------------------
 // Temp-directory bookkeeping
@@ -82,6 +84,44 @@ function autoCleanup(t) {
   t.after(() => cleanupAll());
 }
 
+/**
+ * Give a suite its own temp root and point `os.tmpdir()` at it.
+ *
+ * The prepare suites need this and nothing else does: `setup.mjs` unpacks to
+ * `<tmpdir>/pf-test-data/<ISSUE-ID>/<TC-ID>`, a path derived from the issue id
+ * alone. `node --test` runs suite files in parallel processes, so three suites
+ * exercising the same fixture issue would otherwise be rebuilding, corrupting
+ * and snapshotting *the same directory* at the same time — flaky, and flaky in
+ * a way that looks like a bug in idempotency.
+ *
+ * Isolating the temp root also guarantees the suite cannot leave anything in
+ * the developer's real `/tmp`: everything it creates, directly or through a
+ * child process it starts, lands under `root`, which `restore()` deletes whole.
+ *
+ * Call it at the top of the suite, before anything reads `os.tmpdir()`.
+ *
+ * @returns {{root: string, restore(): void}}
+ */
+function isolateTempRoot(prefix = "pf-ui-suite-") {
+  const previous = { TMPDIR: process.env.TMPDIR, TEMP: process.env.TEMP, TMP: process.env.TMP };
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), prefix));
+  // TMPDIR is what os.tmpdir() reads on POSIX, TEMP/TMP on Windows; a child
+  // process inherits all three, so `setup.mjs` resolves the same root.
+  process.env.TMPDIR = root;
+  process.env.TEMP = root;
+  process.env.TMP = root;
+  return {
+    root,
+    restore() {
+      for (const [key, value] of Object.entries(previous)) {
+        if (value === undefined) delete process.env[key];
+        else process.env[key] = value;
+      }
+      fs.rmSync(root, { recursive: true, force: true });
+    },
+  };
+}
+
 function writeFileTree(rootDir, files) {
   for (const [rel, content] of Object.entries(files)) {
     const abs = path.join(rootDir, ...rel.split("/"));
@@ -117,7 +157,15 @@ function simpleDoc(heading, lines) {
  * aligned fixture would make "every other line is byte for byte identical"
  * fail for a reason that has nothing to do with the behaviour under test.
  */
-function checklistDoc({ issueId, feature = "Fixture feature", date = "2026-07-29", cases = 2, steps = 3, extraSections = {} }) {
+function checklistDoc({
+  issueId,
+  feature = "Fixture feature",
+  date = "2026-07-29",
+  cases = 2,
+  steps = 3,
+  extraSections = {},
+  preparedRoot = null,
+}) {
   const lines = [
     "# Manual Test Checklist",
     "",
@@ -131,6 +179,12 @@ function checklistDoc({ issueId, feature = "Fixture feature", date = "2026-07-29
     lines.push(`## ${tcId}: Fixture case ${c}`, "");
     lines.push("**Prerequisites:**");
     lines.push(`- The fixture issue ${issueId} is checked out.`);
+    // The location of the prepared working copy belongs in the checklist
+    // itself (AC-01f): a tester reading the file without the tool has to be
+    // able to find the data. `preparedRoot` is passed as the *same* value
+    // setup.mjs derives — <tmpdir>/pf-test-data/<ISSUE-ID> — so a test can
+    // compare the two literally instead of matching a shape.
+    if (preparedRoot) lines.push(`- Подготовленные данные: ${path.join(preparedRoot, tcId)}`);
     lines.push("");
     const extra = extraSections[tcId];
     if (extra) lines.push(...extra, "");
@@ -143,6 +197,54 @@ function checklistDoc({ issueId, feature = "Fixture feature", date = "2026-07-29
     lines.push("", "**Notes:**", "");
   }
   return lines.join("\n");
+}
+
+// ---------------------------------------------------------------------------
+// setup.mjs instances
+// ---------------------------------------------------------------------------
+
+const CONFIG_BEGIN = "// --- BEGIN GENERATED CONFIG ---";
+const CONFIG_END = "// --- END GENERATED CONFIG ---";
+
+/**
+ * Instantiate `skills/pf-test/templates/setup.mjs` for a fixture issue.
+ *
+ * Read from the template rather than copied into this file on purpose: the
+ * fixture script *is* the shipped template with its config block filled in, so
+ * the suites that assert on portability and on idempotency are asserting about
+ * the artefact `/pf-test` actually writes into an issue. A copy here would
+ * drift, and the drift would be invisible — the tests would keep passing while
+ * the template rotted.
+ *
+ * `prelude` is emitted once and spread into the cases that use it, which is
+ * what makes "the shared fixture is named exactly once" true of the generated
+ * script and not only of the template.
+ *
+ * @param {{issueId: string, prelude?: string[], cases: Record<string, string[]>}} spec
+ *   `cases` values list entries *besides* the prelude; pass `usePrelude: false`
+ *   per case by listing it in `withoutPrelude`.
+ * @returns {string}
+ */
+function renderSetupScript({ issueId, prelude = [], cases, withoutPrelude = [] }) {
+  const template = fs.readFileSync(SETUP_TEMPLATE_PATH, "utf8");
+  const begin = template.indexOf(CONFIG_BEGIN);
+  const end = template.indexOf(CONFIG_END);
+  if (begin === -1 || end === -1) {
+    throw new Error(
+      `${SETUP_TEMPLATE_PATH} no longer has its generated-config markers — ` +
+        "the template and this renderer have to be changed together"
+    );
+  }
+
+  const q = (s) => JSON.stringify(s);
+  const body = [CONFIG_BEGIN, `const ISSUE_ID = ${q(issueId)};`, `const PRELUDE = [${prelude.map(q).join(", ")}];`, "const CASES = {"];
+  for (const [tcId, entries] of Object.entries(cases)) {
+    const parts = withoutPrelude.includes(tcId) ? [] : ["...PRELUDE"];
+    body.push(`  ${q(tcId)}: [${[...parts, ...entries.map(q)].join(", ")}],`);
+  }
+  body.push("};");
+
+  return template.slice(0, begin) + body.join("\n") + "\n" + template.slice(end);
 }
 
 // ---------------------------------------------------------------------------
@@ -256,9 +358,22 @@ const FIXTURE_ISSUES = {
         feature: "Two cases with declared data",
         cases: 2,
         steps: 3,
+        preparedRoot: path.join(os.tmpdir(), "pf-test-data", "20260107-feat-fixture-twocases"),
         extraSections: {
           "TC-001": ["**Test Data:**", "- `prelude/common.json`", "- `case-a/input.txt`"],
           "TC-002": ["**Test Data:**", "- `prelude/common.json`", "- `case-b/input.csv`"],
+        },
+      }),
+      // An instance of the shipped template. TC-001 also claims the two edge
+      // fixtures of case-a — a nested directory and a directory whose only
+      // content is a .gitkeep — because "the working copy comes back byte for
+      // byte" has to cover those, not only flat files.
+      "test-data/setup.mjs": renderSetupScript({
+        issueId: "20260107-feat-fixture-twocases",
+        prelude: ["prelude/common.json"],
+        cases: {
+          "TC-001": ["case-a/input.txt", "case-a/nested", "case-a/empty-dir"],
+          "TC-002": ["case-b/input.csv"],
         },
       }),
       "test-data/fixtures/prelude/common.json": '{\n  "shared": true\n}\n',
@@ -661,10 +776,14 @@ function installChecklistFixture(repo, issueId, fixtureName) {
 module.exports = {
   TOOL_DIR,
   FIXTURES_DIR,
+  REPO_ROOT,
+  SETUP_TEMPLATE_PATH,
+  renderSetupScript,
   FIXTURE_ISSUES,
   ALL_FIXTURE_ISSUE_IDS,
   makeTempDir,
   removeTempDir,
+  isolateTempRoot,
   cleanupAll,
   autoCleanup,
   writeFileTree,
