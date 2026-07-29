@@ -67,13 +67,17 @@ For each scenario, create detailed test cases:
 | 2 | [Action to take] | [What should happen] |
 
 **Test Data:**
-- Field 1: `value`
-- Field 2: `value`
+- `path/to/fixture.json`
+- `path/to/input.txt`
 
 **Expected Outcome:** [Final verification]
 
 **Priority:** Critical / High / Medium / Low
 ```
+
+**Test Data is mandatory and must be non-empty for every test case whose Type is `Manual`** (Step 4): the field lists the concrete **files and fixtures** that case needs — one bullet per entry, each a path, so the data can later be prepared for the tester automatically instead of by hand. A Manual case that genuinely needs no files still declares that, in one line and with the same label: `**Test Data:** none` (write it as `**Требуемые данные:** не требуются` when `doc_language` is Russian). A Manual test case with a blank, missing or hand-waving Test Data field is not acceptable — "the usual sample data" is not a file.
+
+**Boundary of responsibility: Test Data holds files and fixtures only.** Prose preconditions — bring up a service, create an account, provision an external system, obtain credentials — are **not** test data: they stay in **Preconditions** and must never be listed under Test Data. The line is drawn by what the entry *is* (a file that can be copied into place vs. an action a human performs), not by how important it is.
 
 ### Step 3: Organize by Category
 

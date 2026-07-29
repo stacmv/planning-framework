@@ -1,0 +1,15 @@
+{
+  "_comment": [
+    "Fixture for TC-019 / TC-020. Copy this file to tools/manual-test-ui/projects.json",
+    "of the project under test, then replace both paths below with real absolute",
+    "paths on this machine. Each path must be a directory that contains docs/issues/;",
+    "one of them is this project, the other is any second project. The names may stay",
+    "as they are — they are what the project selector shows. Keys starting with _ are",
+    "ignored by the tool. Alternative to explicit entries: \"projectRoots\": [\"/path/to/dev\"]",
+    "auto-discovers every subdirectory one level deep that has docs/issues/."
+  ],
+  "projects": [
+    { "name": "planning-framework", "path": "/replace/with/absolute/path/to/planning-framework" },
+    { "name": "second-project", "path": "/replace/with/absolute/path/to/any-other-project-with-docs-issues" }
+  ]
+}

@@ -1,0 +1,3 @@
+TC-020 step 6: delete THIS file, then press prepare again.
+It must come back with exactly these three lines and no manual cleanup.
+Marks and notes made on the checklist page must survive that repeat.

@@ -1,0 +1,4 @@
+# Text normalization would destroy these fixtures: several of them exist
+# precisely to pin down how lib/checklist.js handles CRLF and mixed line
+# endings, so git must store and check them out byte for byte.
+*.md -text
