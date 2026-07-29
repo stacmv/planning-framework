@@ -5,10 +5,13 @@
 // checklists produced by the pf-test skill (docs/issues/{open,closed}/*/manual_test_checklist.md).
 //
 // Zero npm dependencies on purpose: this is a personal local tool, not a
-// shipped product. The only git operation it ever performs is `git checkout`
-// of an issue's own branch, and only after the user explicitly confirms it
-// in the UI — everything else (listing, reading a checklist that lives on
-// an unmerged branch) is read-only. Committing stays the job of /pf-close.
+// shipped product. It changes exactly three things, each only on an explicit
+// request: a checklist cell (PATCH .../checklist/steps|notes), the checked-out
+// branch (POST .../checklist/checkout), and a prepared working copy under the
+// system temp directory (POST .../issues/:id/prepare). Everything else —
+// listing, reading a checklist that lives on an unmerged branch, serving
+// documents — is read-only, and none of the three ever writes into the
+// repository. Committing stays the job of /pf-close.
 
 const http = require("node:http");
 const fs = require("node:fs");
@@ -21,6 +24,7 @@ const instructions = require("./lib/instructions");
 const memory = require("./lib/memory");
 const roles = require("./lib/roles");
 const docstate = require("./lib/docstate");
+const prepare = require("./lib/prepare");
 
 const TOOL_DIR = __dirname;
 const PUBLIC_DIR = path.join(TOOL_DIR, "public");
@@ -35,6 +39,47 @@ const BROWSER_MODULES = ["markdown.js", "roles.js"];
 // Documents are prose; a multi-megabyte "document" is a mistake somewhere,
 // and streaming it into a JSON response helps nobody.
 const MAX_READ_BYTES = 4 * 1024 * 1024;
+
+// The staging directory setup.mjs assembles a case in before renaming it into
+// place. The script sweeps it itself, but a script killed on the timeout never
+// reaches its own cleanup — so the server sweeps it after any failed run,
+// which is what makes the next prepare work with no manual tidying.
+const PREPARE_STAGING_DIR = ".staging";
+
+// How long a setup.mjs may run. Overridable so the suites can shorten it to
+// seconds; a bad value falls back to the engine's default rather than to
+// NaN (which would mean "no timeout at all").
+function prepareTimeoutMs(env = process.env) {
+  const parsed = Number.parseInt(env.PLANNING_TEST_UI_PREPARE_TIMEOUT_MS, 10);
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : prepare.DEFAULT_TIMEOUT_MS;
+}
+
+// How a failed run is reported over HTTP. lib/prepare.js never throws — every
+// failure comes back as a report with a `reason` — so this table is the whole
+// of the route's error handling: it translates, it does not re-decide.
+//   * the invalid-* reasons cannot be reached through this route (the server
+//     builds every argument itself) and are mapped anyway, so a future caller
+//     that does pass something odd gets a 400 rather than a 500;
+//   * "exit-code" is 422: the request was well formed, the script refused it;
+//   * "timeout" is 504 and "spawn-error" 500 — the tool failed to get an
+//     answer, which is not the caller's fault.
+const PREPARE_STATUS_BY_REASON = {
+  "invalid-project-root": 400,
+  "invalid-issue-id": 400,
+  "invalid-status": 400,
+  "invalid-tc-id": 400,
+  "invalid-script-name": 400,
+  "no-setup-script": 404,
+  "exit-code": 422,
+  "output-too-large": 413,
+  timeout: 504,
+  "spawn-error": 500,
+};
+
+// Reasons that mean the script did start and then went wrong, as opposed to
+// never having been started (a missing script, a rejected argument, a process
+// that could not be spawned).
+const PREPARE_STARTED_REASONS = new Set(["exit-code", "timeout", "output-too-large"]);
 
 // A subdirectory counts as a project if it looks like it has ever adopted
 // the Planning Framework issue layout — i.e. docs/issues exists. Scans one
@@ -585,6 +630,169 @@ function requireCheckedOut(res, entry) {
   return false;
 }
 
+// ---------------------------------------------------------------------------
+// Preparing test data
+// ---------------------------------------------------------------------------
+//
+// The only route of this tool that executes anything. Three properties make
+// that acceptable, and all three live here rather than in the client:
+//
+//  1. The path is a whitelist, not a parameter. The script is always
+//     `docs/issues/{open,closed}/<ISSUE-ID>/test-data/setup.mjs`, assembled by
+//     lib/prepare.js from an issue id that already matched ISSUE_ID_RE and a
+//     status that came from the resolved issue — one of exactly two values.
+//     A path in the request body is not read, so there is nothing to escape:
+//     the request selects an issue, never a file.
+//  2. No shell, ever. lib/prepare.js runs `execFile(process.execPath, [...])`
+//     with the arguments as an array; this layer starts no process of its own
+//     and builds no command line, so `; rm -rf`, `$(id)` and backticks are
+//     just characters that fail the issue-id pattern.
+//  3. Confirmation is mandatory, exactly as for `checkout`: without
+//     `{"confirm": true}` nothing is started at all.
+//
+// The route's own job after that is small on purpose — decide whether the
+// action is offered for this issue at all (the same decision the tester role
+// publishes, so the UI and the route cannot disagree), translate the report's
+// `reason` into a status code, and sweep the staging directory when a run
+// failed. Everything else is the engine's.
+function prepareEnvelope(projectName, entry, extra = {}) {
+  return {
+    project: projectName,
+    issueId: entry.issueId,
+    issueStatus: entry.status,
+    ok: false,
+    ran: false,
+    reason: null,
+    tcId: null,
+    ...extra,
+  };
+}
+
+// Remove `<tmpdir>/pf-test-data/<ISSUE-ID>/.staging`. Called after a failed
+// run: setup.mjs assembles a case there and renames it into place, so a run
+// that died mid-flight can only have left a *staging* tree behind — the
+// working copy itself is either the previous complete one or absent.
+function cleanPrepareStaging(issueId) {
+  if (!ISSUE_ID_RE.test(issueId)) return;
+  try {
+    fs.rmSync(path.join(prepare.preparedIssueRoot(issueId), PREPARE_STAGING_DIR), {
+      recursive: true,
+      force: true,
+    });
+  } catch {
+    /* best effort: a leftover staging tree must not turn into a 500 */
+  }
+}
+
+// POST .../issues/:id/prepare  { confirm: true, tcId? }
+async function handlePrepare(req, res, projectName, projectRoot, entry) {
+  let body;
+  try {
+    body = await readJsonBody(req);
+  } catch {
+    return sendJson(res, 400, prepareEnvelope(projectName, entry, {
+      error: "invalid_json_body",
+      message: "The request body is not valid JSON.",
+    }));
+  }
+
+  // `null`, a bare string and an array are all valid JSON and none of them is
+  // a request this route understands; reading `.confirm` off them would be a
+  // 500 or, worse, an undefined that some future edit treats as absent.
+  if (body === null || typeof body !== "object" || Array.isArray(body)) {
+    return sendJson(res, 400, prepareEnvelope(projectName, entry, {
+      error: "invalid_json_body",
+      message: "The request body must be a JSON object.",
+    }));
+  }
+
+  // First, before anything is looked up or started: this is a destructive
+  // action (it rebuilds the working copy from scratch) and it runs a script.
+  if (body.confirm !== true) {
+    return sendJson(res, 400, prepareEnvelope(projectName, entry, {
+      error: "confirmation_required",
+      message:
+        "Preparing test data runs this issue's test-data/setup.mjs and rebuilds the working copy. " +
+        'Repeat the request with {"confirm": true} once you have confirmed it.',
+    }));
+  }
+
+  // The same state the tester role publishes for its prepare entry, so "the
+  // UI offered it" and "the route accepts it" are one decision, not two.
+  const action = prepareActionState(projectName, entry);
+  if (!action.offered) {
+    const closed = entry.status === "closed";
+    return sendJson(res, closed ? 409 : 404, prepareEnvelope(projectName, entry, {
+      error: closed ? "issue_closed" : "checklist_not_found",
+      reason: action.reason,
+      message: action.message,
+    }));
+  }
+  if (!action.enabled) {
+    return sendJson(res, 409, prepareEnvelope(projectName, entry, {
+      error: "not_checked_out",
+      reason: action.reason,
+      branch: action.branch,
+      checkout: action.checkout,
+      message: action.message,
+    }));
+  }
+
+  // The only value the caller contributes. Validated against the engine's own
+  // pattern rather than a second copy of it, so "what the route accepts" and
+  // "what the script is asked for" cannot drift apart.
+  const rawTcId = body.tcId === undefined || body.tcId === null ? null : body.tcId;
+  if (rawTcId !== null && (typeof rawTcId !== "string" || !prepare.TC_ID_RE.test(rawTcId))) {
+    return sendJson(res, 400, prepareEnvelope(projectName, entry, {
+      error: "invalid_tc_id",
+      message: `Not a test case id: ${JSON.stringify(rawTcId)}. Expected something like "TC-001", or omit it to prepare the whole issue.`,
+    }));
+  }
+
+  const timeoutMs = prepareTimeoutMs();
+  const report = await prepare.runPrepare({
+    projectRoot,
+    issueId: entry.issueId,
+    // From the resolved issue, never from the request: one of two values.
+    status: entry.status,
+    tcId: rawTcId,
+    timeoutMs,
+  });
+
+  if (!report.ok) cleanPrepareStaging(entry.issueId);
+
+  const statusCode = report.ok ? 200 : PREPARE_STATUS_BY_REASON[report.reason] || 500;
+
+  return sendJson(res, statusCode, {
+    project: projectName,
+    issueId: entry.issueId,
+    issueStatus: entry.status,
+    tcId: report.tcId,
+    ok: report.ok,
+    // Whether the script was started at all — the difference between "your
+    // data is not prepared because the script said no" and "…because there
+    // was nothing to run".
+    ran: report.ok || PREPARE_STARTED_REASONS.has(report.reason),
+    reason: report.reason,
+    message: report.message,
+    ...(report.ok ? {} : { error: report.reason }),
+    scriptPath: report.scriptPath,
+    exitCode: report.exitCode,
+    signal: report.signal,
+    timedOut: report.timedOut,
+    durationMs: report.durationMs,
+    timeoutMs,
+    stdout: report.stdout,
+    stderr: report.stderr,
+    prepared: report.prepared,
+    structured: report.structured,
+    // Convenience for the common single-case request: the one path a tester
+    // is told to open. Null whenever the run prepared anything but exactly
+    // one case, so nobody mistakes "the first of several" for "the one".
+    workdir: report.prepared.length === 1 ? report.prepared[0].workdir : null,
+  });
+}
+
 async function handleApi(req, res, parts, projects, query) {
   // parts = pathname split on "/", filtered — e.g.
   // ["api","roles"]
@@ -600,6 +808,7 @@ async function handleApi(req, res, parts, projects, query) {
   // ["api","projects",":name","issues",":id","checklist","checkout"]
   // ["api","projects",":name","issues",":id","docs"]             ?path=<relative path>
   // ["api","projects",":name","issues",":id","roles",":role"]
+  // ["api","projects",":name","issues",":id","prepare"]          POST {confirm, tcId?}
 
   // GET /api/roles — the role table itself. Project- and issue-independent:
   // which roles exist and what each declares is a property of the framework,
@@ -692,6 +901,13 @@ async function handleApi(req, res, parts, projects, query) {
   // its state (present / not applicable / missing, and where it lives).
   if (parts.length === 6 && parts[5] === "docs" && req.method === "GET") {
     return serveIssueDoc(res, projectName, projectRoot, entry, query.get("path"));
+  }
+
+  // POST .../issues/:id/prepare  { confirm: true, tcId? } — run this issue's
+  // test-data/setup.mjs. The single executing route of the tool; see
+  // handlePrepare for why it is safe to have one.
+  if (parts.length === 6 && parts[5] === "prepare" && req.method === "POST") {
+    return handlePrepare(req, res, projectName, projectRoot, entry);
   }
 
   // GET .../issues/:id/roles/:role — the entries of one role for one issue.
@@ -859,6 +1075,9 @@ module.exports = {
   main,
   BROWSER_MODULES,
   ISSUE_ID_RE,
+  PREPARE_STATUS_BY_REASON,
+  PREPARE_STARTED_REASONS,
+  prepareTimeoutMs,
 };
 
 // Started as a script: serve. Required as a module (tests, and the test
