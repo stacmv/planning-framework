@@ -35,7 +35,7 @@ Converge does not ask *"which version are you on?"* It compares your project aga
 | T4 | `CLAUDE.md` holds exactly one `<!-- pf:begin -->` / `<!-- pf:end -->` section |
 | T5 | `docs/planning/{implementation-plan,session-log,decisions}.md` exist |
 | T6 | `docs/planning/templates/` **mirrors** the framework's templates |
-| T7 | all 16 skills are installed in `~/.claude/skills/` |
+| T7 | all 17 skills are installed in `~/.claude/skills/` |
 | T8 | the `pf` shim exists at `~/.claude/bin/pf` |
 | T9 | no v1/v2 artifacts are left behind (whitelist only — see below) |
 | T10 | no hyphenated `implementation-plan.md` survives inside an issue |

@@ -114,3 +114,7 @@ Save the test plan to `docs/issues/open/[ACTIVE-ISSUE-ID]/test_plan.md`.
 Include: overview and objectives, prerequisites, test cases (2-4 for trivial and ≤80 lines total, 5-10 for small, 10-20 typically for medium, 20+ allowed for large), status tracker, and (medium/large only) known issues section.
 
 Once the sub-agent returns, relay its summary to the user.
+
+## Close the stage: commit & push
+
+After relaying the summary, run the shared commit & push procedure in `~/.claude/skills/pf-git/SKILL.md` ("Stage commit & push") as the last action of this skill. The orchestrator does this, never the sub-agent. Do not restate the procedure here: it defines what to stage, the commit message (including the TC counts), the push guard, and the one-line report. A stage is not finished until its document is committed and pushed.

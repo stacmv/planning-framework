@@ -393,6 +393,7 @@ Sixteen Claude Code skills live in the `skills/` directory — one directory per
 | `pf-autopilot/` | `/pf-autopilot` | Drives the active issue to `/pf-close` autonomously; a self-resume schedule survives session limits and connection drops |
 | `pf-update/` | `/pf-update` | Updates the installed skills from the framework source repo |
 | `pf-size-tiers/` | `/pf-size-tiers` | Reference data: size-tier definitions and document budgets, read by the other skills |
+| `pf-git/` | `/pf-git` | Reference data: the commit & push procedure that closes every stage, read by the other skills |
 
 ### Updating Skills
 
@@ -469,7 +470,7 @@ project/
 ~/.claude/
 ├── bin/
 │   └── pf                               # Global shim → the onboarding TUI
-└── skills/                              # 16 skills — one directory per skill
+└── skills/                              # 17 skills — one directory per skill
     ├── pf/SKILL.md                      # /pf — status + next step
     ├── pf-help/SKILL.md                 # /pf-help — overview + quick start
     ├── pf-brd/SKILL.md                  # /pf-brd — create BRD
@@ -483,8 +484,10 @@ project/
     ├── pf-qa/SKILL.md                   # /pf-qa — QA checks + qa_report.md
     ├── pf-qa-setup/SKILL.md             # /pf-qa-setup — create/update .qa-workflow.md
     ├── pf-close/SKILL.md                # /pf-close — merge, archive, update log
+    ├── pf-autopilot/SKILL.md            # /pf-autopilot — drive the issue to closure
     ├── pf-update/SKILL.md               # /pf-update — refresh installed skills
-    └── pf-size-tiers/SKILL.md           # Reference data (tiers, budgets)
+    ├── pf-size-tiers/SKILL.md           # Reference data (tiers, budgets)
+    └── pf-git/SKILL.md                  # Reference data (stage commit & push)
 ```
 
 **In the framework repo:**

@@ -62,8 +62,10 @@ stage of the pipeline for the active issue.
   /pf-update       - update the installed skills from the framework repo
   /pf-size-tiers   - reference data (size tiers, document budgets); read by
                      the other skills, not normally invoked directly
+  /pf-git          - reference data (the commit & push that closes every
+                     stage); read by the other skills, not invoked directly
 
-That is all 16 of them.`,
+That is all 17 of them.`,
 
   // Screen 4: pointers to more detail.
   `Screen 4/4 — Where to learn more

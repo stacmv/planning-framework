@@ -95,3 +95,7 @@ Every test case must map to a task. Tasks should be completable in one session.
 Where [ISSUE-ID] means: scan docs/issues/open/ and use the active issue folder name.
 
 Once the sub-agent returns, relay its summary to the user.
+
+## Close the stage: commit & push
+
+After relaying the summary, run the shared commit & push procedure in `~/.claude/skills/pf-git/SKILL.md` ("Stage commit & push") as the last action of this skill. The orchestrator does this, never the sub-agent. Do not restate the procedure here: it defines what to stage, the commit message, the push guard, and the one-line report. A stage is not finished until its document is committed and pushed.

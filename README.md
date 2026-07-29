@@ -38,6 +38,7 @@ Sixteen Claude Code skills live in `skills/`, one directory per skill (`skills/<
 | `/pf-autopilot` | Drive the active issue to `/pf-close` autonomously (self-resume schedule survives session limits) |
 | `/pf-update` | Update the installed skills from the framework repo |
 | `/pf-size-tiers` | Reference data (size tiers, document budgets) — read by the other skills |
+| `/pf-git` | Reference data (the commit & push procedure closing every stage) — read by the other skills |
 
 ### Upgrading from v2.0?
 Run `make converge TARGET=/path/to/your-project`. See **[MIGRATION-GUIDE-V3.md](docs/planning/MIGRATION-GUIDE-V3.md)** for what it does to your issues, the backup, and `--dry-run`.

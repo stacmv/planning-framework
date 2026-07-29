@@ -126,6 +126,14 @@ After writing `qa_report.md`, report to the user:
 
 ---
 
+## Phase 6: Commit & Push
+
+As the last action of this skill — **after** the verdict is written and reported, on a PASS and on a FAIL alike — run the shared commit & push procedure in `~/.claude/skills/pf-git/SKILL.md` ("Stage commit & push") for `qa_report.md`. Do not restate the procedure here: it defines what to stage, the commit message (which carries the verdict), the push guard, and the one-line report you append to Phase 5's output.
+
+**Order matters.** This phase runs after Phase 3's git-status check, never before it: committing earlier would let this skill's own artifact — or worse, an unrelated dirty worktree — satisfy the very check that exists to catch it. That is also why the shared procedure stages `qa_report.md` by path instead of `git add -A`.
+
+---
+
 ## Important Notes
 
 - **Do not close the issue** — that is `/pf-close`'s job. This skill only produces the QA report.

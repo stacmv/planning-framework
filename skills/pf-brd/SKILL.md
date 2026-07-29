@@ -40,3 +40,7 @@ Save the BRD to `docs/issues/open/[ISSUE-ID]/brd.md`.
 - If your judgment agrees with the recorded tier, this is a true no-op: do not show any extra prompt or confirmation, not even a pre-filled one.
 
 This reconfirmation step never runs for `size_tier: trivial` — there is no `brd.md` to holistically re-derive scope from in that branch.
+
+## Close the stage: commit & push
+
+As the last action of this skill — after the document is saved and the tier reconfirmation is settled — run the shared commit & push procedure in `~/.claude/skills/pf-git/SKILL.md` ("Stage commit & push"). Do not restate it here: it defines what to stage (`brd.md`, or `notes.md` for the trivial tier, plus `prompt.md` if the tier changed), the commit message, the push guard, and the one-line report. A stage is not finished until its document is committed and pushed.

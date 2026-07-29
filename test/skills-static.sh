@@ -385,7 +385,7 @@ else
 fi
 
 # ══════════════════════════════════════════════════════════════════════════════
-printf '\n=== Extra: pf-update names all 15 skills and reconciles .pf-version\n'
+printf '\n=== Extra: pf-update names every shipped skill and reconciles .pf-version\n'
 # ══════════════════════════════════════════════════════════════════════════════
 
 UPD="$SKILLS/pf-update/SKILL.md"
@@ -446,6 +446,109 @@ for gate in pf-impl-plan pf-execute; do
     pf_pass "$gate: the compelled tool call is named explicitly"
   else
     pf_fail "$gate: no explicit tool call named — prose alone did not fire in manual testing"
+  fi
+done
+
+# ══════════════════════════════════════════════════════════════════════════════
+printf '\n=== TC-059: every stage commits AND pushes, from ONE shared procedure\n'
+# ══════════════════════════════════════════════════════════════════════════════
+#
+# Before this rule, work reached the remote only at /pf-close: the planning stages
+# committed nothing at all and /pf-execute committed without pushing. A session
+# limit, a dropped connection or a second machine therefore lost, or could not see,
+# everything between issue creation and closure — which also made /pf's own
+# fetch+pull sync half a mechanism, since nothing was ever pushed for it to find.
+#
+# Same shape as TC-042: assert that the procedure has exactly ONE home and that
+# every stage REFERENCES it, rather than asserting anyone's prose.
+
+GIT_SKILL="$SKILLS/pf-git/SKILL.md"
+GIT_REF="pf-git/SKILL.md"
+
+# ─── Step 1: the procedure exists, and is reference data, not a stage ─────────
+if [ -f "$GIT_SKILL" ]; then
+  pf_pass "step 1: skills/pf-git/SKILL.md exists"
+else
+  pf_fail "step 1: skills/pf-git/SKILL.md is missing — the procedure has no home"
+fi
+
+if grep -qF 'Stage commit & push' "$GIT_SKILL" 2>/dev/null; then
+  pf_pass 'step 1: pf-git holds a "Stage commit & push" section'
+else
+  pf_fail 'step 1: pf-git has no "Stage commit & push" section — the anchor every skill cites'
+fi
+
+if grep -qiE 'not normally invoked directly|not meant\s*$|not meant to be run directly' "$GIT_SKILL" 2>/dev/null; then
+  pf_pass "step 1: pf-git declares itself reference data (like pf-size-tiers)"
+else
+  pf_fail "step 1: pf-git does not declare itself reference data — it reads as an invocable stage"
+fi
+
+# ─── Step 2: every artifact-producing stage references it ────────────────────
+# pf-close is deliberately absent: it owns Phase 8.5, the parent-branch push, and
+# ran before this rule existed.
+for stage in pf-brd pf-spec pf-test-plan pf-impl-plan pf-check pf-execute pf-test pf-qa; do
+  f="$SKILLS/$stage/SKILL.md"
+  if grep -qF "$GIT_REF" "$f" 2>/dev/null; then
+    pf_pass "step 2: $stage references the shared commit & push procedure"
+  else
+    pf_fail "step 2: $stage does NOT reference $GIT_REF — its stage can end unpushed"
+  fi
+done
+
+# ─── Step 3: the stages REFERENCE the guard, they do not restate it ──────────
+# The push guard (never main/master, never --force, never --no-verify, a failed
+# push is not fatal) lives in pf-git, and pf-close keeps its own Phase 8.5 copy.
+# A third copy in a stage skill is how the two would silently diverge.
+for lit in 'force-with-lease' 'no-verify'; do
+  restaters=""
+  for stage in pf-brd pf-spec pf-test-plan pf-impl-plan pf-check pf-execute pf-test pf-qa; do
+    grep -qF -- "$lit" "$SKILLS/$stage/SKILL.md" 2>/dev/null && restaters="${restaters:+$restaters }$stage"
+  done
+  if [ -z "$restaters" ]; then
+    pf_pass "step 3: no stage skill restates the '$lit' guard — they reference it"
+  else
+    pf_fail "step 3: the '$lit' guard is restated in: $restaters (it belongs in pf-git only)"
+  fi
+done
+
+# ─── Step 4: the guard itself is stated where it lives ───────────────────────
+# shellcheck disable=SC2016  # backticks are markdown in a grep pattern, not command substitution
+if grep -qE '`main` or `master`' "$GIT_SKILL" 2>/dev/null; then
+  pf_pass "step 4: pf-git refuses to auto-push main/master"
+else
+  pf_fail "step 4: pf-git has no main/master push guard — release branches can be auto-pushed"
+fi
+
+if grep -qiE 'do \*\*NOT\*\* abort|never aborts|does not abort' "$GIT_SKILL" 2>/dev/null; then
+  pf_pass "step 4: a failed push is explicitly non-fatal (the work is already committed)"
+else
+  pf_fail "step 4: pf-git does not say a failed push is non-fatal — a network blip can strand a stage"
+fi
+
+# shellcheck disable=SC2016  # backticks are markdown in a grep pattern, not command substitution
+if grep -qiE 'never .*`--no-verify`|never `--force`' "$GIT_SKILL" 2>/dev/null; then
+  pf_pass "step 4: pf-git forbids --force / --no-verify"
+else
+  pf_fail "step 4: pf-git does not forbid --force / --no-verify"
+fi
+
+# ─── Step 5: scoped staging, so /pf-qa's dirty-tree check still means something ─
+# shellcheck disable=SC2016  # backticks are markdown in a grep pattern, not command substitution
+if grep -qiE 'scoped, never `-A`|never `git add -A`' "$GIT_SKILL" 2>/dev/null; then
+  # shellcheck disable=SC2016  # backticks are markdown in the label, not command substitution
+  pf_pass 'step 5: staging is scoped by path, not `git add -A`'
+else
+  pf_fail "step 5: pf-git does not mandate scoped staging — a stage could swallow unrelated edits past QA"
+fi
+
+# ─── Step 6: the rule also binds work done WITHOUT a skill ───────────────────
+for planning in "$REPO_ROOT/PLANNING.md" "$REPO_ROOT/docs/planning/templates/config/PLANNING.md"; do
+  label="$(basename "$(dirname "$planning")")/$(basename "$planning")"
+  if grep -qF "$GIT_REF" "$planning" 2>/dev/null; then
+    pf_pass "step 6: $label carries the commit & push agent rule"
+  else
+    pf_fail "step 6: $label has no commit & push agent rule — hand-done work is exempt"
   fi
 done
 

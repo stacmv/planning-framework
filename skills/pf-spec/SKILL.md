@@ -28,3 +28,7 @@ Based on the BRD, write the specs at `docs/issues/open/[ISSUE-ID]/specs.md` (pla
 **If `size_tier` is medium or large (or absent):** use ASCII diagrams where necessary to illustrate the UI/UX. If this specs file will be too big (more than 1500 lines), please split it into 3 parts. Keep the original file as the index file that links to the 3 parts.
 
 Where [ISSUE-ID] means: scan docs/issues/open/ and use the active issue folder name.
+
+## Close the stage: commit & push
+
+As the last action of this skill — after `specs.md` (and any split parts) is saved — run the shared commit & push procedure in `~/.claude/skills/pf-git/SKILL.md` ("Stage commit & push"). Do not restate it here: it defines what to stage, the commit message, the push guard, and the one-line report. A stage is not finished until its document is committed and pushed.

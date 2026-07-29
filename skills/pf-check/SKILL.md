@@ -42,3 +42,9 @@ Note: these three options are unchanged from today, and the oversized-for-tier f
 
 If "Fix now": dispatch a second sub-agent (Agent tool, default/general-purpose type) to apply the fix. Give it: the target document path, the predecessor document paths, and the full P0/P1 findings list from the analysis step. Instruct it to read what it needs, use AskUserQuestion itself to ask clarifying questions until it is 95% confident (with a recommendation and reason below each option), edit the document directly (honoring the same `doc_language` field for any prose it writes, keeping structural labels in English), and return only a short summary of what changed. Relay that summary to the user.
 If "I'll fix manually" or "Skip and continue": confirm the choice and state the next /pf-* command to run.
+
+## Close the stage: commit & push
+
+This applies to the **"Fix now"** path only — the other two options change no file, so there is nothing to commit and this skill must not create an empty commit.
+
+After relaying the fix sub-agent's summary, run the shared commit & push procedure in `~/.claude/skills/pf-git/SKILL.md` ("Stage commit & push") as the last action of this skill. The orchestrator does this, never the fix sub-agent. Do not restate the procedure here: it defines what to stage (the document(s) the sub-agent actually edited), the commit message, the push guard, and the one-line report. Review corrections are work like any other — they are not finished until they are committed and pushed.

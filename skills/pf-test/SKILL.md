@@ -167,6 +167,14 @@ If there were no Auto-type TCs, replace the auto tests sentence with: "No automa
 
 ---
 
+## Phase 7: Commit & Push
+
+As the last action of this skill, run the shared commit & push procedure in `~/.claude/skills/pf-git/SKILL.md` ("Stage commit & push") for the files this run changed — the updated Status Tracker in `test_plan.md` and `manual_test_checklist.md`. Do not restate the procedure here: it defines what to stage, the commit message, the push guard, and the one-line report, which you append to the Phase 6 summary.
+
+This matters more here than anywhere else in the pipeline: `manual_test_checklist.md` exists to be handed to an **external tester**, who cannot receive it if it never leaves this machine.
+
+---
+
 ## Important Notes
 
 - **Never skip the failure gate** — a partial pass is a failure. All Auto TCs must be `✓` before the checklist is generated.

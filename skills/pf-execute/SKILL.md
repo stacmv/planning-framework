@@ -32,10 +32,10 @@ For `size_tier` small/medium/large, read `docs/issues/open/[ACTIVE-ISSUE-ID]/imp
 ## Phase 0: Branch Setup
 
 1. Determine ISSUE-ID from the active issue folder name in `docs/issues/open/`.
-2. **Commit issue documentation to the current (parent) branch first.** The CREATE→IMPL_PLAN stages run before `/pf-execute`, so at this point you should still be on the parent branch (`develop`/`main`) with the issue's planning docs — for `size_tier: trivial`: `prompt.md`, `notes.md`, `test_plan.md`; for small/medium/large: `prompt.md`, `brd.md`, `specs.md`, `test_plan.md`, `implementation_plan.md` — sitting uncommitted or already committed there.
+2. **Commit issue documentation to the current (parent) branch first — a safety net, normally a no-op.** Each planning stage now commits and pushes its own document as it finishes (`~/.claude/skills/pf-git/SKILL.md`), so by the time `/pf-execute` runs there is usually nothing left here. This step stays because the docs may also have been hand-edited, or produced before that rule existed. At this point you should still be on the parent branch (`develop`/`main`) with the issue's planning docs — for `size_tier: trivial`: `prompt.md`, `notes.md`, `test_plan.md`; for small/medium/large: `prompt.md`, `brd.md`, `specs.md`, `test_plan.md`, `implementation_plan.md`.
    - Run `git status --porcelain -- docs/issues/open/ISSUE-ID/`.
-   - If it shows changes, run `git add docs/issues/open/ISSUE-ID/` then `git commit -m "docs: add planning docs for ISSUE-ID"`. This lands the planning docs on the parent branch immediately — they don't wait for the issue to be implemented and merged to become visible.
-   - If it shows nothing, skip — already committed.
+   - If it shows changes, run `git add docs/issues/open/ISSUE-ID/` then `git commit -m "docs: add planning docs for ISSUE-ID"`, and push per `~/.claude/skills/pf-git/SKILL.md` ("Stage commit & push", Step 3) — the push happens here, on the parent branch, before the issue branch is created.
+   - If it shows nothing, skip — already committed by the stage that produced them.
 3. Check if branch exists: `git branch --list issue/ISSUE-ID`
 4. If branch does not exist: `git checkout -b issue/ISSUE-ID`
 5. If branch exists: `git checkout issue/ISSUE-ID`
@@ -91,10 +91,11 @@ Execute tasks using sub-agents for parallel processing:
 1. **Group tasks into waves** based on dependencies
 2. **Run each task in its own sub-agent** - This keeps context usage low (~18% vs ~56%)
 3. **Process waves sequentially** - Wave N+1 starts only after Wave N completes
-4. **Commit after each wave, not inside sub-agents.** Sub-agents in a wave run concurrently and must NOT run `git commit` themselves (concurrent commits on the same branch race and corrupt each other). Once every task in a wave is confirmed complete via `TaskList`/`TaskGet`, the orchestrator runs, on the issue branch:
-   - `git add -A`
+4. **Commit and push after each wave, not inside sub-agents.** Sub-agents in a wave run concurrently and must NOT run `git commit` themselves (concurrent commits on the same branch race and corrupt each other). Once every task in a wave is confirmed complete via `TaskList`/`TaskGet`, the orchestrator runs the shared commit & push procedure in `~/.claude/skills/pf-git/SKILL.md` ("Stage commit & push") for that wave, on the issue branch:
+   - `git add -A` — a wave owns the code, so this is the one stage that stages the whole worktree rather than a scoped path
    - `git commit -m "feat: <short wave summary> [ISSUE-ID]"` (mention the TC-IDs or task names covered)
-   - Only start the next wave after this commit succeeds.
+   - then push per that procedure's Step 3 guard — an interrupted run must not leave a completed wave stranded on one machine
+   - Only start the next wave after this commit succeeds. A failed **push** does not block the next wave (the wave is committed locally); a failed **commit** does.
 
 ### For Each Task (Sub-Agent Instructions)
 1. Use `TaskGet` to read full task details
@@ -116,7 +117,7 @@ Execute tasks using sub-agents for parallel processing:
 
 ## Phase 3: Completion Summary
 
-Before reporting, run `git status --porcelain`. If anything is still uncommitted (e.g. a final wave's changes), commit it: `git add -A` then `git commit -m "chore: finalize implementation [ISSUE-ID]"`. Every task's changes must be committed on the issue branch by the end of this phase.
+Before reporting, run `git status --porcelain`. If anything is still uncommitted (e.g. a final wave's changes), commit it: `git add -A` then `git commit -m "chore: finalize implementation [ISSUE-ID]"`, then push it per `~/.claude/skills/pf-git/SKILL.md` ("Stage commit & push", Step 3). Every task's changes must be committed **and pushed** on the issue branch by the end of this phase; include that procedure's one-line git report in the summary below.
 
 After all tasks are complete, provide:
 

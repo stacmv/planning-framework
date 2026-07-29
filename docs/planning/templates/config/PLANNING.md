@@ -103,8 +103,10 @@ BRD/ANALYSIS, before TEST_PLAN).
 | `/pf-qa` | Runs `.qa-workflow.md`, produces `qa_report.md` with a PASS/FAIL verdict |
 | `/pf-qa-setup` | Creates or updates `.qa-workflow.md` for this project |
 | `/pf-close` | Closes the issue: merges the branch, archives the folder, updates the session log |
+| `/pf-autopilot` | Drives the active issue to `/pf-close` autonomously (a self-resume schedule survives session limits) |
 | `/pf-update` | Updates the installed skills from the framework repository |
 | `/pf-size-tiers` | Reference data: size tiers and document budgets (read by the other skills) |
+| `/pf-git` | Reference data: the commit & push procedure run at the end of every stage (read by the other skills) |
 
 ---
 
@@ -204,6 +206,7 @@ open/YYYYMMDD-type-slug/   →   closed/YYYYMMDD-type-slug/
 
 - One issue per session
 - One branch per issue
+- **Commit and push every completed unit of issue work** — per `~/.claude/skills/pf-git/SKILL.md` ("Stage commit & push"). The `pf-*` skills do this at the end of each stage; the rule applies equally to work done by hand, without a skill. Work that has not left this machine does not exist for the next session, the other machine, or `/pf`'s remote sync.
 - Update `session-log.md` after every session
 - Check off tasks in `implementation_plan.md` as you complete them
 - Never skip a pipeline stage, and never work against a document that does not exist yet

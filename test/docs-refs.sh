@@ -265,7 +265,9 @@ assert_lists_every_skill() {
 
 # ─── TC-040 step 1: CLAUDE.md no longer promises 7 skills ────────────────────
 
-if grep -q '7 Claude Code skills' CLAUDE.md; then
+# The count must be anchored: a bare '7 Claude Code skills' substring also matches
+# "17 Claude Code skills", so this check failed the moment a 17th skill shipped.
+if grep -qE '(^|[^0-9])7 Claude Code skills' CLAUDE.md; then
   pf_fail "step 1: CLAUDE.md still says \"7 Claude Code skills\""
 else
   pf_pass "step 1: CLAUDE.md no longer says \"7 Claude Code skills\""

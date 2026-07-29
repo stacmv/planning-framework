@@ -11,6 +11,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 - `/pf-autopilot` skill — drives the active issue to `/pf-close` autonomously: creates a self-resume schedule (CronCreate) before starting work, retries a sub-agent once after a connection drop, proceeds with recommended defaults only after 3 unanswered `AskUserQuestion` attempts (logging each as `[autopilot default]` in the issue session-log), and removes the schedule on closure
+- `pf-git` reference skill — the single definition of the commit & push procedure that closes every pipeline stage: scoped staging per stage, Conventional Commit messages carrying the issue ID, and the same push guard `/pf-close` Phase 8.5 uses (never `main`/`master`, never `--force`/`--no-verify`, a failed push is reported rather than fatal). Not invoked directly
+
+### Changed
+- Every artifact-producing stage now commits **and pushes** when it finishes — `/pf-brd`, `/pf-spec`, `/pf-test-plan`, `/pf-impl-plan`, `/pf-check` (on "Fix now"), `/pf-execute` (per wave, push added to the existing commit), `/pf-test` and `/pf-qa` each reference `pf-git` instead of restating the rule. Previously the planning stages committed nothing and work first reached the remote at `/pf-close`, so a session limit, a dropped connection or a second machine lost it — and `/pf`'s fetch+pull sync had nothing to find
+- `PLANNING.md` Agent Rules — the same commit & push rule binds issue work done by hand, without a skill
+- `/pf-execute` Phase 0 step 2 (committing planning docs to the parent branch) is now a documented safety net rather than the normal path, and pushes what it commits
 
 ---
 
