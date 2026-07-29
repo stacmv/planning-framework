@@ -43,6 +43,16 @@ test:
 	else \
 		echo "  no node test suites yet — nothing to run"; \
 	fi; \
+	uitests=0; \
+	for t in tools/manual-test-ui/test/*.test.js; do \
+		[ -f "$$t" ] && uitests=1; \
+	done; \
+	printf '\n=== node --test tools/manual-test-ui/test/\n'; \
+	if [ "$$uitests" -eq 1 ]; then \
+		node --test "tools/manual-test-ui/test/*.test.js" || rc=1; \
+	else \
+		echo "  no node test suites yet — nothing to run"; \
+	fi; \
 	printf '\n'; \
 	if [ "$$rc" -eq 0 ]; then echo "make test: OK"; else echo "make test: FAILED"; fi; \
 	exit $$rc

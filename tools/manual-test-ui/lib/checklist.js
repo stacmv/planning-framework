@@ -15,6 +15,22 @@ const STEPS_HEADER_RE = /^\|\s*(?:Step|Шаг)\s*\|/i;
 const NOTES_LABEL_RE = /^\*\*(?:Notes|Заметки):\*\*\s*(.*)$/;
 const RESULT_COL_NAMES = ["result", "результат"];
 const RESULT_CELL_RE = /^\[([ xX])\]\s*(.*)$/;
+// Data a TC needs, declared by pf-test inside the TC section, in one of two
+// shapes:
+//   **Требуемые данные:** не требуются          (**Test Data:** none)
+//   **Требуемые данные:**  followed by a bullet list of paths
+// A TC with no such label at all is *not* the same as one marked "none" — it
+// predates the feature, so its data need is unknown, never "not needed".
+const TEST_DATA_LABEL_RE = /^\*\*(?:Test Data|Требуемые данные):\*\*\s*(.*)$/;
+const NO_DATA_VALUE_RE = /^(?:не\s+требуются|none)\s*\.?$/i;
+// Where the prepared working copy was unpacked — a bullet inside the
+// prerequisites block. It stays in `prerequisites` as well; this only lifts
+// the path out for callers that need it.
+const PREPARED_PATH_RE = /^-\s*(?:Prepared data|Подготовленные данные):\s*(.+?)\s*$/;
+
+function stripBackticks(s) {
+  return s.trim().replace(/^`+|`+$/g, "").trim();
+}
 
 function detectEol(text) {
   return text.includes("\r\n") ? "\r\n" : "\n";
@@ -55,6 +71,9 @@ function parseChecklist(content) {
       name: heading[2],
       headingLineIndex: i,
       prerequisites: [],
+      requiredData: [],
+      dataStatus: "unknown",
+      preparedPath: null,
       steps: [],
       notesLineIndex: null,
       notesText: "",
@@ -112,6 +131,44 @@ function parseChecklist(content) {
             resultColIndex: resultCol,
           });
         }
+        continue;
+      }
+
+      const dataMatch = line.match(TEST_DATA_LABEL_RE);
+      if (dataMatch) {
+        const inline = dataMatch[1].trim();
+        const declaredNone = NO_DATA_VALUE_RE.test(inline);
+        const items = [];
+        for (let k = j + 1; k < sectionEnd; k++) {
+          const bullet = lines[k].match(/^-\s*(.*)$/);
+          if (!bullet) break;
+          const item = stripBackticks(bullet[1]);
+          if (item) items.push(item);
+        }
+        // An inline value that isn't the "none" marker is a single-item
+        // declaration written on the label line.
+        if (inline && !declaredNone) items.unshift(stripBackticks(inline));
+
+        if (items.length) {
+          tc.requiredData = items;
+          tc.dataStatus = "declared";
+          if (declaredNone) {
+            tc.parseWarnings.push(
+              "test data marked as not required but a list follows — treated as declared"
+            );
+          }
+        } else if (declaredNone) {
+          tc.dataStatus = "none";
+        } else {
+          // Label with nothing under it says nothing about the data need.
+          tc.parseWarnings.push("test data block is empty — data need left unknown");
+        }
+        continue;
+      }
+
+      const preparedMatch = line.match(PREPARED_PATH_RE);
+      if (preparedMatch) {
+        tc.preparedPath = stripBackticks(preparedMatch[1]) || null;
         continue;
       }
 
