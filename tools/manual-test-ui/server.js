@@ -19,6 +19,8 @@ const git = require("./lib/git");
 const paths = require("./lib/paths");
 const instructions = require("./lib/instructions");
 const memory = require("./lib/memory");
+const roles = require("./lib/roles");
+const docstate = require("./lib/docstate");
 
 const TOOL_DIR = __dirname;
 const PUBLIC_DIR = path.join(TOOL_DIR, "public");
@@ -231,8 +233,7 @@ function serveStatic(res, pathname) {
 // under `node --test`) and in the browser (`<script src>`), served so the
 // client never carries a second copy of logic the suite already covers.
 // Allowlisted by exact basename: an unlisted name is 403 whether or not the
-// file exists, and a listed-but-absent one is a plain 404 (roles.js arrives
-// with a later task).
+// file exists, and a listed-but-absent one is a plain 404.
 function serveLibModule(res, pathname) {
   const match = /^\/lib\/([^/]+)$/.exec(pathname);
   const name = match ? match[1] : null;
@@ -292,6 +293,263 @@ function sendFileContent(res, absPath, extra = {}) {
   return sendJson(res, 200, { ...extra, path: absPath, bytes: stat.size, content });
 }
 
+// ---------------------------------------------------------------------------
+// Roles
+// ---------------------------------------------------------------------------
+//
+// The server owns the role → documents mapping and the state of every entry
+// in it; the client renders what it is given and keeps no list of its own
+// (AC-04a…AC-04d, TC-006). Nothing about a role is remembered between
+// requests either — there is no "current role" on the server, which is what
+// makes switching roles free at any moment and makes two identical requests
+// literally identical answers (TC-006 step 6).
+
+function projectApiBase(projectName) {
+  return `/api/projects/${encodeURIComponent(projectName)}`;
+}
+
+function issueApiBase(projectName, issueId) {
+  return `${projectApiBase(projectName)}/issues/${encodeURIComponent(issueId)}`;
+}
+
+// Where a role entry's content is fetched from. Emitted per entry so the
+// client never has to build an API path — and so a document that lives only
+// on the issue branch is fetched through the route that knows how to preview
+// it, rather than through the plain project-document route that would 404.
+function endpointForItem(projectName, entry, item, state) {
+  const base = projectApiBase(projectName);
+  switch (item.kind) {
+    case roles.KIND.ISSUE_DOC:
+      return `${issueApiBase(projectName, entry.issueId)}/docs?path=${encodeURIComponent(state.relativePath)}`;
+    case roles.KIND.PROJECT_DOC:
+      return `${base}/docs?path=${encodeURIComponent(state.relativePath)}`;
+    case roles.KIND.INSTRUCTIONS:
+      return `${base}/instructions`;
+    case roles.KIND.MEMORY:
+      return `${base}/memory`;
+    case roles.KIND.ACTION:
+      return `${issueApiBase(projectName, entry.issueId)}/prepare`;
+    default:
+      return null;
+  }
+}
+
+// State of the "prepare this case's test data" entry of the tester role.
+//
+// It is an action, not a document, but it is an entry of a role and so has
+// to carry one of the same three states (TC-007 step 6). It tracks the
+// checklist, which is what the data is prepared *for*:
+//   * closed issue          → not offered at all (AC-04i);
+//   * no checklist yet      → missing, and /pf-test is what creates it;
+//   * checklist on a branch → offered, disabled, and the reason says the
+//     branch has to be checked out first (AC-04h, TC-007 step 5);
+//   * checklist on disk     → offered and enabled.
+// The per-case refinement (declared / none / unknown test data) is layered
+// on top of this by a later task; the shape is already the one it returns.
+function prepareActionState(projectName, entry) {
+  const common = { location: null, readonly: true, branch: null, checkout: null, reason: null };
+  if (entry.status === "closed") {
+    return {
+      ...common,
+      status: "not_applicable",
+      stage: null,
+      offered: false,
+      enabled: false,
+      requiresCheckout: false,
+      reason: "a closed issue is an archive — preparing its test data is not offered here",
+      message: "This issue is closed; the prepare action is not offered for it.",
+    };
+  }
+  if (entry.checklistStatus === "missing") {
+    return {
+      ...common,
+      status: "missing",
+      stage: "/pf-test",
+      offered: false,
+      enabled: false,
+      requiresCheckout: false,
+      message: "There is no manual_test_checklist.md to prepare data for yet — /pf-test creates it.",
+    };
+  }
+  if (entry.checklistStatus === "on_branch") {
+    return {
+      ...common,
+      status: "present",
+      stage: null,
+      offered: true,
+      enabled: false,
+      requiresCheckout: true,
+      branch: entry.branch,
+      checkout: {
+        required: true,
+        branch: entry.branch,
+        endpoint: `${issueApiBase(projectName, entry.issueId)}/checklist/checkout`,
+        method: "POST",
+        message: `Checking out ${entry.branch} happens only on your explicit confirmation.`,
+      },
+      reason: `the checklist lives on ${entry.branch}, which is not checked out`,
+      message: `Check out ${entry.branch} first — test data is prepared into the checked-out issue.`,
+    };
+  }
+  return {
+    ...common,
+    status: "present",
+    stage: null,
+    offered: true,
+    enabled: true,
+    requiresCheckout: false,
+    message: "Test data can be prepared for the cases of this issue.",
+  };
+}
+
+// One role, its entries, and the state of each — for one issue.
+function buildRoleContents(projectName, projectRoot, entry, roleId) {
+  const role = roles.getRole(roleId);
+  const ctx = docstate.buildIssueContext(projectRoot, entry.issueId, entry.status);
+  const checkoutEndpoint = `${issueApiBase(projectName, entry.issueId)}/checklist/checkout`;
+
+  const items = role.items.map((item) => {
+    let state;
+    let method = "GET";
+    switch (item.kind) {
+      case roles.KIND.ISSUE_DOC:
+        state = docstate.classifyIssueDoc(ctx, item.name);
+        break;
+      case roles.KIND.PROJECT_DOC:
+        state = docstate.classifyProjectDoc(projectRoot, item.docPath);
+        break;
+      case roles.KIND.INSTRUCTIONS:
+        state = docstate.classifyInstructions(instructions.collectInstructions(projectRoot));
+        break;
+      case roles.KIND.MEMORY:
+        state = docstate.classifyMemory(memory.listProjectMemory(projectRoot, process.env));
+        break;
+      case roles.KIND.ACTION:
+        state = prepareActionState(projectName, entry);
+        method = "POST";
+        break;
+      default:
+        // Unreachable while lib/roles.js and this switch agree; an entry with
+        // no state at all is exactly what TC-007 step 6 forbids, so say so
+        // rather than emit a blank.
+        state = {
+          status: "missing",
+          stage: "unknown",
+          location: null,
+          readonly: true,
+          branch: null,
+          checkout: null,
+          reason: null,
+          message: `This tool does not know how to resolve a role entry of kind "${item.kind}".`,
+          relativePath: null,
+          path: null,
+          bytes: null,
+        };
+    }
+    if (state.checkout && !state.checkout.endpoint) {
+      state = { ...state, checkout: { ...state.checkout, endpoint: checkoutEndpoint, method: "POST" } };
+    }
+    return { ...item, ...state, endpoint: endpointForItem(projectName, entry, item, state), method };
+  });
+
+  return {
+    project: projectName,
+    issueId: entry.issueId,
+    issueStatus: entry.status,
+    type: ctx.type,
+    sizeTier: ctx.sizeTier,
+    typeSource: ctx.typeSource,
+    tierSource: ctx.tierSource,
+    metaSource: ctx.metaSource,
+    currentBranch: git.getCurrentBranch(projectRoot),
+    issueBranch: ctx.branch,
+    checklistStatus: entry.checklistStatus,
+    role: { id: role.id, title: role.title, description: role.description },
+    items,
+  };
+}
+
+// GET .../issues/:id/docs?path=… — one document of one issue, with its state.
+//
+// Not folded into the project-wide `docs` route because two things are true
+// here and nowhere else: a document may exist only on the issue's own branch
+// (previewed read-only, with the switch offered), and a document that does
+// not exist has an *answer* — not applicable to this issue, or not created
+// yet by such-and-such stage. All three states come back as 200 with an
+// explanation: the client has to render the explanation, and a 404 would
+// make it show an error instead (AC-04g).
+function serveIssueDoc(res, projectName, projectRoot, entry, requested) {
+  const resolved = paths.resolveProjectFile(projectRoot, requested);
+  if (!resolved.ok) {
+    return sendJson(res, resolved.status, { error: resolved.error, message: resolved.message });
+  }
+  const ctx = docstate.buildIssueContext(projectRoot, entry.issueId, entry.status);
+  if (!paths.isInside(ctx.issueDir, resolved.path)) {
+    return sendJson(res, 400, {
+      error: "path_not_in_issue",
+      message: `That path is not inside ${ctx.issueRelDir}. Project documents are read through ${projectApiBase(projectName)}/docs.`,
+    });
+  }
+  const docName = paths.toPosix(path.relative(ctx.issueDir, resolved.path));
+  if (!docName) {
+    return sendJson(res, 400, { error: "not_a_file", message: "That path is the issue folder itself, not a document." });
+  }
+
+  const state = docstate.classifyIssueDoc(ctx, docName);
+  const envelope = {
+    project: projectName,
+    issueId: entry.issueId,
+    issueStatus: entry.status,
+    name: docName,
+    relativePath: state.relativePath,
+    status: state.status,
+    location: state.location,
+    readonly: state.readonly,
+    branch: state.branch,
+    checkout: state.checkout
+      ? {
+          ...state.checkout,
+          endpoint: `${issueApiBase(projectName, entry.issueId)}/checklist/checkout`,
+          method: "POST",
+        }
+      : null,
+    stage: state.stage,
+    reason: state.reason,
+    message: state.message,
+  };
+
+  if (state.status === "present" && state.location === "disk") {
+    return sendFileContent(res, state.path, envelope);
+  }
+  if (state.status === "present" && state.location === "branch") {
+    const content = git.showFile(projectRoot, state.branch, state.relativePath);
+    if (content === null) {
+      // The branch moved between listing and reading. Report the state, not
+      // a 500.
+      return sendJson(res, 200, {
+        ...envelope,
+        status: "missing",
+        location: null,
+        stage: docstate.stageFor(docName),
+        content: null,
+        bytes: null,
+        message: `${docName} is no longer on ${state.branch}.`,
+      });
+    }
+    const bytes = Buffer.byteLength(content, "utf8");
+    if (bytes > MAX_READ_BYTES) {
+      return sendJson(res, 413, {
+        ...envelope,
+        error: "file_too_large",
+        message: `That file is larger than the ${MAX_READ_BYTES} bytes this tool will read.`,
+        bytes,
+      });
+    }
+    return sendJson(res, 200, { ...envelope, bytes, content });
+  }
+  return sendJson(res, 200, { ...envelope, bytes: null, content: null });
+}
+
 function readJsonBody(req) {
   return new Promise((resolve, reject) => {
     const chunks = [];
@@ -329,6 +587,7 @@ function requireCheckedOut(res, entry) {
 
 async function handleApi(req, res, parts, projects, query) {
   // parts = pathname split on "/", filtered — e.g.
+  // ["api","roles"]
   // ["api","projects"]
   // ["api","projects",":name","docs"]           ?path=<relative path>
   // ["api","projects",":name","instructions"]
@@ -339,6 +598,15 @@ async function handleApi(req, res, parts, projects, query) {
   // ["api","projects",":name","issues",":id","checklist","steps"]
   // ["api","projects",":name","issues",":id","checklist","notes"]
   // ["api","projects",":name","issues",":id","checklist","checkout"]
+  // ["api","projects",":name","issues",":id","docs"]             ?path=<relative path>
+  // ["api","projects",":name","issues",":id","roles",":role"]
+
+  // GET /api/roles — the role table itself. Project- and issue-independent:
+  // which roles exist and what each declares is a property of the framework,
+  // not of a repository.
+  if (parts.length === 2 && parts[1] === "roles" && req.method === "GET") {
+    return sendJson(res, 200, { roles: roles.listRoles() });
+  }
 
   if (parts.length === 2 && parts[1] === "projects" && req.method === "GET") {
     const list = [...projects.entries()].map(([name, p]) => {
@@ -413,12 +681,34 @@ async function handleApi(req, res, parts, projects, query) {
     return sendJson(res, 200, { currentBranch: git.getCurrentBranch(projectRoot), defaultBranch, issues: list });
   }
 
-  if (parts.length < 6 || parts[3] !== "issues" || parts[5] !== "checklist") {
+  if (parts.length < 6 || parts[3] !== "issues") {
     return sendJson(res, 404, { error: "not_found" });
   }
   const issueId = decodeURIComponent(parts[4]);
   const entry = resolveIssue(projectRoot, issueId, defaultBranch);
   if (!entry) return sendJson(res, 404, { error: "issue_not_found" });
+
+  // GET .../issues/:id/docs?path=<relative path> — one issue document, with
+  // its state (present / not applicable / missing, and where it lives).
+  if (parts.length === 6 && parts[5] === "docs" && req.method === "GET") {
+    return serveIssueDoc(res, projectName, projectRoot, entry, query.get("path"));
+  }
+
+  // GET .../issues/:id/roles/:role — the entries of one role for one issue.
+  if (parts.length === 7 && parts[5] === "roles" && req.method === "GET") {
+    const roleId = decodeURIComponent(parts[6]);
+    if (!roles.hasRole(roleId)) {
+      return sendJson(res, 404, {
+        error: "unknown_role",
+        message: `No such role. This tool has ${roles.ROLE_IDS.join(", ")}.`,
+      });
+    }
+    return sendJson(res, 200, buildRoleContents(projectName, projectRoot, entry, roleId));
+  }
+
+  if (parts[5] !== "checklist") {
+    return sendJson(res, 404, { error: "not_found" });
+  }
 
   // GET full parsed checklist — works read-only even when checklistStatus
   // is "on_branch" (previews via git show), so the UI can show the TC list
