@@ -552,4 +552,45 @@ for planning in "$REPO_ROOT/PLANNING.md" "$REPO_ROOT/docs/planning/templates/con
   fi
 done
 
+# ══════════════════════════════════════════════════════════════════════════════
+printf '\n=== TC-060: autopilot pins ONE issue, and survives several being open\n'
+# ══════════════════════════════════════════════════════════════════════════════
+#
+# /pf halts and asks when several issues are open (Step 3). Autopilot derived its
+# target "exactly as /pf does", so a scheduled resume in an unattended session hit
+# that halt on every wake-up and the run never advanced. The fix is an explicit
+# issue ID, pinned into the cron prompt so the resumed session inherits it.
+
+AUTO="$SKILLS/pf-autopilot/SKILL.md"
+
+if grep -qF 'ISSUE-ID' "$AUTO" && grep -qiE 'optional issue id|takes an optional issue' "$AUTO"; then
+  pf_pass "step 1: autopilot documents an issue-ID argument"
+else
+  pf_fail "step 1: autopilot takes no issue ID — it cannot be aimed when several issues are open"
+fi
+
+if grep -qF '/pf-autopilot continue <ISSUE-ID>' "$AUTO"; then
+  pf_pass "step 2: the cron prompt carries the pinned ID into the resumed session"
+else
+  pf_fail "step 2: the cron prompt has no ID — a resume falls back to guessing (the original defect)"
+fi
+
+if grep -qiE 'never fall back to a different issue|does not create one' "$AUTO"; then
+  pf_pass "step 3: an unknown explicit ID stops the run instead of retargeting it"
+else
+  pf_fail "step 3: an unknown explicit ID may silently retarget — hours of work on the wrong issue"
+fi
+
+if grep -qiE 'One autopilot per project, never two' "$AUTO"; then
+  pf_pass "step 4: a second concurrent schedule for the same project is refused"
+else
+  pf_fail "step 4: nothing prevents two autopilots racing for one working tree"
+fi
+
+if grep -qiE 'newest by the `YYYYMMDD` date|newest by date' "$AUTO"; then
+  pf_pass "step 5: the no-ID timeout fallback is defined (newest by date, logged as a default)"
+else
+  pf_fail "step 5: no defined behaviour when no ID is given and several issues are open"
+fi
+
 pf_summary

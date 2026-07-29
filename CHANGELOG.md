@@ -17,6 +17,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Every artifact-producing stage now commits **and pushes** when it finishes — `/pf-brd`, `/pf-spec`, `/pf-test-plan`, `/pf-impl-plan`, `/pf-check` (on "Fix now"), `/pf-execute` (per wave, push added to the existing commit), `/pf-test` and `/pf-qa` each reference `pf-git` instead of restating the rule. Previously the planning stages committed nothing and work first reached the remote at `/pf-close`, so a session limit, a dropped connection or a second machine lost it — and `/pf`'s fetch+pull sync had nothing to find
 - `PLANNING.md` Agent Rules — the same commit & push rule binds issue work done by hand, without a skill
 - `/pf-execute` Phase 0 step 2 (committing planning docs to the parent branch) is now a documented safety net rather than the normal path, and pushes what it commits
+- `/pf-autopilot` takes an optional issue ID (`/pf-autopilot [ISSUE-ID]`) and pins it for the whole run, including in the cron prompt (`/pf-autopilot continue <ISSUE-ID>`). Previously it derived its target "exactly as `/pf` does", and `/pf` halts to ask when several issues are open — so an unattended resume stalled on every wake-up and the run never advanced. An unknown explicit ID now stops the run instead of retargeting it; with no ID and several issues open it asks, falling back to the newest by date after 3 unanswered attempts (logged as `[autopilot default]`). A second schedule for the same project is refused — two autonomous sessions would race for the working tree and branch
 
 ---
 
