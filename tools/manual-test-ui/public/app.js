@@ -34,6 +34,44 @@ const state = {
   checklist: null, // last GET .../checklist, kept for local summary math
 };
 
+// Where the reader was, remembered across a reload. Without this the page
+// always reopened on the first project and the first role, losing the place of
+// anyone who reloads mid-checklist — which is most of a manual test run.
+// Storage is best-effort: a browser with it disabled just gets the defaults.
+const NAV_KEY = "pf-manual-test-ui:nav";
+
+// Filled once at boot from the previous visit, then consumed as each level of
+// the selection is restored. Never read after boot, so ordinary navigation
+// cannot be pulled backwards by a stale value.
+let pendingNav = null;
+
+function saveNav() {
+  try {
+    localStorage.setItem(
+      NAV_KEY,
+      JSON.stringify({
+        project: state.project,
+        issueId: state.issueId,
+        roleId: state.roleId,
+        itemId: state.itemId,
+      })
+    );
+  } catch (e) {
+    /* storage unavailable or full — navigation still works, it just won't persist */
+  }
+}
+
+function readNav() {
+  try {
+    const raw = localStorage.getItem(NAV_KEY);
+    if (!raw) return null;
+    const nav = JSON.parse(raw);
+    return nav && typeof nav === "object" ? nav : null;
+  } catch (e) {
+    return null;
+  }
+}
+
 const el = {
   roleTabs: document.getElementById("role-tabs"),
   contextLabel: document.getElementById("context-label"),
@@ -143,6 +181,9 @@ function renderMarkdownInto(node, text) {
 async function loadRoles() {
   const data = await api("/api/roles");
   state.roles = data.roles || [];
+  if (!state.roleId && pendingNav && state.roles.some((r) => r.id === pendingNav.roleId)) {
+    state.roleId = pendingNav.roleId;
+  }
   if (!state.roleId && state.roles.length) state.roleId = state.roles[0].id;
   renderRoleTabs();
 }
@@ -170,6 +211,7 @@ async function selectRole(roleId) {
   if (state.roleId === roleId) return;
   state.roleId = roleId;
   state.itemId = null; // entries are per-role; nothing carries over
+  saveNav();
   renderRoleTabs();
   await refreshRoleContents();
 }
@@ -189,7 +231,9 @@ async function loadProjects() {
     li.addEventListener("click", () => selectProject(p.name));
     el.projectList.appendChild(li);
   }
-  if (projects.length) await selectProject(projects[0].name);
+  if (!projects.length) return;
+  const remembered = pendingNav && projects.some((p) => p.name === pendingNav.project) ? pendingNav.project : null;
+  await selectProject(remembered || projects[0].name);
 }
 
 async function selectProject(name) {
@@ -199,6 +243,7 @@ async function selectProject(name) {
   state.contents = null;
   state.checklist = null;
   markActive(el.projectList, "projectName", name);
+  saveNav();
   updateContextLabel();
   await loadIssues();
   await refreshRoleContents();
@@ -245,6 +290,7 @@ async function selectIssue(issueId) {
   state.itemId = null;
   state.checklist = null;
   markActive(el.issueList, "issueId", issueId);
+  saveNav();
   updateContextLabel();
   await refreshRoleContents();
 }
@@ -313,6 +359,7 @@ function renderRoleItems() {
     li.title = [item.name, item.description].filter(Boolean).join(" — ");
     li.addEventListener("click", () => {
       state.itemId = item.id;
+      saveNav();
       markActive(el.roleItems, "itemId", item.id);
       openItem(item);
     });
@@ -1000,8 +1047,37 @@ function refreshIssueListProgressBadge() {
 // --------------------------------------------------------------------- boot
 
 async function boot() {
+  pendingNav = readNav();
   await loadRoles();
   await loadProjects();
+  await restoreNav();
+  pendingNav = null; // from here on the selection is whatever the reader does
+}
+
+// Re-opens the issue and the entry the reader had before the reload. Runs after
+// loadProjects, so the project and the role are already restored; each level is
+// only restored when it still exists, since an issue can be closed or a
+// document can change state between visits.
+async function restoreNav() {
+  const nav = pendingNav;
+  if (!nav || nav.project !== state.project) return;
+
+  if (nav.issueId && el.issueList.querySelector(`li[data-issue-id="${cssEscape(nav.issueId)}"]`)) {
+    await selectIssue(nav.issueId);
+  }
+  if (!nav.itemId || !state.contents) return;
+
+  const item = (state.contents.items || []).find((i) => i.id === nav.itemId);
+  if (!item) return;
+  state.itemId = item.id;
+  markActive(el.roleItems, "itemId", item.id);
+  await openItem(item);
+}
+
+// CSS.escape is not in every browser this tool is opened in, and an issue id is
+// already constrained to [0-9a-z-] by the server's own pattern.
+function cssEscape(value) {
+  return typeof CSS !== "undefined" && CSS.escape ? CSS.escape(value) : String(value).replace(/[^\w-]/g, "");
 }
 
 boot().catch((e) => {
