@@ -233,9 +233,9 @@ A/B (см. Overview).
 
 | TC     | Test Case | Type | Priority | Status | Remarks |
 | ------ | --------- | ---- | -------- | ------ | ------- |
-| TC-001 | Self-tracking upstream не подменяет собой родителя | Auto | Critical | [ ] | |
-| TC-002 | Легитимный трекинг `develop` продолжает работать | Auto | High | [ ] | |
-| TC-003 | `develop` отсутствует → fallback на `main` | Auto | High | [ ] | |
-| TC-004 | START-TS вычисляется по пути `open/`, а не `closed/` | Auto | Critical | [ ] | |
-| TC-005 | Drift-check: SKILL.md по-прежнему содержит исправленную форму команд | Auto | Medium | [ ] | |
+| TC-001 | Self-tracking upstream не подменяет собой родителя | Auto | Critical | ✓ | |
+| TC-002 | Легитимный трекинг `develop` продолжает работать | Auto | High | ✓ | |
+| TC-003 | `develop` отсутствует → fallback на `main` | Auto | High | ✓ | |
+| TC-004 | START-TS вычисляется по пути `open/`, а не `closed/` | Auto | Critical | ✓ | |
+| TC-005 | Drift-check: SKILL.md по-прежнему содержит исправленную форму команд | Auto | Medium | ✓ | |
 | TC-006 | `/pf-close` end-to-end — реальный merge и реальное окно usage | Manual | Critical | [ ] | |
