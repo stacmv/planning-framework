@@ -1,7 +1,9 @@
 # Test fixtures
 
-Frozen, hand-built source projects that the convergence script (`scripts/converge-*.sh`)
-is run against. Eleven fixtures, one per starting state we must converge from.
+Frozen, hand-built source projects the test suites run against. Twelve fixtures:
+eleven are starting states the convergence script (`scripts/converge-*.sh`) must
+converge from; the twelfth (`pf-close-basic/`) is a minimal git-project the
+`/pf-close` suite (`test/pf-close.sh`) builds branches and upstreams on top of.
 
 > The script's exact filename is deliberately not spelled out anywhere under `test/`
 > except inside `_pf_converge_exec` in `lib.sh`. That single occurrence is the only
@@ -42,7 +44,7 @@ does not care, and no assertion enumerates these directories.
 
 ---
 
-## The eleven fixtures
+## The twelve fixtures
 
 | Fixture | What it models | Consumed by |
 |---|---|---|
@@ -57,6 +59,7 @@ does not care, and no assertion enumerates these directories.
 | `collision-file-dir/` | `notes.md` is a **file** in `planning/issues/open/20250101-feat-alpha/` and a **directory** in `docs/issues/open/20250101-feat-alpha/` — and the mirror image in `20250102-bug-beta`. Neither a `.v2.md` suffix nor a `.v2/` directory can resolve this. A third, conflict-free issue (`20250103-improve-gamma`) proves phase 3 still carried every non-conflicting element to completion. Converge must ERROR, exit non-zero, and **skip phase 5 entirely** so `planning/` survives (D-B). | TC-054 |
 | `v2-latin/` | A v2 layout whose seven open issues span the whole `doc_language` matrix (Р5, D-G): (1) `20250201-feat-latin` pure Latin → `English`; (2) `20250202-feat-yo` Cyrillic present **only** as `ё`/`Ё` and outnumbering the Latin (72 vs 10) → `Russian`, which a naive `[а-яА-Я]` class would get wrong; (3) `20250203-feat-nodocs` has neither `prompt.md` nor `analysis.md`; (4) `20250204-feat-empty` has both, both empty (0 letters); (5) `20250205-feat-tie` exactly 4 Cyrillic vs 4 Latin → `English` (the rule is *strictly* greater); (6) `20250206-feat-fm` already carries valid frontmatter `doc_language: Russian` and no `size_tier` → not overwritten; (7) `20250207-feat-broken` has **malformed** frontmatter (opening `---`, no closing `---`) → WARNING, file not edited at all. | TC-023, TC-058 |
 | `planning-with-user-files/` | A v2 layout plus `planning/notes-of-mine.md`, a file the framework has never created. Deletion is by whitelist followed by a bare `rmdir planning`, so this file must survive, the `rmdir` must fail, and converge must warn about the leftovers. | TC-018 |
+| `pf-close-basic/` | **Not a convergence fixture.** A minimal one-file project (`docs/issues/open/20260101-bug-close-fixture/prompt.md`, no `.git`) that the `/pf-close` behavioural suite copies via `pf_setup_case … --git`, then adds a `develop` branch, an `issue/…` branch, a self-tracking or legitimate upstream, and extra commits on top of — per-case, never in the fixture itself. | TC-001, TC-002, TC-003, TC-004, TC-005 |
 
 ---
 

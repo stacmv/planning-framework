@@ -57,8 +57,8 @@ Run on the issue branch.
 
 ## Phase 3: Detect Parent Branch
 
-1. Run `git config branch.issue/ISSUE-ID.merge`. If this returns a value such as `refs/heads/develop`, extract the branch name (strip the `refs/heads/` prefix). Use that as PARENT-BRANCH.
-2. If the command returns nothing or fails:
+1. Run `git config branch.issue/ISSUE-ID.merge`. **Self-tracking upstream guard:** if the result is empty, the command fails, or the result equals `refs/heads/issue/ISSUE-ID` itself (a self-tracking upstream set by `git push -u` on the issue branch, never a parent), ignore it and fall through to step 2. Otherwise extract the branch name (strip the `refs/heads/` prefix) and use that as PARENT-BRANCH.
+2. Fallback (the git-config value was ignored or unavailable):
    - Run `git branch --list develop`. If `develop` is listed, set PARENT-BRANCH to `develop`.
    - Otherwise set PARENT-BRANCH to `main`.
 
@@ -85,9 +85,9 @@ This phase produces `docs/issues/closed/ISSUE-ID/usage_report.md`, a best-effort
 
 1. **Find the issue's start time.** Run:
    ```
-   git log --reverse --format=%aI -- docs/issues/closed/ISSUE-ID | head -1
+   git log --reverse --format=%aI -- docs/issues/open/ISSUE-ID | head -1
    ```
-   This is START-TS. If it returns nothing, skip auto-computation (step 2) and go straight to step 3 with a note that the window could not be determined.
+   This is START-TS — the issue lived under `docs/issues/open/ISSUE-ID` throughout its history (Phase 5's move to `closed/` is still uncommitted at this point, and the archive commit is not made until Phase 8, so the `closed/` path does not yet exist in git history). If it returns nothing, skip auto-computation (step 2) and go straight to step 3 with a note that the window could not be determined.
 
 2. **Auto-compute Claude usage from local transcripts.**
    - Transcript directory: `~/.claude/projects/<cwd-with-slashes-replaced-by-dashes>/` (e.g. `pwd` of `/home/stac/dev/planning-framework` → `-home-stac-dev-planning-framework`). If this directory doesn't exist, skip to step 3.
