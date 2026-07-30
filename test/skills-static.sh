@@ -594,4 +594,50 @@ else
   pf_fail "step 5: no defined behaviour when no ID is given and several issues are open"
 fi
 
+# ══════════════════════════════════════════════════════════════════════════════
+printf '\n=== TC-061: autopilot resolves the pf-check review gate without a human\n'
+# ══════════════════════════════════════════════════════════════════════════════
+#
+# In autopilot mode /pf-check still ended on its interactive "How would you like to
+# proceed?" AskUserQuestion. An unattended run therefore stalled at every check gate
+# (analysis/spec/test_plan/impl_plan) until three timeouts elapsed — or hung against
+# a live human who was not there. The fix: pf-autopilot invokes /pf-check with an
+# `autopilot` argument, and pf-check gained an "Autopilot mode" branch that resolves
+# the gate itself (Fix now for P0/P1, continue otherwise) and logs the decision.
+
+CHECK="$SKILLS/pf-check/SKILL.md"
+
+if grep -qiE 'Autopilot mode' "$CHECK"; then
+  pf_pass "step 1: pf-check documents an Autopilot mode branch"
+else
+  pf_fail "step 1: pf-check has no Autopilot mode — its review gate always stops for a human"
+fi
+
+# shellcheck disable=SC2016  # backticks are markdown in a grep pattern, not command substitution
+if grep -qiE 'argument `autopilot`' "$CHECK"; then
+  pf_pass "step 2: pf-check keys Autopilot mode on the autopilot argument"
+else
+  pf_fail "step 2: pf-check's Autopilot mode has no trigger — it cannot tell it is unattended"
+fi
+
+# shellcheck disable=SC2016  # backticks are markdown in a grep pattern, not command substitution
+if grep -qiE 'do \*\*not\*\* present the .*AskUserQuestion' "$CHECK"; then
+  pf_pass "step 3: Autopilot mode skips the interactive AskUserQuestion"
+else
+  pf_fail "step 3: Autopilot mode still presents the interactive gate"
+fi
+
+if grep -qiE 'Any P0 or P1' "$CHECK" && grep -qF '[autopilot default]' "$CHECK"; then
+  pf_pass "step 4: it auto-applies Fix now for P0/P1 and logs the decision as [autopilot default]"
+else
+  pf_fail "step 4: Autopilot mode does not auto-apply Fix now / log an [autopilot default]"
+fi
+
+# ─── pf-autopilot passes the argument so pf-check can see it ───────────────────
+if grep -qF '/pf-check autopilot' "$AUTO"; then
+  pf_pass "step 5: pf-autopilot invokes /pf-check with the autopilot argument"
+else
+  pf_fail "step 5: pf-autopilot never passes the autopilot argument — pf-check cannot know"
+fi
+
 pf_summary
