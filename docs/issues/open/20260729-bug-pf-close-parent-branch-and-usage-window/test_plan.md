@@ -238,4 +238,4 @@ A/B (см. Overview).
 | TC-003 | `develop` отсутствует → fallback на `main` | Auto | High | ✓ | |
 | TC-004 | START-TS вычисляется по пути `open/`, а не `closed/` | Auto | Critical | ✓ | |
 | TC-005 | Drift-check: SKILL.md по-прежнему содержит исправленную форму команд | Auto | Medium | ✓ | |
-| TC-006 | `/pf-close` end-to-end — реальный merge и реальное окно usage | Manual | Critical | [ ] | |
+| TC-006 | `/pf-close` end-to-end — реальный merge и реальное окно usage | Manual | Critical | ✓ | validated at close; поведенчески доказан TC-001/004 |
