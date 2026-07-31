@@ -60,10 +60,14 @@ every prerequisite gate.
 
 | Pipeline | Stage order |
 |---|---|
-| `size_tier: trivial` (all issue types) | CREATE (`prompt.md`) → BRD/SPEC/IMPL_PLAN collapsed into NOTES (`notes.md`) → TEST_PLAN (`test_plan.md`) → TESTING (`manual_test_checklist.md`) → QA (`qa_report.md`) |
-| feat (small/medium/large) | CREATE → BRD (`brd.md`) → SPEC (`specs.md`) → TEST_PLAN → IMPL_PLAN (`implementation_plan.md`) → TESTING → QA |
-| improve (small/medium/large) | CREATE → BRD → TEST_PLAN → IMPL_PLAN → TESTING → QA |
-| bug (small/medium/large) | CREATE → ANALYSIS (`analysis.md`) → TEST_PLAN → IMPL_PLAN → TESTING → QA |
+| `size_tier: trivial` (all issue types) | CREATE (`prompt.md`) → BRD/SPEC/IMPL_PLAN collapsed into NOTES (`notes.md`) → TEST_PLAN (`test_plan.md`) → CODE_REVIEW (`code_review.md`) → TESTING (`manual_test_checklist.md`) → QA (`qa_report.md`) |
+| feat (small/medium/large) | CREATE → BRD (`brd.md`) → SPEC (`specs.md`) → TEST_PLAN → IMPL_PLAN (`implementation_plan.md`) → CODE_REVIEW (`code_review.md`) → TESTING → QA |
+| improve (small/medium/large) | CREATE → BRD → TEST_PLAN → IMPL_PLAN → CODE_REVIEW (`code_review.md`) → TESTING → QA |
+| bug (small/medium/large) | CREATE → ANALYSIS (`analysis.md`) → TEST_PLAN → IMPL_PLAN → CODE_REVIEW (`code_review.md`) → TESTING → QA |
+
+CODE_REVIEW applies uniformly across every tier, including `trivial` — code
+review does not scale down with document tier; findings are findings, not
+prose to trim (see `specs.md` §8 of the pluggable-reviewers issue).
 
 Routing keys on the **first incomplete stage** of the pipeline — never on the
 last document that happens to sit on disk. A migrated v2 issue can carry a
@@ -75,8 +79,8 @@ incomplete stage is TEST_PLAN, so its next step is `/pf-test-plan`, never
 
 - The criterion applies to **every** document of an issue, not to `test_plan.md`
   alone: `prompt.md`, `notes.md`, `brd.md`, `specs.md`, `analysis.md`,
-  `test_plan.md`, `implementation_plan.md`, `manual_test_checklist.md`,
-  `qa_report.md`.
+  `test_plan.md`, `implementation_plan.md`, `code_review.md`,
+  `manual_test_checklist.md`, `qa_report.md`.
 - It applies to issues under `docs/issues/open/` — those are the only ones the
   pipeline routes. Issues under `docs/issues/closed/` are archive: the pointer
   `brd.md` that convergence leaves in a closed legacy issue (it links to the

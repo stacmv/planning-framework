@@ -10,7 +10,7 @@ Update the installed Planning Framework skills to the latest version.
 
 The update script **discovers skills by globbing `skills/*/SKILL.md` in the framework repo** — it never reads the list below, and a new skill is picked up without editing this file. The list is documentation only; keep it in sync, but the script is the source of truth.
 
-All 17 skills:
+All 18 skills:
 
 - `pf` — orchestrator: shows active issue status and next step
 - `pf-help` — framework overview and quick-start
@@ -20,6 +20,7 @@ All 17 skills:
 - `pf-test-plan` — test plan generation
 - `pf-impl-plan` — implementation plan creation
 - `pf-execute` — implementation execution via sub-agents
+- `pf-codereview` — hard gate code review of the issue's diff, between `/pf-execute` and `/pf-test`
 - `pf-test` — run tests for the active issue
 - `pf-manual-test` — local Manual Test UI for `manual_test_checklist.md`
 - `pf-qa` — QA checklist execution

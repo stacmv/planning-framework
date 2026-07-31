@@ -32,7 +32,7 @@ make converge TARGET=/path/to/your-project
 - `PLANNING.md` - Framework instructions
 - `.pf-version` - Framework version stamp
 - `CLAUDE.md` - With a `<!-- pf:begin -->` / `<!-- pf:end -->` framework section
-- 17 skills in `~/.claude/skills/` (`/pf`, `/pf-help`, `/pf-brd`, `/pf-spec`, `/pf-check`, `/pf-test-plan`, `/pf-impl-plan`, `/pf-execute`, `/pf-test`, `/pf-manual-test`, `/pf-qa`, `/pf-qa-setup`, `/pf-close`, `/pf-autopilot`, `/pf-update`, `/pf-size-tiers`, `/pf-git`) and the `pf` shim in `~/.claude/bin/`
+- 18 skills in `~/.claude/skills/` (`/pf`, `/pf-help`, `/pf-brd`, `/pf-spec`, `/pf-check`, `/pf-test-plan`, `/pf-impl-plan`, `/pf-execute`, `/pf-codereview`, `/pf-test`, `/pf-manual-test`, `/pf-qa`, `/pf-qa-setup`, `/pf-close`, `/pf-autopilot`, `/pf-update`, `/pf-size-tiers`, `/pf-git`) and the `pf` shim in `~/.claude/bin/`
 - `docs/issues/open/` and `/closed/` - Issue folders
 - `docs/planning/` - Global planning files + templates
 
@@ -85,6 +85,7 @@ Agent follows workflow automatically:
 /pf-test-plan        ← Generate test plan from spec
 /pf-impl-plan        ← Generate implementation plan
 /pf-execute          ← Begin implementation
+/pf-codereview       ← Hard gate: review the code diff (Claude/Codex/both)
 /pf-test             ← Run automated tests and generate manual checklist
 /pf-qa               ← Run QA checks and produce qa_report.md
 /pf-close            ← Merge branch, archive issue, update session-log
@@ -96,17 +97,17 @@ Each skill checks that the previous step is done before proceeding.
 
 **feat:**
 ```
-CREATE → BRD → SPEC → TEST_PLAN → IMPL_PLAN → /pf-execute → TESTING → /pf-qa → QA → /pf-close → CLOSED
+CREATE → BRD → SPEC → TEST_PLAN → IMPL_PLAN → /pf-execute → /pf-codereview → TESTING → /pf-qa → QA → /pf-close → CLOSED
 ```
 
 **improve:**
 ```
-CREATE → BRD → TEST_PLAN → IMPL_PLAN → /pf-execute → TESTING → /pf-qa → QA → /pf-close → CLOSED
+CREATE → BRD → TEST_PLAN → IMPL_PLAN → /pf-execute → /pf-codereview → TESTING → /pf-qa → QA → /pf-close → CLOSED
 ```
 
 **bug:**
 ```
-CREATE → ANALYZE → TEST_PLAN → IMPL_PLAN → /pf-execute → TESTING → /pf-qa → QA → /pf-close → CLOSED
+CREATE → ANALYZE → TEST_PLAN → IMPL_PLAN → /pf-execute → /pf-codereview → TESTING → /pf-qa → QA → /pf-close → CLOSED
 ```
 
 ### File Structure
@@ -234,6 +235,7 @@ Details live in **issue folders**, not global files.
 /pf-test-plan        Create test plan from spec or analysis
 /pf-impl-plan        Create implementation plan from test plan
 /pf-execute          Begin implementation
+/pf-codereview       Hard gate: review the code diff (Claude/Codex/both)
 /pf-test             Run automated tests, update Status Tracker, generate manual_test_checklist.md
 /pf-qa               Run QA checks from .qa-workflow.md and produce qa_report.md with PASS/FAIL verdict
 /pf-qa-setup         Create or update .qa-workflow.md for the project
@@ -510,7 +512,7 @@ PREVIEW:     ./scripts/converge-to-v3.sh --target <path> --dry-run
 UPDATE:      ./scripts/update-skills.sh
 
 SESSION:     /pf → shows status and next step (Claude Code)
-PIPELINE:    /pf-brd → /pf-spec → /pf-test-plan → /pf-impl-plan → /pf-execute → /pf-test → /pf-qa → /pf-close
+PIPELINE:    /pf-brd → /pf-spec → /pf-test-plan → /pf-impl-plan → /pf-execute → /pf-codereview → /pf-test → /pf-qa → /pf-close
 CHECK:       /pf-check → verifies pipeline consistency
 QA SETUP:    /pf-qa-setup → create/update .qa-workflow.md
 

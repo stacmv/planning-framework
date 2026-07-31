@@ -6,8 +6,10 @@
 гарду, которая один раз при создании issue запрашивает этот выбор, единый механизм
 вызова Codex с fallback на Claude, расширение `pf-check` для ревью документов силами
 Codex/обоих ревьюеров, и новый жёсткий гейт `pf-codereview` — стадию ревью кода между
-`/pf-execute` и `/pf-test`. Пять задач ниже покрывают все 10 test cases из
-`test_plan.md`.
+`/pf-execute` и `/pf-test`. Пять задач ниже реализуют всю фичу; по решению владельца
+проекта формальным тест-планом покрыта только одна статическая проверка
+(severity-mapping consistency, TC-001 в `test_plan.md`) — остальное верифицируется
+дальнейшим использованием framework, см. `test_plan.md`'s "Scope decision".
 
 ### Files to Create/Modify
 
@@ -26,7 +28,7 @@ Codex/обоих ревьюеров, и новый жёсткий гейт `pf-c
 
 #### Task 1: Frontmatter `reviewers` и гарда назначения при создании issue
 
-**Mapped Test Cases:** TC-001
+**Mapped Test Cases:** none (descoped from the formal test plan by owner decision — see test_plan.md's "Scope decision")
 
 **Files:**
 - `skills/pf-brd/SKILL.md` - добавить гарду назначения ревьюеров сразу после
@@ -46,11 +48,11 @@ Codex/обоих ревьюеров, и новый жёсткий гейт `pf-c
 - Набор ключей зависит от типа issue и тира — см. specs.md §2/§3
 
 **Acceptance Criteria:**
-- [ ] TC-001 passes
+- [x] Implemented and committed; not covered by a formal test case (see test_plan.md's "Scope decision")
 
 #### Task 2: `pf-check` — выбор ревьюера, вызов Codex, `both`-агрегация
 
-**Mapped Test Cases:** TC-002, TC-003, TC-004, TC-005, TC-006, TC-007
+**Mapped Test Cases:** TC-001 (severity-mapping consistency only; the reviewer-selection/Codex-invocation/both-aggregation behavior this task implements is descoped from the formal test plan by owner decision — see test_plan.md's "Scope decision")
 
 **Files:**
 - `skills/pf-check/SKILL.md` - перед диспетчеризацией сабагента анализа (строка
@@ -79,16 +81,12 @@ Codex/обоих ревьюеров, и новый жёсткий гейт `pf-c
   (specs.md §7) — этот шаг `pf-check` уже не требует правки
 
 **Acceptance Criteria:**
-- [ ] TC-002 passes
-- [ ] TC-003 passes
-- [ ] TC-004 passes
-- [ ] TC-005 passes
-- [ ] TC-006 passes
-- [ ] TC-007 passes
+- [x] TC-001 passes (severity-mapping section verified consistent with pf-codereview)
+- [x] Reviewer-selection/Codex-invocation/both-aggregation implemented and committed; not covered by a formal test case (see test_plan.md's "Scope decision")
 
 #### Task 3: Новый скилл `pf-codereview` — жёсткий гейт ревью кода
 
-**Mapped Test Cases:** TC-007, TC-008
+**Mapped Test Cases:** TC-001 (severity-mapping consistency only; the hard-gate behavior this task implements is descoped from the formal test plan by owner decision — see test_plan.md's "Scope decision")
 
 **Files:**
 - `skills/pf-codereview/SKILL.md` - новый файл. Входной гейт: `implementation_plan.md`
@@ -111,12 +109,12 @@ Codex/обоих ревьюеров, и новый жёсткий гейт `pf-c
   образцу `qa_report.md`
 
 **Acceptance Criteria:**
-- [ ] TC-007 passes
-- [ ] TC-008 passes
+- [x] TC-001 passes (severity-mapping section verified consistent with pf-check)
+- [x] Hard-gate behavior implemented and committed; not covered by a formal test case (see test_plan.md's "Scope decision")
 
 #### Task 4: `pf-test` — предусловие `code_review.md`
 
-**Mapped Test Cases:** TC-009
+**Mapped Test Cases:** none (descoped from the formal test plan by owner decision — see test_plan.md's "Scope decision")
 
 **Files:**
 - `skills/pf-test/SKILL.md` - добавить проверку сразу после существующей
@@ -133,11 +131,11 @@ Codex/обоих ревьюеров, и новый жёсткий гейт `pf-c
   выполнено
 
 **Acceptance Criteria:**
-- [ ] TC-009 passes
+- [x] Implemented and committed; not covered by a formal test case (see test_plan.md's "Scope decision")
 
 #### Task 5: Роутинг и справочные обновления (`pf`, `pf-size-tiers`, `pf-update`, `PLANNING.md`)
 
-**Mapped Test Cases:** TC-010
+**Mapped Test Cases:** none (descoped from the formal test plan by owner decision — see test_plan.md's "Scope decision")
 
 **Files:**
 - `skills/pf-size-tiers/SKILL.md` - добавить `code_review.md` в список документов
@@ -160,4 +158,4 @@ Codex/обоих ревьюеров, и новый жёсткий гейт `pf-c
 - Изменение в таблицах `pf` — чисто добавление строки/шага, без переупорядочивания
 
 **Acceptance Criteria:**
-- [ ] TC-010 passes
+- [x] Implemented and committed; not covered by a formal test case (see test_plan.md's "Scope decision")

@@ -57,6 +57,22 @@ For the single issue folder found, extract TYPE from the folder name:
 
 Before proceeding to Step 5, check the active issue's `prompt.md` frontmatter. If it has no `size_tier` field, ask the same tier question as in "Creating prompt.md" below (four options — trivial/small/medium/large, one-line descriptions, recommending medium by default), then write the answer back into `prompt.md`'s frontmatter before continuing. Do not re-ask once `size_tier` is already present.
 
+## Reviewer-assignment guard (before Step 5)
+
+Before proceeding to Step 5, and only for a **bug**-type issue whose `size_tier` is not `trivial` (a trivial-tier bug issue never writes `analysis.md` — per the precedence rule in Step 6 it is routed to `/pf-brd` instead, which carries its own copy of this guard for that case): check the active issue's `prompt.md` frontmatter. If it has no `reviewers` field, ask the user via `AskUserQuestion` — one question per key, "Who should review `<key>`?" with the three options **claude** / **codex** / **both**, recommending **claude** for every key ("matches today's default behavior") — for the keys `analysis`, `test_plan`, `implementation_plan`, `code`. Write the answers into `prompt.md`'s frontmatter as a `reviewers:` block, next to `size_tier`, e.g.:
+
+```yaml
+reviewers:
+  analysis: claude
+  test_plan: claude
+  implementation_plan: claude
+  code: claude
+```
+
+Do not re-ask once `reviewers` is already present — check for the field's presence before asking, exactly as the guard above already does for `size_tier`.
+
+For `feat`/`improve`-type issues, and for any `trivial`-tier issue (including bug), this guard does not fire — `~/.claude/skills/pf-brd/SKILL.md`'s own reviewer-assignment guard covers those cases instead.
+
 ## Step 5: Detect completed stages
 
 Check which documents inside the issue folder at `<ISSUE-ID>/` in the `docs/issues/open/` directory of the active project (relative to /pf's CWD) are **complete**.
@@ -73,6 +89,7 @@ The criterion applies to **every row** of the table below — `notes.md`, `manua
 | `analysis.md` | ANALYSIS (bug type only) |
 | `test_plan.md` | TEST_PLAN |
 | `implementation_plan.md` | IMPL_PLAN |
+| `code_review.md` | CODE_REVIEW |
 | `manual_test_checklist.md` | TESTING |
 | `qa_report.md` | QA |
 | `notes.md` | BRD, SPEC, IMPL_PLAN (and ANALYSIS, for bug-type) — all at once |
@@ -92,7 +109,7 @@ If `size_tier` is small/medium/large, use the type-specific workflow below as be
 Applies whenever `size_tier: trivial`, superseding the feat/improve/bug tables below entirely:
 
 ```
-CREATE → /pf-brd (produces notes.md) → /pf-check → /pf-test-plan → /pf-check → /pf-execute
+CREATE → /pf-brd (produces notes.md) → /pf-check → /pf-test-plan → /pf-check → /pf-execute → /pf-codereview
 ```
 
 This table is keyed on **which documents in the issue folder are complete**, not on "last completed stage" — Step 5's `notes.md` row collapses BRD/SPEC/IMPL_PLAN (and ANALYSIS) into the completed-stages *display* line all at once, which would incorrectly suggest routing straight to `/pf-execute` if this table were keyed the same way. Keying on the documents avoids that: `/pf-test-plan` is never skipped just because `notes.md` also stands in for the earlier stages.
@@ -103,13 +120,13 @@ This table is keyed on **which documents in the issue folder are complete**, not
 |---|---|
 | `notes.md` is not complete | `/pf-brd` |
 | `notes.md` complete, `test_plan.md` not complete | `/pf-check` (before a complete `test_plan.md` exists), then `/pf-test-plan` (once check passed, per the "Note on 'check passed'" convention below) |
-| `notes.md` + `test_plan.md` both complete | `/pf-check` (before executing), then `/pf-execute` (once check passed) |
+| `notes.md` + `test_plan.md` both complete, `code_review.md` not complete | `/pf-check` (before executing), then `/pf-execute` (once check passed), then `/pf-codereview` (once execution done) |
 
 `/pf-spec` and `/pf-impl-plan` must never appear as a next step when `size_tier: trivial`.
 
 ### feat workflow
 ```
-CREATE → /pf-brd → BRD → /pf-spec → SPEC → /pf-check → (check passes) → /pf-test-plan → TEST_PLAN → /pf-check → (check passes) → /pf-impl-plan → IMPL_PLAN → /pf-check → (check passes) → /pf-execute
+CREATE → /pf-brd → BRD → /pf-spec → SPEC → /pf-check → (check passes) → /pf-test-plan → TEST_PLAN → /pf-check → (check passes) → /pf-impl-plan → IMPL_PLAN → /pf-check → (check passes) → /pf-execute → /pf-codereview → TESTING → /pf-qa → QA → /pf-close
 ```
 
 Stages are complete per `~/.claude/skills/pf-size-tiers/SKILL.md`; the first incomplete stage governs.
@@ -125,12 +142,13 @@ Stages are complete per `~/.claude/skills/pf-size-tiers/SKILL.md`; the first inc
 | IMPL_PLAN (every preceding stage complete) | `/pf-check` |
 | IMPL_PLAN + check passed | `/pf-execute` |
 | **`implementation_plan.md` exists, but BRD / SPEC / TEST_PLAN is not complete** (a migrated v2 issue, or a stub `test_plan.md`) | Go **back to the first incomplete stage**: `/pf-brd` if `brd.md` is not complete, else `/pf-spec` if `specs.md` is not complete, else `/pf-test-plan`. Never `/pf-execute`. |
+| CODE_REVIEW (`implementation_plan.md` complete, `code_review.md` not complete) | `/pf-codereview` |
 | TESTING | `/pf-qa` |
 | QA | `/pf-close` |
 
 ### improve workflow
 ```
-CREATE → /pf-brd → BRD → /pf-check → (check passes) → /pf-test-plan → TEST_PLAN → /pf-check → (check passes) → /pf-impl-plan → IMPL_PLAN → /pf-execute
+CREATE → /pf-brd → BRD → /pf-check → (check passes) → /pf-test-plan → TEST_PLAN → /pf-check → (check passes) → /pf-impl-plan → IMPL_PLAN → /pf-execute → /pf-codereview → TESTING → /pf-qa → QA → /pf-close
 ```
 
 Stages are complete per `~/.claude/skills/pf-size-tiers/SKILL.md`; the first incomplete stage governs.
@@ -144,12 +162,13 @@ Stages are complete per `~/.claude/skills/pf-size-tiers/SKILL.md`; the first inc
 | TEST_PLAN + check passed | `/pf-impl-plan` |
 | IMPL_PLAN (every preceding stage complete) | `/pf-execute` |
 | **`implementation_plan.md` exists, but BRD / TEST_PLAN is not complete** (a migrated v2 issue, or a stub `test_plan.md`) | Go **back to the first incomplete stage**: `/pf-brd` if `brd.md` is not complete, else `/pf-test-plan`. Never `/pf-execute`. |
+| CODE_REVIEW (`implementation_plan.md` complete, `code_review.md` not complete) | `/pf-codereview` |
 | TESTING | `/pf-qa` |
 | QA | `/pf-close` |
 
 ### bug workflow
 ```
-CREATE → ANALYSIS → /pf-check → (check passes) → /pf-test-plan → TEST_PLAN → /pf-check → (check passes) → /pf-impl-plan → IMPL_PLAN → /pf-execute
+CREATE → ANALYSIS → /pf-check → (check passes) → /pf-test-plan → TEST_PLAN → /pf-check → (check passes) → /pf-impl-plan → IMPL_PLAN → /pf-execute → /pf-codereview → TESTING → /pf-qa → QA → /pf-close
 ```
 
 Stages are complete per `~/.claude/skills/pf-size-tiers/SKILL.md`; the first incomplete stage governs.
@@ -164,6 +183,7 @@ Stages are complete per `~/.claude/skills/pf-size-tiers/SKILL.md`; the first inc
 | IMPL_PLAN (every preceding stage complete) | `/pf-execute` |
 | **`implementation_plan.md` exists, but `test_plan.md` is missing or not complete** (the migrated v2 bug issue: `analysis.md` + a renamed `implementation_plan.md`, no test plan) | `/pf-test-plan`. Never `/pf-execute` — there is no test plan to implement against. |
 | **`implementation_plan.md` or `test_plan.md` exists, but `analysis.md` is not complete** | Back to the first incomplete stage — the "CREATE only" row's action (write `analysis.md`). |
+| CODE_REVIEW (`implementation_plan.md` complete, `code_review.md` not complete) | `/pf-codereview` |
 | TESTING | `/pf-qa` |
 | QA | `/pf-close` |
 

@@ -52,6 +52,7 @@ stage of the pipeline for the active issue.
   /pf-impl-plan    - create the implementation plan
   /pf-check        - review the most recent document for problems
   /pf-execute      - execute the implementation plan via sub-agents
+  /pf-codereview   - hard gate: review the code diff (Claude/Codex/both)
   /pf-test         - run tests and build the manual test checklist
   /pf-manual-test  - fill in the manual test checklist interactively
   /pf-qa           - run QA checks and produce qa_report.md
