@@ -256,7 +256,6 @@ Closes #42
 
 ⚙️ **Tooling Improvements**
 - NPM package for easy installation
-- Python package (`pip install planning-framework`)
 - Docker container for testing
 - GitHub Action for checking docs are updated
 - VS Code extension

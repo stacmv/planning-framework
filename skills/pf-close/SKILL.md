@@ -92,7 +92,7 @@ This phase produces `docs/issues/closed/ISSUE-ID/usage_report.md`, a best-effort
 2. **Auto-compute Claude usage from local transcripts.**
    - Transcript directory: `~/.claude/projects/<cwd-with-slashes-replaced-by-dashes>/` (e.g. `pwd` of `/home/stac/dev/planning-framework` → `-home-stac-dev-planning-framework`). If this directory doesn't exist, skip to step 3.
    - For every `*.jsonl` file in that directory, read each line as JSON, keep entries where `.type == "assistant"` and `.timestamp >= START-TS`, dedupe by `.message.id` (a single API response can appear more than once in the log), then group by `.message.model` and sum `.message.usage.input_tokens`, `.cache_creation_input_tokens`, `.cache_read_input_tokens`, and `.output_tokens`.
-   - A small inline Python (or `jq`) script run via Bash is the right tool for this — don't try to do the aggregation by eye.
+   - A small inline `jq` (or Node.js) script run via Bash is the right tool for this — don't try to do the aggregation by eye.
    - **Caveat to carry into the report:** this time-window heuristic captures *all* Claude Code activity in this project directory during the window, not just this issue. If the user worked on something else in parallel, note that the figure may be inflated.
    - For pricing, invoke the `claude-api` skill to get current per-model $/Mtok rates and compute an approximate cost. If that skill is unavailable or a model's price can't be found, report the token counts only and mark cost as "unavailable — pricing table not found" rather than guessing.
 
