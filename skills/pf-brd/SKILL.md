@@ -8,6 +8,26 @@ Determine the active issue by scanning `docs/issues/open/` for [ISSUE-ID].
 
 **Legacy-tier guard (runs first, before any other prerequisite check):** read `docs/issues/open/[ISSUE-ID]/prompt.md`'s YAML frontmatter. If it has no `size_tier` field, ask the user via `AskUserQuestion` — "How big is this task?" with the four options **trivial** / **small** / **medium** / **large** (one-line descriptions from `~/.claude/skills/pf-size-tiers/SKILL.md`'s Tiers table), recommending **medium** ("matches today's default behavior") — then write the answer into `prompt.md`'s frontmatter, next to `doc_language`, before proceeding with the rest of this skill.
 
+**Reviewer-assignment guard (runs immediately after the legacy-tier guard above):** read `docs/issues/open/[ISSUE-ID]/prompt.md`'s YAML frontmatter — `size_tier` is guaranteed present by this point. If it has no `reviewers` field, ask the user via `AskUserQuestion` — one question per applicable key, "Who should review `<key>`?" with the three options **claude** / **codex** / **both**, recommending **claude** for every key ("matches today's default behavior") — then write the answers into `prompt.md`'s frontmatter as a `reviewers:` block, next to `size_tier`, e.g.:
+
+```yaml
+reviewers:
+  brd: claude
+  specs: claude
+  test_plan: claude
+  implementation_plan: claude
+  code: claude
+```
+
+Do not re-ask once `reviewers` is already present — check for the field's presence before asking, exactly as the legacy-tier guard above already does for `size_tier`.
+
+The applicable key set depends on `size_tier` and, when not `trivial`, on the issue type (feat/improve — detected from the folder name pattern, same as `~/.claude/skills/pf/SKILL.md` Step 4):
+- `size_tier: trivial` (any issue type, including bug — this is the only place a trivial-tier issue's reviewers get asked, since it never reaches `/pf`'s own bug-specific guard): `notes`, `test_plan`, `code`.
+- `size_tier` small/medium/large, issue type `feat`: `brd`, `specs`, `test_plan`, `implementation_plan`, `code`.
+- `size_tier` small/medium/large, issue type `improve`: `brd`, `test_plan`, `implementation_plan`, `code` (no `specs`).
+
+A non-trivial `bug` issue never reaches `pf-brd` (see `~/.claude/skills/pf/SKILL.md`'s bug workflow) — that case is handled by the equivalent guard in `~/.claude/skills/pf/SKILL.md` instead.
+
 Read `docs/issues/open/[ISSUE-ID]/prompt.md` to understand the project description.
 
 **Output gate — `notes.md` / `brd.md` already present (regenerate / keep / cancel).** If `notes.md` OR `brd.md` already exists in the same folder, do **not** stop outright. First judge the existing document against the shared definition of "stage complete" in `~/.claude/skills/pf-size-tiers/SKILL.md` ("Stage completion") — do not restate the criterion here. Then ask the user via `AskUserQuestion`, stating whether the document is complete or an incomplete stub, with three options:

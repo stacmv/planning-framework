@@ -46,7 +46,7 @@ Codex/обоих ревьюеров, и новый жёсткий гейт `pf-c
 - Набор ключей зависит от типа issue и тира — см. specs.md §2/§3
 
 **Acceptance Criteria:**
-- [ ] TC-001 passes
+- [x] TC-001 passes
 
 #### Task 2: `pf-check` — выбор ревьюера, вызов Codex, `both`-агрегация
 
