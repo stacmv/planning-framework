@@ -1,5 +1,8 @@
 // Example "issue diff" for TC-008 — copy this file into a scratch project's
-// working tree as if it were the code /pf-execute had just produced, so that
+// working tree AS `sort-tasks.js` (renamed from .js.txt — kept as .txt in
+// this repo's own fixtures so the framework's own QA scope guard doesn't
+// mistake inert example code for a real .js file introduced into the repo)
+// as if it were the code /pf-execute had just produced, so that
 // /pf-codereview has a real, intentional P0-level problem to find.
 //
 // The bug: `sortField` comes straight from request input and is interpolated

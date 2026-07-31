@@ -68,7 +68,7 @@ const CASES = {
   "TC-002": ["case-002/prompt.md", "case-002/specs.md"],
   "TC-003": ["case-003/prompt.md", "case-003/specs.md"],
   "TC-006": ["case-006/prompt.md", "case-006/specs.md"],
-  "TC-008": ["case-008/prompt.md", "case-008/implementation_plan.md", "case-008/bad-diff-example.js"],
+  "TC-008": ["case-008/prompt.md", "case-008/implementation_plan.md", "case-008/bad-diff-example.js.txt"],
   "TC-009": [
     "case-009/prompt.md",
     "case-009/test_plan.md",
