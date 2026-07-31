@@ -42,6 +42,7 @@ Stage **only the paths this stage owns**:
 | `/pf-impl-plan` | `docs/issues/open/<ISSUE-ID>/implementation_plan.md` |
 | `/pf-check` | the document(s) the fix sub-agent actually edited |
 | `/pf-execute` | `-A` at a wave boundary — this stage owns the code, not just the issue folder |
+| `/pf-codereview` | `docs/issues/open/<ISSUE-ID>/code_review.md` (+ the file(s) the fix sub-agent actually edited, on a Fix-now loop iteration) |
 | `/pf-test` | `docs/issues/open/<ISSUE-ID>/test_plan.md`, `manual_test_checklist.md` |
 | `/pf-qa` | `docs/issues/open/<ISSUE-ID>/qa_report.md` |
 
@@ -68,6 +69,7 @@ work:
 | `/pf-impl-plan` | `docs: implementation_plan.md (<N> tasks) [<ISSUE-ID>]` |
 | `/pf-check` | `docs: /pf-check corrections to <doc> [<ISSUE-ID>]` |
 | `/pf-execute` | `feat: <short wave summary> [<ISSUE-ID>]` (or `fix:` / `refactor:` as fits) |
+| `/pf-codereview` | `docs: code_review.md — <PASS\|FAIL> [<ISSUE-ID>]` |
 | `/pf-test` | `test: status tracker + manual checklist [<ISSUE-ID>]` |
 | `/pf-qa` | `docs: qa_report.md — <PASS\|FAIL> [<ISSUE-ID>]` |
 
