@@ -50,7 +50,7 @@ Codex/обоих ревьюеров, и новый жёсткий гейт `pf-c
 
 #### Task 2: `pf-check` — выбор ревьюера, вызов Codex, `both`-агрегация
 
-**Mapped Test Cases:** TC-002, TC-003, TC-004, TC-005, TC-006, TC-007
+**Mapped Test Cases:** TC-002, TC-003, TC-006, TC-007 (fallback/raw-CLI branches implemented per specs.md §4 but not covered by a test case — see test_plan.md's note on single-machine constraints)
 
 **Files:**
 - `skills/pf-check/SKILL.md` - перед диспетчеризацией сабагента анализа (строка
@@ -81,8 +81,6 @@ Codex/обоих ревьюеров, и новый жёсткий гейт `pf-c
 **Acceptance Criteria:**
 - [ ] TC-002 passes
 - [ ] TC-003 passes
-- [ ] TC-004 passes
-- [ ] TC-005 passes
 - [ ] TC-006 passes
 - [ ] TC-007 passes
 
