@@ -385,6 +385,7 @@ Sixteen Claude Code skills live in the `skills/` directory — one directory per
 | `pf-test-plan/` | `/pf-test-plan` | Creates `test_plan.md` from `specs.md` or `analysis.md` |
 | `pf-impl-plan/` | `/pf-impl-plan` | Creates `implementation_plan.md` from `test_plan.md` |
 | `pf-execute/` | `/pf-execute` | Executes the implementation plan via sub-agents; requires a complete pipeline |
+| `pf-codereview/` | `/pf-codereview` | Hard gate: reviews the issue's code diff (Claude/Codex/both), blocks on open P0/P1 findings |
 | `pf-test/` | `/pf-test` | Runs automated tests, updates the Status Tracker, generates `manual_test_checklist.md` |
 | `pf-manual-test/` | `/pf-manual-test` | Launches the local Manual Test UI to fill in `manual_test_checklist.md` |
 | `pf-qa/` | `/pf-qa` | Runs QA checks from `.qa-workflow.md`, produces `qa_report.md` with a PASS/FAIL verdict |

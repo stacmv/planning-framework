@@ -12,7 +12,7 @@ Determine the active issue from `docs/issues/open/`. Read ISSUE-ID from the fold
 
 ## Phase 0: Input Gate — `implementation_plan.md` must be complete
 
-Reuse exactly the same mechanical prerequisite check `/pf-execute` runs for its own gate — do not invent a second one. Per the shared "Stage completion" definition in `~/.claude/skills/pf-size-tiers/SKILL.md`, judged fresh from the filesystem (`ls`/`wc -c`/`grep -c 'TODO: Run /pf-'`), never from memory:
+Reuse exactly the same mechanical prerequisite check `/pf-execute` runs for its own gate — do not invent a second one. Per the shared "Stage completion" definition in `~/.claude/skills/pf-size-tiers/SKILL.md`, judged fresh from the filesystem, never from memory (see "Evaluating it is a MECHANICAL check" there for the exact tool calls to run):
 
 - **If `size_tier: trivial`:** `notes.md` must be complete (which itself requires `test_plan.md` to be complete). If not, stop: "Notes document is required. Run /pf-brd first." — or, if `test_plan.md` is the incomplete one: "Test plan is required. Run /pf-test-plan first."
 - **If `size_tier` is small/medium/large (or absent):** `implementation_plan.md` must be complete — which includes every preceding stage (`brd.md`/`specs.md` or `analysis.md`, and `test_plan.md`). If not, stop naming whichever stage is actually incomplete, exactly as `/pf-execute` does (e.g. "Implementation plan is required. Run /pf-impl-plan first.").

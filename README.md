@@ -30,6 +30,7 @@ Sixteen Claude Code skills live in `skills/`, one directory per skill (`skills/<
 | `/pf-impl-plan` | Create the implementation plan from the test plan |
 | `/pf-check` | Review the most recent pipeline document for problems |
 | `/pf-execute` | Execute the implementation plan via sub-agents |
+| `/pf-codereview` | Hard gate: review the code diff (Claude/Codex/both) |
 | `/pf-test` | Run tests, update the Status Tracker, build the manual test checklist |
 | `/pf-manual-test` | Fill in the manual test checklist interactively |
 | `/pf-qa` | Run QA checks from `.qa-workflow.md`, produce `qa_report.md` |
