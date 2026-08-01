@@ -859,6 +859,7 @@ t3_planning_md() {
 # both create CLAUDE.md from scratch and replace a marked region in an existing
 # one.
 t4_claude_md() {
+  [ "${PF_CONVERGE_SKIP_CLAUDE:-0}" = "1" ] && return 0
   local src="$TEMPLATES_SRC/config/CLAUDE.md"
   local file="$TARGET/CLAUDE.md"
   local body n_begin n_end bl el banner tmp
@@ -979,6 +980,7 @@ t6_mirror_templates() {
 # is exactly how defect 3 (7 skills out of 15) came to exist; the final summary
 # below is derived from what was actually installed, never from a fixed list.
 t7_skills() {
+  [ "${PF_CONVERGE_SKIP_CLAUDE:-0}" = "1" ] && return 0
   local skills_dir="$HOME/.claude/skills" src name dst
   mkdir -p "$skills_dir"
   for src in "$SKILLS_SRC"/*/; do
@@ -994,6 +996,7 @@ t7_skills() {
 }
 
 t8_shim() {
+  [ "${PF_CONVERGE_SKIP_CLAUDE:-0}" = "1" ] && return 0
   local bin_dir="$HOME/.claude/bin"
   mkdir -p "$bin_dir"
   cat >"$bin_dir/pf" <<EOF
@@ -1011,7 +1014,11 @@ EOF
 check_qa_workflow() {
   local f="$TARGET/.qa-workflow.md"
   if [ ! -f "$f" ]; then
-    QA_HINT="Run \`/pf-qa-setup\` in Claude Code to create \`.qa-workflow.md\` for this project"
+    if [ "${PF_CONVERGE_SKIP_CLAUDE:-0}" = "1" ]; then
+      QA_HINT="Run the PF qa-setup skill to create \`.qa-workflow.md\` for this project"
+    else
+      QA_HINT="Run \`/pf-qa-setup\` in Claude Code to create \`.qa-workflow.md\` for this project"
+    fi
   elif grep -qE '\*\*Version:\*\* *2\.0' "$f"; then
     warn ".qa-workflow.md carries the v2 stamp (**Version:** 2.0) — it was NOT overwritten (it is your document). Run \`/pf-qa-setup\` to regenerate it for v3."
   fi
@@ -1158,7 +1165,11 @@ print_report() {
     say ""
   fi
 
-  say "Next: open Claude Code in the project and run /pf"
+  if [ "${PF_CONVERGE_SKIP_CLAUDE:-0}" = "1" ]; then
+    say "Next: continue with the selected outer adapter."
+  else
+    say "Next: open Claude Code in the project and run /pf"
+  fi
 }
 
 print_plan() {

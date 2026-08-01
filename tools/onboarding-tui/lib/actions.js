@@ -4,7 +4,7 @@
  * lib/actions.js
  *
  * Thin wrappers around the repository's shell scripts
- * (scripts/converge-to-v3.sh, scripts/update-skills.sh). This module
+ * (scripts/converge-to-v4.sh, scripts/update-skills.sh). This module
  * intentionally does NOT re-implement any of their business logic — it
  * only spawns them as child processes with inherited stdio, so the user
  * sees/interacts with exactly the same prompts and output as running them
@@ -64,7 +64,7 @@ function runScript(scriptPath, args = [], spawnOpts = {}) {
 }
 
 /**
- * Delegate to scripts/converge-to-v3.sh — the single entry point for
+ * Delegate to scripts/converge-to-v4.sh — the single entry point for
  * installing, migrating and topping up a project. The target directory is
  * passed explicitly as `--target <dir>`; the script accepts it in any flag
  * position and defaults to `$(pwd)` when omitted.
@@ -77,7 +77,7 @@ function runScript(scriptPath, args = [], spawnOpts = {}) {
  * @returns {Promise<number|null>}
  */
 function runConverge(targetDir) {
-  const scriptPath = path.join(repoRoot, "scripts", "converge-to-v3.sh");
+  const scriptPath = path.join(repoRoot, "scripts", "converge-to-v4.sh");
   return runScript(scriptPath, ["--target", targetDir]);
 }
 

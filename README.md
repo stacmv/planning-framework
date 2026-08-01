@@ -1,4 +1,4 @@
-# Planning Framework v3.0
+# Planning Framework v4.0
 
 > **Issue-based workflow for AI-assisted development across sessions and branches**
 
@@ -6,6 +6,12 @@
 [![Version](https://img.shields.io/badge/version-3.0.0-blue.svg)](docs/planning/FRAMEWORK.md)
 
 ---
+
+## What's New in v4.0
+
+- **Claude Code + Codex support** — the same PF core can be installed for Claude, Codex, or both.
+- **Runtime-relative reviewers** — issue frontmatter can use `self`, `peer`, `both`, `claude`, or `codex`.
+- **Codex project adapter** — converge installs repo-local skills into `.agents/skills/` and writes a bounded PF section in `AGENTS.md`.
 
 ## What's New in v3.0
 
@@ -18,7 +24,7 @@
 
 ## Skills
 
-Sixteen Claude Code skills live in `skills/`, one directory per skill (`skills/<name>/SKILL.md`). Converge installs all of them into `~/.claude/skills/`.
+Sixteen PF skills live in `skills/`, one directory per skill (`skills/<name>/SKILL.md`). Converge installs them into `~/.claude/skills/` for Claude Code and into `.agents/skills/` for Codex projects.
 
 | Command | Purpose |
 |---------|---------|
@@ -102,13 +108,13 @@ Re-running the same command later updates an existing install in place (no promp
 git clone https://github.com/[your-org]/planning-framework
 cd planning-framework
 
-# 2. Converge your project on v3
+# 2. Converge your project on v4
 make converge TARGET=/path/to/your-project
 # Works whatever the project starts from: no framework, v1, v2,
 # half-migrated, or an incomplete v3 install. Idempotent.
 
 # 3. Review and commit
-cd /path/to/your-project && git status && git add . && git commit -m "Planning Framework v3.0"
+cd /path/to/your-project && git status && git add . && git commit -m "Planning Framework v4.0"
 
 # 4. Set up QA gates and create the first issue
 # In Claude Code: /pf-qa-setup, then "Create an issue to [add feature]"
@@ -117,7 +123,7 @@ cd /path/to/your-project && git status && git add . && git commit -m "Planning F
 Not sure what it would do? Add `--dry-run`:
 
 ```bash
-./scripts/converge-to-v3.sh --target /path/to/your-project --dry-run
+./scripts/converge-to-v4.sh --target /path/to/your-project --dry-run
 ```
 
 **See [QUICKSTART.md](docs/planning/QUICKSTART.md) for the complete 5-minute guide and [MIGRATION-GUIDE-V3.md](docs/planning/MIGRATION-GUIDE-V3.md) for upgrades.**
@@ -249,12 +255,13 @@ irm https://raw.githubusercontent.com/stacmv/planning-framework/main/scripts/ins
 
 **Install / migrate / top up — one script:**
 ```bash
-make converge                       # Converge the current directory on v3
+make converge                       # Converge the current directory on v4
 make converge TARGET=<path>         # ...or a specific project
-./scripts/converge-to-v3.sh --dry-run --target <path>   # Show the plan, change nothing
+make converge TARGET=<path> AGENTS=both                  # Install Claude and Codex adapters
+./scripts/converge-to-v4.sh --dry-run --target <path>    # Show the plan, change nothing
 ```
 
-Installs the framework + skills + the global `pf` shim, migrates v1/v2 layouts, and tops up an incomplete v3 install. Same script for all of it.
+Installs the framework + selected agent adapters, migrates v1/v2 layouts, and tops up an incomplete v3/v4 install. Same script for all of it.
 
 **Interactive:**
 ```bash
@@ -437,4 +444,4 @@ MIT License - Use freely in any project. See [LICENSE](LICENSE) for details.
 
 **Star this repo if it helps your project! ⭐**
 
-**Planning Framework v3.0 - Build better with AI assistance** 🚀
+**Planning Framework v4.0 - Build better with AI assistance**

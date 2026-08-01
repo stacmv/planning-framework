@@ -1,25 +1,25 @@
 ---
 name: pf-brd
 description: Generate a Business Requirements Document (BRD) for the active issue via guided Q&A
-version: 3.0.0
+version: 4.0.0
 ---
 
 Determine the active issue by scanning `docs/issues/open/` for [ISSUE-ID].
 
 **Legacy-tier guard (runs first, before any other prerequisite check):** read `docs/issues/open/[ISSUE-ID]/prompt.md`'s YAML frontmatter. If it has no `size_tier` field, ask the user via `AskUserQuestion` — "How big is this task?" with the four options **trivial** / **small** / **medium** / **large** (one-line descriptions from `~/.claude/skills/pf-size-tiers/SKILL.md`'s Tiers table), recommending **medium** ("matches today's default behavior") — then write the answer into `prompt.md`'s frontmatter, next to `doc_language`, before proceeding with the rest of this skill.
 
-**Reviewer-assignment guard (runs immediately after the legacy-tier guard above):** read `docs/issues/open/[ISSUE-ID]/prompt.md`'s YAML frontmatter — `size_tier` is guaranteed present by this point. If it has no `reviewers` field, ask the user via `AskUserQuestion` — one question per applicable key, "Who should review `<key>`?" with the three options **claude** / **codex** / **both**, recommending **claude** for every key ("matches today's default behavior") — then write the answers into `prompt.md`'s frontmatter as a `reviewers:` block, next to `size_tier`, e.g.:
+**Reviewer-assignment guard (runs immediately after the legacy-tier guard above):** read `docs/issues/open/[ISSUE-ID]/prompt.md`'s YAML frontmatter — `size_tier` is guaranteed present by this point. If it has no `reviewers` field, ask the user via `AskUserQuestion` — one question per applicable key, "Who should review `<key>`?" with the three options **self** / **peer** / **both**, recommending **self** for every key ("works with whichever PF4 runtime agent is active") — then write the answers into `prompt.md`'s frontmatter as a `reviewers:` block, next to `size_tier`, e.g.:
 
 ```yaml
 reviewers:
-  brd: claude
-  specs: claude
-  test_plan: claude
-  implementation_plan: claude
-  code: claude
+  brd: self
+  specs: self
+  test_plan: self
+  implementation_plan: self
+  code: self
 ```
 
-Do not re-ask once `reviewers` is already present — check for the field's presence before asking, exactly as the legacy-tier guard above already does for `size_tier`.
+Do not re-ask once `reviewers` is already present — check for the field's presence before asking, exactly as the legacy-tier guard above already does for `size_tier`. Existing issues may still contain explicit `claude` or `codex` values; those are valid pinned reviewers and must be honored by `pf-check`/`pf-codereview`.
 
 The applicable key set depends on `size_tier` and, when not `trivial`, on the issue type (feat/improve — detected from the folder name pattern, same as `~/.claude/skills/pf/SKILL.md` Step 4):
 - `size_tier: trivial` (any issue type, including bug — this is the only place a trivial-tier issue's reviewers get asked, since it never reaches `/pf`'s own bug-specific guard): `notes`, `test_plan`, `code`.

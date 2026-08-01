@@ -5,6 +5,7 @@ const path = require('node:path');
 
 // PLANNING.md version stamp, e.g. "**Framework Version:** 3.0.0". The stamp is
 // a DOCUMENT, not the machine-readable marker: .pf-version outranks it (Р7).
+const V4_VERSION_RE = /Framework Version:\**\s*4\.\d+/;
 const V3_VERSION_RE = /Framework Version:\**\s*3\.\d+/;
 const V2_VERSION_RE = /Framework Version:\**\s*2\.\d+/;
 
@@ -48,9 +49,9 @@ function readFileOrNull(p) {
  *      transfer failed and phase 5 was therefore skipped (D-B). Reading the
  *      marker first would call such a project 'v3', hand it the v3 menu and
  *      leave the untransferred planning/ data silently behind.
- *   2. .pf-version present                 -> 3.x = 'v3'; 1.x/2.x =
- *      'v2-or-older'; anything else (4.0.0, garbage) = 'unknown'.
- *   3. PLANNING.md version stamp           -> 3.x = 'v3'; 2.x = 'v2-or-older';
+ *   2. .pf-version present                 -> 4.x = 'v4'; 3.x = 'v3'; 1.x/2.x =
+ *      'v2-or-older'; anything else (5.0.0, garbage) = 'unknown'.
+ *   3. PLANNING.md version stamp           -> 4.x = 'v4'; 3.x = 'v3'; 2.x = 'v2-or-older';
  *      any other stamp, or none at all, falls THROUGH (defect 6: the old code
  *      short-circuited to 'unknown' here, which made the 'v2-or-older' branch
  *      unreachable for every real v2 project — they all carry a 2.0 stamp).
@@ -67,7 +68,7 @@ function readFileOrNull(p) {
  * convergence tells v1 from v2 internally.
  *
  * @param {string} targetDir
- * @returns {"none"|"v2-or-older"|"v3"|"unknown"}
+ * @returns {"none"|"v2-or-older"|"v3"|"v4"|"unknown"}
  */
 function detectState(targetDir) {
   const planningMdPath = path.join(targetDir, 'PLANNING.md');
@@ -90,6 +91,9 @@ function detectState(targetDir) {
     const m = PF_VERSION_RE.exec(pfVersionRaw.trim());
     if (m) {
       const major = Number(m[1]);
+      if (major === 4) {
+        return 'v4';
+      }
       if (major === 3) {
         return 'v3';
       }
@@ -105,6 +109,9 @@ function detectState(targetDir) {
   const planningMdExists = fs.existsSync(planningMdPath);
   if (planningMdExists) {
     const contents = readFileOrNull(planningMdPath) || '';
+    if (V4_VERSION_RE.test(contents)) {
+      return 'v4';
+    }
     if (V3_VERSION_RE.test(contents)) {
       return 'v3';
     }

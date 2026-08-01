@@ -1,7 +1,7 @@
 ---
 name: pf-check
 description: Review the most recently produced planning document in the active issue for potential problems, grouped by priority
-version: 3.0.0
+version: 4.0.0
 ---
 
 Before checking any other prerequisite, read `prompt.md`'s frontmatter. If it has no `size_tier` field, ask the user via `AskUserQuestion` — same 4 tier options and descriptions as in `~/.claude/skills/pf-size-tiers/SKILL.md`, recommending medium ("matches today's default behavior") — then write the answer into `prompt.md`'s frontmatter before proceeding with the rest of this skill.
@@ -26,12 +26,18 @@ Before dispatching any analysis, read the `reviewers` block from `docs/issues/op
 | `implementation_plan.md` | `implementation_plan` |
 | `analysis.md` | `analysis` |
 
-If the `reviewers` block is absent, or the specific key is absent from it, treat it as `claude` — this is the backward-compatibility default (see BRD/specs: existing issues created before this field existed must behave exactly as they did before). In that case, do **not** ask the user anything about reviewer choice here (that question belongs only to the once-per-issue guard in `pf-brd`/`pf`) — just proceed with the Claude path below silently, with no mention of Codex anywhere in the output.
+If the `reviewers` block is absent, or the specific key is absent from it, treat it as `self`. Do **not** ask the user anything about reviewer choice here (that question belongs only to the once-per-issue guard in `pf-brd`/`pf`).
 
 The resolved value drives which of the three paths below runs:
 - **`claude`** — run the "Claude review" path only.
 - **`codex`** — run the "Codex invocation chain" only.
 - **`both`** — run both independently (each exactly as it would run alone), then aggregate per "`both`-mode aggregation" below.
+
+### PF4 reviewer resolution override
+
+PF4 reviewer values are runtime-relative. If a value is `self`, use the current runtime/master agent. If it is `peer`, use the other installed supported agent and fall back to `self` with a note when the peer is unavailable. If it is `both`, run Claude and Codex independently and aggregate. Explicit `claude` and `codex` values are pinned reviewers kept for existing issues and explicit opt-in.
+
+In Codex runtime, the Claude peer path is `claude -p "<review-only brief>"`; the prompt must forbid file edits and must ask only for findings. In Claude Code runtime, the Codex peer path is the Codex invocation chain below. The runtime/master agent owns all fixes regardless of which reviewer produced findings.
 
 ### Claude review path
 
@@ -115,8 +121,10 @@ Present the returned findings to the user as-is, then use AskUserQuestion to pre
 
 Note: these three options are unchanged from today, and the oversized-for-tier finding (above) flows through them exactly like any other P0/P1 finding — "Skip and continue" remains available for it too. pf-check itself does not implement any special blocking behavior for oversized documents; it stays advisory-only, same as for every other finding. The real enforcement happens downstream: each pipeline skill (pf-spec, pf-test-plan, pf-impl-plan, pf-execute) independently recomputes this same oversized-for-tier comparison against its own predecessor document(s) as a prerequisite-gate check before it starts producing its own document, and stops there if the predecessor is still oversized. This gate and its three options are identical for `claude`, `codex`, and `both` — the reviewer choice changes only who produces the findings above it, never the gate itself.
 
-If "Fix now": dispatch a second sub-agent (Agent tool, default/general-purpose type) to apply the fix. **This fix sub-agent is always Claude, never Codex, regardless of which reviewer(s) produced the findings** — Codex (in any invocation form) only ever finds problems; it is never given write access to the repository (see specs.md §7). Give it: the target document path, the predecessor document paths, and the full P0/P1 findings list from the analysis step — for `both`, this is the merged, source-tagged (`[Claude]`/`[Codex]`) list from the aggregation above; the fix sub-agent should address all of it regardless of tag. Instruct it to read what it needs, use AskUserQuestion itself to ask clarifying questions until it is 95% confident (with a recommendation and reason below each option), edit the document directly (honoring the same `doc_language` field for any prose it writes, keeping structural labels in English), and return only a short summary of what changed. Relay that summary to the user.
+If "Fix now": apply the fix through the runtime/master agent. In Claude Code runtime this may be a second sub-agent (Agent tool, default/general-purpose type); in Codex runtime keep the fix in the current Codex task/session. Reviewer agents are read-only regardless of which reviewer(s) produced the findings. Give the fixer: the target document path, the predecessor document paths, and the full P0/P1 findings list from the analysis step — for `both`, this is the merged, source-tagged (`[Claude]`/`[Codex]`) list from the aggregation above; the fixer should address all of it regardless of tag. Instruct it to read what it needs, ask clarifying questions only when genuinely needed, edit the document directly (honoring the same `doc_language` field for any prose it writes, keeping structural labels in English), and return only a short summary of what changed. Relay that summary to the user.
 If "I'll fix manually" or "Skip and continue": confirm the choice and state the next /pf-* command to run.
+
+PF4 fix override: the runtime/master agent applies fixes. In Claude Code runtime this may be a Claude sub-agent; in Codex runtime it stays in the current Codex task/session. Reviewer agents, including a peer called through `claude -p` or `codex exec`, are read-only and never own file edits.
 
 ## Close the stage: commit & push
 

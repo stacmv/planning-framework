@@ -1,21 +1,21 @@
 ---
 name: pf-help
 description: Show Planning Framework overview, skill descriptions, and quick-start instructions for new users
-version: 3.0.0
+version: 4.0.0
 ---
 
 Display the following help text exactly:
 
 ---
 
-# Planning Framework v3.0
+# Planning Framework v4.0
 
 A structured workflow for AI-assisted software development. Every feature or fix goes through a design pipeline before any code is written.
 
 ## How it works
 
 Each task lives in an **issue folder** under `docs/issues/open/YYYYMMDD-type-slug/`.
-Run `/pf` at any time to see where you are and what to do next.
+Run `/pf` in Claude Code, or use the local `pf` skill from `.agents/skills` in Codex, to see where you are and what to do next.
 
 ## Workflow by issue type
 
@@ -67,10 +67,10 @@ Run `/pf` at any time to see where you are and what to do next.
 ## Installing in a new project
 
 One command handles every case — a fresh project, an older (v1/v2) one, or an
-incomplete v3 one. Run it from the project directory:
+incomplete v3/v4 one. Run it from the project directory:
 
 ```bash
-bash ~/dev/planning-framework/scripts/converge-to-v3.sh
+bash ~/dev/planning-framework/scripts/converge-to-v4.sh
 ```
 
 Or, from the framework repository: `make converge TARGET=/path/to/project`

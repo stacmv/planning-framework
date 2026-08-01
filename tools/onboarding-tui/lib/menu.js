@@ -38,15 +38,20 @@ const path = require("node:path");
 const MENUS = {
   none: [
     { key: "1", label: "What is Planning Framework? (tutorial)", action: "tutorial" },
-    { key: "2", label: "Install v3.0 into this project", action: "converge" },
+    { key: "2", label: "Install v4.0 into this project", action: "converge" },
   ],
   "v2-or-older": [
-    { key: "1", label: "Migrate this project to v3.0", action: "converge" },
-    { key: "2", label: "What changed in v3.0? (short overview)", action: "changelog" },
+    { key: "1", label: "Migrate this project to v4.0", action: "converge" },
+    { key: "2", label: "What changed in v4.0? (short overview)", action: "changelog" },
   ],
   v3: [
-    { key: "1", label: "Top up this project to the full v3.0 target state", action: "converge" },
-    { key: "2", label: "Update skills to latest version", action: "update-skills" },
+    { key: "1", label: "Top up this project to the full v4.0 target state", action: "converge" },
+    { key: "2", label: "Update agent adapters to latest version", action: "update-skills" },
+    { key: "3", label: "Show active issue status (/pf equivalent)", action: "issue-status" },
+  ],
+  v4: [
+    { key: "1", label: "Top up this project to the full v4.0 target state", action: "converge" },
+    { key: "2", label: "Update agent adapters to latest version", action: "update-skills" },
     { key: "3", label: "Show active issue status (/pf equivalent)", action: "issue-status" },
   ],
   unknown: [
@@ -130,7 +135,7 @@ function renderMenu(state, items) {
 /**
  * Show the main menu for `state` and return the selected action token.
  *
- * @param {"none"|"v2-or-older"|"v3"|"unknown"} state
+ * @param {"none"|"v2-or-older"|"v3"|"v4"|"unknown"} state
  * @param {{ targetDir?: string, rl?: readline.Interface }} [opts]
  * @returns {Promise<string>} action token, e.g. "tutorial", "converge",
  *   "changelog", "update-skills", "issue-status", "diagnose", or "quit".

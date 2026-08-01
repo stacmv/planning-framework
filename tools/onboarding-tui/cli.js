@@ -12,7 +12,7 @@
  *                         repository's shell scripts via child_process.spawn
  *
  * Install and migration are a single action: `converge`. It is offered from
- * the `none`, `v2-or-older` and `v3` states alike (an incomplete v3 project
+ * the `none`, `v2-or-older`, `v3` and `v4` states alike (an incomplete project
  * tops itself up with the very same run).
  *
  * No npm dependencies.
@@ -37,11 +37,12 @@ function parseTargetDir(argv) {
 
 function printChangelog() {
   console.log("");
-  console.log("What changed in v3.0?");
+  console.log("What changed in v4.0?");
   console.log("----------------------");
-  console.log("  - Skills-based workflow via /pf and related commands");
+  console.log("  - Multi-agent workflow via Claude Code and Codex adapters");
   console.log("  - BRD -> spec -> test plan -> implementation plan pipeline");
-  console.log("  - New skills/ directory with Claude Code skills");
+  console.log("  - Peer reviewer mode: self, peer, both, claude or codex");
+  console.log("  - Codex skills installed into .agents/skills/ when Codex is enabled");
   console.log("  - See PLANNING.md in the migrated project for full details");
   console.log("");
 }
@@ -50,8 +51,8 @@ function printIssueStatus() {
   console.log("");
   console.log("Issue status");
   console.log("------------");
-  console.log("  Run `/pf` in Claude Code (in this project) for full active");
-  console.log("  issue status and the next recommended step.");
+  console.log("  Run `/pf` in Claude Code or the `pf` skill in Codex for full");
+  console.log("  active issue status and the next recommended step.");
   console.log("");
 }
 

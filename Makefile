@@ -1,4 +1,5 @@
 PORT ?=
+AGENTS ?= auto
 
 .PHONY: help test test-ui update-skills issue-status converge tui
 
@@ -8,12 +9,13 @@ help:
 	@echo "  make test                         Run the whole suite: test/*.sh + node --test"
 	@echo "  make test-ui                      Launch the Manual Test UI (see tools/manual-test-ui/README.md)"
 	@echo "  make test-ui PORT=4400            Launch it on a specific port"
-	@echo "  make update-skills                Propagate skills/ to ~/.claude/skills/ for all consumer projects"
+	@echo "  make update-skills                Propagate skills/ to ~/.claude/skills/ for Claude projects"
 	@echo "  make update-skills SOURCE=path    Propagate from a different source directory"
 	@echo "  make issue-status                 Check status of issues from remote branches"
 	@echo "  make issue-status ID=20240127-... Check status of a specific issue"
-	@echo "  make converge                     Converge a project on v3 (install, migrate or top up)"
+	@echo "  make converge                     Converge a project on v4 (install, migrate or top up)"
 	@echo "  make converge TARGET=<path>       Converge a specific project directory"
+	@echo "  make converge AGENTS=both         Install Claude and Codex adapters"
 	@echo "  make tui                          Launch the interactive onboarding/update wizard"
 	@echo "  make tui TARGET=<path>            Run against a specific target project directory"
 
@@ -77,7 +79,7 @@ issue-status:
 # It replaces the four former per-version setup and migration targets, all removed.
 # Without TARGET= the script defaults to the current directory.
 converge:
-	bash scripts/converge-to-v3.sh $(if $(TARGET),--target $(TARGET),)
+	bash scripts/converge-to-v4.sh $(if $(TARGET),--target $(TARGET),) --agents $(AGENTS)
 
 tui:
 	node tools/onboarding-tui/cli.js $(if $(TARGET),--target $(TARGET),)

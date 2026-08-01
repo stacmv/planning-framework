@@ -1,7 +1,7 @@
 ---
 name: pf-update
 description: Update Planning Framework skills to the latest version from the framework source repo
-version: 3.0.0
+version: 4.0.0
 ---
 
 Update the installed Planning Framework skills to the latest version.
@@ -53,12 +53,12 @@ Show the output to the user ([new], [updated], [unchanged] per skill).
 
 Updating the skills without touching `.pf-version` lets the marker drift silently: the project claims one framework version while running another. So, after the update:
 
-1. Read the framework version from the framework repo — `PF_VERSION` in `scripts/converge-to-v3.sh`.
+1. Read the framework version from the framework repo — `PF_VERSION` in `scripts/converge-to-v4.sh`.
 2. Read the current project's `.pf-version` (the file at the repo root of the project `/pf-update` was invoked in).
 3. Compare:
    - **Match** — say so in one line and move on. Nothing to do.
    - **Mismatch or `.pf-version` missing entirely** — do **not** rewrite the file yourself: the marker is written by convergence, together with the layout and documents it stands for. Print a recommendation instead, naming both versions:
-     "This project's `.pf-version` says `<project-version>`, the framework is `<framework-version>`. Run convergence to bring the project up to date: `make converge` in the project, or `bash <path-to-planning-framework>/scripts/converge-to-v3.sh --target <project-path>`."
+     "This project's `.pf-version` says `<project-version>`, the framework is `<framework-version>`. Run convergence to bring the project up to date: `make converge` in the project, or `bash <path-to-planning-framework>/scripts/converge-to-v4.sh --target <project-path>`."
      (If `.pf-version` is absent, say "This project has no `.pf-version` marker" and give the same recommendation.)
 
 ## Step 4: Report

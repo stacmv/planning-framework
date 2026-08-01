@@ -1,10 +1,10 @@
 ---
 name: pf
 description: Planning Framework orchestrator — shows active issue, completed stages, and next step
-version: 3.0.0
+version: 4.0.0
 ---
 
-You are the Planning Framework v3.0 orchestrator. When invoked as `/pf`, perform the following steps exactly.
+You are the Planning Framework v4.0 orchestrator. When invoked as `/pf` or as the Codex `pf` skill, perform the following steps exactly.
 
 ## Step 1: Read installed version
 
@@ -59,17 +59,17 @@ Before proceeding to Step 5, check the active issue's `prompt.md` frontmatter. I
 
 ## Reviewer-assignment guard (before Step 5)
 
-Before proceeding to Step 5, and only for a **bug**-type issue whose `size_tier` is not `trivial` (a trivial-tier bug issue never writes `analysis.md` — per the precedence rule in Step 6 it is routed to `/pf-brd` instead, which carries its own copy of this guard for that case): check the active issue's `prompt.md` frontmatter. If it has no `reviewers` field, ask the user via `AskUserQuestion` — one question per key, "Who should review `<key>`?" with the three options **claude** / **codex** / **both**, recommending **claude** for every key ("matches today's default behavior") — for the keys `analysis`, `test_plan`, `implementation_plan`, `code`. Write the answers into `prompt.md`'s frontmatter as a `reviewers:` block, next to `size_tier`, e.g.:
+Before proceeding to Step 5, and only for a **bug**-type issue whose `size_tier` is not `trivial` (a trivial-tier bug issue never writes `analysis.md` — per the precedence rule in Step 6 it is routed to `/pf-brd` instead, which carries its own copy of this guard for that case): check the active issue's `prompt.md` frontmatter. If it has no `reviewers` field, ask the user via `AskUserQuestion` — one question per key, "Who should review `<key>`?" with the three options **self** / **peer** / **both**, recommending **self** for every key ("works with whichever PF4 runtime agent is active") — for the keys `analysis`, `test_plan`, `implementation_plan`, `code`. Write the answers into `prompt.md`'s frontmatter as a `reviewers:` block, next to `size_tier`, e.g.:
 
 ```yaml
 reviewers:
-  analysis: claude
-  test_plan: claude
-  implementation_plan: claude
-  code: claude
+  analysis: self
+  test_plan: self
+  implementation_plan: self
+  code: self
 ```
 
-Do not re-ask once `reviewers` is already present — check for the field's presence before asking, exactly as the guard above already does for `size_tier`.
+Do not re-ask once `reviewers` is already present — check for the field's presence before asking, exactly as the guard above already does for `size_tier`. Existing issues may still contain explicit `claude` or `codex` values; those are valid pinned reviewers and must be honored by `pf-check`/`pf-codereview`.
 
 For `feat`/`improve`-type issues, and for any `trivial`-tier issue (including bug), this guard does not fire — `~/.claude/skills/pf-brd/SKILL.md`'s own reviewer-assignment guard covers those cases instead.
 

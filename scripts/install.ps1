@@ -1,4 +1,4 @@
-# Planning Framework v3.0 — one-command installer for Windows.
+# Planning Framework v4.0 — one-command installer for Windows.
 #
 #   irm https://raw.githubusercontent.com/stacmv/planning-framework/main/scripts/install.ps1 | iex
 #
@@ -38,7 +38,7 @@ if (-not (Get-Command node -ErrorAction SilentlyContinue)) {
     exit 1
 }
 
-Write-Host 'Planning Framework v3.0 — installer'
+Write-Host 'Planning Framework v4.0 — installer'
 Write-Host '===================================='
 Write-Host "  git : $(& git --version)"
 Write-Host "  node: $(& node --version)"
@@ -96,7 +96,7 @@ Write-Host ''
 
 # ─── 5. PATH check + summary ──────────────────────────────────────────────────
 
-Write-Host 'Planning Framework v3.0 installed'
+Write-Host 'Planning Framework v4.0 installed'
 Write-Host "  Location : $InstallDir  (branch $RepoBranch)"
 Write-Host "  Skills   : $SkillsDir"
 Write-Host "  Command  : $(Join-Path $BinDir 'pf.cmd')"

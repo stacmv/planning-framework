@@ -1,6 +1,6 @@
 #!/usr/bin/env sh
 #
-# Planning Framework v3.0 — one-command installer for Linux/macOS.
+# Planning Framework v4.0 — one-command installer for Linux/macOS.
 #
 #   curl -fsSL https://raw.githubusercontent.com/stacmv/planning-framework/main/scripts/install.sh | sh
 #
@@ -34,7 +34,7 @@ if ! command -v node >/dev/null 2>&1; then
   exit 1
 fi
 
-echo "Planning Framework v3.0 — installer"
+echo "Planning Framework v4.0 — installer"
 echo "===================================="
 echo "  git : $(git --version 2>/dev/null || echo 'unknown')"
 echo "  node: $(node --version 2>/dev/null || echo 'unknown')"
@@ -64,12 +64,12 @@ echo ""
 # Mirrors scripts/update-skills.sh: every directory under skills/ that
 # contains a SKILL.md is copied. No hardcoded skill list — so all current
 # skills are installed and future ones are picked up automatically. This is
-# the same discovery install.ps1 and converge-to-v3.sh use, giving full skill
+# the same discovery install.ps1 and converge scripts use, giving full skill
 # parity across platforms.
 #
 # install.sh installs the framework ITSELF (clone + skills + `pf` shim); it
 # writes nothing into a consumer project. Onboarding a project is a separate,
-# explicit step: `pf` (the TUI) or `converge-to-v3.sh`.
+# explicit step: `pf` (the TUI) or `converge-to-v4.sh`.
 
 echo "Installing skills to: $GLOBAL_SKILLS_DIR"
 for src in "$INSTALL_DIR"/skills/*/; do
@@ -84,7 +84,7 @@ done
 echo ""
 
 # ─── 4. Install global `pf` shim (AC-6) ───────────────────────────────────────
-# Same template as update-skills.sh / converge-to-v3.sh, with
+# Same template as update-skills.sh / converge scripts, with
 # <FRAMEWORK_ROOT> = $INSTALL_DIR. Idempotent (wholesale rewrite, no backups).
 # The shim does NOT inject --target "$(pwd)": cli.js defaults to process.cwd(),
 # and a hardcoded --target would make `pf --target <dir>` silently ignored
@@ -103,7 +103,7 @@ echo ""
 
 # ─── 5. PATH check + summary ──────────────────────────────────────────────────
 
-echo "✓ Planning Framework v3.0 installed"
+echo "✓ Planning Framework v4.0 installed"
 echo "  Location : $INSTALL_DIR  (branch $REPO_BRANCH)"
 echo "  Skills   : $GLOBAL_SKILLS_DIR"
 echo "  Command  : $GLOBAL_BIN_DIR/pf"

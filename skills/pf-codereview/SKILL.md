@@ -1,7 +1,7 @@
 ---
 name: pf-codereview
 description: Review the active issue's code diff for potential problems, grouped by priority — a hard gate between /pf-execute and /pf-test
-version: 3.0.0
+version: 4.0.0
 ---
 
 Determine the active issue from `docs/issues/open/`. Read ISSUE-ID from the folder name.
@@ -37,7 +37,13 @@ This diff — plus `implementation_plan.md` and `test_plan.md` for intent/contex
 
 ## Phase 2: Reviewer Selection
 
-Read the `reviewers` block from `docs/issues/open/ISSUE-ID/prompt.md`'s frontmatter and resolve `reviewers.code`. If the `reviewers` block or the `code` key is absent, treat it as `claude` — the same backward-compatibility default `pf-check` uses, and for the same reason: issues created before this field existed must review code exactly as `claude`-only would have.
+### PF4 reviewer resolution override
+
+PF4 reviewer values are runtime-relative. If `reviewers.code` is `self`, use the current runtime/master agent. If it is `peer`, use the other installed supported agent and fall back to `self` with a note when the peer is unavailable. If it is `both`, run Claude and Codex independently and aggregate. Explicit `claude` and `codex` values are pinned reviewers kept for existing issues and explicit opt-in.
+
+In Codex runtime, the Claude peer path is `claude -p "<review-only brief>"`; the prompt must forbid file edits and must ask only for findings. In Claude Code runtime, the Codex peer path is `pf-check`'s Codex invocation chain. The runtime/master agent owns all fixes regardless of which reviewer produced findings.
+
+Read the `reviewers` block from `docs/issues/open/ISSUE-ID/prompt.md`'s frontmatter and resolve `reviewers.code`. If the `reviewers` block or the `code` key is absent, treat it as `self`.
 
 The resolved value drives which path runs, identically to `pf-check`:
 - **`claude`** — the "Claude review" path below only.
@@ -122,13 +128,15 @@ Write finding prose in the issue's `doc_language` (default English), keeping `[C
 
 This is the one deliberate difference from `pf-check`'s gate: `pf-check` always keeps a third "Skip and continue" option; this skill never offers it while a P0/P1 finding is open, per the BRD's requirement that the code-review gate is genuinely blocking. Only P2-or-none resolves to `verdict: PASS` without any gate question at all.
 
-**If "Fix now":** dispatch a fix sub-agent (Agent tool, default/general-purpose type). **This fix sub-agent is always Claude, never Codex, regardless of which reviewer(s) produced the findings** — Codex, in any invocation form, only ever finds problems; it is never given write access to the repository. Give it: PARENT-BRANCH (so it can re-derive the diff), the full P0/P1 findings list (source-tagged `[Claude]`/`[Codex]` if `both`), and `implementation_plan.md`/`test_plan.md` for context. Instruct it to read what it needs, use `AskUserQuestion` itself for genuinely ambiguous points, patch the diff directly, and return only a short summary of what changed.
+**If "Fix now":** apply the fix through the runtime/master agent. In Claude Code runtime this may be a fix sub-agent (Agent tool, default/general-purpose type); in Codex runtime keep the fix in the current Codex task/session. Reviewer agents are read-only regardless of which reviewer(s) produced the findings. Give the fixer: PARENT-BRANCH (so it can re-derive the diff), the full P0/P1 findings list (source-tagged `[Claude]`/`[Codex]` if `both`), and `implementation_plan.md`/`test_plan.md` for context. Instruct it to read what it needs, ask clarifying questions only when genuinely needed, patch the diff directly, and return only a short summary of what changed.
 
 After the fix sub-agent returns, **loop**: go back to Phase 1 (recompute the diff — it has changed), re-run Phase 2 (the same `reviewers.code` reviewer(s)) and Phase 3 (rewrite `code_review.md`), then re-evaluate this Phase 4 gate. Repeat automatically — no need to re-ask the user to re-invoke the skill — until `verdict: PASS`. Relay each iteration's fix summary to the user as it happens.
 
 **If "I'll fix manually, then re-run /pf-codereview":** confirm the choice, state that `code_review.md` currently records `verdict: FAIL`, and stop. Do not loop — the next `/pf-codereview` invocation starts a fresh Phase 0.
 
 ---
+
+PF4 fix override: the runtime/master agent applies fixes. In Claude Code runtime this may be a Claude sub-agent; in Codex runtime it stays in the current Codex task/session. Reviewer agents, including a peer called through `claude -p` or `codex exec`, are read-only and never own file edits.
 
 ## Phase 5: Commit & Push
 
@@ -142,4 +150,4 @@ As the last action of this skill invocation — after the loop above (if any) ha
 - **Never widen the diff to the whole working tree.** The scope is always `PARENT-BRANCH...HEAD`, computed fresh each loop iteration.
 - **The severity mapping and the Codex invocation chain live in exactly one place** — `skills/pf-check/SKILL.md`. This skill references them; it never copies or re-derives them, so the two skills cannot drift apart on what P0/P1/P2 mean.
 - **"Skip and continue" does not exist here, ever, while P0/P1 is open.** This is the one deliberate divergence from `pf-check`'s gate — everything else about reviewer selection, Codex fallback, and `both`-aggregation is identical.
-- **Fix sub-agent is always Claude** — Codex (in any invocation form) only ever produces findings, never writes to the repository.
+- **Fixes are runtime-owned** — reviewer agents only produce findings; the runtime/master agent applies repository edits.

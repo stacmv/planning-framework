@@ -1,8 +1,8 @@
-# Planning Framework v3.0
+# Planning Framework v4.0
 
-> **Claude Code users:** Run `/pf` to see your active issue status and next step.
+> **Claude Code users:** Run `/pf`. **Codex users:** use the local `pf` skill from `.agents/skills`.
 
-Planning Framework is an issue-based workflow for tracking development work across AI agent sessions, supporting Claude Code, Gemini CLI, and Qwen Code.
+Planning Framework is an issue-based workflow for tracking development work across AI agent sessions. PF4 keeps the same core workflow and adds first-class adapters for Claude Code and Codex.
 
 ---
 
@@ -168,5 +168,16 @@ open/YYYYMMDD-type-slug/   →   closed/YYYYMMDD-type-slug/
 
 ---
 
-**Framework Version:** 3.0
+**Framework Version:** 4.0
 **Last Updated:** 2026-06-24
+
+---
+
+## PF4 multi-agent runtime
+
+PF4 supports Claude Code and Codex as runtime/master agents. The runtime agent owns workflow state
+and file edits. A peer reviewer may inspect documents or code, but fixes are applied by the runtime
+agent.
+
+Reviewer values in issue frontmatter may be `self`, `peer`, `both`, `claude`, or `codex`. `self`
+means the current runtime agent; `peer` means the other supported agent when it is available.

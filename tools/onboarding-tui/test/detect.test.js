@@ -52,7 +52,7 @@ test('TC-002: PLANNING.md with valid v3.x marker plus CLAUDE.md -> v3 (v3 wins)'
   }
 });
 
-test('TC-004: PLANNING.md with invalid/mismatched version marker -> unknown', () => {
+test('TC-004: PLANNING.md with supported v4.x marker -> v4', () => {
   const tmpDir = makeTmpDir();
   try {
     fs.writeFileSync(
@@ -60,7 +60,7 @@ test('TC-004: PLANNING.md with invalid/mismatched version marker -> unknown', ()
       '# Planning Framework\n\n**Framework Version:** 4.0.0\n'
     );
     const result = detectState(tmpDir);
-    assert.strictEqual(result, 'unknown');
+    assert.strictEqual(result, 'v4');
   } finally {
     cleanup(tmpDir);
   }
@@ -185,8 +185,8 @@ test('TCD-03: .pf-version 1.0.0 -> v2-or-older (no separate v1 token — KI-9)',
   assertState((dir) => writePfVersion(dir, '1.0.0'), 'v2-or-older');
 });
 
-test('TCD-04: .pf-version 4.0.0 (a future version) -> unknown', () => {
-  assertState((dir) => writePfVersion(dir, '4.0.0'), 'unknown');
+test('TCD-04: .pf-version 4.0.0 -> v4', () => {
+  assertState((dir) => writePfVersion(dir, '4.0.0'), 'v4');
 });
 
 test('TCD-05: .pf-version holding garbage -> unknown', () => {
@@ -248,11 +248,11 @@ test('TCD-10: mixed/half-migrated layout -> v2-or-older, even once markers say v
   }
 });
 
-test('TCD-11: a 4.0-stamped PLANNING.md next to CLAUDE.md -> unknown, not v2', () => {
+test('TCD-11: a 5.0-stamped PLANNING.md next to CLAUDE.md -> unknown, not v2', () => {
   // Rule 5 keeps its "no PLANNING.md" precondition: a future version must not
   // be classified as v2 and offered a migration DOWNWARDS.
   assertState((dir) => {
-    writePlanningMd(dir, '4.0');
+    writePlanningMd(dir, '5.0');
     fs.writeFileSync(path.join(dir, 'CLAUDE.md'), '# Some CLAUDE.md content\n');
   }, 'unknown');
 });
@@ -263,7 +263,7 @@ test('TCD: every state token observed above is a key of MENUS (KI-9)', () => {
   // showMenu() throws on an unknown state — and it is NOT called here: it opens
   // readline on process.stdin and loops until valid input, so under `node --test`
   // it would hang. The exported MENUS map is checked instead.
-  assert.deepStrictEqual(Object.keys(MENUS).sort(), ['none', 'unknown', 'v2-or-older', 'v3']);
+  assert.deepStrictEqual(Object.keys(MENUS).sort(), ['none', 'unknown', 'v2-or-older', 'v3', 'v4']);
 
   // 'none' comes from TC-001 above, which does not feed observedTokens.
   observedTokens.add(stateAfter(() => {}));
@@ -272,5 +272,5 @@ test('TCD: every state token observed above is a key of MENUS (KI-9)', () => {
   for (const token of observedTokens) {
     assert.ok(menuKeys.has(token), `detectState returned "${token}", which has no menu`);
   }
-  assert.deepStrictEqual([...observedTokens].sort(), ['none', 'unknown', 'v2-or-older', 'v3']);
+  assert.deepStrictEqual([...observedTokens].sort(), ['none', 'unknown', 'v2-or-older', 'v3', 'v4']);
 });

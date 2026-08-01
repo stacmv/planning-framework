@@ -91,7 +91,13 @@ test("TC-036 step 2: MENUS['v2-or-older'] offers converge, and no `migrate` toke
 test('TC-036 step 3: MENUS.v3 offers converge — an incomplete v3 project can top itself up (Р11)', () => {
   const tokens = actionsOf('v3');
   assert.ok(tokens.includes('converge'), 'MENUS.v3 has no converge item — Р11 is unimplemented');
-  // The pre-existing v3 items survive.
+  assert.ok(tokens.includes('update-skills'));
+  assert.ok(tokens.includes('issue-status'));
+});
+
+test('TC-036 step 3b: MENUS.v4 offers converge and adapter actions', () => {
+  const tokens = actionsOf('v4');
+  assert.ok(tokens.includes('converge'), 'MENUS.v4 has no converge item');
   assert.ok(tokens.includes('update-skills'));
   assert.ok(tokens.includes('issue-status'));
 });
@@ -114,7 +120,7 @@ test('TC-036 step 5: actions.js exports runConverge and nothing named after the 
   assert.strictEqual(actions.runMigrateV2ToV3, undefined, 'runMigrateV2ToV3 must be gone');
 
   const src = fs.readFileSync(path.join(TUI_ROOT, 'lib', 'actions.js'), 'utf8');
-  assert.match(src, /converge-to-v3\.sh/, 'runConverge must delegate to converge-to-v3.sh');
+  assert.match(src, /converge-to-v4\.sh/, 'runConverge must delegate to converge-to-v4.sh');
   // The P2-7 compromise comment described a prompt-for-target quirk of the
   // script that is being deleted; it must not outlive it.
   assert.ok(!src.includes('P2-7'), 'the P2-7 compromise comment must be deleted');
