@@ -70,12 +70,14 @@ Run this chain whenever the resolved reviewer for TARGET is `codex` (alone or as
       - `--scope branch` (not the default `auto`/`working-tree`) so the diff is always against `<base-ref>`, never the ad-hoc working tree.
       - `<base-ref>` is the same parent-branch detection `pf-close` uses (`git config branch.issue/<ISSUE-ID>.merge`, falling back to `develop`/`main`). Because TARGET is a document authored fresh within the issue branch, the resulting branch diff against `<base-ref>` is, in practice, the whole document — this is what specs.md means by "scope = whole target document" for document review, as opposed to the code-review case in `pf-codereview` where the same `--base <base-ref>` diff spans the entire issue implementation instead of one file.
    c. Parse the command's JSON stdout against `review-output.schema.json` (`verdict`, `summary`, `findings[]` with `severity`/`title`/`body`/`file`/`line_start`/`line_end`/`recommendation`). Map each finding's `severity` to P0/P1/P2 per the mapping table below. Skip to "Present findings" below (do not also run the Claude sub-agent, unless this is the Codex half of `both`).
-3. **Plugin not available.** Ask the user (`AskUserQuestion`) whether to install the `codex` plugin now. If they agree, tell them the exact two commands (do not paraphrase or guess at alternatives):
+3. **Plugin not available.** Ask the user (`AskUserQuestion`) whether to install the `codex` plugin now. If they agree, tell them the exact four commands, in order (do not paraphrase or guess at alternatives — source: [openai/codex-plugin-cc](https://github.com/openai/codex-plugin-cc) README):
    ```
    /plugin marketplace add openai/codex-plugin-cc
    /plugin install codex@openai-codex
+   /reload-plugins
+   /codex:setup
    ```
-   and stop this review for now — re-run this skill once it's installed, which resumes at step 1. If they decline, continue to step 4.
+   `/reload-plugins` is required — a freshly installed plugin's skills/commands do not become available in the current session until plugins are reloaded. `/codex:setup` then checks the Codex CLI itself and offers to install/authenticate it if needed. After this, stop this review for now — re-run this skill once setup is done, which resumes at step 1. If they decline the install, continue to step 4.
 4. **Raw CLI fallback.** Call the Codex CLI directly via `Bash`, bypassing the plugin wrapper entirely:
    ```
    codex exec "<review brief: TARGET path + predecessor list + the same 'identify problems from different angles, check tier budget, group by priority' instruction as the Claude path above>"
