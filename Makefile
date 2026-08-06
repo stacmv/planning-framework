@@ -14,6 +14,7 @@ help:
 	@echo "  make issue-status ID=20240127-... Check status of a specific issue"
 	@echo "  make converge                     Converge a project on v3 (install, migrate or top up)"
 	@echo "  make converge TARGET=<path>       Converge a specific project directory"
+	@echo "  make converge TARGET=<path> YES=1    Converge non-interactively (skip confirmation prompt)"
 	@echo "  make tui                          Launch the interactive onboarding/update wizard"
 	@echo "  make tui TARGET=<path>            Run against a specific target project directory"
 
@@ -77,7 +78,7 @@ issue-status:
 # It replaces the four former per-version setup and migration targets, all removed.
 # Without TARGET= the script defaults to the current directory.
 converge:
-	bash scripts/converge-to-v3.sh $(if $(TARGET),--target $(TARGET),)
+	bash scripts/converge-to-v3.sh $(if $(TARGET),--target $(TARGET),) $(if $(YES),--yes,)
 
 tui:
 	node tools/onboarding-tui/cli.js $(if $(TARGET),--target $(TARGET),)

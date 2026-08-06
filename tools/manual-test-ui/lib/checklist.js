@@ -38,12 +38,13 @@ function detectEol(text) {
 
 function splitCells(row) {
   // "| a | b | c |" -> ["a", "b", "c"], trimmed. Tolerates a missing
-  // trailing pipe. Does not support escaped "\|" inside cells — this
-  // format has never needed one.
+  // trailing pipe. Supports GFM-escaped "\|" inside a cell: split on each
+  // "|" not preceded by a backslash, then unescape "\|" to a literal "|"
+  // inside the already-separated cell.
   let s = row.trim();
   if (s.startsWith("|")) s = s.slice(1);
   if (s.endsWith("|")) s = s.slice(0, -1);
-  return s.split("|").map((c) => c.trim());
+  return s.split(/(?<!\\)\|/).map((c) => c.trim().replace(/\\\|/g, "|"));
 }
 
 function parseChecklist(content) {
@@ -52,6 +53,12 @@ function parseChecklist(content) {
 
   const meta = {};
   const tcs = [];
+  // Content inside a TC's body that matches none of the known labels —
+  // e.g. a stray "## Section" heading, free prose, or an unrelated table
+  // sitting between two TC blocks. It does not conceptually belong to the
+  // TC above it, so it is kept separate rather than folded into that TC's
+  // warnings/notes or silently dropped.
+  const looseSections = [];
 
   let i = 0;
   // Header metadata block, before the first TC heading.
@@ -176,6 +183,12 @@ function parseChecklist(content) {
       if (notesMatch) {
         tc.notesLineIndex = j;
         tc.notesText = notesMatch[1];
+        continue;
+      }
+
+      // Nothing above recognized this line — don't let it vanish silently.
+      if (line.trim() !== "") {
+        looseSections.push({ afterTc: tc.id, lineIndex: j, text: line });
       }
     }
 
@@ -183,7 +196,7 @@ function parseChecklist(content) {
     i = sectionEnd;
   }
 
-  return { meta, tcs, eol, lineCount: lines.length };
+  return { meta, tcs, eol, lineCount: lines.length, looseSections };
 }
 
 function summarize(parsed) {
@@ -219,7 +232,11 @@ function patchStepResult(content, tcId, stepNum, { checked, note }) {
   const box = checked ? "[x]" : "[ ]";
   const cleanNote = (note || "").replace(/\|/g, "/").trim();
   cells[step.resultColIndex] = cleanNote ? `${box} ${cleanNote}` : box;
-  lines[step.lineIndex] = `| ${cells.join(" | ")} |`;
+  // Re-escape every cell before joining, not just the patched one:
+  // splitCells() above already unescaped "\|" into a literal "|" in each
+  // cell, so writing raw cells back would re-corrupt any other cell that
+  // contains an escaped pipe.
+  lines[step.lineIndex] = `| ${cells.map((c) => c.replace(/\|/g, "\\|")).join(" | ")} |`;
 
   return lines.join(parsed.eol);
 }

@@ -37,9 +37,9 @@
 - Результат обоих ручных прогонов (дословные тексты отказов) фиксируется в `session-log.md`.
 
 **Acceptance Criteria:**
-- [ ] TC-001 passes
-- [ ] TC-002 passes
-- [ ] TC-003 passes
+- [x] TC-001 passes
+- [ ] TC-002 passes — прогон 2026-08-06 отклонён как недоказательный, исполняется человеком (см. `session-log.md`)
+- [ ] TC-003 passes — not run by this executor; requires a human operator at the screen and `CronCreate` permission (see `session-log.md`, 2026-08-06)
 
 #### Task 2: Экранированный `\|` в ячейках таблицы — парсинг и обратная сериализация
 
