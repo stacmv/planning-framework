@@ -10,11 +10,15 @@
 - Ran `/pf-check autopilot` against specs.md (reviewer: Codex, per this issue's own pre-existing `reviewers:` block). Findings: 1 P1 (missing `pf-execute` code-write delegation spec), 2 P2 (migration/confirmation gaps for direct skill invocation bypassing `/pf`).
 - `[autopilot default]` pf-check auto-applied Fix now — 1 P0/P1 addressed (plus both P2s, since they were cheap to fold into the same edit): added §6a (`pf-execute` delegation), §7.0 (automigration as pf-check/pf-codereview's own prerequisite), amended §7.3/§2 (`confirmed:` marker for `code.review: skip`).
 
+- Wrote test_plan.md (20 TC, 3 Auto/17 Manual, Known Issues section per medium tier).
+- Ran `/pf-check autopilot` against test_plan.md (reviewer: Codex). Finding: 1 P2 (TC-covering-migration only exercises `/pf-check`'s direct-invocation path, not `/pf-codereview`'s, per specs.md §7.0).
+- `[autopilot default]` pf-check auto-continued — only P2/none. TC left as-is; the gap is noted here for whoever writes/extends the implementation-plan or test_plan later.
+
 **In Progress:**
-- Next stage: `/pf-test-plan`.
+- Next stage: `/pf-impl-plan`.
 
 **Blockers:**
 - None.
 
 **Next Session:**
-- `/pf-test-plan` → `/pf-check` → `/pf-impl-plan` → `/pf-check` → `/pf-execute` → `/pf-codereview` → `/pf-test` → `/pf-qa` → `/pf-close`.
+- `/pf-impl-plan` → `/pf-check` → `/pf-execute` → `/pf-codereview` → `/pf-test` → `/pf-qa` → `/pf-close`.
