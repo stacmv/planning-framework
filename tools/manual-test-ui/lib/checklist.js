@@ -38,12 +38,13 @@ function detectEol(text) {
 
 function splitCells(row) {
   // "| a | b | c |" -> ["a", "b", "c"], trimmed. Tolerates a missing
-  // trailing pipe. Does not support escaped "\|" inside cells — this
-  // format has never needed one.
+  // trailing pipe. Supports GFM-escaped "\|" inside a cell: split on each
+  // "|" not preceded by a backslash, then unescape "\|" to a literal "|"
+  // inside the already-separated cell.
   let s = row.trim();
   if (s.startsWith("|")) s = s.slice(1);
   if (s.endsWith("|")) s = s.slice(0, -1);
-  return s.split("|").map((c) => c.trim());
+  return s.split(/(?<!\\)\|/).map((c) => c.trim().replace(/\\\|/g, "|"));
 }
 
 function parseChecklist(content) {
@@ -219,7 +220,11 @@ function patchStepResult(content, tcId, stepNum, { checked, note }) {
   const box = checked ? "[x]" : "[ ]";
   const cleanNote = (note || "").replace(/\|/g, "/").trim();
   cells[step.resultColIndex] = cleanNote ? `${box} ${cleanNote}` : box;
-  lines[step.lineIndex] = `| ${cells.join(" | ")} |`;
+  // Re-escape every cell before joining, not just the patched one:
+  // splitCells() above already unescaped "\|" into a literal "|" in each
+  // cell, so writing raw cells back would re-corrupt any other cell that
+  // contains an escaped pipe.
+  lines[step.lineIndex] = `| ${cells.map((c) => c.replace(/\|/g, "\\|")).join(" | ")} |`;
 
   return lines.join(parsed.eol);
 }
