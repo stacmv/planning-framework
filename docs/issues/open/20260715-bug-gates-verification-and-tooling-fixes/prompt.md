@@ -1,6 +1,11 @@
 ---
 doc_language: Russian
 size_tier: small
+reviewers:
+  analysis: codex
+  test_plan: codex
+  implementation_plan: both
+  code: both
 ---
 
 Follow-up к `20260713-bug-v2-to-v3-migration-defects` (закрыт, смержен в `develop`, коммиты `c6ee908..095cb20`). Четыре находки, всплывшие при исполнении и ручном тестировании того issue. Все четыре перепроверены на текущем `develop` (`836b04e`, добавивший `/pf-autopilot`) 2026-07-15 — ни одна не исправлена.
