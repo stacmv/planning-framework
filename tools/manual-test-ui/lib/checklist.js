@@ -53,6 +53,12 @@ function parseChecklist(content) {
 
   const meta = {};
   const tcs = [];
+  // Content inside a TC's body that matches none of the known labels —
+  // e.g. a stray "## Section" heading, free prose, or an unrelated table
+  // sitting between two TC blocks. It does not conceptually belong to the
+  // TC above it, so it is kept separate rather than folded into that TC's
+  // warnings/notes or silently dropped.
+  const looseSections = [];
 
   let i = 0;
   // Header metadata block, before the first TC heading.
@@ -177,6 +183,12 @@ function parseChecklist(content) {
       if (notesMatch) {
         tc.notesLineIndex = j;
         tc.notesText = notesMatch[1];
+        continue;
+      }
+
+      // Nothing above recognized this line — don't let it vanish silently.
+      if (line.trim() !== "") {
+        looseSections.push({ afterTc: tc.id, lineIndex: j, text: line });
       }
     }
 
@@ -184,7 +196,7 @@ function parseChecklist(content) {
     i = sectionEnd;
   }
 
-  return { meta, tcs, eol, lineCount: lines.length };
+  return { meta, tcs, eol, lineCount: lines.length, looseSections };
 }
 
 function summarize(parsed) {
