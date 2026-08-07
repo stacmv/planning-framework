@@ -60,7 +60,10 @@ I want to build [read description from prompt.md]. I want you to help me brainst
 IMPORTANT: DO NOT INCLUDE ANY TECHNICAL IMPLEMENTATION DETAILS.
 Use the AskUserQuestion tool to ask me clarifying questions until you are 95% confident you can complete this task successfully. For each question, add your recommendation (with reason why) below the options. This would help me in making a better decision.
 
-Save the BRD to `docs/issues/open/[ISSUE-ID]/brd.md`.
+Once confident, **resolve role** for the `brd` key per `~/.claude/skills/pf-roles/SKILL.md` (§4's fallback order).
+
+- If `write == claude` — unchanged: this session saves `docs/issues/open/[ISSUE-ID]/brd.md` directly — no sub-agent dispatch (this skill never dispatched one anyway).
+- If `write != claude` (in this issue, only `codex`) — this session still runs the clarifying-questions loop above itself (delegated actors cannot call `AskUserQuestion`), then delegates the actual write to the resolved actor's write-invocator per `~/.claude/skills/pf-roles/SKILL.md` §7, targeting `docs/issues/open/[ISSUE-ID]/brd.md` with a single prompt built per §7/§6.2's shape (the target path, `prompt.md`'s path, the requirements clarified in this run, `doc_language`, and the BRD section structure described above) — a from-scratch pipeline document, so use §7's asynchronous case — and reads the resulting `brd.md` back from disk once the call returns.
 
 **Post-save tier reconfirmation:** after saving `brd.md`, re-read it and holistically judge whether its actual scope (user stories, acceptance criteria, business-rule complexity) matches the recorded `size_tier`.
 - If your judgment disagrees with the recorded tier, ask the user via `AskUserQuestion` — recommend your own judgment, with reasoning — to confirm or override. If the tier changes, update `size_tier` in `prompt.md`.
