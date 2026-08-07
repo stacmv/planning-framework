@@ -104,3 +104,52 @@
 **Next Session:**
 - `/pf-qa` → `/pf-close` (consider addressing the open P2 cleanup items
   from `code_review.md` before or during `/pf-close`).
+
+---
+
+## 2026-08-07 — Session 1 (cont.) [Claude Code, pf-autopilot] — `/pf-qa` blocked → `/pf-user-docs`
+
+**Completed:**
+- Ran `/pf-qa`; its own prerequisite gate stopped it immediately:
+  `roles.user_docs`/`roles.dev_docs` resolve to the general default
+  (`write: claude, review: [claude]`) for this `size_tier: medium` issue —
+  not `skip` — and neither `user_docs.md` nor `dev_docs.md` existed yet.
+  Per the feat routing table, TESTING → `/pf-user-docs` → `/pf-dev-docs` →
+  `/pf-qa`; ran `/pf-user-docs` next.
+- Wrote `user_docs.md` directly (`write == claude`) — skipped the
+  clarifying-questions loop as an `[autopilot default]`: the preceding
+  `brd.md`/`specs.md`/`implementation_plan.md`/`code_review.md` already
+  fully specify this feature's user-facing behavior, so 95% confidence was
+  already met without asking.
+- Reviewed it (Claude-only path, `roles.user_docs.review == [claude]`
+  general default). Findings: **1 P0** (the profile-comparison table
+  misdescribed review *scope* for both non-default profiles —
+  `claude-writes-codex-reviews`'s `code:` entry is a no-op duplicate of its
+  `default`, so Codex actually reviews every stage, not just code; and for
+  `codex-implements`, `dev_docs`/planning docs are reviewed by Codex via
+  `default`, not Claude, contrary to what the doc said), **3 P1** (missing
+  Codex-CLI-availability precondition for the two non-default profiles;
+  missing mention that the whole `profile:` can be swapped mid-pipeline by
+  hand, not just point-overrides; `agents.yml`/`role-profiles.yml` never
+  named as the actual source of truth for actors/profiles), **4 P2**.
+  `[autopilot default]` P0+P1 present → Fix now, applied directly (fast
+  prose corrections, no need for a separate fix sub-agent given full
+  context already in hand) rather than dispatched: corrected the profile
+  table's review-scope claims, added the Codex CLI precondition, added the
+  mid-pipeline whole-profile-swap note, named `agents.yml`/
+  `role-profiles.yml` explicitly. Folded in 2 of the 4 P2s (write/review
+  actor-match caveat, manual `roles.<key>: skip` on any tier) since cheap;
+  left the pf-execute `haiku`-dispatch P2 (already tracked in
+  `code_review.md`) and a tone nitpick unaddressed as genuinely minor.
+  `pf-user-docs`'s gate (unlike `pf-codereview`'s) is single-pass, not a
+  fix-then-re-review loop — no second review round.
+- Committed & pushed `user_docs.md`.
+
+**In Progress:**
+- Next stage: `/pf-dev-docs`, then `/pf-qa`.
+
+**Blockers:**
+- None.
+
+**Next Session:**
+- `/pf-dev-docs` → `/pf-qa` → `/pf-close`.
