@@ -1,0 +1,5 @@
+actors:
+  claude: { kind: llm, invoke: agent,  model: claude-sonnet-5 }
+  haiku:  { kind: llm, invoke: agent,  model: claude-haiku-4-5-20251001 }
+  codex:  { kind: llm, invoke: codex-companion }
+  gemini: { kind: llm, invoke: cli,    command: "gemini -p {prompt}" }

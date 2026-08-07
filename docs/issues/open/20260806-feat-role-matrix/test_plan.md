@@ -456,12 +456,12 @@ TC-001 проверяет, что такая комбинация принима
 | TC-006 | Автосоздание `agents.yml`/`role-profiles.yml` при первом обращении | Manual | Medium | [ ] | |
 | TC-007 | Единственный вопрос выбора профиля при создании issue | Manual | High | [ ] | |
 | TC-008 | Смена профиля/ролей посреди пайплайна — только непройденные стадии | Manual | High | [ ] | |
-| TC-009 | `pf-roles` reference-skill — структурная полнота | Auto | Medium | [ ] | |
+| TC-009 | `pf-roles` reference-skill — структурная полнота | Auto | Medium | ✓ | |
 | TC-010 | Автомиграция `reviewers:` → `roles:` через `/pf`, без потери данных | Manual | Critical | [ ] | |
 | TC-011 | Автомиграция как собственное предусловие `pf-check`/`pf-codereview` | Manual | High | [ ] | |
 | TC-012 | `pf-execute` делегирует задачу Codex как write-актору | Manual | Critical | [ ] | |
 | TC-013 | `pf-execute` — регрессия для `write: claude` не появилась | Manual | Medium | [ ] | |
-| TC-014 | Маршрутизация пайплайна — `user_docs`/`dev_docs` между TESTING и QA | Auto | High | [ ] | |
+| TC-014 | Маршрутизация пайплайна — `user_docs`/`dev_docs` между TESTING и QA | Auto | High | ✓ | |
 | TC-015 | `pf-qa` prerequisite — требует `user_docs.md`/`dev_docs.md`, если не `skip` | Manual | High | [ ] | |
 | TC-016 | `code.review: skip` — подтверждение через `/pf` | Manual | Critical | [ ] | |
 | TC-017 | `code.review: skip` — `pf-codereview` сам запрашивает подтверждение | Manual | High | [ ] | |
