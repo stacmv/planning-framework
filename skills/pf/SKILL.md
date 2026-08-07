@@ -21,6 +21,10 @@ Read the file `~/.claude/skills/pf/SKILL.md` and extract the value of the `versi
 
 List the contents of the `docs/issues/open/` directory of the active project (relative to /pf's CWD) (if it exists). Collect all subdirectories whose names match the pattern `YYYYMMDD-TYPE-SLUG` where TYPE is one of `feat`, `improve`, or `bug` and YYYYMMDD is an 8-digit date.
 
+**Automigration: `reviewers:` → `roles:`.** For **every** open issue folder just collected — not only whichever one the user ends up picking in Step 3 — check its `prompt.md` frontmatter: if it has a `reviewers:` block but no `roles:` block, convert it now, following the conversion rule and fallback-order algorithm defined in `~/.claude/skills/pf-roles/SKILL.md` (§5, §4) — do not restate that rule here. This covers every key actually present in that issue's `reviewers:` block (including `analysis`/`notes`, not only the five planning-doc keys), maps `both` → `[claude, codex]`, writes the resulting `roles:` block into `prompt.md`, and removes the old `reviewers:` block entirely (not left alongside). No question is asked to the user — fully deterministic. This step runs here, before Step 3's issue picker and before Step 4, specifically so it isn't limited to whichever issue is eventually selected.
+
+This step does **not** commit anything itself — `/pf`'s own scan is read/write on `prompt.md` only, never a git operation. The `prompt.md` edit rides along with whichever `pf-*` stage runs next for that issue and writes to it, staged and committed per that stage's own procedure in `~/.claude/skills/pf-git/SKILL.md`'s Step 1 staging table.
+
 ## Step 3: Handle zero or multiple issues
 
 **No issue folders found:**
@@ -59,6 +63,8 @@ Before proceeding to Step 5, check the active issue's `prompt.md` frontmatter. I
 
 ## Reviewer-assignment guard (before Step 5)
 
+**Skip this entire guard if `prompt.md` already has a `profile:` field.** A `profile:` resolves both write and review for every stage via `~/.claude/skills/pf-roles/SKILL.md` (§4), so asking this guard's question would be redundant. This guard's text below remains the sole automigration path for issues that have **neither** `profile:` nor `roles:` — genuinely old issues created before this feature. Issues created after this feature always get `profile:` from the mandatory question in "Creating prompt.md" above, so in practice this guard only ever fires for such legacy issues.
+
 Before proceeding to Step 5, and only for a **bug**-type issue whose `size_tier` is not `trivial` (a trivial-tier bug issue never writes `analysis.md` — per the precedence rule in Step 6 it is routed to `/pf-brd` instead, which carries its own copy of this guard for that case): check the active issue's `prompt.md` frontmatter. If it has no `reviewers` field, ask the user via `AskUserQuestion` — one question per key, "Who should review `<key>`?" with the three options **claude** / **codex** / **both**, recommending **claude** for every key ("matches today's default behavior") — for the keys `analysis`, `test_plan`, `implementation_plan`, `code`. Write the answers into `prompt.md`'s frontmatter as a `reviewers:` block, next to `size_tier`, e.g.:
 
 ```yaml
@@ -72,6 +78,20 @@ reviewers:
 Do not re-ask once `reviewers` is already present — check for the field's presence before asking, exactly as the guard above already does for `size_tier`.
 
 For `feat`/`improve`-type issues, and for any `trivial`-tier issue (including bug), this guard does not fire — `~/.claude/skills/pf-brd/SKILL.md`'s own reviewer-assignment guard covers those cases instead.
+
+## `code.review: skip` confirmation guard (before Step 5)
+
+Before proceeding to Step 5, check the active issue's `prompt.md` frontmatter for `roles.code.review: skip` (whether it resolves there via an explicit point-specific entry or was just written by the automigration step above). This covers both the moment the user sets it at issue creation and the next `/pf` run after a hand-edit to `prompt.md`.
+
+If `roles.code.review: skip` is present **without** an adjacent `confirmed:` marker, ask the user via `AskUserQuestion`: **"Code review is disabled for this issue — confirm?"** On a "yes" answer, write `confirmed: <today's date>` next to it in `prompt.md`'s frontmatter, in the exact form defined in `~/.claude/skills/pf-roles/SKILL.md` §1:
+
+```yaml
+code: { write: claude, review: skip, confirmed: 2026-08-07 }
+```
+
+If `confirmed:` is already present, do nothing — do not re-ask.
+
+`/pf-codereview` asks this same question itself, and writes the same marker, if this step gets bypassed (e.g. `/pf-codereview` is invoked directly on an issue that never passed through this guard) — that duplicate safety net lives in `~/.claude/skills/pf-codereview/SKILL.md`, not restated here. This section only fixes the moment and place this fires within `/pf`.
 
 ## Step 5: Detect completed stages
 
@@ -175,7 +195,7 @@ Stages are complete per `~/.claude/skills/pf-size-tiers/SKILL.md`; the first inc
 
 | Position (first incomplete stage governs) | Next step |
 |---|---|
-| CREATE only (no complete analysis.md) | Ask the user to describe the bug, then write `analysis.md` (root cause, reproduction steps, impact) to the issue folder, in the language recorded in `prompt.md`'s `doc_language` frontmatter field (default English). Then re-read the saved `analysis.md` and holistically judge whether its actual scope (root cause complexity, blast radius, number of affected code paths) matches the recorded `size_tier`. If the judgment disagrees, ask the user via `AskUserQuestion` (recommend the model's own judgment, with reasoning) to confirm or override, then update `prompt.md`'s `size_tier` if changed. (This reconfirmation step never runs when `size_tier: trivial` — per the precedence rule above, trivial-tier bug issues never reach this row at all; they are routed via the trivial-tier table to `/pf-brd`, which produces `notes.md` instead.) |
+| CREATE only (no complete analysis.md) | Ask the user to describe the bug. **Resolve role** for the `analysis` key per `~/.claude/skills/pf-roles/SKILL.md` (§4's fallback order) to get `write`. If `write == claude`, behavior is unchanged: this session writes `analysis.md` (root cause, reproduction steps, impact) to the issue folder directly, in the language recorded in `prompt.md`'s `doc_language` frontmatter field (default English). If `write != claude` (in this issue, only `codex`), this orchestrating session still runs the clarifying `AskUserQuestion` dialog itself — delegated actors cannot call `AskUserQuestion` — then delegates the actual file write to the resolved actor's write-invocator per `~/.claude/skills/pf-roles/SKILL.md` §7 (targeting `analysis.md` in the issue folder), and reads the resulting file back from disk once the call returns. Either way, once `analysis.md` exists on disk, re-read it and holistically judge whether its actual scope (root cause complexity, blast radius, number of affected code paths) matches the recorded `size_tier` — this reconfirmation step is unchanged. If the judgment disagrees, ask the user via `AskUserQuestion` (recommend the model's own judgment, with reasoning) to confirm or override, then update `prompt.md`'s `size_tier` if changed. (This reconfirmation step never runs when `size_tier: trivial` — per the precedence rule above, trivial-tier bug issues never reach this row at all; they are routed via the trivial-tier table to `/pf-brd`, which produces `notes.md` instead.) |
 | ANALYSIS present | `/pf-check` |
 | ANALYSIS + check passed | `/pf-test-plan` |
 | TEST_PLAN | `/pf-check` |
@@ -221,12 +241,15 @@ Immediately after, use AskUserQuestion to ask a second question: **"How big is t
 - **medium** (recommended) — Today's framework default. 4-6 user stories.
 - **large** — Multi-subsystem or 7+ user stories.
 
-Write `prompt.md` with a YAML frontmatter block recording both answers, followed by the task description:
+Immediately after, use AskUserQuestion to ask a third question: **"Which role profile should this issue use?"** with options listing the profile names found in `docs/planning/role-profiles.yml` (see `~/.claude/skills/pf-roles/SKILL.md` §3 for the file's schema and auto-creation rule), recommending **solo-claude** ("matches today's behavior").
+
+Write `prompt.md` with a YAML frontmatter block recording all three answers, followed by the task description:
 
 ```
 ---
 doc_language: English
 size_tier: medium
+profile: solo-claude
 ---
 
 <task description as given by the user>
@@ -235,3 +258,5 @@ size_tier: medium
 Use the exact language name the user gave (e.g. `Russian`, or whatever they typed for "Other") as the `doc_language` value. Every downstream pf-* skill that produces a document reads this field and writes its prose content in that language, defaulting to English if the field is absent — see each skill's own instructions for specifics.
 
 Record the chosen tier (`trivial`, `small`, `medium`, or `large`) as `size_tier`, next to `doc_language`. Every downstream pf-* skill reads this field and scales document length/sections/routing accordingly — see `~/.claude/skills/pf-size-tiers/SKILL.md` for the full tables and each skill's own instructions for specifics.
+
+Record the chosen profile name as `profile:`, next to `size_tier`. Every downstream pf-* skill that resolves a stage's write/review role reads this field as part of the fallback order — see `~/.claude/skills/pf-roles/SKILL.md` §4. Once `profile:` is set, the Reviewer-assignment guard earlier in this file no longer fires for this issue.
