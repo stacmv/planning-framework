@@ -111,10 +111,14 @@ The criterion applies to **every row** of the table below — `notes.md`, `manua
 | `implementation_plan.md` | IMPL_PLAN |
 | `code_review.md` | CODE_REVIEW |
 | `manual_test_checklist.md` | TESTING |
+| `user_docs.md` (or `roles.user_docs` resolved to `skip` — see note below) | USER_DOCS |
+| `dev_docs.md` (or `roles.dev_docs` resolved to `skip` — see note below) | DEV_DOCS |
 | `qa_report.md` | QA |
 | `notes.md` | BRD, SPEC, IMPL_PLAN (and ANALYSIS, for bug-type) — all at once |
 
 List all completed stages in order. Note: the `notes.md` row is for the **completed-stages display line** only (this line, and Step 7's status block). Step 6's next-step decision for `size_tier: trivial` never uses this collapsed-stage view — see the precedence rule and trivial-tier routing table in Step 6.
+
+**USER_DOCS/DEV_DOCS and `skip`.** Before checking `user_docs.md`/`dev_docs.md` against the shared stage-completion definition, resolve `roles.user_docs`/`roles.dev_docs` per `~/.claude/skills/pf-roles/SKILL.md` (§4's fallback order), reading the issue's `prompt.md` frontmatter. If the resolved role is `skip` — explicit, via a profile's point-specific entry, or via the tier-default fallback for `size_tier: trivial`/`small` — the corresponding stage counts as **complete for routing purposes** (Step 6) without `user_docs.md`/`dev_docs.md` ever existing on disk, and Step 6's first-incomplete-stage routing moves straight past it. It is **not**, however, listed among the plain stage names on the completed-stages display line: it is rendered separately as `skipped (roles.user_docs: skip)` (respectively `skipped (roles.dev_docs: skip)`) — see Step 7. If the role does not resolve to `skip`, USER_DOCS/DEV_DOCS follow the ordinary per-document rule above like any other stage, and appear on the display line as plain `USER_DOCS`/`DEV_DOCS` once their document is complete.
 
 ## Step 6: Determine next step
 
@@ -146,8 +150,9 @@ This table is keyed on **which documents in the issue folder are complete**, not
 
 ### feat workflow
 ```
-CREATE → /pf-brd → BRD → /pf-spec → SPEC → /pf-check → (check passes) → /pf-test-plan → TEST_PLAN → /pf-check → (check passes) → /pf-impl-plan → IMPL_PLAN → /pf-check → (check passes) → /pf-execute → /pf-codereview → TESTING → /pf-qa → QA → /pf-close
+CREATE → /pf-brd → BRD → /pf-spec → SPEC → /pf-check → (check passes) → /pf-test-plan → TEST_PLAN → /pf-check → (check passes) → /pf-impl-plan → IMPL_PLAN → /pf-check → (check passes) → /pf-execute → /pf-codereview → TESTING → /pf-user-docs* → /pf-dev-docs* → /pf-qa → QA → /pf-close
 ```
+(`*` — optional; may resolve to `roles.<key>: skip`, see Step 5's USER_DOCS/DEV_DOCS note.)
 
 Stages are complete per `~/.claude/skills/pf-size-tiers/SKILL.md`; the first incomplete stage governs.
 
@@ -163,13 +168,16 @@ Stages are complete per `~/.claude/skills/pf-size-tiers/SKILL.md`; the first inc
 | IMPL_PLAN + check passed | `/pf-execute` |
 | **`implementation_plan.md` exists, but BRD / SPEC / TEST_PLAN is not complete** (a migrated v2 issue, or a stub `test_plan.md`) | Go **back to the first incomplete stage**: `/pf-brd` if `brd.md` is not complete, else `/pf-spec` if `specs.md` is not complete, else `/pf-test-plan`. Never `/pf-execute`. |
 | CODE_REVIEW (`implementation_plan.md` complete, `code_review.md` not complete) | `/pf-codereview` |
-| TESTING | `/pf-qa` |
+| TESTING | `/pf-user-docs` — unless `roles.user_docs` resolves to `skip` (per Step 5's note), in which case treat USER_DOCS as complete and continue down this table |
+| USER_DOCS (complete or `skip`-resolved) | `/pf-dev-docs` — unless `roles.dev_docs` resolves to `skip`, in which case treat DEV_DOCS as complete and continue down this table |
+| DEV_DOCS (complete or `skip`-resolved) | `/pf-qa` |
 | QA | `/pf-close` |
 
 ### improve workflow
 ```
-CREATE → /pf-brd → BRD → /pf-check → (check passes) → /pf-test-plan → TEST_PLAN → /pf-check → (check passes) → /pf-impl-plan → IMPL_PLAN → /pf-execute → /pf-codereview → TESTING → /pf-qa → QA → /pf-close
+CREATE → /pf-brd → BRD → /pf-check → (check passes) → /pf-test-plan → TEST_PLAN → /pf-check → (check passes) → /pf-impl-plan → IMPL_PLAN → /pf-execute → /pf-codereview → TESTING → /pf-user-docs* → /pf-dev-docs* → /pf-qa → QA → /pf-close
 ```
+(`*` — optional; may resolve to `roles.<key>: skip`, see Step 5's USER_DOCS/DEV_DOCS note.)
 
 Stages are complete per `~/.claude/skills/pf-size-tiers/SKILL.md`; the first incomplete stage governs.
 
@@ -183,13 +191,16 @@ Stages are complete per `~/.claude/skills/pf-size-tiers/SKILL.md`; the first inc
 | IMPL_PLAN (every preceding stage complete) | `/pf-execute` |
 | **`implementation_plan.md` exists, but BRD / TEST_PLAN is not complete** (a migrated v2 issue, or a stub `test_plan.md`) | Go **back to the first incomplete stage**: `/pf-brd` if `brd.md` is not complete, else `/pf-test-plan`. Never `/pf-execute`. |
 | CODE_REVIEW (`implementation_plan.md` complete, `code_review.md` not complete) | `/pf-codereview` |
-| TESTING | `/pf-qa` |
+| TESTING | `/pf-user-docs` — unless `roles.user_docs` resolves to `skip` (per Step 5's note), in which case treat USER_DOCS as complete and continue down this table |
+| USER_DOCS (complete or `skip`-resolved) | `/pf-dev-docs` — unless `roles.dev_docs` resolves to `skip`, in which case treat DEV_DOCS as complete and continue down this table |
+| DEV_DOCS (complete or `skip`-resolved) | `/pf-qa` |
 | QA | `/pf-close` |
 
 ### bug workflow
 ```
-CREATE → ANALYSIS → /pf-check → (check passes) → /pf-test-plan → TEST_PLAN → /pf-check → (check passes) → /pf-impl-plan → IMPL_PLAN → /pf-execute → /pf-codereview → TESTING → /pf-qa → QA → /pf-close
+CREATE → ANALYSIS → /pf-check → (check passes) → /pf-test-plan → TEST_PLAN → /pf-check → (check passes) → /pf-impl-plan → IMPL_PLAN → /pf-execute → /pf-codereview → TESTING → /pf-user-docs* → /pf-dev-docs* → /pf-qa → QA → /pf-close
 ```
+(`*` — optional; may resolve to `roles.<key>: skip`, see Step 5's USER_DOCS/DEV_DOCS note.)
 
 Stages are complete per `~/.claude/skills/pf-size-tiers/SKILL.md`; the first incomplete stage governs.
 
@@ -204,7 +215,9 @@ Stages are complete per `~/.claude/skills/pf-size-tiers/SKILL.md`; the first inc
 | **`implementation_plan.md` exists, but `test_plan.md` is missing or not complete** (the migrated v2 bug issue: `analysis.md` + a renamed `implementation_plan.md`, no test plan) | `/pf-test-plan`. Never `/pf-execute` — there is no test plan to implement against. |
 | **`implementation_plan.md` or `test_plan.md` exists, but `analysis.md` is not complete** | Back to the first incomplete stage — the "CREATE only" row's action (write `analysis.md`). |
 | CODE_REVIEW (`implementation_plan.md` complete, `code_review.md` not complete) | `/pf-codereview` |
-| TESTING | `/pf-qa` |
+| TESTING | `/pf-user-docs` — unless `roles.user_docs` resolves to `skip` (per Step 5's note), in which case treat USER_DOCS as complete and continue down this table |
+| USER_DOCS (complete or `skip`-resolved) | `/pf-dev-docs` — unless `roles.dev_docs` resolves to `skip`, in which case treat DEV_DOCS as complete and continue down this table |
+| DEV_DOCS (complete or `skip`-resolved) | `/pf-qa` |
 | QA | `/pf-close` |
 
 **Note on "check passed":** A check counts as passed only when the document it was run against is **complete** per the shared definition in `~/.claude/skills/pf-size-tiers/SKILL.md` ("Stage completion") **and** the next document in sequence is complete as well. Mere existence of the next file is **not** enough: an empty or stub document (one that fails the shared definition) never counts as a passed check — it is treated as absent, and the next step is the skill that produces it.
@@ -219,6 +232,8 @@ Active issue: <ISSUE-ID>  (type: feat/improve/bug, tier: trivial/small/medium/la
 Completed stages: <STAGE1>, <STAGE2>, ...
 Next step: /<next-command>
 ```
+
+**USER_DOCS/DEV_DOCS on the Completed stages line.** If `roles.user_docs`/`roles.dev_docs` resolved to `skip` (per Step 5's note), that stage is included on the Completed stages line using the literal pattern `skipped (roles.user_docs: skip)` (respectively `skipped (roles.dev_docs: skip)`) — not the plain stage name `USER_DOCS`/`DEV_DOCS`, and never as `Next step`. If the stage's document is genuinely complete instead, it appears as the plain stage name `USER_DOCS`/`DEV_DOCS` like any other completed stage. If the stage is neither complete nor `skip`-resolved, it is omitted from the line entirely, same as any other incomplete stage. Example: `Completed stages: CREATE, BRD, SPEC, TEST_PLAN, IMPL_PLAN, CODE_REVIEW, TESTING, skipped (roles.user_docs: skip), skipped (roles.dev_docs: skip)`.
 
 If Step 2's remote sync produced a note (fetch failed, or unpulled commits remain), append it as one extra line at the end of the block, e.g. `Note: N unpulled commit(s) on origin/CURRENT-BRANCH — run \`git pull\` manually.` Omit the line entirely when the sync was clean.
 
