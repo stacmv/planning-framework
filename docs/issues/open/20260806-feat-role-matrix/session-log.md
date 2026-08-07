@@ -44,3 +44,63 @@
 
 **Next Session:**
 - `/pf-test` → `/pf-qa` → `/pf-close` (consider addressing the open P2 cleanup items before or during `/pf-close`).
+
+---
+
+## 2026-08-07 — Session 1 (cont.) [Claude Code, pf-autopilot] — `/pf-test`
+
+**Completed:**
+- Ran `make test` (background, ~135 tests). Result: 134 passed, 1 failed —
+  `tools/manual-test-ui/test/read-paths.test.js`'s `TC-011` (`EPERM:
+  symlink`, a Windows privilege limitation creating symlinks without
+  elevation/Developer Mode). Confirmed via `git diff develop...HEAD --stat`
+  that this issue's diff touches no `tools/` path — the failure predates
+  and is unrelated to this issue's changes. Not fixed, not worked around;
+  reported as-is per `.qa-workflow.md`.
+- `[autopilot default]` **Found and closed a real gap before proceeding**:
+  `test_plan.md` declares TC-009 and TC-014 `Type: Auto`, but none of the 7
+  implementation tasks in `implementation_plan.md` ever scheduled writing
+  the automated test code their own Acceptance Criteria named — `git diff
+  develop...HEAD --name-only | grep "^test/"` returned empty. Consulted
+  `advisor`: writing the missing coverage now closes Task 1/Task 7's own
+  acceptance criteria rather than adding scope; reclassifying to Manual or
+  proceeding on the technicality that unmapped Status Tracker rows stay
+  `[ ]` rather than `✗` were both rejected as the exact "silent cap"
+  pattern this framework's own conventions warn against. Wrote
+  `test/skills-role-matrix-static.sh` (grep-based structural assertions,
+  same convention as the pre-existing `test/skills-static.sh`), covering
+  both TCs' Steps verbatim. Ran it standalone (not the full `make test` —
+  15+ min, and the unrelated symlink failure would still exit nonzero) — 8/8
+  assertions pass. Marked both rows `✓` in the Status Tracker directly
+  from this verified run, not from `/pf-test`'s own Phase 3.2 pattern
+  scanner: that scanner's TC-ID patterns are written for `it()`/`describe()`/
+  comment-based JS test files and do not recognize this repo's bash
+  `printf`-header convention (the same convention `skills-static.sh`
+  already used for the prior issue's Auto TCs) — a latent gap, now also
+  visible in this issue's own diff, that is exactly what the sibling
+  `20260806-bug-test-plan-tc-untracked` (filed earlier this session) is
+  about. Noted here rather than worked around.
+- Generated `manual_test_checklist.md` for the remaining 18 Manual TCs, plus
+  `test-data/` (one real fixture file per TC's declared Test Data entries —
+  mostly `zz-fixture-*` issue-folder content — and `setup.mjs` from the
+  standard template). Verified `node setup.mjs` prepares all 17 declared
+  cases (TC-007/TC-009/TC-014/TC-020 intentionally undeclared — no files,
+  Auto, Auto, and tester-produced-in-Step-1 respectively) with exit code 0.
+  `[autopilot default]` Checklist prose unavoidably names `/pf-*` commands
+  and config file paths (`prompt.md`, `roles:`) despite Phase 5.3's
+  "no internal jargon" instruction — this issue's own Manual TCs test
+  internal tooling behavior, so there is no way to describe the actions
+  without them; noted transparently in the checklist's own "How to use"
+  section rather than silently deviating or producing an unusable checklist.
+- Committed & pushed (`b212e60`): `test_plan.md` Status Tracker,
+  `manual_test_checklist.md`, `test-data/`, `test/skills-role-matrix-static.sh`.
+
+**In Progress:**
+- Next stage: `/pf-qa`.
+
+**Blockers:**
+- None.
+
+**Next Session:**
+- `/pf-qa` → `/pf-close` (consider addressing the open P2 cleanup items
+  from `code_review.md` before or during `/pf-close`).
