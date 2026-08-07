@@ -378,6 +378,48 @@ itself (document content, task description, file path, context — shape depends
 on the caller, see each consumer's own section) and calls the script the same
 way `pf-check`'s "Codex invocation chain" already calls it for **review**.
 
+### Availability check before writing
+
+**This availability check is the write-side counterpart to `pf-check`'s
+"Codex invocation chain" (review side).** Before issuing the `task ...
+--write` call above, the calling skill checks Codex availability the same
+way that chain does — see `~/.claude/skills/pf-check/SKILL.md`, steps 1-2:
+plugin present (its `codex:setup`/`codex:rescue` skills appear in this
+session's available-skills listing) → run the `codex:setup` skill if the CLI
+itself isn't confirmed ready → proceed once `codex:setup` reports the CLI is
+installed and authenticated. If the plugin isn't installed at all, offer to
+install it via the same four commands `pf-check`'s chain step 3 documents —
+reference that step rather than repeating the command list here. Do not
+restate or fork this check; every consumer of this section reuses it as-is.
+
+**Where it diverges from the review-side chain: the final fallback.**
+`pf-check`'s chain step 5 lets Codex-unavailable silently fall back to Claude
+reviewing instead — acceptable there because findings are findings regardless
+of which engine produced them. Write delegation cannot do the same: if a
+stage's resolved `write` actor is `codex` and Codex is genuinely unavailable
+after the steps above (plugin install declined, or the CLI is not
+installed/not authenticated even after `codex:setup` offered to fix it),
+silently substituting Claude as author would silently violate the user's
+configured authorship — there is no raw-CLI write fallback equivalent to
+review's `codex exec` (write needs the plugin's `codex-companion.mjs`
+script; there is no unstructured raw-CLI write path). So the correct
+behavior here is a **stop, with a clear,
+actionable error** — never a silent fallback to Claude, and never an
+unhandled crash from a missing script path. The calling skill must surface
+something equivalent to:
+
+```
+Configured write actor 'codex' is unavailable (Codex CLI not
+installed/authenticated). Either complete Codex setup, or change this
+stage's `write` to `claude` in `prompt.md`.
+```
+
+— and then stop that skill's current operation there: no document or code
+gets written by a substitute actor. This applies identically to every
+consumer of this section (`pf-brd`, `pf-spec`, `pf-test-plan`, `pf-impl-plan`,
+`pf-execute`, `pf-user-docs`, `pf-dev-docs`) — each inherits this check by
+referencing this section rather than implementing its own copy.
+
 ### Prompt shape for a from-scratch pipeline document
 
 When the consumer skill is generating a pipeline document from nothing (a BRD,

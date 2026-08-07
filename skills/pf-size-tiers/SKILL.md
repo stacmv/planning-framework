@@ -69,7 +69,7 @@ every prerequisite gate.
 pipeline above — including `size_tier: trivial` — between TESTING and QA.
 They are never simply absent from the stage order; whether either actually
 requires a document on a given issue is decided by role resolution
-(`~/.claude/skills/pf-roles/SKILL.md` §1.4), not by the pipeline table. Both
+(`pf-roles` §4, level 3), not by the pipeline table. Both
 resolve to `skip` by default at `trivial`/`small` tier (fallback level 3),
 and may resolve to `skip` at any tier via an explicit
 `roles.user_docs`/`roles.dev_docs: skip` or a profile's point-specific
@@ -95,7 +95,7 @@ incomplete stage is TEST_PLAN, so its next step is `/pf-test-plan`, never
   `test_plan.md`, `implementation_plan.md`, `code_review.md`,
   `manual_test_checklist.md`, `user_docs.md`, `dev_docs.md`, `qa_report.md`.
 - `user_docs.md`/`dev_docs.md` are the one exception to conjunct 1 above:
-  when role resolution (`~/.claude/skills/pf-roles/SKILL.md` §1.4) yields
+  when role resolution (`pf-roles` §4, level 3) yields
   `skip` for `roles.user_docs`/`roles.dev_docs`, that stage counts as
   complete even though no file exists on disk — the exception is narrow and
   applies to these two keys only. Every other document in the list above

@@ -8,26 +8,19 @@
 
 ## Findings
 
-### Previous round — resolution status
+### Previous rounds — resolution status
 
-All 6 P0/P1 findings from the first round are **RESOLVED**, confirmed independently by both reviewers on re-review:
-1. `pf-roles/SKILL.md` §4 level 5 — now per-key, not gated on whole `roles:` block. RESOLVED.
-2. Broken §7/§6.2 cross-references (pf-brd/pf-spec/pf-user-docs/pf-dev-docs). RESOLVED.
-3. `pf-execute` Task Type propagation + trivial-tier exception. RESOLVED.
-4. `pf-execute` wave-completion self-contradiction. RESOLVED.
-5. Automigration `prompt.md` ownership for unselected issues. RESOLVED (scoped to selected issue only).
-6. Legacy reviewer-guard skip condition (`profile:` or `roles:`). RESOLVED.
+Round 1 (6 P0/P1) and round 2 (#7 P1, #8/#9/#10 P2) all confirmed **RESOLVED** on re-review by both reviewers, no half-fixes or new contradictions found in the touched files. #9 (`Task Type: docs` dispatch) — Codex flagged this round that `pf-impl-plan` still lists `docs` as an allowed task type while `pf-execute` hard-stops on it; on inspection this is the intended design from round 2's fix: `pf-execute`'s explicit stop-with-message *is* the "map it explicitly" resolution Codex itself offered as an acceptable alternative to disallowing the type outright — not a new gap. No further action.
+
+Finding #11 (specs.md/implementation_plan.md drift, out of diff scope) remains open as a pre-`/pf-close` cleanup item, not a code-review blocker.
 
 ### P1 (Important) — new this round
 
-7. **[Codex] `pf-execute` has no fallback for `implementation_plan.md` missing the `Task Type` field.** Phase 2's role resolution now depends on `Task Type` carried from Phase 1, but any implementation plan generated before this issue (or hand-edited without the field) has no `Task Type` on its tasks — those plans become unexecutable rather than degrading gracefully. Needs an explicit "field absent → default to `code`" fallback (or an explicit regeneration gate), not silent failure.
+12. **[Codex] `pf-roles/SKILL.md` §7's write-invocation (`codex-companion.mjs task ... --write`) has no availability/setup/fallback gate**, unlike the review chain in `pf-check` (which checks plugin availability, runs `codex:setup`, falls back to raw CLI, and finally falls back to Claude if Codex is genuinely unavailable). A project selecting `codex-implements` or hand-setting `write: codex` where the Codex plugin/CLI isn't installed/authenticated will have every write-delegated stage fail outright (missing script path) instead of failing with a clear, actionable message. Needs an explicit availability check before the write call, with a clear stop message (not a silent crash) when Codex isn't available — write delegation cannot silently fall back to Claude the way review can (that would silently violate the user's configured authorship), so the correct behavior is a clear error, not a graceful degrade.
 
-### P2 (Minor)
+### P2 (Minor) — new this round
 
-8. **[Claude] `pf-execute`'s "Important Notes" still says "Use `TaskList` periodically to check overall progress"** — a rudiment untouched by the fix pass, now contradicting the just-clarified Phase 2 point 6 (`TaskList`/`TaskGet` don't reflect real completion for `write: claude` tasks).
-9. **[Codex] `docs` task type (from `pf-impl-plan`'s `Task Type: code | tests | docs`) has no corresponding role-resolution mapping in `pf-execute`** — dispatch behavior for a `docs`-typed task is undefined. Should be explicitly reserved/rejected until implemented, not silently unhandled.
-10. **[Codex] `code.review: skip` confirmation gates (`/pf`, `pf-codereview` Phase 1.5) only check literal `prompt.md` text, not the full `pf-roles` §4 resolution chain** — a profile-level point-specific `skip` (hypothetical; no default profile does this) would bypass the confirmation question. Likely an accepted scope boundary rather than a bug (matches `specs.md` §2's framing), but worth a one-line note.
-11. **[Claude] `specs.md`/`implementation_plan.md` (this issue's own planning docs, committed to `develop` before the issue branch existed — outside this review's diff scope) still describe the pre-fix design** (level-5-gates-on-whole-block; automigration covers every open issue) — a future reader consulting the spec after archival would see the design that caused findings #1/#5 above. Out of scope for this gate (not part of `develop...HEAD`), noted for cleanup before `/pf-close`.
+13. **[Claude] `skills/pf-size-tiers/SKILL.md` references a nonexistent "`pf-roles` §1.4"** (twice) for the tier-default-skip mechanic — the actual location is `pf-roles` §4, level 3 (confirmed correct in `pf-user-docs`/`pf-dev-docs`, which cite it correctly). Likely carried over from `specs.md`'s own numbering (where §1.4 is a real subsection) during drafting. Simple reference fix.
 
 ---
 
@@ -35,4 +28,4 @@ All 6 P0/P1 findings from the first round are **RESOLVED**, confirmed independen
 
 **FAIL**
 
-(One open P1 — #7. #8-#11 are P2/out-of-scope and do not block on their own, but #8-#9 are cheap enough to fold into the same fix pass.)
+(One open P1 — #12.)
