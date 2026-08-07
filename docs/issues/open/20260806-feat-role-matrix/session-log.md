@@ -196,3 +196,70 @@
 
 **Next Session:**
 - `/pf-qa` → `/pf-close`.
+
+---
+
+## 2026-08-07 — Session 1 (cont.) [Claude Code, pf-autopilot] — `/pf-qa` → FAIL, autopilot run paused here
+
+**Completed:**
+- Ran `.qa-workflow.md`'s full checklist. All 9 automated commands pass
+  (shellcheck; no debug output/TODOs introduced; no secrets/remote-exec
+  patterns; clean tree; branch ancestry; scope guard) except the Testing
+  gate. Answered all 6 `[AI check]` items myself by reading the named files
+  (this project's `.qa-workflow.md` splits items into
+  [Automated]/[AI check]/[Human check] — `pf-qa`'s generic Phase 3 doesn't
+  know that split and would have escalated all 7 non-command items to the
+  user; consulted `advisor` before proceeding, which caught this). 5 of 6
+  AI checks pass; "Diff satisfies every acceptance criterion" fails for the
+  same root cause as the Testing gate.
+- **Verdict: FAIL — one blocker.** `manual_test_checklist.md` (18 Manual
+  TCs) has not been run by a human tester; `test_plan.md`'s Status Tracker
+  still shows 18 unresolved rows and `implementation_plan.md`'s matching
+  Acceptance Criteria checkboxes are unchecked. This is the single
+  "[Human check] Manual test checklist has been run" item — the one item
+  `pf-qa`'s Phase 3 genuinely requires a live user response for, unlike
+  `/pf-check`/`/pf-user-docs`/`/pf-dev-docs`, none of which carry an
+  autopilot branch for it. Did **not** attempt to run the 18 TCs myself —
+  three (TC-005/012/017) are blocked without a configured Codex CLI per
+  the test plan's own Prerequisites, three more (TC-007/016/017) require
+  observing a live `AskUserQuestion` prompt answered by an actor other than
+  the tester, and the checklist's own steps have the tester copy fixtures
+  into `docs/issues/open/zz-fixture-*/`, which would leave the working
+  tree dirty and fail this same QA run's own clean-tree gate.
+- Committed & pushed `qa_report.md` (`e2e5489`).
+- **A fourth structural framework finding, surfaced by this run — not
+  filed as a separate issue yet, noted here as a candidate:**
+  `.qa-workflow.md`'s Testing gate assumes `/pf-test` marks *every*
+  Status Tracker row `✓`/`✗`, but `/pf-test`'s own Phase 3.4 explicitly
+  leaves Manual-type rows unchanged by design. The gate's premise is wrong
+  for any issue with Manual TCs, which is nearly every issue above
+  `trivial`/`small` tier — the gate can only ever go green after a human
+  has actually run the manual checklist and hand-updated the tracker, a
+  step this framework has no skill for. Related to, but distinct from, the
+  already-filed `20260806-bug-test-plan-tc-untracked` (that one is about
+  `/pf-test`'s Auto-TC scanner not recognizing this repo's own bash-test
+  convention; this one is about the QA gate's blanket assumption over
+  Manual TCs specifically).
+
+**In Progress:**
+- **Stopped here.** `/pf-autopilot` cannot advance to `/pf-close` — QA is
+  FAIL pending a human tester actually running
+  `docs/issues/open/20260806-feat-role-matrix/manual_test_checklist.md`
+  and updating `test_plan.md`'s Status Tracker accordingly, then
+  re-running `/pf-qa`.
+
+**Blockers:**
+- Manual test checklist not yet executed by a human tester (see above).
+
+**Next Session:**
+- A human runs `manual_test_checklist.md` (Codex CLI required for
+  TC-005/012/017) → update `test_plan.md`'s Status Tracker → re-run
+  `/pf-qa` → `/pf-close`.
+- The CronCreate autopilot-resume schedule for this issue is **left in
+  place** — deleting it is autopilot's closure ritual, and the issue is
+  not closed. The user decides whether to keep it running (it will keep
+  firing and re-report this same FAIL until the human step happens) or
+  cancel it manually.
+- Consider filing the `.qa-workflow.md` Testing-gate/Manual-TC mismatch
+  noted above as its own bug issue, alongside the still-open
+  `20260806-bug-test-plan-tc-untracked`.
