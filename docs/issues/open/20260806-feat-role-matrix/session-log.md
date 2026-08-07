@@ -153,3 +153,46 @@
 
 **Next Session:**
 - `/pf-dev-docs` → `/pf-qa` → `/pf-close`.
+
+---
+
+## 2026-08-07 — Session 1 (cont.) [Claude Code, pf-autopilot] — `/pf-dev-docs`
+
+**Completed:**
+- Wrote `dev_docs.md` directly (`write == claude`, general default —
+  `roles.dev_docs` not explicit, no profile). `[autopilot default]` skipped
+  the clarifying-questions loop — `specs.md`/`implementation_plan.md`/
+  `code_review.md`/`session-log.md` already fully specify the architecture.
+- Reviewed it (Claude-only path, `roles.dev_docs.review == [claude]`
+  general default). Findings: **0 P0, 4 P1** (only listed 3 of the final
+  `code_review.md`'s 7 open P2s in "Known Limitations", omitting the most
+  relevant one — #11, the very `specs.md`/`implementation_plan.md` drift
+  this doc itself was silently exhibiting; described the fixed
+  automigration scope — per-issue, not all-open-issues — without flagging
+  that `specs.md`/`implementation_plan.md` still describe the old
+  all-issues version, so a reader cross-checking against those two docs
+  would be misled; fabricated a "Phase -1" label for `pf-check`'s
+  automigration prerequisite — `pf-check/SKILL.md` has no phase numbering
+  at all, only `pf-codereview` has a real "Phase 0.5"; and — the biggest
+  completeness gap — never mentioned the `/pf-user-docs`/`/pf-dev-docs`
+  stages themselves, despite this very file being one of their outputs),
+  **3 P2**. `[autopilot default]` P1 present → Fix now, applied directly:
+  expanded "Known Limitations" to all 7 P2s verbatim from `code_review.md`;
+  added an explicit paragraph flagging the automigration-scope drift
+  against `specs.md`/`implementation_plan.md` as open cleanup item #11
+  rather than silently matching their stale text; corrected the `pf-check`
+  reference to its actual unnumbered heading; added a full "New optional
+  stages" section describing `pf-user-docs`/`pf-dev-docs`, the routing
+  change, and the `pf-qa`/`pf-git` prerequisite/staging updates. Folded in
+  all 3 P2s (the reserved-not-wired `run` field, the `Task Type` field's
+  role in `pf-execute`, the round-1 legacy-guard fix) since cheap.
+- Committed & pushed `dev_docs.md`.
+
+**In Progress:**
+- Next stage: `/pf-qa`.
+
+**Blockers:**
+- None.
+
+**Next Session:**
+- `/pf-qa` → `/pf-close`.
