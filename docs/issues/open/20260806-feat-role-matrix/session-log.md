@@ -18,11 +18,16 @@
 - Ran `/pf-check autopilot` (both-mode: Claude + Codex) against implementation_plan.md. Findings: 2 P0 (Claude — fallback-priority contradiction defeating trivial/small→skip default; `analysis`/`notes` role keys entirely uncovered for bug/trivial issues), 3 P1 (Claude — pf-execute wave concurrency with mixed write actors unspecified; no Task Type marker in impl-plan template; sync Codex write call risks Bash timeout on large generations; automigration's prompt.md edit has no committing owner), 1 P1 (Codex — pf-test still gates on literal `verdict: PASS`, doesn't accept the confirmed `SKIPPED` code-review verdict), plus 3 P2 folded in.
 - `[autopilot default]` pf-check auto-applied Fix now — all P0/P1 addressed (both P2/P0/P1 from both reviewers, plus 3 P2s folded in for cheapness), by amending **both** specs.md (root design gaps — corrected fallback order, extended `analysis`/`notes` key coverage, wave-concurrency rule, Task Type field, sync/async write-call guidance, pf-test SKIPPED gate, code:skip error, sequential-mode non-Claude fix template, automigration timing) and implementation_plan.md (reflected each fix in the relevant task's Files/Implementation Notes, no tasks removed/renumbered, all 20 TC mappings verified intact).
 
+- Ran `/pf-execute` on branch `issue/20260806-feat-role-matrix`. Serialized all 7 tasks into 7 separate waves (one task per wave, no intra-wave concurrency) — a deliberate deviation from pf-execute's usual dependency-based wave grouping, because `skills/pf-brd/SKILL.md` is touched by both Task 2 and Task 3, and `skills/pf/SKILL.md` by both Task 2 and Task 7; full serialization avoids a same-file clobber between sub-agents without requiring section-level conflict analysis. Confirmed via `advisor` before starting execute (blast-radius check on `make update-skills` mid-pipeline).
+- All 7 tasks completed and committed (one commit per wave, pushed after each): agents.yml/role-profiles.yml/pf-roles (new); /pf automigration+profile question+skip confirm; write-delegation in pf-brd/pf-spec/pf-test-plan/pf-impl-plan; pf-check/pf-codereview role-source+sequential-mode+skip handling+pf-test SKIPPED-verdict acceptance; pf-execute per-task delegation; pf-user-docs/pf-dev-docs (new)+pf-qa+pf-git; pipeline routing in pf/SKILL.md+pf-size-tiers.
+- Asked the user explicitly whether to run `make update-skills` mid-pipeline (syncs live `~/.claude/skills/pf-*` used by two other concurrent sessions, pay_20/info-diet, and switches this issue's own remaining stages to the new rules mid-flight) or defer to after `/pf-close`. User chose: sync now, accept the risk. Ran `make update-skills` after all 7 tasks — 12 updated, 3 new (`pf-roles`, `pf-user-docs`, `pf-dev-docs`), 6 unchanged. Confirmed via the available-skills listing that the new/updated skills are now live.
+- Note flagged by the Task 7 sub-agent: any *other* in-flight medium/large issue already past TESTING with no `roles:`/`profile:` will now route to `/pf-user-docs` on its next `/pf` run instead of straight to `/pf-qa` — intended behavior (tier-default `skip` only applies to trivial/small), not a bug, but a visible change for any such issue.
+
 **In Progress:**
-- Next stage: `/pf-execute`.
+- Next stage: `/pf-codereview`.
 
 **Blockers:**
 - None.
 
 **Next Session:**
-- `/pf-execute` → `/pf-codereview` → `/pf-test` → `/pf-qa` → `/pf-close`.
+- `/pf-codereview` → `/pf-test` → `/pf-qa` → `/pf-close`.
