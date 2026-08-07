@@ -8,27 +8,31 @@
 
 ## Findings
 
-### P0 (Blocker)
+### Previous round — resolution status
 
-1. **[Claude] Резолвер `pf-roles/SKILL.md` §4, уровень 5 — гейт на весь блок `roles:`, а не per-key.** Уровень 5 («общий дефолт») сформулирован как «issue has neither `roles:` nor `profile:` **at all**» — это условие на присутствие блока целиком. Как только у issue появляется частичный `roles:` (гарантированный результат автомиграции — она конвертирует только ключи, реально бывшие в старом `reviewers:`: обычно `brd`/`specs`/`test_plan`/`implementation_plan`/`code`, иногда `analysis`/`notes`) без `profile:`, уровень 5 становится недостижим для **любого** ключа, включая те, которых в `roles:` нет вовсе (`tests`, `user_docs`, `dev_docs` — их старый `reviewers:` никогда не содержал). Результат резолвинга для этих ключей не определён. Затронутые потребители: `pf-qa` (резолвит `user_docs`/`dev_docs` на каждом прогоне), `pf/SKILL.md` Step 5/6 (та же пара ключей), `pf-execute` (резолвит `tests` для задач с `Task Type: tests`). Воспроизводится и без автомиграции — любой ручной `roles: { code: {...} }` без `profile:` блокирует дефолтный резолвинг всех остальных ключей. Направление фикса: уровень 5 должен проверяться per-key («для *этого* ключа нет явной записи и нет `profile:` вовсе»), не как гейт на присутствие блока `roles:` целиком.
+All 6 P0/P1 findings from the first round are **RESOLVED**, confirmed independently by both reviewers on re-review:
+1. `pf-roles/SKILL.md` §4 level 5 — now per-key, not gated on whole `roles:` block. RESOLVED.
+2. Broken §7/§6.2 cross-references (pf-brd/pf-spec/pf-user-docs/pf-dev-docs). RESOLVED.
+3. `pf-execute` Task Type propagation + trivial-tier exception. RESOLVED.
+4. `pf-execute` wave-completion self-contradiction. RESOLVED.
+5. Automigration `prompt.md` ownership for unselected issues. RESOLVED (scoped to selected issue only).
+6. Legacy reviewer-guard skip condition (`profile:` or `roles:`). RESOLVED.
 
-### P1 (Important)
+### P1 (Important) — new this round
 
-2. **[Claude] Битая перекрёстная ссылка «§7/§6.2»** в `skills/pf-brd/SKILL.md`, `skills/pf-spec/SKILL.md`, `skills/pf-user-docs/SKILL.md`, `skills/pf-dev-docs/SKILL.md` — отсылает к несуществующей секции `pf-roles/SKILL.md` (у `pf-roles` только §1–§8 верхнего уровня, никакого §6.2 нет; это унаследованная ссылка на issue-локальный `specs.md §6.2`, перенесённая буквально). Именно та форма расхождения, которую централизация в `pf-roles` должна была предотвратить.
-3. **[Claude] `pf-execute`: передача `Task Type` от Phase 1 к Phase 2 не определена, и для trivial-tier поле не существует вовсе.** Phase 1 не указывает, что `Task Type` попадает в созданную задачу; Phase 2 требует резолвить `tests` по этому полю, но не говорит, откуда его брать для уже созданной задачи. Для trivial-tier (`notes.md`'s "## Tasks" чеклист) поля `Task Type` не существует в принципе — делегация на не-Claude актора там молча недоступна, без явного текстового исключения.
-4. **[Claude] Самопротиворечие в `pf-execute` про завершение волны.** Существующая (не переписанная этим diff'ом) инструкция всё ещё предписывает оркестратору полагаться на `TaskList`/`TaskGet` для решения «волна готова». Новый абзац этим же diff'ом констатирует, что у Claude-сабагентов нет доступа к этим тулам вовсе, называет это «out of scope» — но не даёт оркестратору рабочего способа определить завершённость `write: claude`-задач.
-5. **[Claude+Codex] Правка `prompt.md` от автомиграции остаётся «ничьей» для НЕ выбранной issue.** `/pf`'s автомиграция мигрирует все открытые issue за один прогон, но `pf-git`'s staging-квалификатор закрывает коммит только для issue, которую реально ведёт следующая стадия. Правки к другим смигрированным issue остаются незастейдженными без владельца — гарантированно ловятся `pf-qa`'s общедеревянной `git status --porcelain` проверкой на следующем прогоне, для другой issue. *(Совпадает с находкой [Codex] ниже — тот же баг, независимо найден обоими ревьюерами.)*
-6. **[Codex] `pf-brd`'s legacy reviewer guard не пропускается, если `roles:` уже существует (только по `profile:`).** Issue, уже автомигрированная на `roles:`, но без `profile:`, всё ещё проходит guard, задаёт старые reviewer-вопросы и дописывает `reviewers:` обратно в `prompt.md` — прямо нарушая инвариант «`reviewers:` удаляется, не остаётся рядом с `roles:`» (`pf-roles/SKILL.md`). Тот же фикс нужен аналогичному guard в `/pf`.
+7. **[Codex] `pf-execute` has no fallback for `implementation_plan.md` missing the `Task Type` field.** Phase 2's role resolution now depends on `Task Type` carried from Phase 1, but any implementation plan generated before this issue (or hand-edited without the field) has no `Task Type` on its tasks — those plans become unexecutable rather than degrading gracefully. Needs an explicit "field absent → default to `code`" fallback (or an explicit regeneration gate), not silent failure.
 
 ### P2 (Minor)
 
-7. **[Codex] Эйгерная автомиграция в `/pf`'s Step 2 задевает issue, которую пользователь ещё не выбрал** (частично то же, что P1#5 — Codex указывает на источник проблемы конкретно в `pf/SKILL.md:24`).
-8. **[Claude] Поле `roles.<key>.run`** задокументировано и присутствует в дефолтном профиле `codex-implements`, но ни один потребитель его не читает — не помечено как reserved, в отличие от `Task Type: docs`.
-9. **[Claude] Не все `pf-*`-скиллы несут собственную копию автомиграционного шага** — только `/pf`, `pf-check`, `pf-codereview`. Не ломает резолвинг напрямую, но означает, что физическая миграция документа на диске гарантирована не на каждом пути пайплайна.
-10. **[Claude] Неточная внутренняя ссылка** в `skills/pf-execute/SKILL.md` — «point 5» должно быть «point 4» (суждение о завершённости, не механический вызов `TaskUpdate`).
+8. **[Claude] `pf-execute`'s "Important Notes" still says "Use `TaskList` periodically to check overall progress"** — a rudiment untouched by the fix pass, now contradicting the just-clarified Phase 2 point 6 (`TaskList`/`TaskGet` don't reflect real completion for `write: claude` tasks).
+9. **[Codex] `docs` task type (from `pf-impl-plan`'s `Task Type: code | tests | docs`) has no corresponding role-resolution mapping in `pf-execute`** — dispatch behavior for a `docs`-typed task is undefined. Should be explicitly reserved/rejected until implemented, not silently unhandled.
+10. **[Codex] `code.review: skip` confirmation gates (`/pf`, `pf-codereview` Phase 1.5) only check literal `prompt.md` text, not the full `pf-roles` §4 resolution chain** — a profile-level point-specific `skip` (hypothetical; no default profile does this) would bypass the confirmation question. Likely an accepted scope boundary rather than a bug (matches `specs.md` §2's framing), but worth a one-line note.
+11. **[Claude] `specs.md`/`implementation_plan.md` (this issue's own planning docs, committed to `develop` before the issue branch existed — outside this review's diff scope) still describe the pre-fix design** (level-5-gates-on-whole-block; automigration covers every open issue) — a future reader consulting the spec after archival would see the design that caused findings #1/#5 above. Out of scope for this gate (not part of `develop...HEAD`), noted for cleanup before `/pf-close`.
 
 ---
 
 ## Verdict
 
 **FAIL**
+
+(One open P1 — #7. #8-#11 are P2/out-of-scope and do not block on their own, but #8-#9 are cheap enough to fold into the same fix pass.)

@@ -85,6 +85,8 @@ For `feat`/`improve`-type issues, and for any `trivial`-tier issue (including bu
 
 Before proceeding to Step 5, check the active issue's `prompt.md` frontmatter for `roles.code.review: skip` (whether it resolves there via an explicit point-specific entry or was just written by the automigration step above). This covers both the moment the user sets it at issue creation and the next `/pf` run after a hand-edit to `prompt.md`.
 
+**Scope note:** this check reads literal `prompt.md` text only — it does not run the full `~/.claude/skills/pf-roles/SKILL.md` §4 resolution chain (which could in principle resolve `review: skip` from a profile's point-specific entry, level 2, with no matching literal text in `prompt.md`). No default profile currently produces a point-specific `skip` for `code`, so this is a documented scope boundary, not a known gap.
+
 If `roles.code.review: skip` is present **without** an adjacent `confirmed:` marker, ask the user via `AskUserQuestion`: **"Code review is disabled for this issue — confirm?"** On a "yes" answer, write `confirmed: <today's date>` next to it in `prompt.md`'s frontmatter, in the exact form defined in `~/.claude/skills/pf-roles/SKILL.md` §1:
 
 ```yaml
