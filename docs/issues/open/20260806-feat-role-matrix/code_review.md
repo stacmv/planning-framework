@@ -10,17 +10,17 @@
 
 ### Previous rounds — resolution status
 
-Round 1 (6 P0/P1) and round 2 (#7 P1, #8/#9/#10 P2) all confirmed **RESOLVED** on re-review by both reviewers, no half-fixes or new contradictions found in the touched files. #9 (`Task Type: docs` dispatch) — Codex flagged this round that `pf-impl-plan` still lists `docs` as an allowed task type while `pf-execute` hard-stops on it; on inspection this is the intended design from round 2's fix: `pf-execute`'s explicit stop-with-message *is* the "map it explicitly" resolution Codex itself offered as an acceptable alternative to disallowing the type outright — not a new gap. No further action.
-
-Finding #11 (specs.md/implementation_plan.md drift, out of diff scope) remains open as a pre-`/pf-close` cleanup item, not a code-review blocker.
+Rounds 1-3 (12 findings total) all confirmed **RESOLVED** on re-review by both reviewers across multiple independent passes, no half-fixes or new contradictions found. Finding #11 (specs.md/implementation_plan.md drift, out of diff scope) remains an open pre-`/pf-close` cleanup item, not a code-review blocker.
 
 ### P1 (Important) — new this round
 
-12. **[Codex] `pf-roles/SKILL.md` §7's write-invocation (`codex-companion.mjs task ... --write`) has no availability/setup/fallback gate**, unlike the review chain in `pf-check` (which checks plugin availability, runs `codex:setup`, falls back to raw CLI, and finally falls back to Claude if Codex is genuinely unavailable). A project selecting `codex-implements` or hand-setting `write: codex` where the Codex plugin/CLI isn't installed/authenticated will have every write-delegated stage fail outright (missing script path) instead of failing with a clear, actionable message. Needs an explicit availability check before the write call, with a clear stop message (not a silent crash) when Codex isn't available — write delegation cannot silently fall back to Claude the way review can (that would silently violate the user's configured authorship), so the correct behavior is a clear error, not a graceful degrade.
+14. **[Codex] `pf-codereview` Phase 1.5 honors a *declined* `code.review: skip` confirmation as if it were confirmed.** When `roles.code.review: skip` has no `confirmed:` marker, the phase asks the user to confirm — but the text says "either way" (confirmed yes, or the question just having been asked) skip Phase 2/3's normal review and write `verdict: SKIPPED`. If the user answers **no**, review should not be silently skipped — the hard gate is being bypassed without actual confirmation. Needs an explicit "no" branch: do not write `confirmed:`, do not skip review — fall through to normal Phase 2 review instead (as if `code.review` were not `skip` at all, or at minimum stop with a message that the issue's `roles.code.review: skip` is unconfirmed and cannot proceed until either confirmed or changed).
 
 ### P2 (Minor) — new this round
 
-13. **[Claude] `skills/pf-size-tiers/SKILL.md` references a nonexistent "`pf-roles` §1.4"** (twice) for the tier-default-skip mechanic — the actual location is `pf-roles` §4, level 3 (confirmed correct in `pf-user-docs`/`pf-dev-docs`, which cite it correctly). Likely carried over from `specs.md`'s own numbering (where §1.4 is a real subsection) during drafting. Simple reference fix.
+15. **[Codex] `pf-impl-plan`'s template still frames `Task Type: docs` as a live third choice**, even though `pf-execute` unconditionally hard-stops on it. Reported twice by Codex across rounds 3-4 — strengthen beyond round 2's "reserved" note: the template should tell the drafting actor not to assign `docs` to any task in a plan meant for actual execution (since nothing currently dispatches it), not just document that it's reserved after the fact.
+16. **[Codex] `pf-codereview`'s Phase -1 automigration can mutate `prompt.md` before Phase 0's prerequisite hard-stop**, leaving an unowned dirty `prompt.md` edit if Phase 0 then stops (e.g. incomplete `implementation_plan.md`) before Phase 5 ever commits. Reorder: Phase 0 (prerequisite check) doesn't need role resolution, so it can safely run *before* Phase -1's automigration — preventing any mutation when the skill is about to stop anyway.
+17. **[Codex] `pf-check`'s sequential-review dispatch only defines Claude/Codex invocation paths, not a generic `invoke: agent` actor.** The example role matrix and `agents.yml` include `haiku` (`invoke: agent`, a different model) as a plausible reviewer — `by: [haiku, codex]` has no defined dispatch for the `haiku` pass. Sequential (and parallel) review dispatch should handle any `invoke: agent` actor generically (dispatch a sub-agent using that actor's configured `model` from `agents.yml`), not assume "agent" always means "Claude with the default model."
 
 ---
 
@@ -28,4 +28,4 @@ Finding #11 (specs.md/implementation_plan.md drift, out of diff scope) remains o
 
 **FAIL**
 
-(One open P1 — #12.)
+(One open P1 — #14.)
