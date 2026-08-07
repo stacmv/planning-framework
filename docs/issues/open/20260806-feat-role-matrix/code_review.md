@@ -8,24 +8,30 @@
 
 ## Findings
 
-### Previous rounds — resolution status
+### Resolution history (4 fix rounds)
 
-Rounds 1-3 (12 findings total) all confirmed **RESOLVED** on re-review by both reviewers across multiple independent passes, no half-fixes or new contradictions found. Finding #11 (specs.md/implementation_plan.md drift, out of diff scope) remains an open pre-`/pf-close` cleanup item, not a code-review blocker.
+All P0/P1 findings across four review rounds are **RESOLVED**, independently confirmed by both reviewers on final re-review:
+- Round 1 (1 P0, 5 P1): resolver fallback per-key fix, broken cross-references, `pf-execute` Task Type propagation, wave-completion self-contradiction, automigration ownership scoping, legacy reviewer-guard condition.
+- Round 2 (1 P1): `Task Type` missing-field fallback in `pf-execute`.
+- Round 3 (1 P1): Codex write-invocation availability/setup gate in `pf-roles` §7.
+- Round 4 (1 P1): `pf-codereview`'s declined skip-confirmation ("no") now actually runs review instead of silently skipping.
 
-### P1 (Important) — new this round
+No open P0/P1 findings remain.
 
-14. **[Codex] `pf-codereview` Phase 1.5 honors a *declined* `code.review: skip` confirmation as if it were confirmed.** When `roles.code.review: skip` has no `confirmed:` marker, the phase asks the user to confirm — but the text says "either way" (confirmed yes, or the question just having been asked) skip Phase 2/3's normal review and write `verdict: SKIPPED`. If the user answers **no**, review should not be silently skipped — the hard gate is being bypassed without actual confirmation. Needs an explicit "no" branch: do not write `confirmed:`, do not skip review — fall through to normal Phase 2 review instead (as if `code.review` were not `skip` at all, or at minimum stop with a message that the issue's `roles.code.review: skip` is unconfirmed and cannot proceed until either confirmed or changed).
+### P2 (Minor) — open, non-blocking
 
-### P2 (Minor) — new this round
+Accumulated across rounds, left for a `/pf-close`-adjacent cleanup pass (not blocking `/pf-test`):
 
-15. **[Codex] `pf-impl-plan`'s template still frames `Task Type: docs` as a live third choice**, even though `pf-execute` unconditionally hard-stops on it. Reported twice by Codex across rounds 3-4 — strengthen beyond round 2's "reserved" note: the template should tell the drafting actor not to assign `docs` to any task in a plan meant for actual execution (since nothing currently dispatches it), not just document that it's reserved after the fact.
-16. **[Codex] `pf-codereview`'s Phase -1 automigration can mutate `prompt.md` before Phase 0's prerequisite hard-stop**, leaving an unowned dirty `prompt.md` edit if Phase 0 then stops (e.g. incomplete `implementation_plan.md`) before Phase 5 ever commits. Reorder: Phase 0 (prerequisite check) doesn't need role resolution, so it can safely run *before* Phase -1's automigration — preventing any mutation when the skill is about to stop anyway.
-17. **[Codex] `pf-check`'s sequential-review dispatch only defines Claude/Codex invocation paths, not a generic `invoke: agent` actor.** The example role matrix and `agents.yml` include `haiku` (`invoke: agent`, a different model) as a plausible reviewer — `by: [haiku, codex]` has no defined dispatch for the `haiku` pass. Sequential (and parallel) review dispatch should handle any `invoke: agent` actor generically (dispatch a sub-agent using that actor's configured `model` from `agents.yml`), not assume "agent" always means "Claude with the default model."
+- **#11** `specs.md`/`implementation_plan.md` (this issue's own planning docs, outside the diff) still describe pre-fix design details (resolver fallback wording, automigration scope, `Task Type: docs` as assignable).
+- **#18** `pf-check`'s `both`-mode parallel dispatch is only explicitly defined for exactly `[<agent-actor>, codex]` — 3+-actor or 2×`invoke:agent` parallel combinations are undocumented (unreachable via any default profile, but not explicitly scoped out either).
+- **#19** `pf-roles` §1's "`code.review: skip`" description says `pf-codereview` "writes the same marker" on asking — doesn't reflect that a "no" answer runs review without writing `confirmed:`.
+- **#20** `pf-impl-plan`'s commit-ownership line ("orchestrator does this, never the sub-agent") doesn't mention the delegated-actor case the way `pf-check`'s equivalent line does.
+- **[Codex]** `pf-execute`'s per-task write delegation branches on the literal actor name (`claude` vs. not) rather than the actor's `agents.yml` `invoke:` value — a non-Claude `invoke: agent` writer (e.g. `haiku`) would incorrectly route through the Codex write-invocation path.
+- **[Codex]** `pf-codereview`'s reviewer-selection table is still hard-coded to `claude`/`codex` — doesn't reflect `pf-check`'s generalization to arbitrary `invoke: agent` reviewers (e.g. `roles.code.review: [haiku]`).
+- **[Codex]** `pf-qa`'s code-review-skip risk line keys only on `roles.code.review` resolving to `skip`, without checking for a `confirmed:` marker or `code_review.md`'s `SKIPPED` verdict — would misreport a declined-then-actually-reviewed case as skipped.
 
 ---
 
 ## Verdict
 
-**FAIL**
-
-(One open P1 — #14.)
+**PASS**
