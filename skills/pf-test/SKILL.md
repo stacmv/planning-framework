@@ -6,7 +6,7 @@ version: 3.0.0
 
 Determine the active issue from `docs/issues/open/`. Read `docs/issues/open/[ACTIVE-ISSUE-ID]/test_plan.md` — if it does not exist, stop: "test_plan.md is required. Run /pf-test-plan first."
 
-Then check `docs/issues/open/[ACTIVE-ISSUE-ID]/code_review.md`: it must exist and its `verdict:` field must read literally `PASS`. This is a mechanical check — read the file and compare the field's literal value, no judgment call. If the file is missing, or exists with `verdict: FAIL` (or any value other than `PASS`), stop: "code_review.md (PASS) is required. Run /pf-codereview first." (translate per `doc_language` in `prompt.md`'s YAML frontmatter if it is set to something other than English).
+Then check `docs/issues/open/[ACTIVE-ISSUE-ID]/code_review.md`: it must exist and its `verdict:` field must read literally `PASS` **or** start with `SKIPPED` (the latter written by `/pf-codereview` when `roles.code.review: skip` is confirmed — see `~/.claude/skills/pf-roles/SKILL.md` §1's "`code.review: skip`" section; it is not a failure, and this prerequisite must not block on it). This is a mechanical check — read the file and compare the field's literal value, no judgment call. If the file is missing, or exists with `verdict: FAIL` (or any value other than `PASS`/`SKIPPED...`), stop: "code_review.md (PASS) is required. Run /pf-codereview first." (translate per `doc_language` in `prompt.md`'s YAML frontmatter if it is set to something other than English).
 
 ---
 

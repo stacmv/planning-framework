@@ -13,9 +13,13 @@ Determine the active issue from `docs/issues/open/`. Identify the most recently 
 - If checking implementation_plan.md: predecessors are brd.md, specs.md (if present), test_plan.md
 - If checking analysis.md (bug pipeline): predecessors are none (it's the first document produced).
 
+## Automigration — this skill's own prerequisite
+
+Before doing anything else in this skill — before resolving any `roles.<key>` below — check the active issue's `prompt.md` frontmatter: if it has a `reviewers:` block but no `roles:` block, run the same automigration `/pf`'s Step 2 runs, following the conversion rule and fallback-order algorithm defined in `~/.claude/skills/pf-roles/SKILL.md` (§5, §4) — do not restate that rule here. This skill does not assume `/pf` already did this: it can be invoked directly on a legacy issue, including from `/pf-autopilot`, bypassing `/pf` entirely. As with `/pf`'s own copy of this step, this is read/write on `prompt.md` only — the edit rides along with whichever commit this invocation makes at the end (see "Close the stage: commit & push" below).
+
 ## Reviewer selection
 
-Before dispatching any analysis, read the `reviewers` block from `docs/issues/open/[ISSUE-ID]/prompt.md`'s frontmatter (see `~/.claude/skills/pf-brd/SKILL.md`'s reviewer-assignment guard for how/when it's written). Map TARGET to its `reviewers.<key>`:
+Before dispatching any analysis, resolve the role for TARGET's key per `~/.claude/skills/pf-roles/SKILL.md` (§4's fallback order), reading `docs/issues/open/[ISSUE-ID]/prompt.md`'s frontmatter (`roles:`/`profile:`, post-automigration). Map TARGET to its role key:
 
 | TARGET | key |
 |---|---|
@@ -26,12 +30,16 @@ Before dispatching any analysis, read the `reviewers` block from `docs/issues/op
 | `implementation_plan.md` | `implementation_plan` |
 | `analysis.md` | `analysis` |
 
-If the `reviewers` block is absent, or the specific key is absent from it, treat it as `claude` — this is the backward-compatibility default (see BRD/specs: existing issues created before this field existed must behave exactly as they did before). In that case, do **not** ask the user anything about reviewer choice here (that question belongs only to the once-per-issue guard in `pf-brd`/`pf`) — just proceed with the Claude path below silently, with no mention of Codex anywhere in the output.
+The resolved role's `review` field (a list + `mode`, per `pf-roles` §1) drives which path runs below. This skill still reasons about `review` in terms of the same three shapes it always has — `claude`-only, `codex`-only, `both` (`claude` + `codex`) — now expressed as `{ mode: parallel, by: [...] }`. Backward-compat equivalence, dictated by `~/.claude/skills/pf-roles/SKILL.md` §5's automigration rule:
 
-The resolved value drives which of the three paths below runs:
-- **`claude`** — run the "Claude review" path only.
-- **`codex`** — run the "Codex invocation chain" only.
-- **`both`** — run both independently (each exactly as it would run alone), then aggregate per "`both`-mode aggregation" below.
+| Resolved `review` | Path below |
+|---|---|
+| `{ mode: parallel, by: [claude] }` (or `review` absent entirely — the general default) | "Claude review" path only |
+| `{ mode: parallel, by: [codex] }` | "Codex invocation chain" only |
+| `{ mode: parallel, by: [claude, codex] }` | both, independently, then "`both`-mode aggregation" below |
+| `{ mode: sequential, by: [...] }` | "Sequential review mode" below |
+
+If role resolution yields no `roles:`/`profile:` at all for this issue (§4's level 5 general default), the resolved review is `[claude]` — this is the same backward-compatibility behavior as before this issue (existing issues created before any of this existed review exactly as `claude`-only would have). In that case, do **not** ask the user anything about reviewer choice here (that question belongs only to the once-per-issue guard in `pf-brd`/`pf`) — just proceed with the Claude path below silently, with no mention of Codex anywhere in the output.
 
 ### Claude review path
 
@@ -100,7 +108,7 @@ The raw, unstructured output of a direct `codex exec` call (step 4 above) is **n
 
 ### `both`-mode aggregation
 
-When the resolved reviewer is `both`, run the Claude review path and the Codex invocation chain independently — each exactly as described above, as if it were the only reviewer assigned. Wait for both to complete, then merge before presenting anything to the user:
+When the resolved `review` is `{ mode: parallel, by: [claude, codex] }`, run the Claude review path and the Codex invocation chain independently — each exactly as described above, as if it were the only reviewer assigned. Wait for both to complete, then merge before presenting anything to the user:
 
 - Combine both sets of findings into one list, still grouped by priority (P0/P1/P2) exactly as for a single reviewer.
 - Prefix every individual finding with its source tag: `[Claude]` or `[Codex]`.
@@ -108,7 +116,19 @@ When the resolved reviewer is `both`, run the Claude review path and the Codex i
 - Do **not** deduplicate, rank, or arbitrate between the two sources, even when they comment on the exact same location and disagree — both findings are shown to the user as independent input. This is a deliberate BRD requirement (no automatic conflict resolution between reviewers); the author/user makes the final call.
 - If Codex was invoked via the raw `codex exec` fallback (chain step 4), its unstructured block is still shown alongside the merged P0/P1/P2 list, labeled the same "Codex findings (unstructured)" as the `codex`-only case — it is not forced into the priority grouping just because Claude's half has one.
 
-**Autopilot mode — no interactive gate.** This applies identically regardless of which reviewer path produced the findings (`claude`/`codex`/`both`, tags and all). If this skill was invoked with the argument `autopilot` (pf-autopilot passes it — see `~/.claude/skills/pf-autopilot/SKILL.md`), do **not** present the `AskUserQuestion` below. Still present the findings to the user first, for the record, then resolve the review gate automatically from the findings:
+### Sequential review mode
+
+When the resolved `review` is `{ mode: sequential, by: [r1, r2, ...] }`, run the reviewers in `by` in order, each seeing the previous one's fixes already applied — the mechanics are fully defined in `~/.claude/skills/pf-roles/SKILL.md` §6; this section only fixes how `pf-check` carries it out:
+
+1. `r1` runs its review path (Claude review path or Codex invocation chain, per which actor it is) against TARGET as it stands now, producing findings.
+2. Those findings are dispatched to this stage's resolved `write` actor (§4's fallback order, same resolution as everywhere else) — the same mechanism as the interactive "Fix now" path below, but automatic: no `AskUserQuestion`, no confirmation prompt. If `write` is Claude, this is the same fix-sub-agent dispatch described under "If 'Fix now'" below, just triggered without a user choice. If `write` is not Claude, it uses the write-invocation form from `~/.claude/skills/pf-roles/SKILL.md` §7, with the "apply these findings to an existing file" prompt from §6 there (not the "write a document from scratch" prompt) — findings are P0/P1 only, same as any other fix dispatch.
+3. TARGET is re-read from disk.
+4. The next reviewer in `by` runs its review path against the now-fixed TARGET.
+5. Repeat through the last reviewer in `by`; its findings are **not** auto-fixed by this loop — they flow into the normal end-of-review gate below (the `AskUserQuestion`/autopilot handling), same as a single-reviewer run's findings would.
+
+**Final report.** Instead of one merged list, present each reviewer's findings as its own block, labeled `[<actor>, pass N]` (`N` = 1-based position in `by`) — including findings from passes before the last one, which were already auto-fixed in step 2 above; mark each such finding `(fixed before next reviewer)` so the pass history stays visible rather than only the final snapshot. The last reviewer's block feeds the gate below exactly as any single reviewer's findings would.
+
+**Autopilot mode — no interactive gate.** This applies identically regardless of which reviewer path produced the findings (`claude`/`codex`/`both`/sequential, tags and all — for sequential mode this is the last reviewer's findings, per "Final report" above). If this skill was invoked with the argument `autopilot` (pf-autopilot passes it — see `~/.claude/skills/pf-autopilot/SKILL.md`), do **not** present the `AskUserQuestion` below. Still present the findings to the user first, for the record, then resolve the review gate automatically from the findings:
 - **Any P0 or P1 finding** → take the **"Fix now"** path (dispatch the fix sub-agent described below). Keep it non-interactive: instruct that sub-agent **not** to call `AskUserQuestion` — it applies the specified fixes directly, and for any genuinely ambiguous point it picks the most reasonable option and records the assumption in its summary instead of asking.
 - **Only P2 findings, or none** → take the **"Skip and continue"** path.
 Append one line to the issue's `session-log.md` recording the auto-decision, marked `[autopilot default]` (e.g. `[autopilot default] pf-check auto-applied Fix now — N P0/P1 addressed`, or `[autopilot default] pf-check auto-continued — only P2/none`). Everything downstream (the fix sub-agent, the commit & push below) then runs exactly as it would for the chosen path.
@@ -122,11 +142,13 @@ Present the returned findings to the user as-is, then use AskUserQuestion to pre
 
 Note: these three options are unchanged from today, and the oversized-for-tier finding (above) flows through them exactly like any other P0/P1 finding — "Skip and continue" remains available for it too. pf-check itself does not implement any special blocking behavior for oversized documents; it stays advisory-only, same as for every other finding. The real enforcement happens downstream: each pipeline skill (pf-spec, pf-test-plan, pf-impl-plan, pf-execute) independently recomputes this same oversized-for-tier comparison against its own predecessor document(s) as a prerequisite-gate check before it starts producing its own document, and stops there if the predecessor is still oversized. This gate and its three options are identical for `claude`, `codex`, and `both` — the reviewer choice changes only who produces the findings above it, never the gate itself.
 
-If "Fix now": dispatch a second sub-agent (Agent tool, default/general-purpose type) to apply the fix. **This fix sub-agent is always Claude, never Codex, regardless of which reviewer(s) produced the findings** — Codex (in any invocation form) only ever finds problems; it is never given write access to the repository (see specs.md §7). Give it: the target document path, the predecessor document paths, and the full P0/P1 findings list from the analysis step — for `both`, this is the merged, source-tagged (`[Claude]`/`[Codex]`) list from the aggregation above; the fix sub-agent should address all of it regardless of tag. Instruct it to read what it needs, use AskUserQuestion itself to ask clarifying questions until it is 95% confident (with a recommendation and reason below each option), edit the document directly (honoring the same `doc_language` field for any prose it writes, keeping structural labels in English), and return only a short summary of what changed. Relay that summary to the user.
+If "Fix now": dispatch the fix to this stage's resolved `write` actor (`~/.claude/skills/pf-roles/SKILL.md` §4's fallback order — the same resolution already done for review selection above, re-read fresh, never cached). **The fixer is not always Claude** — it is whichever actor `write` resolves to for this stage, regardless of which reviewer(s) produced the findings; Codex (in any review invocation form) still only ever finds problems, it never reviews and fixes in the same role, but a stage whose `write` is `codex` gets its fixes from `codex`, not from Claude. This is a deliberate behavior change from before this issue (BRD Non-Goals — no write/review independence invariant is introduced).
+- **If `write == claude`:** dispatch a second sub-agent (Agent tool, default/general-purpose type) to apply the fix — same as before. Give it: the target document path, the predecessor document paths, and the full P0/P1 findings list from the analysis step — for `both`, this is the merged, source-tagged (`[Claude]`/`[Codex]`) list from the aggregation above; for sequential mode, the last reviewer's findings. The fix sub-agent should address all of it regardless of tag. Instruct it to read what it needs, use AskUserQuestion itself to ask clarifying questions until it is 95% confident (with a recommendation and reason below each option), edit the document directly (honoring the same `doc_language` field for any prose it writes, keeping structural labels in English), and return only a short summary of what changed. Relay that summary to the user.
+- **If `write != claude`** (in this issue, only `codex`): use the write-invocation form from `~/.claude/skills/pf-roles/SKILL.md` §7, with the "apply these findings to an existing file" prompt form from §6 there (not the "write a document from scratch" form) — the same form the automatic inter-pass step of sequential mode uses above. The actor is given the target document path and edits it itself (`--write`); this skill re-reads the file from disk afterward and reports a short summary to the user (there is no clarifying-question loop here — a delegated actor cannot call `AskUserQuestion`, so the findings themselves must carry enough detail to act on, same as the sequential inter-pass step).
 If "I'll fix manually" or "Skip and continue": confirm the choice and state the next /pf-* command to run.
 
 ## Close the stage: commit & push
 
-This applies to the **"Fix now"** path only — the other two options change no file, so there is nothing to commit and this skill must not create an empty commit.
+The **"Fix now"** path always has something to commit (the document the fix actor edited). The other two options ("I'll fix manually" / "Skip and continue") change no file on their own — **except** when the automigration step above fired for this issue during this same invocation, in which case `prompt.md` changed even though the review gate itself changed nothing; stage and commit that edit too. Only skip this whole section (no commit at all) when neither the fix actor nor automigration touched anything this run.
 
-After relaying the fix sub-agent's summary, run the shared commit & push procedure in `~/.claude/skills/pf-git/SKILL.md` ("Stage commit & push") as the last action of this skill. The orchestrator does this, never the fix sub-agent. Do not restate the procedure here: it defines what to stage (the document(s) the sub-agent actually edited), the commit message, the push guard, and the one-line report. Review corrections are work like any other — they are not finished until they are committed and pushed.
+After relaying the fix summary (if any), run the shared commit & push procedure in `~/.claude/skills/pf-git/SKILL.md` ("Stage commit & push") as the last action of this skill. The orchestrator does this, never a delegated fix actor. Do not restate the procedure here: it defines the commit message, the push guard, and the one-line report. Stage the document(s) actually edited (the review's TARGET, for "Fix now"), plus `prompt.md` if automigration wrote to it this run. Review corrections are work like any other — they are not finished until they are committed and pushed.
