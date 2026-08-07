@@ -36,18 +36,34 @@ Stage **only the paths this stage owns**:
 
 | Stage | Paths to `git add` |
 | ----- | ------------------ |
-| `/pf-brd` | `docs/issues/open/<ISSUE-ID>/brd.md` (+ `prompt.md` if `size_tier` changed) |
-| `/pf-spec` | `docs/issues/open/<ISSUE-ID>/specs.md` |
-| `/pf-test-plan` | `docs/issues/open/<ISSUE-ID>/test_plan.md` (+ `prompt.md` if `size_tier` changed) |
-| `/pf-impl-plan` | `docs/issues/open/<ISSUE-ID>/implementation_plan.md` |
-| `/pf-check` | the document(s) the fix sub-agent actually edited |
-| `/pf-execute` | `-A` at a wave boundary — this stage owns the code, not just the issue folder |
-| `/pf-codereview` | `docs/issues/open/<ISSUE-ID>/code_review.md` (+ the file(s) the fix sub-agent actually edited, on a Fix-now loop iteration) |
-| `/pf-test` | `docs/issues/open/<ISSUE-ID>/test_plan.md`, `manual_test_checklist.md` |
-| `/pf-qa` | `docs/issues/open/<ISSUE-ID>/qa_report.md` |
+| `/pf-brd` | `docs/issues/open/<ISSUE-ID>/brd.md` (+ `prompt.md` if `size_tier` changed) (+ `prompt.md`, if automigration ran this same invocation) |
+| `/pf-spec` | `docs/issues/open/<ISSUE-ID>/specs.md` (+ `prompt.md`, if automigration ran this same invocation) |
+| `/pf-test-plan` | `docs/issues/open/<ISSUE-ID>/test_plan.md` (+ `prompt.md` if `size_tier` changed) (+ `prompt.md`, if automigration ran this same invocation) |
+| `/pf-impl-plan` | `docs/issues/open/<ISSUE-ID>/implementation_plan.md` (+ `prompt.md`, if automigration ran this same invocation) |
+| `/pf-check` | the document(s) the fix sub-agent actually edited (+ `prompt.md`, if automigration ran this same invocation) |
+| `/pf-execute` | `-A` at a wave boundary — this stage owns the code, not just the issue folder (+ `prompt.md`, if automigration ran this same invocation — already covered by `-A`, since it sweeps the whole worktree) |
+| `/pf-codereview` | `docs/issues/open/<ISSUE-ID>/code_review.md` (+ the file(s) the fix sub-agent actually edited, on a Fix-now loop iteration) (+ `prompt.md`, if automigration ran this same invocation) |
+| `/pf-test` | `docs/issues/open/<ISSUE-ID>/test_plan.md`, `manual_test_checklist.md` (+ `prompt.md`, if automigration ran this same invocation) |
+| `/pf-user-docs` | `docs/issues/open/<ISSUE-ID>/user_docs.md` (+ `prompt.md`, if automigration ran this same invocation) |
+| `/pf-dev-docs` | `docs/issues/open/<ISSUE-ID>/dev_docs.md` (+ `prompt.md`, if automigration ran this same invocation) |
+| `/pf-qa` | `docs/issues/open/<ISSUE-ID>/qa_report.md` (+ `prompt.md`, if automigration ran this same invocation) |
 
 For `size_tier: trivial`, `notes.md` stands in for `brd.md` / `specs.md` /
 `implementation_plan.md` — stage it under whichever stage produced it.
+
+**Why every row carries the automigration qualifier.** The `reviewers:` →
+`roles:` automigration (`~/.claude/skills/pf-roles/SKILL.md` §5) edits
+`prompt.md` but never commits that edit itself — by design, so it doesn't
+create a commit of its own just for the migration. Whichever `pf-*` stage
+runs next for that issue after automigration fired is the one responsible
+for staging that edit alongside its own artifact. Before this qualifier
+existed on every row, only `/pf-brd`/`/pf-test-plan` carried a `prompt.md`
+qualifier at all (for `size_tier` changes) — so a stage without one (most of
+them) would leave the automigration edit unstaged and uncommitted, and it
+would only surface much later as a dirty-tree failure at `/pf-qa`, far
+removed from its actual cause. Only one stage actually stages this edit in a
+given run — whichever one runs immediately after automigration fired — but
+every row needs the qualifier because any of them could be that stage.
 
 **Why scoped and not `git add -A`.** `/pf-qa` fails the run when `git status` is
 dirty (see its Important Notes), and that check only means something if unrelated
@@ -71,6 +87,8 @@ work:
 | `/pf-execute` | `feat: <short wave summary> [<ISSUE-ID>]` (or `fix:` / `refactor:` as fits) |
 | `/pf-codereview` | `docs: code_review.md — <PASS\|FAIL> [<ISSUE-ID>]` |
 | `/pf-test` | `test: status tracker + manual checklist [<ISSUE-ID>]` |
+| `/pf-user-docs` | `docs: user_docs.md for <ISSUE-ID>` |
+| `/pf-dev-docs` | `docs: dev_docs.md for <ISSUE-ID>` |
 | `/pf-qa` | `docs: qa_report.md — <PASS\|FAIL> [<ISSUE-ID>]` |
 
 Never `--no-verify`: a repo's pre-commit hooks apply to framework commits too.

@@ -4,7 +4,10 @@ description: Run QA checks from .qa-workflow.md, confirm manual items, and produ
 version: 3.0.0
 ---
 
-Determine the active issue from `docs/issues/open/`. Check prerequisites: `manual_test_checklist.md` must exist inside the issue folder. If it does not exist, stop: "Testing stage is not complete. Run /pf-test first."
+Determine the active issue from `docs/issues/open/`. Check prerequisites, in order:
+
+1. `manual_test_checklist.md` must exist inside the issue folder. If it does not exist, stop: "Testing stage is not complete. Run /pf-test first."
+2. For each of `user_docs`, `dev_docs`: resolve the role for that key per `~/.claude/skills/pf-roles/SKILL.md` (§4's fallback order), reading `docs/issues/open/ISSUE-ID/prompt.md`'s frontmatter (`roles:`/`profile:`). If the resolved role is `skip` (explicit, via a profile's point-specific entry, or via the tier-default fallback for `size_tier: trivial`/`small`), this key's file requirement does not apply — move on to the next key. Otherwise `docs/issues/open/ISSUE-ID/user_docs.md` (respectively `dev_docs.md`) must exist and be non-empty. If it is missing or empty, stop with the same pattern as the check above: "User docs stage is not complete. Run /pf-user-docs first." (respectively "Dev docs stage is not complete. Run /pf-dev-docs first.").
 
 **Documentation language:** read the `doc_language` field from `docs/issues/open/ISSUE-ID/prompt.md`'s YAML frontmatter (default: English if absent). Write prose in `qa_report.md` (blocker descriptions, notes) in that language, but keep the report's structural labels and the `**PASS**`/`**FAIL**` verdict markers in English exactly as specified below, since `/pf-close` parses them literally.
 
@@ -68,7 +71,23 @@ Manual QA items need your confirmation:
 For each item, reply with: 1 PASS, 2 PASS, 3 FAIL, etc.
 ```
 
-Wait for the user's response before proceeding to Phase 4.
+Wait for the user's response before proceeding to Phase 3.5.
+
+---
+
+## Phase 3.5: Resolve the code-review risk line
+
+Resolve the role for the `code` key per `~/.claude/skills/pf-roles/SKILL.md` (§4's fallback order), reading `docs/issues/open/ISSUE-ID/prompt.md`'s frontmatter. If `roles.code.review == skip`:
+
+- Read the `confirmed:` marker recorded next to `roles.code.review: skip` in `prompt.md`'s frontmatter (written by `/pf` or `pf-codereview` — see `~/.claude/skills/pf-roles/SKILL.md`'s "`code.review: skip`" section).
+- This unconditionally produces one risk line for Phase 4's report, verbatim except for the date:
+  ```
+  ⚠ Risk: code review was skipped for this issue (roles.code.review: skip, confirmed <date>). No independent review of the implementation exists.
+  ```
+
+If `roles.code.review` is anything other than `skip`, there is no risk line to add here — proceed to Phase 4 with an empty risk list.
+
+This check runs regardless of whether `code_review.md` shows `verdict: PASS` or `verdict: SKIPPED` — the risk line is about the *role*, not about which verdict a prior stage happened to record.
 
 ---
 
@@ -99,6 +118,12 @@ Compile all results and write `docs/issues/open/ISSUE-ID/qa_report.md` using the
 
 ---
 
+## Risks
+
+[List every risk line produced by Phase 3.5 (and any future risk source), one per line. If none, write: _None._]
+
+---
+
 ## Blockers
 
 [List every item that failed — either automated or manual — with a brief description of what failed. If none, write: _None._]
@@ -114,6 +139,7 @@ Rules for the Verdict section:
 - If zero blockers: write `**PASS**` on its own line.
 - If any blockers exist: write `**FAIL**` on its own line.
 - The verdict must appear as a standalone line (`**PASS**` or `**FAIL**`) so `/pf-close` can detect it with a simple text search.
+- **The Risks section never affects the Verdict.** A non-empty Risks section (including the `roles.code.review: skip` line from Phase 3.5) is informational only — it does not turn a `PASS` into a `FAIL` by itself. Only entries in the Blockers section do that.
 
 ---
 
