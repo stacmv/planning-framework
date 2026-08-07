@@ -59,7 +59,7 @@ Group test cases into implementation tasks:
 ### Implementation Tasks
 
 #### Task 1: [Name]
-**Task Type:** code | tests | docs
+**Task Type:** code | tests
 **Mapped Test Cases:** TC-001, TC-002, TC-003
 **Files:**
 - `path/to/file1` - [description]
@@ -78,7 +78,7 @@ Group test cases into implementation tasks:
 **`Task Type` is mandatory for every task** — populate it immediately after the task heading, before `Mapped Test Cases`, whichever actor drafts the plan (the dispatched sub-agent on the `write == claude` path, or the delegated actor on the `write != claude` path):
 - `code` — the task writes/changes product code; `/pf-execute` resolves `roles.code` for it.
 - `tests` — the task writes automated tests; `/pf-execute` resolves `roles.tests` for it.
-- `docs` — the task writes documentation as part of the implementation plan itself (not via `/pf-user-docs`/`/pf-dev-docs`); not used for delegation in this issue, reserved so the template doesn't need to change again when such a task appears.
+- `docs` — reserved for a future task type (documentation written as part of the implementation plan itself, not via `/pf-user-docs`/`/pf-dev-docs`). **Do not assign `Task Type: docs` to any task in a plan meant for actual execution.** `/pf-execute` has no dispatch path for it today and hard-stops the moment it sees one (before creating any tasks) — so a `docs`-typed task blocks the entire plan from running, not just itself. If a task is genuinely doc-writing work and there is no better fit among `code`/`tests`, mark it `Task Type: code` instead for now, until `docs` dispatch actually exists in `/pf-execute`.
 
 ### Step 3: Identify Dependencies
 

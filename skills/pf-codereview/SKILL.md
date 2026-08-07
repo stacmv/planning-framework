@@ -10,11 +10,9 @@ Determine the active issue from `docs/issues/open/`. Read ISSUE-ID from the fold
 
 ---
 
-## Phase -1: Automigration — this skill's own prerequisite
-
-Before anything else — before Phase 0 — check the active issue's `prompt.md` frontmatter: if it has a `reviewers:` block but no `roles:` block, run the same automigration `/pf`'s Step 2 runs, following the conversion rule and fallback-order algorithm defined in `~/.claude/skills/pf-roles/SKILL.md` (§5, §4) — do not restate that rule here. This skill does not assume `/pf` already did this: it can be invoked directly on a legacy issue, including from `/pf-autopilot`, bypassing `/pf` entirely. This is read/write on `prompt.md` only — the edit rides along with whichever commit this invocation makes in Phase 5.
-
 ## Phase 0: Input Gate — `implementation_plan.md` must be complete
+
+This runs **first, before automigration (Phase 0.5) or any role resolution** — it needs neither. Checking the prerequisite before touching `prompt.md` means that if this gate stops the skill, nothing has been mutated yet: no dirty, unowned `prompt.md` edit is left behind for a run that never reaches Phase 5's commit.
 
 Reuse exactly the same mechanical prerequisite check `/pf-execute` runs for its own gate — do not invent a second one. Per the shared "Stage completion" definition in `~/.claude/skills/pf-size-tiers/SKILL.md`, judged fresh from the filesystem, never from memory (see "Evaluating it is a MECHANICAL check" there for the exact tool calls to run):
 
@@ -22,6 +20,12 @@ Reuse exactly the same mechanical prerequisite check `/pf-execute` runs for its 
 - **If `size_tier` is small/medium/large (or absent):** `implementation_plan.md` must be complete — which includes every preceding stage (`brd.md`/`specs.md` or `analysis.md`, and `test_plan.md`). If not, stop naming whichever stage is actually incomplete, exactly as `/pf-execute` does (e.g. "Implementation plan is required. Run /pf-impl-plan first.").
 
 > **Run the check, do not recall it.** Your first action here is a tool call against the issue folder, not a recollection of what you read earlier this session — see "Evaluating it is a MECHANICAL check" in `~/.claude/skills/pf-size-tiers/SKILL.md`.
+
+---
+
+## Phase 0.5: Automigration — this skill's own prerequisite
+
+Only once Phase 0 has passed — before Phase 1 — check the active issue's `prompt.md` frontmatter: if it has a `reviewers:` block but no `roles:` block, run the same automigration `/pf`'s Step 2 runs, following the conversion rule and fallback-order algorithm defined in `~/.claude/skills/pf-roles/SKILL.md` (§5, §4) — do not restate that rule here. This skill does not assume `/pf` already did this: it can be invoked directly on a legacy issue, including from `/pf-autopilot`, bypassing `/pf` entirely. This is read/write on `prompt.md` only — the edit rides along with whichever commit this invocation makes in Phase 5. Running this after Phase 0 (rather than before it) means Phase 0 stopping the skill early never leaves a `prompt.md` mutation behind — see Phase 0's note above.
 
 ---
 
@@ -47,15 +51,16 @@ If `roles.code.review` is anything other than `skip`, this phase does nothing fu
 
 If it **is** `skip`:
 - Check `docs/issues/open/ISSUE-ID/prompt.md`'s frontmatter for a `confirmed:` marker adjacent to `roles.code.review: skip`. **Scope note:** this `confirmed:` check reads literal `prompt.md` text only, not the full §4 resolution chain — a profile-level point-specific `skip` (with no matching literal text in `prompt.md`) would not be caught here. No default profile currently produces that, so this is a documented scope boundary, matching `/pf`'s equivalent confirmation-guard note.
-- **If `confirmed:` is already present** (written earlier by `/pf`'s `code.review: skip` confirmation guard, or by this skill itself on a previous run) — do not run any reviewer path (Phase 2 and Phase 3's normal PASS/FAIL logic do not run).
-- **If `confirmed:` is absent** (e.g. `code.review: skip` was hand-edited into `prompt.md`, bypassing `/pf` entirely) — ask the user the same question `/pf` would ask, via `AskUserQuestion`: **"Code review is disabled for this issue — confirm?"** On "yes," write `confirmed: <today's date>` into `prompt.md`'s frontmatter next to `roles.code.review: skip`, in the exact form `~/.claude/skills/pf-roles/SKILL.md` §1 shows (`code: { write: claude, review: skip, confirmed: 2026-08-07 }`), then continue below. Do not run any reviewer path either way — the confirmation only gates whether the skip is allowed to stand, not whether review runs.
-- Write `docs/issues/open/ISSUE-ID/code_review.md` with `verdict: SKIPPED (roles.code.review: skip, confirmed <confirmation date>)` in place of the normal PASS/FAIL verdict format from Phase 3, and do **not** block progression to `/pf-test` — skip Phase 2, Phase 3, and Phase 4's gate entirely, and go straight to Phase 5 (Commit & Push).
+- **If `confirmed:` is already present** (written earlier by `/pf`'s `code.review: skip` confirmation guard, or by this skill itself on a previous run) — do not run any reviewer path (Phase 2 and Phase 3's normal PASS/FAIL logic do not run). Write `docs/issues/open/ISSUE-ID/code_review.md` with `verdict: SKIPPED (roles.code.review: skip, confirmed <confirmation date>)` in place of the normal PASS/FAIL verdict format from Phase 3, and do **not** block progression to `/pf-test` — skip Phase 2, Phase 3, and Phase 4's gate entirely, and go straight to Phase 5 (Commit & Push).
+- **If `confirmed:` is absent** (e.g. `code.review: skip` was hand-edited into `prompt.md`, bypassing `/pf` entirely) — ask the user the same question `/pf` would ask, via `AskUserQuestion`: **"Code review is disabled for this issue — confirm?"** The two answers are **not** equivalent — branch on the actual reply:
+  - **"yes"** — write `confirmed: <today's date>` into `prompt.md`'s frontmatter next to `roles.code.review: skip`, in the exact form `~/.claude/skills/pf-roles/SKILL.md` §1 shows (`code: { write: claude, review: skip, confirmed: 2026-08-07 }`). Then do not run any reviewer path — write `docs/issues/open/ISSUE-ID/code_review.md` with `verdict: SKIPPED (roles.code.review: skip, confirmed <confirmation date>)` in place of the normal PASS/FAIL verdict format from Phase 3, and do **not** block progression to `/pf-test` — skip Phase 2, Phase 3, and Phase 4's gate entirely, and go straight to Phase 5 (Commit & Push).
+  - **"no"** — the skip is declined. Do **not** write a `confirmed:` marker. Do **not** write `verdict: SKIPPED`, and do **not** skip Phase 2/3/4. Since the literal configured `roles.code.review` value (`skip`) cannot itself be resolved to a reviewer, treat this run's review as the general `[claude]` default (`~/.claude/skills/pf-roles/SKILL.md` §4's fallback — the same default Phase 2 uses whenever no `roles:`/`profile:` is configured at all): run the **Claude review path** below directly for this run, then continue into Phase 3 (write `code_review.md`) and Phase 4 (the hard gate) exactly as if `review` had resolved to `[claude]` in the first place. (Do not re-enter Phase 2's role resolution here — reading `prompt.md` again would just see `skip` a second time; this is a one-time override for this run's review only, it does not rewrite `roles.code.review` in `prompt.md`.) State plainly to the user that answering "no" means code review actually runs now, on this diff — it does not silently continue treating the code as unreviewed, and it does not loop back into asking the same skip-confirmation question again this run.
 
 ---
 
 ## Phase 2: Reviewer Selection
 
-Resolve the role for the `code` key per `~/.claude/skills/pf-roles/SKILL.md` (§4's fallback order), reading `docs/issues/open/ISSUE-ID/prompt.md`'s frontmatter (`roles:`/`profile:`, post-automigration from Phase -1). This resolution is not reused from Phase 1.5 — it is re-read fresh here (never cached, per `pf-roles/SKILL.md` §8), and by this point Phase 1.5 has already established that `review` is not `skip`. If role resolution yields no `roles:`/`profile:` at all for this issue (§4's level 5 general default), the resolved review is `[claude]` — the same backward-compatibility default `pf-check` uses, and for the same reason: issues created before this field existed must review code exactly as `claude`-only would have.
+Resolve the role for the `code` key per `~/.claude/skills/pf-roles/SKILL.md` (§4's fallback order), reading `docs/issues/open/ISSUE-ID/prompt.md`'s frontmatter (`roles:`/`profile:`, post-automigration from Phase 0.5). This resolution is not reused from Phase 1.5 — it is re-read fresh here (never cached, per `pf-roles/SKILL.md` §8), and by this point Phase 1.5 has already established that `review` is not `skip` — except for the Phase 1.5 "no" branch, which skips straight to the Claude review path for that one run instead of re-entering this phase (see Phase 1.5 above). If role resolution yields no `roles:`/`profile:` at all for this issue (§4's level 5 general default), the resolved review is `[claude]` — the same backward-compatibility default `pf-check` uses, and for the same reason: issues created before this field existed must review code exactly as `claude`-only would have.
 
 The resolved role's `review` field (a list + `mode`, per `pf-roles` §1) drives which path runs, identically to `pf-check`:
 - `{ mode: parallel, by: [claude] }` (or `review` absent — general default) — the "Claude review" path below only.
@@ -63,7 +68,7 @@ The resolved role's `review` field (a list + `mode`, per `pf-roles` §1) drives 
 - `{ mode: parallel, by: [claude, codex] }` — both, independently, then merged per `pf-check`'s **"`both`-mode aggregation"**.
 - `{ mode: sequential, by: [...] }` — `pf-check`'s **"Sequential review mode"** (`skills/pf-check/SKILL.md`), applied to the code diff instead of a document: each reviewer in `by` reviews in turn, findings between passes are auto-dispatched to the resolved `write` actor for `code` (§4 below covers who that is), and the final `code_review.md` (Phase 3) lists each pass as its own `[<actor>, pass N]` block, same as `pf-check`'s final report — this skill references that mechanism by name rather than restating it.
 
-`roles.code.review: skip` is a separate, valid value handled entirely in Phase 1.5 above (before this phase even runs) — it is not one of the four shapes above and does not run any reviewer path. By the time this phase runs, Phase 1.5 has already ruled it out.
+`roles.code.review: skip` is a separate, valid value handled entirely in Phase 1.5 above (before this phase even runs) — it is not one of the four shapes above. On confirmed skip, it does not run any reviewer path at all; on a declined ("no") confirmation, Phase 1.5 runs the Claude review path itself and this phase is not re-entered for that run (see Phase 1.5's "no" branch above). Either way, by the time this phase would run, Phase 1.5 has already handled the `skip` case.
 
 ### Claude review path
 
@@ -133,7 +138,7 @@ Write finding prose in the issue's `doc_language` (default English), keeping `[C
 
 ## Phase 4: The Hard Gate — no "Skip and continue"
 
-**This phase does not run at all when Phase 1.5 resolved `roles.code.review: skip`** — that path already wrote `verdict: SKIPPED` and went straight to Phase 5, bypassing Phase 2, Phase 3, and this gate entirely (see Phase 1.5 above).
+**This phase does not run at all when Phase 1.5's skip confirmation came back "yes"** (skip stands, confirmed) — that path already wrote `verdict: SKIPPED` and went straight to Phase 5, bypassing Phase 2, Phase 3, and this gate entirely (see Phase 1.5 above). If Phase 1.5's confirmation came back **"no"** instead, the skip was declined and review actually ran (Phase 1.5's "no" branch) — this gate runs normally, exactly as if `review` had never been `skip`.
 
 **If Phase 3 produced `verdict: PASS`** (no open P0/P1): report the result and stop here — no `AskUserQuestion` is needed, there is nothing to resolve. State the next step: "Code review passed. Run /pf-test."
 
@@ -151,13 +156,15 @@ This is the one deliberate difference from `pf-check`'s gate: `pf-check` always 
 
 After the fix returns, **loop**: go back to Phase 1 (recompute the diff — it has changed), re-run Phase 2 (the same resolved `review` reviewer(s)) and Phase 3 (rewrite `code_review.md`), then re-evaluate this Phase 4 gate. Repeat automatically — no need to re-ask the user to re-invoke the skill — until `verdict: PASS`. Relay each iteration's fix summary to the user as it happens.
 
+**Exception — this run started from Phase 1.5's "no" branch (declined skip):** "re-run Phase 2" here means re-running the **Claude review path directly**, the same one-time override Phase 1.5 established, not re-entering Phase 2's role resolution — `prompt.md` still literally reads `roles.code.review: skip`, unconfirmed, so a fresh Phase 2 resolution would see `skip` again and the loop would silently stop reviewing on iteration 2. The `[claude]` override, once triggered by a "no" answer, holds for every iteration of this loop for the rest of this invocation; the skip-confirmation question is not re-asked within it.
+
 **If "I'll fix manually, then re-run /pf-codereview":** confirm the choice, state that `code_review.md` currently records `verdict: FAIL`, and stop. Do not loop — the next `/pf-codereview` invocation starts a fresh Phase 0.
 
 ---
 
 ## Phase 5: Commit & Push
 
-As the last action of this skill invocation — after the loop above (if any) has settled, whether it ends in `verdict: PASS`, `verdict: SKIPPED` (Phase 1.5), or the user chose to fix manually and left `verdict: FAIL` — run the shared commit & push procedure in `~/.claude/skills/pf-git/SKILL.md` ("Stage commit & push"). Do not restate the procedure here: it defines the push guard and the one-line git report. Stage `docs/issues/open/ISSUE-ID/code_review.md`, plus `prompt.md` if Phase -1's automigration or Phase 1.5's `confirmed:` write touched it this run, plus any file(s) a fix actor actually edited during this invocation's Fix-now loop (never `git add -A` — same scoped-staging rule every other `pf-*` stage follows). Commit message: `docs: code_review.md — <PASS|FAIL|SKIPPED> [<ISSUE-ID>]` (mirrors `pf-qa`'s `qa_report.md — <PASS|FAIL> [<ISSUE-ID>]` message; see `~/.claude/skills/pf-git/SKILL.md`'s Step 2 table).
+As the last action of this skill invocation — after the loop above (if any) has settled, whether it ends in `verdict: PASS`, `verdict: SKIPPED` (Phase 1.5), or the user chose to fix manually and left `verdict: FAIL` — run the shared commit & push procedure in `~/.claude/skills/pf-git/SKILL.md` ("Stage commit & push"). Do not restate the procedure here: it defines the push guard and the one-line git report. Stage `docs/issues/open/ISSUE-ID/code_review.md`, plus `prompt.md` if Phase 0.5's automigration or Phase 1.5's `confirmed:` write touched it this run, plus any file(s) a fix actor actually edited during this invocation's Fix-now loop (never `git add -A` — same scoped-staging rule every other `pf-*` stage follows). Commit message: `docs: code_review.md — <PASS|FAIL|SKIPPED> [<ISSUE-ID>]` (mirrors `pf-qa`'s `qa_report.md — <PASS|FAIL> [<ISSUE-ID>]` message; see `~/.claude/skills/pf-git/SKILL.md`'s Step 2 table).
 
 ---
 

@@ -87,11 +87,14 @@ Before proceeding to Step 5, check the active issue's `prompt.md` frontmatter fo
 
 **Scope note:** this check reads literal `prompt.md` text only — it does not run the full `~/.claude/skills/pf-roles/SKILL.md` §4 resolution chain (which could in principle resolve `review: skip` from a profile's point-specific entry, level 2, with no matching literal text in `prompt.md`). No default profile currently produces a point-specific `skip` for `code`, so this is a documented scope boundary, not a known gap.
 
-If `roles.code.review: skip` is present **without** an adjacent `confirmed:` marker, ask the user via `AskUserQuestion`: **"Code review is disabled for this issue — confirm?"** On a "yes" answer, write `confirmed: <today's date>` next to it in `prompt.md`'s frontmatter, in the exact form defined in `~/.claude/skills/pf-roles/SKILL.md` §1:
+If `roles.code.review: skip` is present **without** an adjacent `confirmed:` marker, ask the user via `AskUserQuestion`: **"Code review is disabled for this issue — confirm?"** The two answers are not equivalent — branch on the actual reply:
+- **"yes"** — write `confirmed: <today's date>` next to it in `prompt.md`'s frontmatter, in the exact form defined in `~/.claude/skills/pf-roles/SKILL.md` §1:
 
 ```yaml
 code: { write: claude, review: skip, confirmed: 2026-08-07 }
 ```
+
+- **"no"** — do **not** write a `confirmed:` marker. `/pf` itself does not run code review (that only ever happens inside `/pf-codereview`), so there is nothing to "fall through to" here — this guard's only effect either way is what it writes to `prompt.md`. Leaving `confirmed:` unwritten means the value stays exactly as it was before this guard ran: `roles.code.review: skip`, unconfirmed. Proceed to Step 5 normally. When this issue's pipeline later reaches `/pf-codereview`, its own Phase 1.5 will see `skip` with no `confirmed:` marker and ask the same question again — and if answered "no" there too, `/pf-codereview` actually runs code review rather than skipping it (see its Phase 1.5 "no" branch in `~/.claude/skills/pf-codereview/SKILL.md`). This guard does not silently let the skip stand unconfirmed forever; it just doesn't itself perform the skip or the review — that enforcement lives entirely in `/pf-codereview`.
 
 If `confirmed:` is already present, do nothing — do not re-ask.
 

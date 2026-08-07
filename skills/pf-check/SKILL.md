@@ -30,20 +30,22 @@ Before dispatching any analysis, resolve the role for TARGET's key per `~/.claud
 | `implementation_plan.md` | `implementation_plan` |
 | `analysis.md` | `analysis` |
 
-The resolved role's `review` field (a list + `mode`, per `pf-roles` §1) drives which path runs below. This skill still reasons about `review` in terms of the same three shapes it always has — `claude`-only, `codex`-only, `both` (`claude` + `codex`) — now expressed as `{ mode: parallel, by: [...] }`. Backward-compat equivalence, dictated by `~/.claude/skills/pf-roles/SKILL.md` §5's automigration rule:
+The resolved role's `review` field (a list + `mode`, per `pf-roles` §1) drives which path runs below. Which path a given actor uses is decided by that actor's `agents.yml` entry (`~/.claude/skills/pf-roles/SKILL.md` §2), not by its name: any actor with `invoke: agent` (`claude`, `haiku`, or any other actor registered that way) dispatches via the **"Claude review path"** below — the heading name is legacy, the path itself is generic, see that section's opening note; any actor with `invoke: codex-companion` (`codex`, today's only such actor) dispatches via the **"Codex invocation chain"**. `claude` is simply today's default/most common `invoke: agent` actor — it is not a hardcoded special case, and neither is `codex` for `invoke: codex-companion`. Backward-compat equivalence, dictated by `~/.claude/skills/pf-roles/SKILL.md` §5's automigration rule:
 
 | Resolved `review` | Path below |
 |---|---|
-| `{ mode: parallel, by: [claude] }` (or `review` absent entirely — the general default) | "Claude review" path only |
-| `{ mode: parallel, by: [codex] }` | "Codex invocation chain" only |
-| `{ mode: parallel, by: [claude, codex] }` | both, independently, then "`both`-mode aggregation" below |
-| `{ mode: sequential, by: [...] }` | "Sequential review mode" below |
+| `{ mode: parallel, by: [X] }` where `X`'s `agents.yml` entry has `invoke: agent` (`claude` is the general-default case; `review` absent entirely also resolves to `[claude]` — same path) | "Claude review path" below, dispatched using `X`'s configured `model` |
+| `{ mode: parallel, by: [X] }` where `X`'s `agents.yml` entry has `invoke: codex-companion` (in this framework, `codex`) | "Codex invocation chain" only |
+| `{ mode: parallel, by: [X, Y] }` — one `invoke: agent` actor and one `invoke: codex-companion` actor (in this framework, `claude` + `codex`; `both` in the old two-reviewer schema) | both, independently, then "`both`-mode aggregation" below |
+| `{ mode: sequential, by: [...] }` | "Sequential review mode" below — any mix of `invoke: agent` and `invoke: codex-companion` actors, in any order |
 
-If role resolution yields no `roles:`/`profile:` at all for this issue (§4's level 5 general default), the resolved review is `[claude]` — this is the same backward-compatibility behavior as before this issue (existing issues created before any of this existed review exactly as `claude`-only would have). In that case, do **not** ask the user anything about reviewer choice here (that question belongs only to the once-per-issue guard in `pf-brd`/`pf`) — just proceed with the Claude path below silently, with no mention of Codex anywhere in the output.
+If role resolution yields no `roles:`/`profile:` at all for this issue (§4's level 5 general default), the resolved review is `[claude]` — this is the same backward-compatibility behavior as before this issue (existing issues created before any of this existed review exactly as `claude`-only would have). In that case, do **not** ask the user anything about reviewer choice here (that question belongs only to the once-per-issue guard in `pf-brd`/`pf`) — just proceed with the Claude review path below silently, using `claude`'s configured model, with no mention of Codex anywhere in the output.
 
 ### Claude review path
 
-**Do not read these documents yourself.** Dispatch a single sub-agent (Agent tool, default/general-purpose type — no need for a fork, since its full context is not needed afterward) with a prompt along these lines:
+**Despite the name, this path is not Claude-specific** — it runs for **any** actor `X` whose `agents.yml` entry has `invoke: agent` (Haiku, or any other actor registered that way, not only `claude`). The heading keeps the name "Claude review path" unchanged for other skills that reference this section by name (`pf-dev-docs`/`pf-user-docs`). Look up `X`'s `model` field in `docs/planning/agents.yml` (`~/.claude/skills/pf-roles/SKILL.md` §2) and pass it on the `Agent` tool dispatch below, so the sub-agent actually runs as the configured actor rather than always defaulting to Claude's own model. (`agents.yml`'s default `claude` entry — `model: claude-sonnet-5` — already matches what an unqualified `Agent` dispatch would use, so passing it explicitly is a no-op for that actor; it only changes behavior for a genuinely different actor like `haiku`.) If the dispatch mechanism cannot accept the registry's `model` value as given, surface that as an actor-registry configuration mismatch to the user rather than silently falling back to the default actor.
+
+**Do not read these documents yourself.** Dispatch a single sub-agent (Agent tool, default/general-purpose type — no need for a fork, since its full context is not needed afterward), with the resolved actor's `model` set as above, and a prompt along these lines:
 
 > Read `docs/issues/open/[ISSUE-ID]/[TARGET]` and its predecessor documents: [list]. Analyze the codebase context and identify potential problems with [TARGET] from different angles, considering every edge case. Use ASCII diagrams to illustrate if helpful. Do not edit anything — analysis only.
 >
@@ -66,7 +68,7 @@ If role resolution yields no `roles:`/`profile:` at all for this issue (§4's le
 
 **This section is canonical.** It is the single place that defines how this framework talks to Codex and how Codex's findings get folded into pf's P0/P1/P2 priorities. `~/.claude/skills/pf-codereview/SKILL.md` uses this exact same chain and mapping for code review — it references this section by name rather than restating or redefining it. Do not duplicate this chain elsewhere; change it here only.
 
-Run this chain whenever the resolved reviewer for TARGET is `codex` (alone or as the Codex half of `both`). The brief given to Codex is the same TARGET + predecessor list + tier-budget check + "group by P0/P1/P2" brief as the Claude review path above, adapted to whichever invocation form below actually ends up running.
+Run this chain whenever the resolved reviewer for TARGET is an actor whose `agents.yml` entry has `invoke: codex-companion` (in this framework, `codex` — alone or as one side of a two-actor `by` list). The brief given to Codex is the same TARGET + predecessor list + tier-budget check + "group by P0/P1/P2" brief as the Claude review path above, adapted to whichever invocation form below actually ends up running.
 
 1. **Check plugin availability.** Determine whether the `codex` plugin is available in this Claude Code installation — its skills `codex:setup` and `codex:rescue` appear in this session's available-skills listing. If they don't, skip to step 3.
 2. **Plugin available.**
@@ -77,7 +79,7 @@ Run this chain whenever the resolved reviewer for TARGET is `codex` (alone or as
       ```
       - `--scope branch` (not the default `auto`/`working-tree`) so the diff is always against `<base-ref>`, never the ad-hoc working tree.
       - `<base-ref>` is the same parent-branch detection `pf-close` uses (`git config branch.issue/<ISSUE-ID>.merge`, falling back to `develop`/`main`). Because TARGET is a document authored fresh within the issue branch, the resulting branch diff against `<base-ref>` is, in practice, the whole document — this is what specs.md means by "scope = whole target document" for document review, as opposed to the code-review case in `pf-codereview` where the same `--base <base-ref>` diff spans the entire issue implementation instead of one file.
-   c. Parse the command's JSON stdout against `review-output.schema.json` (`verdict`, `summary`, `findings[]` with `severity`/`title`/`body`/`file`/`line_start`/`line_end`/`recommendation`). Map each finding's `severity` to P0/P1/P2 per the mapping table below. Skip to "Present findings" below (do not also run the Claude sub-agent, unless this is the Codex half of `both`).
+   c. Parse the command's JSON stdout against `review-output.schema.json` (`verdict`, `summary`, `findings[]` with `severity`/`title`/`body`/`file`/`line_start`/`line_end`/`recommendation`). Map each finding's `severity` to P0/P1/P2 per the mapping table below. Skip to "Present findings" below (do not also run the `invoke: agent` sub-agent, unless this is the Codex half of a two-actor `by` list).
 3. **Plugin not available.** Ask the user (`AskUserQuestion`) whether to install the `codex` plugin now. If they agree, tell them the exact four commands, in order (do not paraphrase or guess at alternatives — source: [openai/codex-plugin-cc](https://github.com/openai/codex-plugin-cc) README):
    ```
    /plugin marketplace add openai/codex-plugin-cc
@@ -88,10 +90,10 @@ Run this chain whenever the resolved reviewer for TARGET is `codex` (alone or as
    `/reload-plugins` is required — a freshly installed plugin's skills/commands do not become available in the current session until plugins are reloaded. `/codex:setup` then checks the Codex CLI itself and offers to install/authenticate it if needed. After this, stop this review for now — re-run this skill once setup is done, which resumes at step 1. If they decline the install, continue to step 4.
 4. **Raw CLI fallback.** Call the Codex CLI directly via `Bash`, bypassing the plugin wrapper entirely:
    ```
-   codex exec "<review brief: TARGET path + predecessor list + the same 'identify problems from different angles, check tier budget, group by priority' instruction as the Claude path above>"
+   codex exec "<review brief: TARGET path + predecessor list + the same 'identify problems from different angles, check tier budget, group by priority' instruction as the invoke: agent path above>"
    ```
    Capture stdout as plain text. This response is **not** schema-shaped — it has no `severity` field — so it is **never** run through the P0/P1/P2 mapping below. Present it to the user verbatim, in its own block labeled **"Codex findings (unstructured)"**, separate from any P0/P1/P2 grouping.
-5. **Codex genuinely unavailable.** If, after the above, Codex still cannot produce a result (CLI not installed/not authenticated even after being offered, plugin declined and `codex exec` itself errors or is not on `PATH`) — silently fall back to the Claude review path above for this artifact. Do not surface this as an error to the user. Append one line to the findings output: "Codex unavailable — review performed by Claude" (translate per `doc_language` if it is set to something other than English).
+5. **Codex genuinely unavailable.** If, after the above, Codex still cannot produce a result (CLI not installed/not authenticated even after being offered, plugin declined and `codex exec` itself errors or is not on `PATH`) — silently fall back to the Claude review path above, running as `claude` specifically (not whichever other `invoke: agent` actor, if any, is also configured for this stage), for this artifact. Do not surface this as an error to the user. Append one line to the findings output: "Codex unavailable — review performed by Claude" (translate per `doc_language` if it is set to something other than English).
 
 ### Severity → priority mapping
 
@@ -108,19 +110,19 @@ The raw, unstructured output of a direct `codex exec` call (step 4 above) is **n
 
 ### `both`-mode aggregation
 
-When the resolved `review` is `{ mode: parallel, by: [claude, codex] }`, run the Claude review path and the Codex invocation chain independently — each exactly as described above, as if it were the only reviewer assigned. Wait for both to complete, then merge before presenting anything to the user:
+When the resolved `review` is `{ mode: parallel, by: [X, codex] }` — `X` an `invoke: agent` actor (`claude` + `codex` is today's common case, but any `invoke: agent` actor paired with `codex` works the same way) — run the Claude review path (as `X`, with `X`'s configured `model`) and the Codex invocation chain independently — each exactly as described above, as if it were the only reviewer assigned. Wait for both to complete, then merge before presenting anything to the user:
 
 - Combine both sets of findings into one list, still grouped by priority (P0/P1/P2) exactly as for a single reviewer.
-- Prefix every individual finding with its source tag: `[Claude]` or `[Codex]`.
-- **Exception — Codex fell back to Claude within a `both` run (chain step 5 above):** tag that portion `[Codex→Claude fallback]` instead of plain `[Codex]`, and keep the "Codex unavailable — review performed by Claude" note, so the user isn't misled into thinking two independent engines actually reviewed the document — it was Claude twice, once under each label.
+- Prefix every individual finding with its source tag: `[<X>]` (e.g. `[Claude]`, `[Haiku]` — capitalized actor name) or `[Codex]`.
+- **Exception — Codex fell back to Claude within a `both`-shaped run (chain step 5 above):** the fallback always runs as `claude` specifically (chain step 5 above), regardless of which `invoke: agent` actor `X` was configured as the other half — tag that portion `[Codex→Claude fallback]` instead of plain `[Codex]`, and keep the "Codex unavailable — review performed by Claude" note, so the user isn't misled into thinking two independent engines actually reviewed the document.
 - Do **not** deduplicate, rank, or arbitrate between the two sources, even when they comment on the exact same location and disagree — both findings are shown to the user as independent input. This is a deliberate BRD requirement (no automatic conflict resolution between reviewers); the author/user makes the final call.
-- If Codex was invoked via the raw `codex exec` fallback (chain step 4), its unstructured block is still shown alongside the merged P0/P1/P2 list, labeled the same "Codex findings (unstructured)" as the `codex`-only case — it is not forced into the priority grouping just because Claude's half has one.
+- If Codex was invoked via the raw `codex exec` fallback (chain step 4), its unstructured block is still shown alongside the merged P0/P1/P2 list, labeled the same "Codex findings (unstructured)" as the `codex`-only case — it is not forced into the priority grouping just because the `invoke: agent` half has one.
 
 ### Sequential review mode
 
-When the resolved `review` is `{ mode: sequential, by: [r1, r2, ...] }`, run the reviewers in `by` in order, each seeing the previous one's fixes already applied — the mechanics are fully defined in `~/.claude/skills/pf-roles/SKILL.md` §6; this section only fixes how `pf-check` carries it out:
+When the resolved `review` is `{ mode: sequential, by: [r1, r2, ...] }`, run the reviewers in `by` in order, each seeing the previous one's fixes already applied — the mechanics are fully defined in `~/.claude/skills/pf-roles/SKILL.md` §6; this section only fixes how `pf-check` carries it out. Each `r_n` can be **any** actor registered in `agents.yml` — `by: [haiku, codex]` and `by: [claude, haiku, codex]` are both valid, not just two-actor `claude`/`codex` lists:
 
-1. `r1` runs its review path (Claude review path or Codex invocation chain, per which actor it is) against TARGET as it stands now, producing findings.
+1. `r1` runs its review path — the Claude review path above (using `r1`'s configured `model`) if `r1`'s `agents.yml` entry has `invoke: agent`, or the Codex invocation chain if it has `invoke: codex-companion` — against TARGET as it stands now, producing findings.
 2. Those findings are dispatched to this stage's resolved `write` actor (§4's fallback order, same resolution as everywhere else) — the same mechanism as the interactive "Fix now" path below, but automatic: no `AskUserQuestion`, no confirmation prompt. If `write` is Claude, this is the same fix-sub-agent dispatch described under "If 'Fix now'" below, just triggered without a user choice. If `write` is not Claude, it uses the write-invocation form from `~/.claude/skills/pf-roles/SKILL.md` §7, with the "apply these findings to an existing file" prompt from §6 there (not the "write a document from scratch" prompt) — findings are P0/P1 only, same as any other fix dispatch.
 3. TARGET is re-read from disk.
 4. The next reviewer in `by` runs its review path against the now-fixed TARGET.
