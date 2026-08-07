@@ -66,6 +66,12 @@ Fields of a stage's role record:
   deduplication or arbitration. `sequential` is the fix-and-forward chain — see
   §6.
 - **`run`** — `tests` stage only: which actor actually executes the test run.
+  **Reserved — not yet consumed.** Documented and present in the shipped
+  `codex-implements` default profile (§3) so the schema doesn't need to change
+  again once a consumer reads it, but no `pf-*` skill resolves or acts on it
+  in this issue (the same reserved-field pattern as `implementation_plan.md`'s
+  `Task Type: docs`, see `~/.claude/skills/pf-impl-plan/SKILL.md`). Wiring an
+  actual consumer for it is out of scope here.
 - **`skip`** — the whole stage is skipped. Only valid for `user_docs`/`dev_docs`.
   `code: skip` (skipping authorship of `code` itself) is invalid — the resolver
   must stop with an explicit error, never proceed silently and never crash with
@@ -208,10 +214,28 @@ the corrected, load-bearing order (do not swap levels 3 and 4):
    after.
 4. **The selected profile's `default` entry** — only reached if levels 1–3 did
    not fire.
-5. **The general default.** Only reached when the issue has neither `roles:`
-   nor `profile:` at all: `write: claude`, and `review` resolved from the
-   legacy `reviewers:` block if present (§5, automigration) or else
-   `review: [claude]`. This is today's pre-issue behavior, unchanged.
+5. **The general default.** Evaluated **per key**, like every level above —
+   this is a condition on *this specific key*, never a gate on the `roles:`
+   block's presence as a whole. Reached for key `<key>` when **both**: (a)
+   `prompt.md` has no explicit `roles.<key>` entry for this key (level 1 did
+   not fire for it), and (b) the issue has no `profile:` field at all (so
+   levels 2–4, which all depend on a selected profile, cannot fire for any
+   key). Resolves to `write: claude`, and `review` resolved from the legacy
+   `reviewers:` block's entry for this same key if present (§5, automigration)
+   or else `review: [claude]`. This is today's pre-issue behavior, unchanged.
+
+   **This must not be gated on whether `roles:` exists at all.** A `roles:`
+   block is routinely **partial** — automigration (§5) only ever converts the
+   keys that existed in the old `reviewers:` block (typically `brd`/`specs`/
+   `test_plan`/`implementation_plan`/`code`, sometimes `analysis`/`notes` —
+   never `tests`/`user_docs`/`dev_docs`, since nothing in the old schema
+   covered them), and a hand-written `roles:` can just as easily cover only
+   one key. An issue with `roles: { code: {...} }` and no `profile:` must
+   still resolve `tests`/`user_docs`/`dev_docs`/every other uncovered key
+   through level 5 normally — `roles:` existing for *other* keys never blocks
+   level 5 for *this* key. Level 5 is unreachable for key `<key>` only when
+   `<key>` itself already has an explicit entry (then level 1 already
+   resolved it) or a `profile:` is set (then levels 2–4 take over for it).
 
 ### Why level 3 must come before level 4, not after
 
@@ -272,11 +296,22 @@ for each key: actor in the old reviewers:
   whichever `pf-*` stage runs next for that issue, not as its own commit — see
   `~/.claude/skills/pf-git/SKILL.md`'s staging table.
 - **Where this runs:** as part of `/pf`'s Step 2 (scanning `docs/issues/open/`),
-  for every open issue that has `reviewers:` but no `roles:` — before the issue
-  picker, so it covers every open issue, not only whichever one gets selected.
-  `pf-check` and `pf-codereview` also run this same check themselves, as their
-  own first step, before resolving any `roles.<key>` — they do not assume `/pf`
-  already ran it, since they can be invoked directly on a legacy issue.
+  scoped to the **selected** issue only — the sole issue folder if only one is
+  open, or the one Step 3's picker resolves once the user answers which issue
+  to work on. It does **not** run for every open issue in one pass: an issue
+  the user did not select this invocation is left untouched, and migrates on
+  its own first `/pf`/`pf-check`/`pf-codereview` touch instead — whichever of
+  those it happens to hit next, whenever it is next actually worked on. This
+  keeps every `prompt.md` automigration edit owned by the same `pf-*` stage
+  invocation that commits it (`~/.claude/skills/pf-git/SKILL.md`'s staging
+  table only ever qualifies the edit for the issue the next stage actually
+  operates on); migrating every open issue in one `/pf` pass would leave every
+  non-selected issue's edit unstaged and unowned, tripping `pf-qa`'s
+  whole-tree `git status --porcelain` check later for a different issue than
+  the one being worked on. `pf-check` and `pf-codereview` also run this same
+  check themselves, as their own first step, before resolving any
+  `roles.<key>` — they do not assume `/pf` already ran it, since they can be
+  invoked directly on a legacy issue.
 
 ---
 
@@ -342,6 +377,42 @@ programmatically from another skill. The consumer skill builds `<prompt>`
 itself (document content, task description, file path, context — shape depends
 on the caller, see each consumer's own section) and calls the script the same
 way `pf-check`'s "Codex invocation chain" already calls it for **review**.
+
+### Prompt shape for a from-scratch pipeline document
+
+When the consumer skill is generating a pipeline document from nothing (a BRD,
+specs, user-docs, dev-docs, or any other document produced by a `pf-*` write
+stage — not the fix-forward edit form, which is §6's shape instead), the
+`<prompt>` built for the write-invocator has this common shape, regardless of
+which document or which consumer skill is calling it:
+
+- **Target file path** — where the actor must write the document, e.g.
+  `docs/issues/open/[ISSUE-ID]/brd.md`.
+- **`prompt.md`'s content** — the issue's original task description, so the
+  actor has the same starting context a human/Claude author would have had.
+- **Predecessor documents** — whichever prior-stage documents already exist in
+  the issue folder (e.g. `brd.md`/`specs.md` when writing `implementation_plan.md`;
+  `brd.md`/`specs.md`/`implementation_plan.md` when writing `user_docs.md` or
+  `dev_docs.md`) — full content, not summarized, since these are the actor's
+  primary source material.
+- **A compressed summary of the requirements clarified in this run** — the
+  consumer skill already ran its own `AskUserQuestion` clarifying-questions
+  loop before delegating (delegated actors cannot call `AskUserQuestion`
+  themselves), so the prompt must fold the answers from that loop into a
+  compact summary rather than omitting them.
+- **`doc_language`** — from `prompt.md`'s frontmatter, so the actor writes
+  prose content in the right language (headings/structural labels stay
+  English regardless — see each consumer's own "Documentation language" note).
+- **Section structure for the tier** — whatever section list, line budget, or
+  diagram/split rules the target document's own tier rules call for (e.g.
+  `pf-spec`'s small-tier ≤300-line budget vs. medium/large's 1500-line split
+  trigger) — folded into the same prompt, not left for a separate step.
+
+Each consumer skill's own section (referenced from the four places above)
+states which of its own documents this applies to and any document-specific
+additions; this list is the shared shape they all build from, so a consumer
+does not need to restate it — a plain reference to "`pf-roles/SKILL.md` §7"
+is enough.
 
 **Write vs. review stay separate.** Codex's **review** invocation form
 (`codex-companion.mjs review --wait --scope ...`) is a different operation with

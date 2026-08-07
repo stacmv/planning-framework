@@ -71,6 +71,13 @@ For `size_tier` small/medium/large, read `docs/issues/open/[ACTIVE-ISSUE-ID]/imp
    - `blocked_by`: tasks that must complete first
    - `blocks`: tasks that depend on this one
 
+   **No `Task Type` field** — trivial-tier's `notes.md` "## Tasks" checklist has
+   no `**Task Type:** code | tests | docs` field, and never will (out of scope
+   for this tier). This is not a gap: every trivial-tier task always resolves
+   role for `code` in Phase 2 (never `tests`), since there is no field to say
+   otherwise. Do not add a `Task Type` to the created task's description for
+   this tier.
+
 **If `size_tier` is small/medium/large:** Parse the implementation plan and use `TaskCreate` to create a task for each implementation item:
 
 1. **Extract all tasks** from `implementation_plan.md`
@@ -80,6 +87,12 @@ For `size_tier` small/medium/large, read `docs/issues/open/[ACTIVE-ISSUE-ID]/imp
    - Mapped test cases (TCs) that verify the task
    - `blocked_by`: tasks that must complete first
    - `blocks`: tasks that depend on this one
+   - **`Task Type`** — carry the task's `**Task Type:** code | tests | docs`
+     field (from `implementation_plan.md`, per
+     `~/.claude/skills/pf-impl-plan/SKILL.md`) verbatim into the created
+     task's own description/metadata. Phase 2 resolves role from this stored
+     value — it does not re-read `implementation_plan.md` from scratch per
+     task (see Phase 2, "Execution Strategy" point 2).
 
 ---
 
@@ -89,13 +102,15 @@ For `size_tier` small/medium/large, read `docs/issues/open/[ACTIVE-ISSUE-ID]/imp
 Execute tasks using sub-agents for parallel processing:
 
 1. **Group tasks into waves** based on dependencies
-2. **Resolve each task's write actor before dispatching it.** Every task in `implementation_plan.md` carries a `**Task Type:** code | tests | docs` field (see `~/.claude/skills/pf-impl-plan/SKILL.md`). Before executing a task, resolve role — same "resolve role" pattern used elsewhere for whole documents, applied here per task instead — per `~/.claude/skills/pf-roles/SKILL.md` §4, for `code` (or, when the task's `Task Type` is `tests`, for `tests`) to get that task's `write` actor:
+2. **Resolve each task's write actor before dispatching it.** For `size_tier` small/medium/large, each task's `Task Type` (`code` | `tests` | `docs`) was already carried into the task's own description/metadata at creation time (Phase 1, "Create Tasks from Implementation Plan") — read it from there, not by re-reading `implementation_plan.md` from scratch for each task. For `size_tier: trivial`, there is no `Task Type` field at all (Phase 1 says so explicitly) — always resolve for `code`, never `tests`, for every task in that tier. Before executing a task, resolve role — same "resolve role" pattern used elsewhere for whole documents, applied here per task instead — per `~/.claude/skills/pf-roles/SKILL.md` §4, for `code` (or, when the task's `Task Type` is `tests`, for `tests`) to get that task's `write` actor:
    - **`write == claude`** — unchanged: dispatch a Claude sub-agent via the `Agent` tool, exactly as today (TC-013 — this must stay a true no-regression case). See "For Each Task — `write: claude` (Sub-Agent Instructions)" below.
    - **`write != claude`** (in this issue, only `codex`) — the task is not dispatched to a sub-agent at all. The orchestrating `pf-execute` session itself calls the resolved actor's write-invocator per `~/.claude/skills/pf-roles/SKILL.md` §7 (for `codex`: `codex-companion.mjs task "<prompt>" --write`). See "For Each Task — `write != claude` (delegated actor)" below (TC-012).
 3. **Run each `write: claude` task in its own sub-agent** - This keeps context usage low (~18% vs ~56%)
 4. **Within a wave, run `write != claude` (Codex-delegated) tasks sequentially, after every `write: claude` sub-agent in that wave has finished, and before that wave's commit — never concurrently with the Claude sub-agents.** Today, Claude sub-agents in a wave run concurrently via the `Agent` tool and never commit themselves — only the orchestrator commits at the wave boundary, specifically to avoid a working-tree race. Codex-delegated tasks go through a different, synchronous channel (`Bash` → `codex-companion.mjs task ... --write`), and the joint safety of that channel running at the same time as parallel `Agent`-tool sub-agents has not been validated in this issue. This ordering is a **temporary simplification for this issue**, not a permanent architectural constraint — cross-channel parallel-safety can be investigated separately once the role matrix is in real use.
 5. **Process waves sequentially** - Wave N+1 starts only after Wave N completes
-6. **Commit and push after each wave, not inside sub-agents or delegated-actor calls.** Claude sub-agents in a wave run concurrently and must NOT run `git commit` themselves (concurrent commits on the same branch race and corrupt each other); Codex-delegated tasks (run sequentially per point 4 above) must not commit themselves either — same reason, one commit per wave. Once every task in a wave is confirmed complete — via `TaskList`/`TaskGet` for `write: claude` tasks, and by the orchestrator's own judgment (point 5 in the `write != claude` instructions below) for delegated tasks — the orchestrator runs the shared commit & push procedure in `~/.claude/skills/pf-git/SKILL.md` ("Stage commit & push") for that wave, on the issue branch:
+6. **Commit and push after each wave, not inside sub-agents or delegated-actor calls.** Claude sub-agents in a wave run concurrently and must NOT run `git commit` themselves (concurrent commits on the same branch race and corrupt each other); Codex-delegated tasks (run sequentially per point 4 above) must not commit themselves either — same reason, one commit per wave. Once every task in a wave is confirmed complete, the orchestrator runs the shared commit & push procedure in `~/.claude/skills/pf-git/SKILL.md` ("Stage commit & push") for that wave, on the issue branch. How "confirmed complete" is judged differs by task kind, and the two channels are not symmetric:
+   - **For `write: claude` tasks** — in practice, from each dispatched sub-agent's own final response/summary, not from a `TaskList`/`TaskGet` check. `TaskList`/`TaskGet` is the channel this instruction used to name here, but as "Why the orchestrator, not the actor, reads and marks the task" below explains, Claude sub-agents have no access to `TaskUpdate` at all today, so a task's `TaskGet` state is never actually advanced by the sub-agent that did the work — checking it would not reflect real completion. This is an existing, out-of-scope gap (not introduced or fixed by this issue); until it's fixed, the sub-agent's own final response is the orchestrator's real completion signal for these tasks.
+   - **For `write != claude` (delegated) tasks** — by the orchestrator's own judgment, per point 4 (not point 5) in the "For Each Task — `write != claude` (delegated actor)" instructions below: point 4 is where the orchestrator re-reads the target file(s) from disk and confirms they match the task; point 5 is only the mechanical `TaskUpdate` call that follows once that judgment is already made.
    - `git add -A` — a wave owns the code, so this is the one stage that stages the whole worktree rather than a scoped path. This commits whatever was actually written, regardless of which actor wrote it — there is no separate commit marking a task as delegated; the wave/commit structure itself is unchanged.
    - `git commit -m "feat: <short wave summary> [ISSUE-ID]"` (mention the TC-IDs or task names covered)
    - then push per that procedure's Step 3 guard — an interrupted run must not leave a completed wave stranded on one machine

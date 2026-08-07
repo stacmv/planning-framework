@@ -25,7 +25,7 @@ I want you to help me write user-facing documentation for issue [ISSUE-ID] — t
 Once confident:
 
 - **If `write == claude`** — this session saves `docs/issues/open/[ISSUE-ID]/user_docs.md` directly. Write it directly — no sub-agent dispatch.
-- **If `write != claude`** (in this issue, only `codex`) — this session still runs the clarifying-questions loop above itself (delegated actors cannot call `AskUserQuestion`), then delegates the actual write to the resolved actor's write-invocator per `~/.claude/skills/pf-roles/SKILL.md` §7, targeting `docs/issues/open/[ISSUE-ID]/user_docs.md` with a single prompt built per §7/§6.2's shape (the target path, `prompt.md`'s path, the requirements clarified in this run, `doc_language`, and the section guidance above) — a from-scratch pipeline document, so use §7's asynchronous case — and reads the resulting `user_docs.md` back from disk once the call returns.
+- **If `write != claude`** (in this issue, only `codex`) — this session still runs the clarifying-questions loop above itself (delegated actors cannot call `AskUserQuestion`), then delegates the actual write to the resolved actor's write-invocator per `~/.claude/skills/pf-roles/SKILL.md` §7, targeting `docs/issues/open/[ISSUE-ID]/user_docs.md` with a single prompt built per §7's shape (the target path, `prompt.md`'s path, the requirements clarified in this run, `doc_language`, and the section guidance above) — a from-scratch pipeline document, so use §7's asynchronous case — and reads the resulting `user_docs.md` back from disk once the call returns.
 
 `user_docs.md` must exist and be non-empty when this step finishes — `~/.claude/skills/pf-qa/SKILL.md`'s prerequisite check for this stage depends on it.
 
