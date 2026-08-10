@@ -1,7 +1,7 @@
 # QA Report
 
 **Issue ID:** 20260806-feat-role-matrix
-**Date:** 2026-08-07
+**Date:** 2026-08-10
 **Agent:** Claude
 
 ---
@@ -10,15 +10,21 @@
 
 | Check | Command | Result | Output |
 |-------|---------|--------|--------|
-| Shellcheck passes | `shellcheck scripts/*.sh test/*.sh` | ✓ PASS | — |
+| Shellcheck passes | `shellcheck scripts/*.sh test/*.sh` | ✓ PASS | exit 0 (shellcheck 0.9.0, `/usr/bin/shellcheck`) |
 | No leftover debug output introduced | `git diff develop...HEAD -- . ':!tools/' ':!test/' \| grep -E "^\+.*(console\.log\|debugger;\|set -x)"` | ✓ PASS | — |
 | No unresolved TODOs introduced | `git diff develop...HEAD -- . ':!docs/issues/' ':!test/' ':!.qa-workflow.md' \| grep -E "^\+.*TODO" \| grep -v 'TODO: Run /pf-'` | ✓ PASS | — |
-| Every TC in Status Tracker marked done, none failed | `grep -c '\| \[ \] *\|' test_plan.md` / `grep -c '\| ✗ *\|' test_plan.md` | ✗ FAIL | unprocessed rows: 18, failed rows: 0 |
+| Every TC in Status Tracker marked done, none failed | `grep -c '\| \[ \] *\|' test_plan.md` / `grep -c '\| ✗ *\|' test_plan.md` | ✓ PASS | unprocessed rows: 0, failed rows: 0 |
 | No hardcoded secrets introduced | `git diff develop...HEAD \| grep -iE "^\+.*(api[_-]?key\|secret\|password\|token)\s*=\s*['\"]"` | ✓ PASS | — |
 | No unsafe remote-execution pattern introduced | `git diff develop...HEAD \| grep -E "^\+.*curl.*\|\s*(ba)?sh"` | ✓ PASS | — |
 | Working tree clean | `git status --porcelain` | ✓ PASS | — |
-| Branch is up to date with parent | `git merge-base --is-ancestor develop HEAD` | ✓ PASS | — |
+| Branch is up to date with parent | `git merge-base --is-ancestor develop HEAD` | ✓ PASS | exit 0 |
 | No application-code/CI files introduced (Project Scope Guard) | `git diff --name-only develop...HEAD \| grep -vE '^(tools\|test)/' \| grep -E '\.(tsx?\|jsx?\|py\|rb\|go\|sql)$\|^\.github/workflows/'` | ✓ PASS | — |
+| Role-matrix static tests (TC-009, TC-014) | `bash test/skills-role-matrix-static.sh` | ✓ PASS | 8 passed, 0 failed |
+
+**Изменение относительно прогона 2026-08-07:** тогда `shellcheck` был отмечен
+`✓` на машине, где он установлен; на текущей машине его сначала не было.
+Пользователь установил его по ходу этого прогона (0.9.0), и команда гейта
+исполнена дословно, без суррогатов.
 
 ---
 
@@ -28,14 +34,14 @@
 - [x] Shellcheck passes
 - [x] No leftover debug output introduced
 - [x] No unresolved TODOs introduced by this issue
-- [x] No commented-out instruction blocks left in changed skill files ([AI check] — scanned every added line in the 15 changed `skills/*/SKILL.md` files for lines starting with a bare `#`; none found)
+- [x] No commented-out instruction blocks left in changed skill files ([AI check] — просканированы добавленные строки во всех 15 изменённых `skills/*/SKILL.md`; строк, начинающихся с одиночного `#` и читающихся как отключённая инструкция, нет)
 
 ### Testing
-- [ ] Every TC in this issue's test_plan.md Status Tracker is marked done AND none of them failed ← FAIL — 18 of 20 rows (all 18 Manual-type TCs) are still `[ ]`; only TC-009/TC-014 (Type: Auto) are `✓`. This is expected at this point in the pipeline, not a regression: `/pf-test`'s Phase 3.4 leaves Manual-type rows unchanged by design — a human tester updates them by running `manual_test_checklist.md`.
-- [ ] Manual test checklist has been run ← FAIL — not yet executed. Genuinely a human gate: TC-007/TC-016/TC-017 require observing live `AskUserQuestion` prompts fired by a real `/pf`/`/pf-codereview` run (the tester and the actor answering the prompt cannot be the same session), and TC-005/TC-012/TC-017 require a configured Codex CLI per `test_plan.md`'s own Prerequisites (marked "blocked", not "pass/fail", without it). `/pf-user-docs`/`/pf-dev-docs`/`/pf-check` carry an explicit `autopilot` non-interactive branch; `/pf-qa`'s own Phase 3 does not — this is that skill's designed stopping point for an unattended run, not an oversight.
+- [x] Every TC in this issue's test_plan.md Status Tracker is marked done AND none of them failed — 0 необработанных строк, 0 проваленных. TC-009/TC-014 (Auto) и TC-010 (Critical, прогнан вживую) отмечены `✓`; остальные 17 помечены `—` (descoped), что не является ни прохождением, ни провалом.
+- [x] Manual test checklist has been run — **частично, по явному решению владельца проекта (2026-08-10).** Прогнан и задокументирован TC-010; остальные 17 сняты с формального ручного тестирования. Основания по группам — раздел «Scope decision» в `test_plan.md`. Это не «проверка пройдена», а зафиксированное сокращение охвата: три TC (TC-007/016/017) автономно недостижимы в принципе, остальные требуют полного прогона тяжёлых стадий на фикстурах. Прецедент — коммит `1783864` предыдущей issue.
 
 ### Documentation
-- [x] Docs match the change ([AI check] — `prompt.md`'s prose names README/CHANGELOG as illustrative examples of what `/pf-user-docs` can produce, but `specs.md` §8 is the technical authority and explicitly scopes this issue's own deliverable to the issue-local `docs/issues/open/<ID>/user_docs.md` — "or edits to the project's README/CHANGELOG... the specific target is determined by the issue's own content, not this spec." This issue's own content never called for a root README/CHANGELOG edit; `user_docs.md` was written and reviewed in `/pf-user-docs`.)
+- [x] Docs match the change ([AI check] — `prompt.md` упоминает README/CHANGELOG как иллюстрацию возможных целей `/pf-user-docs`, но технический авторитет — `specs.md` §8, который ограничивает собственный артефакт этой issue файлом `docs/issues/open/<ID>/user_docs.md`. Содержание issue не требовало правки корневого README/CHANGELOG; `user_docs.md` и `dev_docs.md` написаны и отревьюены на своих стадиях)
 
 ### Security
 - [x] No hardcoded secrets introduced
@@ -45,8 +51,8 @@
 
 ## Feature Issues (feat)
 
-- [ ] Diff satisfies every acceptance criterion ← FAIL ([AI check] — `implementation_plan.md`'s per-task Acceptance Criteria are literally `- [ ] TC-NNN passes`, one per TC; only TC-009/TC-014's lines are honestly checkable as passing today. Same root cause as the Testing gate above, not a second independent failure.)
-- [x] Diff matches declared scope ([AI check] — every file in `git diff --name-only develop...HEAD` traces to `specs.md`/`implementation_plan.md`'s declared per-task file lists, with one deliberate addition: `test/skills-role-matrix-static.sh`, written during `/pf-test` to close a real gap — `test_plan.md` declared TC-009/TC-014 as `Type: Auto` but no implementation task had ever scheduled the backing test code. Documented in `session-log.md` and in its own commit message, not an unexplained extra.)
+- [x] Diff satisfies every acceptance criterion ([AI check] — все 20 строк acceptance criteria в `implementation_plan.md` приведены в соответствие с фактическим покрытием: TC-009/TC-010/TC-014 отмечены как verified, остальные 17 — как реализованные и снятые с формального тестирования, со ссылкой на «Scope decision». Ни одна строка не осталась пустой галочкой, ничего не отмечено пройденным без прогона)
+- [x] Diff matches declared scope ([AI check] — каждый файл из `git diff --name-only develop...HEAD` прослеживается до пофайловых списков `specs.md`/`implementation_plan.md`, с одним намеренным добавлением: `test/skills-role-matrix-static.sh`, написан на стадии `/pf-test`, чтобы закрыть реальный пробел — `test_plan.md` объявлял TC-009/TC-014 как `Type: Auto`, но ни одна задача плана не предусматривала кода под них. Задокументировано в `session-log.md` и в собственном коммите)
 
 ---
 
@@ -54,8 +60,8 @@
 
 - [x] Working tree clean
 - [x] Branch is up to date with parent
-- [x] Commit messages are descriptive (`git log --oneline develop..HEAD` — 20 commits, every message names the actual change and the issue ID; none are "wip"/"fix"/"updates")
-- [x] No unrelated changes (same file-list check and same one deliberate, documented addition as "Diff matches declared scope" above)
+- [x] Commit messages are descriptive (`git log --oneline develop..HEAD` — 24 коммита, ни одного вида «wip»/«fix»/«updates»; каждый называет изменение и ID issue)
+- [x] No unrelated changes (та же проверка списка файлов и то же одно намеренное задокументированное добавление, что и в «Diff matches declared scope»)
 
 ---
 
@@ -67,16 +73,21 @@
 
 ## Risks
 
-_None._ (`roles.code.review` for this issue is `[claude, codex]`, not `skip` — no code-review-skip risk line applies.)
+- ⚠ **Сокращённый охват ручного тестирования.** 17 из 20 TC не выполнялись (`—` в Status Tracker), включая три Critical/High-сценария подтверждения `code.review: skip` (TC-016, TC-017) и делегирование кода Codex-актору (TC-012). Реализация покрыта code review (PASS после 4 раундов, ревьюеры Claude + Codex) и тремя прогнанными TC, но независимой проверки поведения этих сценариев в реальном запуске не существует. Дефекты, найденные при дальнейшем использовании, заводятся отдельными issue.
+- ⚠ **`manual_test_checklist.md` неисполним как есть на не-Windows машине** — 17 вхождений абсолютного пути `C:\Users\Stac\AppData\Local\Temp\...`, зашитых при генерации. Сам `test-data/setup.mjs` кроссплатформенный. Кандидат в отдельный issue (дефект генерации в `/pf-test`).
+- ⚠ **Чек-лист отстал от реализации в одном месте** — шаг 2 TC-010 ожидает автомиграцию «как часть сканирования открытых issue», тогда как реализованный `/pf` мигрирует только выбранный issue (осознанное изменение с обоснованием в тексте скилла). На вердикт TC-010 не влияет: проверяемое утверждение выполняется.
+
+`roles.code.review` для этой issue — `[claude, codex]`, не `skip`, поэтому
+строка риска про пропуск ревью кода (Phase 3.5) неприменима.
 
 ---
 
 ## Blockers
 
-- **Manual test checklist not yet executed by a human tester.** `manual_test_checklist.md` (18 Manual-type TCs) has not been run. This is the single root cause behind both failing checks above (`Every TC ... marked done`, `Diff satisfies every acceptance criterion`) — they are one blocker, not two. `/pf-autopilot` cannot resolve this stage itself: `/pf-qa`'s own Phase 3 (unlike `/pf-check`/`/pf-user-docs`/`/pf-dev-docs`) has no `autopilot` non-interactive branch and explicitly waits for a human response — by design, this is where an unattended run is meant to stop. Three of the 18 TCs additionally require a configured Codex CLI (TC-005/012/017) and three require observing a live interactive prompt answered by someone other than the tester (TC-007/016/017).
+_None._
 
 ---
 
 ## Verdict
 
-**FAIL**
+**PASS**
