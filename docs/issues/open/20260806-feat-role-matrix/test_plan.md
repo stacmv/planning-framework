@@ -58,6 +58,68 @@ TC-001 проверяет, что такая комбинация принима
   TC-006 должны отсутствовать в момент старта теста (переименовать/удалить
   перед прогоном, если уже созданы предыдущим тестом, и восстановить после).
 
+## Scope decision
+
+Решение владельца проекта (2026-08-10): формальное ручное тестирование этой
+issue покрывается частично. Прогнаны и отмечены `✓` три TC:
+
+- **TC-009, TC-014** (Type: Auto) — прогоняются скриптом
+  `test/skills-role-matrix-static.sh`, 8/8 assertions PASS.
+- **TC-010** (Critical) — прогнан вживую на фикстуре
+  `zz-fixture-migration`: все пять ключей мигрировали, `both` →
+  `[claude, codex]`, блок `reviewers:` из frontmatter удалён целиком,
+  четыре невыбранных open-issue остались нетронутыми (скоупинг
+  подтверждён).
+
+Остальные 17 TC помечены `—` (descoped), **не** `✓` — они не выполнялись,
+и их отметка не означает прохождения. Причины, по группам:
+
+- **TC-007, TC-016, TC-017** — проверяемое утверждение и есть «команда
+  задаёт вопрос пользователю», а шаг «Ответьте „да"» требует, чтобы
+  тестировщик и отвечающий были разными сторонами. Автономным прогоном
+  недостижимо в принципе.
+- **TC-001, TC-002, TC-004, TC-005, TC-006, TC-008, TC-011, TC-012,
+  TC-013, TC-015, TC-018** — требуют полного прогона тяжёлых стадий
+  (`/pf-brd`, `/pf-spec`, `/pf-check`, `/pf-execute`, `/pf-qa`) на
+  фикстурах, часть из них сама уходит в интерактивный Q&A.
+- **TC-003, TC-019, TC-020** — резолверные сценарии; отдельные их
+  утверждения проверены механически по ходу сессии (см. ниже), но
+  штатные шаги TC не выполнялись.
+
+Обоснование дескопа — то же, что в `20260731-feat-pluggable-reviewers`
+(коммит `1783864`): у framework один пользователь, и формальная ручная
+верификация каждого сценария до закрытия не требуется. Остальное
+валидируется реальным использованием; найденный дефект становится
+отдельным issue, а не блокером этого.
+
+**Что всё же проверено механически** (не заменяет прогон TC, но сужает
+неизвестность):
+
+- отсутствие проверки независимости write/review — ключевое утверждение
+  TC-001: во всех четырёх скиллах инвариант явно объявлен невведённым;
+- удаление старого абсолютного запрета «fix-сабагент всегда Claude, никогда
+  Codex» из `pf-check` и `pf-codereview` — строка отсутствует, то есть
+  заменена, а не дописана рядом;
+- дословный текст ошибки `kind: human` (TC-020) присутствует в `pf-roles`;
+- форма write-инвокации `task ... --write` с sync/async-разветвлением
+  зафиксирована в `pf-roles` единожды.
+
+**Известное расхождение чек-листа с реализацией.** Шаг 2 TC-010 в
+`manual_test_checklist.md` ожидает конверсию «как часть сканирования
+открытых issue», тогда как реализованный `/pf` мигрирует **только
+выбранный** issue — осознанное изменение с обоснованием в тексте скилла
+(миграция невыбранного issue оставляла бы правку `prompt.md`
+незастейдженной, всплывая позже как dirty-tree на `/pf-qa` другого issue).
+Чек-лист отстал от реализации; на вердикт TC-010 это не влияет —
+проверяемое утверждение (конверсия происходит, данные не теряются)
+выполняется.
+
+**Дефект генерации чек-листа.** В `manual_test_checklist.md` 17 раз зашит
+абсолютный путь `C:\Users\Stac\AppData\Local\Temp\...` — документ
+сгенерирован на Windows-машине и в таком виде неисполним на других.
+Сам `test-data/setup.mjs` кроссплатформенный и раскладывает фикстуры
+корректно. Кандидат в отдельный issue.
+
 ## Test Cases
 
 ### Functional: role resolution, review modes, actor registry
@@ -448,26 +510,26 @@ TC-001 проверяет, что такая комбинация принима
 
 | TC     | Test Case | Type   | Priority | Status | Remarks |
 | ------ | --------- | ------ | -------- | ------ | ------- |
-| TC-001 | Явные `roles:` — резолвинг write/review, включая совпадающего актора | Manual | High | [ ] | |
-| TC-002 | Fallback на профиль при отсутствии `roles:` | Manual | High | [ ] | |
-| TC-003 | Fallback по умолчанию без `roles:`/`profile:` | Manual | High | [ ] | |
-| TC-004 | Параллельный режим ревью | Manual | High | [ ] | |
-| TC-005 | Последовательный режим ревью с автоприменением фиксов | Manual | High | [ ] | |
-| TC-006 | Автосоздание `agents.yml`/`role-profiles.yml` при первом обращении | Manual | Medium | [ ] | |
-| TC-007 | Единственный вопрос выбора профиля при создании issue | Manual | High | [ ] | |
-| TC-008 | Смена профиля/ролей посреди пайплайна — только непройденные стадии | Manual | High | [ ] | |
-| TC-009 | `pf-roles` reference-skill — структурная полнота | Auto | Medium | [ ] | |
-| TC-010 | Автомиграция `reviewers:` → `roles:` через `/pf`, без потери данных | Manual | Critical | [ ] | |
-| TC-011 | Автомиграция как собственное предусловие `pf-check`/`pf-codereview` | Manual | High | [ ] | |
-| TC-012 | `pf-execute` делегирует задачу Codex как write-актору | Manual | Critical | [ ] | |
-| TC-013 | `pf-execute` — регрессия для `write: claude` не появилась | Manual | Medium | [ ] | |
-| TC-014 | Маршрутизация пайплайна — `user_docs`/`dev_docs` между TESTING и QA | Auto | High | [ ] | |
-| TC-015 | `pf-qa` prerequisite — требует `user_docs.md`/`dev_docs.md`, если не `skip` | Manual | High | [ ] | |
-| TC-016 | `code.review: skip` — подтверждение через `/pf` | Manual | Critical | [ ] | |
-| TC-017 | `code.review: skip` — `pf-codereview` сам запрашивает подтверждение | Manual | High | [ ] | |
-| TC-018 | `code.review: skip` — строка риска в `qa_report.md` | Manual | Medium | [ ] | |
-| TC-019 | Tier-дефолт `skip` для `user_docs`/`dev_docs` при `trivial`/`small` | Manual | Medium | [ ] | |
-| TC-020 | Отсутствующий актор в реестре / `kind: human` — явная ошибка | Manual | Low | [ ] | |
+| TC-001 | Явные `roles:` — резолвинг write/review, включая совпадающего актора | Manual | High | — | descoped — see Scope decision |
+| TC-002 | Fallback на профиль при отсутствии `roles:` | Manual | High | — | descoped — see Scope decision |
+| TC-003 | Fallback по умолчанию без `roles:`/`profile:` | Manual | High | — | descoped — see Scope decision |
+| TC-004 | Параллельный режим ревью | Manual | High | — | descoped — see Scope decision |
+| TC-005 | Последовательный режим ревью с автоприменением фиксов | Manual | High | — | descoped — see Scope decision |
+| TC-006 | Автосоздание `agents.yml`/`role-profiles.yml` при первом обращении | Manual | Medium | — | descoped — see Scope decision |
+| TC-007 | Единственный вопрос выбора профиля при создании issue | Manual | High | — | descoped — see Scope decision |
+| TC-008 | Смена профиля/ролей посреди пайплайна — только непройденные стадии | Manual | High | — | descoped — see Scope decision |
+| TC-009 | `pf-roles` reference-skill — структурная полнота | Auto | Medium | ✓ | |
+| TC-010 | Автомиграция `reviewers:` → `roles:` через `/pf`, без потери данных | Manual | Critical | ✓ | verified this session |
+| TC-011 | Автомиграция как собственное предусловие `pf-check`/`pf-codereview` | Manual | High | — | descoped — see Scope decision |
+| TC-012 | `pf-execute` делегирует задачу Codex как write-актору | Manual | Critical | — | descoped — see Scope decision |
+| TC-013 | `pf-execute` — регрессия для `write: claude` не появилась | Manual | Medium | — | descoped — see Scope decision |
+| TC-014 | Маршрутизация пайплайна — `user_docs`/`dev_docs` между TESTING и QA | Auto | High | ✓ | |
+| TC-015 | `pf-qa` prerequisite — требует `user_docs.md`/`dev_docs.md`, если не `skip` | Manual | High | — | descoped — see Scope decision |
+| TC-016 | `code.review: skip` — подтверждение через `/pf` | Manual | Critical | — | descoped — see Scope decision |
+| TC-017 | `code.review: skip` — `pf-codereview` сам запрашивает подтверждение | Manual | High | — | descoped — see Scope decision |
+| TC-018 | `code.review: skip` — строка риска в `qa_report.md` | Manual | Medium | — | descoped — see Scope decision |
+| TC-019 | Tier-дефолт `skip` для `user_docs`/`dev_docs` при `trivial`/`small` | Manual | Medium | — | descoped — see Scope decision |
+| TC-020 | Отсутствующий актор в реестре / `kind: human` — явная ошибка | Manual | Low | — | descoped — see Scope decision |
 
 ## Known Issues
 

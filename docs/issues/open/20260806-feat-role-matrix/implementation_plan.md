@@ -201,11 +201,11 @@ Prerequisites.
   это читалось как императив к любому скиллу, вызывающему резолвинг (TC-020).
 
 **Acceptance Criteria:**
-- [ ] TC-006
-- [ ] TC-008
-- [ ] TC-009
-- [ ] TC-019
-- [ ] TC-020
+- [x] TC-006 — implemented; descoped from formal manual testing by owner decision (see test_plan.md "Scope decision")
+- [x] TC-008 — implemented; descoped from formal manual testing by owner decision (see test_plan.md "Scope decision")
+- [x] TC-009 — verified (see test_plan.md Status Tracker)
+- [x] TC-019 — implemented; descoped from formal manual testing by owner decision (see test_plan.md "Scope decision")
+- [x] TC-020 — implemented; descoped from formal manual testing by owner decision (see test_plan.md "Scope decision")
 
 ---
 
@@ -286,9 +286,9 @@ Prerequisites.
   его текстом на месте.
 
 **Acceptance Criteria:**
-- [ ] TC-007
-- [ ] TC-010
-- [ ] TC-016
+- [x] TC-007 — implemented; descoped from formal manual testing by owner decision (see test_plan.md "Scope decision")
+- [x] TC-010 — verified (see test_plan.md Status Tracker)
+- [x] TC-016 — implemented; descoped from formal manual testing by owner decision (see test_plan.md "Scope decision")
 
 ---
 
@@ -350,9 +350,9 @@ Prerequisites.
   [codex]}`).
 
 **Acceptance Criteria:**
-- [ ] TC-001
-- [ ] TC-002
-- [ ] TC-003
+- [x] TC-001 — implemented; descoped from formal manual testing by owner decision (see test_plan.md "Scope decision")
+- [x] TC-002 — implemented; descoped from formal manual testing by owner decision (see test_plan.md "Scope decision")
+- [x] TC-003 — implemented; descoped from formal manual testing by owner decision (see test_plan.md "Scope decision")
 
 ---
 
@@ -429,10 +429,10 @@ Prerequisites.
   не трогать эти секции, кроме смены источника роли выше.
 
 **Acceptance Criteria:**
-- [ ] TC-004
-- [ ] TC-005
-- [ ] TC-011
-- [ ] TC-017
+- [x] TC-004 — implemented; descoped from formal manual testing by owner decision (see test_plan.md "Scope decision")
+- [x] TC-005 — implemented; descoped from formal manual testing by owner decision (see test_plan.md "Scope decision")
+- [x] TC-011 — implemented; descoped from formal manual testing by owner decision (see test_plan.md "Scope decision")
+- [x] TC-017 — implemented; descoped from formal manual testing by owner decision (see test_plan.md "Scope decision")
 
 ---
 
@@ -492,8 +492,8 @@ Prerequisites.
   сконфигурировано (см. Task 4, BRD Non-Goals).
 
 **Acceptance Criteria:**
-- [ ] TC-012
-- [ ] TC-013
+- [x] TC-012 — implemented; descoped from formal manual testing by owner decision (see test_plan.md "Scope decision")
+- [x] TC-013 — implemented; descoped from formal manual testing by owner decision (see test_plan.md "Scope decision")
 
 ---
 
@@ -563,8 +563,8 @@ Prerequisites.
   месте (тот же принцип, что у всех остальных `pf-*` скиллов).
 
 **Acceptance Criteria:**
-- [ ] TC-015
-- [ ] TC-018
+- [x] TC-015 — implemented; descoped from formal manual testing by owner decision (see test_plan.md "Scope decision")
+- [x] TC-018 — implemented; descoped from formal manual testing by owner decision (see test_plan.md "Scope decision")
 
 ---
 
@@ -611,7 +611,7 @@ Prerequisites.
   подключена к обычному пути `/pf` для issue любого типа/tier.
 
 **Acceptance Criteria:**
-- [ ] TC-014
+- [x] TC-014 — verified (see test_plan.md Status Tracker)
 
 ### Dependencies
 

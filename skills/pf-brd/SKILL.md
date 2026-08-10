@@ -8,7 +8,9 @@ Determine the active issue by scanning `docs/issues/open/` for [ISSUE-ID].
 
 **Legacy-tier guard (runs first, before any other prerequisite check):** read `docs/issues/open/[ISSUE-ID]/prompt.md`'s YAML frontmatter. If it has no `size_tier` field, ask the user via `AskUserQuestion` — "How big is this task?" with the four options **trivial** / **small** / **medium** / **large** (one-line descriptions from `~/.claude/skills/pf-size-tiers/SKILL.md`'s Tiers table), recommending **medium** ("matches today's default behavior") — then write the answer into `prompt.md`'s frontmatter, next to `doc_language`, before proceeding with the rest of this skill.
 
-**Reviewer-assignment guard (runs immediately after the legacy-tier guard above):** read `docs/issues/open/[ISSUE-ID]/prompt.md`'s YAML frontmatter — `size_tier` is guaranteed present by this point. If it has no `reviewers` field, ask the user via `AskUserQuestion` — one question per applicable key, "Who should review `<key>`?" with the three options **claude** / **codex** / **both**, recommending **claude** for every key ("matches today's default behavior") — then write the answers into `prompt.md`'s frontmatter as a `reviewers:` block, next to `size_tier`, e.g.:
+**Reviewer-assignment guard (runs immediately after the legacy-tier guard above):** **Skip this entire guard if `prompt.md` already has a `profile:` field, or already has a `roles:` block (with or without `profile:`)** — either one means the new schema is already in play (a `profile:` resolves both write and review for every stage via `~/.claude/skills/pf-roles/SKILL.md` §4; a `roles:` block, even a partial one left by automigration, is itself the new schema), so asking this guard's old per-document reviewer question and writing a `reviewers:` block would be redundant — and would violate `~/.claude/skills/pf-roles/SKILL.md` §5's invariant that `reviewers:` is never re-added alongside `roles:`. This guard's text below remains the sole automigration path for issues that have **neither** `profile:` **nor** `roles:` at all — genuinely old issues created before this feature; issues created after this feature always get `profile:` from the mandatory question in `~/.claude/skills/pf/SKILL.md`'s "Creating prompt.md", so in practice this guard only ever fires for such legacy issues.
+
+Otherwise: read `docs/issues/open/[ISSUE-ID]/prompt.md`'s YAML frontmatter — `size_tier` is guaranteed present by this point. If it has no `reviewers` field, ask the user via `AskUserQuestion` — one question per applicable key, "Who should review `<key>`?" with the three options **claude** / **codex** / **both**, recommending **claude** for every key ("matches today's default behavior") — then write the answers into `prompt.md`'s frontmatter as a `reviewers:` block, next to `size_tier`, e.g.:
 
 ```yaml
 reviewers:
@@ -45,7 +47,12 @@ Read `size_tier` from `prompt.md`'s frontmatter (set by the guard above if it wa
 
 I want to build [read description from prompt.md]. Run a condensed version of the clarifying-questions loop below: same 95%-confidence bar and recommendation-with-reason pattern as the full Q&A, but shorter — fewer questions, scoped to what's needed for a one-liner or single obvious fix (what & why, acceptance criteria, the handful of files/tasks involved). Use the AskUserQuestion tool, adding your recommendation (with reason why) below the options for each question.
 
-Once confident, write `docs/issues/open/[ISSUE-ID]/notes.md` directly using the `notes.md` template from `~/.claude/skills/pf-size-tiers/SKILL.md` (the "What & Why" / "Acceptance Criteria" / "Root Cause / Context" [bug issues only, omit for feat/improve] / "Tasks" sections, target under ~50 lines total). Write it directly — no sub-agent dispatch (this skill never dispatched one anyway). Do not create `brd.md`.
+Once confident, **resolve role** for the `notes` key — not `brd` — per `~/.claude/skills/pf-roles/SKILL.md` (§4's fallback order). `notes.md` stands in for `brd.md`/`specs.md`/`implementation_plan.md` (and, for bug-type issues, `analysis.md`) as a single document, so it has its own independent role key in the matrix, resolved the same way as every other key, regardless of the fact that this branch lives inside `pf-brd`.
+
+- If `write == claude` — unchanged: this session writes `docs/issues/open/[ISSUE-ID]/notes.md` directly using the `notes.md` template from `~/.claude/skills/pf-size-tiers/SKILL.md` (the "What & Why" / "Acceptance Criteria" / "Root Cause / Context" [bug issues only, omit for feat/improve] / "Tasks" sections, target under ~50 lines total). Write it directly — no sub-agent dispatch (this skill never dispatched one anyway).
+- If `write != claude` (in this issue, only `codex`) — this session still runs the clarifying-questions loop above itself (delegated actors cannot call `AskUserQuestion`), then delegates the actual write to the resolved actor's write-invocator per `~/.claude/skills/pf-roles/SKILL.md` §7, targeting `docs/issues/open/[ISSUE-ID]/notes.md` with the same template/section structure folded into the prompt built for the actor, and reads the resulting file back from disk once the call returns.
+
+Do not create `brd.md`.
 
 ## If `size_tier` is small/medium/large
 
@@ -53,7 +60,10 @@ I want to build [read description from prompt.md]. I want you to help me brainst
 IMPORTANT: DO NOT INCLUDE ANY TECHNICAL IMPLEMENTATION DETAILS.
 Use the AskUserQuestion tool to ask me clarifying questions until you are 95% confident you can complete this task successfully. For each question, add your recommendation (with reason why) below the options. This would help me in making a better decision.
 
-Save the BRD to `docs/issues/open/[ISSUE-ID]/brd.md`.
+Once confident, **resolve role** for the `brd` key per `~/.claude/skills/pf-roles/SKILL.md` (§4's fallback order).
+
+- If `write == claude` — unchanged: this session saves `docs/issues/open/[ISSUE-ID]/brd.md` directly — no sub-agent dispatch (this skill never dispatched one anyway).
+- If `write != claude` (in this issue, only `codex`) — this session still runs the clarifying-questions loop above itself (delegated actors cannot call `AskUserQuestion`), then delegates the actual write to the resolved actor's write-invocator per `~/.claude/skills/pf-roles/SKILL.md` §7, targeting `docs/issues/open/[ISSUE-ID]/brd.md` with a single prompt built per §7's shape (the target path, `prompt.md`'s path, the requirements clarified in this run, `doc_language`, and the BRD section structure described above) — a from-scratch pipeline document, so use §7's asynchronous case — and reads the resulting `brd.md` back from disk once the call returns.
 
 **Post-save tier reconfirmation:** after saving `brd.md`, re-read it and holistically judge whether its actual scope (user stories, acceptance criteria, business-rule complexity) matches the recorded `size_tier`.
 - If your judgment disagrees with the recorded tier, ask the user via `AskUserQuestion` — recommend your own judgment, with reasoning — to confirm or override. If the tier changes, update `size_tier` in `prompt.md`.

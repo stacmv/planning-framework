@@ -21,11 +21,16 @@ Read `size_tier` from `prompt.md`'s frontmatter.
 
 **Documentation language:** read the `doc_language` field from `docs/issues/open/[ISSUE-ID]/prompt.md`'s YAML frontmatter (default: English if absent). Write `specs.md`'s prose content in that language. Keep headings and structural labels in English so downstream tooling keeps working.
 
-Based on the BRD, write the specs at `docs/issues/open/[ISSUE-ID]/specs.md` (place next to BRD file). Use the AskUserQuestion tool to ask me clarifying questions until you are 95% confident you can complete this task successfully. For each question, add your recommendation (with reason why) below the options. This would help me in making a better decision.
+Based on the BRD, produce the specs at `docs/issues/open/[ISSUE-ID]/specs.md` (place next to BRD file) — who actually writes it is resolved below. Use the AskUserQuestion tool to ask me clarifying questions until you are 95% confident you can complete this task successfully. For each question, add your recommendation (with reason why) below the options. This would help me in making a better decision.
 
 **If `size_tier: small`:** omit ASCII diagrams unless the issue involves UI/UX. Target ≤300 lines total instead of applying the 1500-line split trigger below.
 
 **If `size_tier` is medium or large (or absent):** use ASCII diagrams where necessary to illustrate the UI/UX. If this specs file will be too big (more than 1500 lines), please split it into 3 parts. Keep the original file as the index file that links to the 3 parts.
+
+Once confident, **resolve role** for the `specs` key per `~/.claude/skills/pf-roles/SKILL.md` (§4's fallback order).
+
+- If `write == claude` — unchanged: this session writes `specs.md` directly (and, if oversized, its index + 3 parts), following the tier rules above — no sub-agent dispatch.
+- If `write != claude` (in this issue, only `codex`) — the clarifying-questions loop above still runs in this session (delegated actors cannot call `AskUserQuestion`); once confident, delegate the actual write to the resolved actor's write-invocator per `~/.claude/skills/pf-roles/SKILL.md` §7, targeting `docs/issues/open/[ISSUE-ID]/specs.md` with a single prompt built per §7's shape (the target path, `prompt.md`'s path, `brd.md`'s path, the requirements clarified in this run, `doc_language`, the tier-appropriate section structure/diagram/line-budget rules above — and, folded into the same prompt rather than a separate step, the 1500-line split instruction: if the generated spec exceeds 1500 lines, split it into an index file plus 3 parts, exactly as described above). A from-scratch pipeline document is §7's asynchronous case. The same actor performs both the drafting and, if triggered, the split, in this one call — not a separate Claude post-processing pass. Once it returns, read the resulting file(s) back from disk (the index `specs.md` and any part files, if a split occurred) and continue this skill's existing post-processing unchanged.
 
 Where [ISSUE-ID] means: scan docs/issues/open/ and use the active issue folder name.
 
