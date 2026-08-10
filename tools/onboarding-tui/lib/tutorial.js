@@ -65,8 +65,12 @@ stage of the pipeline for the active issue.
                      the other skills, not normally invoked directly
   /pf-git          - reference data (the commit & push that closes every
                      stage); read by the other skills, not invoked directly
+  /pf-roles        - reference data (write/review actor resolution); read by
+                     the other skills, not normally invoked directly
+  /pf-user-docs    - write user-facing documentation for the active issue
+  /pf-dev-docs     - write developer-facing documentation for the active issue
 
-That is all 17 of them.`,
+That is all 21 of them.`,
 
   // Screen 4: pointers to more detail.
   `Screen 4/4 — Where to learn more
