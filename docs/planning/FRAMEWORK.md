@@ -373,7 +373,7 @@ git commit -m "Close issue 20240127-feat-add-auth: Added JWT authentication"
 
 ## Skills
 
-Sixteen Claude Code skills live in the `skills/` directory — one directory per skill, each holding a `SKILL.md`. They are installed into `~/.claude/skills/` by `converge-to-v3.sh` and refreshed by `update-skills.sh`.
+21 Claude Code skills live in the `skills/` directory — one directory per skill, each holding a `SKILL.md`. They are installed into `~/.claude/skills/` by `converge-to-v3.sh` and refreshed by `update-skills.sh`.
 
 | Skill | Command | What it does |
 |-------|---------|-------------|
@@ -395,6 +395,9 @@ Sixteen Claude Code skills live in the `skills/` directory — one directory per
 | `pf-update/` | `/pf-update` | Updates the installed skills from the framework source repo |
 | `pf-size-tiers/` | `/pf-size-tiers` | Reference data: size-tier definitions and document budgets, read by the other skills |
 | `pf-git/` | `/pf-git` | Reference data: the commit & push procedure that closes every stage, read by the other skills |
+| `pf-roles/` | `/pf-roles` | Reference data: the write/review actor-resolution matrix, read by the other skills |
+| `pf-user-docs/` | `/pf-user-docs` | Writes user-facing documentation (README/CHANGELOG/user guide) for the active issue |
+| `pf-dev-docs/` | `/pf-dev-docs` | Writes developer-facing documentation (architecture/ADRs/runbook) for the active issue |
 
 ### Updating Skills
 
@@ -488,7 +491,10 @@ project/
     ├── pf-autopilot/SKILL.md            # /pf-autopilot — drive the issue to closure
     ├── pf-update/SKILL.md               # /pf-update — refresh installed skills
     ├── pf-size-tiers/SKILL.md           # Reference data (tiers, budgets)
-    └── pf-git/SKILL.md                  # Reference data (stage commit & push)
+    ├── pf-git/SKILL.md                  # Reference data (stage commit & push)
+    ├── pf-roles/SKILL.md                # Reference data (write/review actor resolution)
+    ├── pf-user-docs/SKILL.md            # /pf-user-docs — write user-facing docs
+    └── pf-dev-docs/SKILL.md             # /pf-dev-docs — write developer-facing docs
 ```
 
 **In the framework repo:**

@@ -18,7 +18,7 @@
 
 ## Skills
 
-Sixteen Claude Code skills live in `skills/`, one directory per skill (`skills/<name>/SKILL.md`). Converge installs all of them into `~/.claude/skills/`.
+21 Claude Code skills live in `skills/`, one directory per skill (`skills/<name>/SKILL.md`). Converge installs all of them into `~/.claude/skills/`.
 
 | Command | Purpose |
 |---------|---------|
@@ -40,6 +40,9 @@ Sixteen Claude Code skills live in `skills/`, one directory per skill (`skills/<
 | `/pf-update` | Update the installed skills from the framework repo |
 | `/pf-size-tiers` | Reference data (size tiers, document budgets) — read by the other skills |
 | `/pf-git` | Reference data (the commit & push procedure closing every stage) — read by the other skills |
+| `/pf-roles` | Reference data (actor registry, role profiles, write/review resolution) — read by the other skills |
+| `/pf-user-docs` | Write user-facing documentation for the active issue |
+| `/pf-dev-docs` | Write developer-facing documentation (architecture, ADRs, runbook) for the active issue |
 
 ### Upgrading from v2.0?
 Run `make converge TARGET=/path/to/your-project`. See **[MIGRATION-GUIDE-V3.md](docs/planning/MIGRATION-GUIDE-V3.md)** for what it does to your issues, the backup, and `--dry-run`.
