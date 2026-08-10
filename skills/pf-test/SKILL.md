@@ -88,6 +88,8 @@ Do NOT proceed to Phase 5 when this gate triggers.
 
 Proceed here only when all Auto-type TCs in the Status Tracker have Status `✓`, OR when the Status Tracker contains no rows with Type `Auto`.
 
+If, after Phase 3, one or more Auto-type rows remain unmatched — Status still `[ ]`, with no `✗` rows to trigger the gate above — this precondition is not met. Stop with message: "N Auto TC(s) have no matching test in the runner output — Status left as `[ ]`. Add a test using a convention from Phase 3.2, or re-run /pf-test, before generating the manual checklist."
+
 ### 5.1 Extract Manual TCs
 
 Read every row in the Status Tracker where **Type is `Manual`**. Collect the TC-IDs.
