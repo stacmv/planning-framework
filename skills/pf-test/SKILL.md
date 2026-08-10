@@ -41,12 +41,15 @@ For each test file found in 3.1, scan its content for any of these patterns:
 - Function or method name contains a TC-ID: `test_TC001_`, `it_TC001_`, or the literal `TC001` (zero-padded or not) anywhere in a function name, `it(...)`, `describe(...)`, or `test(...)` call
 - Comment directly above a test: `# TC-001` or `// TC-001`
 - Describe block title starting with the TC-ID: `describe('TC-001:` or `describe("TC-001:`
+- A TC-ID at the **start** of a string literal passed to a test helper — the shell convention `pf_pass "TC-009 step 1: ..."` / `pf_fail "TC-009 ..."`. The TC-ID must lead the string; a TC-ID appearing later inside a message (e.g. `assert.ok(x, "TC-001 not parsed")`) is not this convention and does not match.
 
 Collect a map of TC-ID → test name(s) as found in the runner output.
 
+A TC-ID occurring only inside a string used as fixture or sample test data — not a call to a test helper or an assertion — does not count as a match and must be ignored, even though it is a string literal. Example: `tools/manual-test-ui/test/checklist-ru.test.js` embeds `## TC-001:` inside a fixture constant; that is data under test, not a declaration that this file tests TC-001.
+
 ### 3.3 Match to runner output
 
-Compare the test names captured in Phase 2 against the TC-ID map from 3.2. Determine pass or fail for each mapped TC-ID.
+Compare the test names captured in Phase 2 against the TC-ID map from 3.2. Determine pass or fail for each mapped TC-ID. Use the same substring-matching technique as 3.2 against the runner output — not limited to test names or function names; a TC-ID anywhere in captured stdout (for example printed verbatim by `pf_pass`) counts as a match for that TC.
 
 Tests that have no TC-ID pattern are counted in an aggregate total but are not mapped individually.
 
