@@ -19,8 +19,12 @@ Determine the active issue from `docs/issues/open/`. Read `size_tier` from `prom
 
 **Oversized-predecessor guard.** Before producing `test_plan.md`, recompute the oversized-for-tier check against the predecessor document(s) that will be handed to whichever actor drafts the plan:
 - `size_tier: trivial` → `notes.md`, budget ~50 lines.
-- `size_tier: small` → `specs.md`, budget ~300 lines.
-- `size_tier: medium`/`large` → `specs.md`, no cap.
+- `size_tier: small` → `specs.md` for feat/improve, `analysis.md` for bug; budget ~300 lines either way.
+- `size_tier: medium`/`large` → `specs.md` for feat/improve, `analysis.md` for bug; no cap.
+
+A bug issue above trivial tier has no `brd.md` and no `specs.md` — `analysis.md`
+is its sole predecessor, and it is the file this guard measures. Do not skip the
+guard just because `specs.md` is absent.
 
 Use a lightweight **mechanical count only** (e.g. `wc -l` on the file) to perform this check — not a full semantic `Read` of the document. This is not a contradiction of the "do not read these documents or draft the plan yourself" instruction below: a mechanical line count is not a semantic read, and it doesn't touch the document's content — it only tells this skill whether to stop before producing the document. Whichever actor drafts the plan — the dispatched sub-agent, or the delegated actor — still does the actual full reading and drafting, exactly as before.
 
@@ -34,7 +38,7 @@ If the predecessor is oversized for its tier, stop before producing `test_plan.m
 The source document(s) to read/pass, and the target test-case count, by tier:
 
 - **If `size_tier: trivial`:** source document is `notes.md` (not `brd.md`/`specs.md`, which don't exist for trivial issues). Target 2-4 test cases, ≤80 lines total. Omit the Known Issues table section (Step 5) entirely — keep the Status Tracker section (Step 4).
-- **If `size_tier: small`:** source document(s) are `brd.md` + `specs.md` if present. Target 5-10 test cases. Omit the Known Issues table section (Step 5).
+- **If `size_tier: small`:** source document(s) are `brd.md` + `specs.md` if present for feat/improve, `analysis.md` for bug. Target 5-10 test cases. Omit the Known Issues table section (Step 5).
 - **If `size_tier: medium`/`large` (or absent):** source document(s) are `brd.md` + `specs.md` if present for feat/improve, `analysis.md` for bug — unchanged from today. Target 10-20 test cases typical for medium, 20+ allowed for large. Include the Known Issues table section (Step 5) — no regression from current behavior.
 
 Tell it (the sub-agent, or — for a delegated actor — folded into the write prompt) to also read the `doc_language` field from `prompt.md`'s YAML frontmatter (default: English if absent) and write the test plan's prose content (test case names, descriptions, steps, notes) in that language, keeping headings and structural labels (e.g. `Status Tracker`, `TC-NNN`, `Priority`) in English so downstream tooling keeps working. Instruct it to write the result directly to `docs/issues/open/[ACTIVE-ISSUE-ID]/test_plan.md`. The sub-agent path returns only a short summary (test case count, categories covered) — not the document contents, since the orchestrator does not need them. For a delegated actor, once the write-invocator call returns, read `test_plan.md` back from disk and derive that same short summary from it instead.
