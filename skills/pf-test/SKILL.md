@@ -36,20 +36,46 @@ Scan the entire test suite for test-looking files, regardless of whether they we
 
 ### 3.2 Scan for TC-ID patterns
 
-For each test file found in 3.1, scan its content for any of these patterns:
+A file found in 3.1 contributes TC-IDs to the **active issue's** map only if
+it identifies itself as belonging to that issue: the active ISSUE-ID appears
+somewhere in the file **or its path** — this repo's existing convention, e.g.
+`test/skills-role-matrix-static.sh:2`, whose header names its issue — or the
+file appears in `git diff --name-only develop...HEAD` (it is this issue's own
+work, changed on this branch). A file scanned in 3.1 that qualifies under
+neither test is not mapped to this issue: do not record any TC-ID found in it
+here, even where a pattern below matches literally.
+
+For each qualifying file, scan its content for any of these patterns:
 
 - Function or method name contains a TC-ID: `test_TC001_`, `it_TC001_`, or the literal `TC001` (zero-padded or not) anywhere in a function name, `it(...)`, `describe(...)`, or `test(...)` call
 - Comment directly above a test: `# TC-001` or `// TC-001`
 - Describe block title starting with the TC-ID: `describe('TC-001:` or `describe("TC-001:`
-- A TC-ID at the **start** of a string literal passed to a test helper — the shell convention `pf_pass "TC-009 step 1: ..."` / `pf_fail "TC-009 ..."`. The TC-ID must lead the string; a TC-ID appearing later inside a message (e.g. `assert.ok(x, "TC-001 not parsed")`) is not this convention and does not match.
+- A TC-ID inside a string literal that is the test's own **label** — the argument by which a test-registration or result-reporting helper names the case: the shell convention `pf_pass "TC-009 step 1: ..."` / `pf_fail "TC-009 ..."`, or the JS `test(...)` / `describe(...)` / `it(...)` title argument. What decides a match is the string's *role* — does it name/register this case to a test helper or reporter? — not where inside the string the TC-ID sits.
 
-Collect a map of TC-ID → test name(s) as found in the runner output.
+A TC-ID counts as a match only under that role. It does not count, and must
+be ignored, in any of these forms even though each is a string literal
+containing the TC-ID:
 
-A TC-ID occurring only inside a string used as fixture or sample test data — not a call to a test helper or an assertion — does not count as a match and must be ignored, even though it is a string literal. Example: `tools/manual-test-ui/test/checklist-ru.test.js` embeds `## TC-001:` inside a fixture constant; that is data under test, not a declaration that this file tests TC-001.
+- An assertion's failure-message argument — `assert.ok(ru, "TC-001 not parsed")` (`tools/manual-test-ui/test/checklist-ru.test.js:47`) — the string reports on an assertion; it does not label a case to a test helper.
+- A TC-ID as an object field value — `tcId: "TC-001"` (`tools/manual-test-ui/test/checklist-git.test.js:101`) — data describing a case, not a label passed to a test-registration or reporting helper.
+- A TC-ID as a selector or parameter — `prepareOk("TC-001")`, `const runs = [null, "TC-001", ...]` (`tools/manual-test-ui/test/prepare-repo-state.test.js`), `CASE_IDS = ["TC-001", "TC-002"]` (`prepare.test.js:35`) — the TC-ID picks or lists a case; it does not label this test.
+- A TC-ID inside a string used as fixture or sample test data — the string is data under test, not a label. Example: `tools/manual-test-ui/test/checklist-ru.test.js` embeds `## TC-001:` inside a fixture constant (also `## TC-002:`); that is data under test, not a declaration that this file tests TC-001.
+
+These four are the same rule, not separate exceptions: a TC-ID does not count
+and must not match — is ignored — unless the string is the label a
+test-registration or result-reporting helper uses to name this case.
+
+For each qualifying file, collect a map of TC-ID → the exact label string
+matched above, verbatim (not just the bare TC-ID) — 3.3 searches the runner
+output for this full label, not the bare ID. When the matched text is not
+itself something the runner prints (a comment directly above a test, or a
+bare function name) — record the adjacent test's own name/title instead: the
+string the runner does print for that test, so 3.3 still has something to
+find in captured stdout.
 
 ### 3.3 Match to runner output
 
-Compare the test names captured in Phase 2 against the TC-ID map from 3.2. Determine pass or fail for each mapped TC-ID. Use the same substring-matching technique as 3.2 against the runner output — not limited to test names or function names; a TC-ID anywhere in captured stdout (for example printed verbatim by `pf_pass`) counts as a match for that TC.
+For each TC-ID mapped in 3.2, search the captured stdout from Phase 2 for the **exact label string** recorded for it there — not the bare TC-ID — using the same substring-matching technique as 3.2: not limited to test names or function names; a matching label anywhere in captured stdout (for example printed verbatim by `pf_pass`) counts as a match for that TC. Matching the bare TC-ID alone is not enough: a bare `TC-001` collides with unrelated occurrences elsewhere in a full `make test` run — banners (e.g. `test/converge-fresh.sh:15`), other issues' TC-IDs, or the fixtures/selectors excluded in 3.2 — while the full label recorded in 3.2 is specific enough to avoid that collision. Determine pass or fail for each mapped TC-ID from that match, e.g. whether the label was printed by `pf_pass` or `pf_fail`, or from the runner's own pass/fail report for the test carrying that label.
 
 Tests that have no TC-ID pattern are counted in an aggregate total but are not mapped individually.
 
@@ -212,4 +238,4 @@ This matters more here than anywhere else in the pipeline: `manual_test_checklis
 - **Never skip the failure gate** — a partial pass is a failure. All Auto TCs must be `✓` before the checklist is generated.
 - **Do not invent pass/fail status** — only update Status Tracker rows where you found a matching test in the runner output. Leave unmatched rows as `[ ]`.
 - **TC-ID format in test_plan.md is `TC-NNN`** (hyphen, three digits). When scanning test files, match both `TC-001` (with hyphen) and `TC001` (without) as the same TC.
-- **If the branch diff errors** (`git diff --name-only develop...HEAD` returns an error), do not skip TC-ID mapping — degrade Phase 3.1 to scanning the entire test suite for test-looking files (as described above) and proceed with TC-ID mapping as normal.
+- **If the branch diff errors** (`git diff --name-only develop...HEAD` returns an error), do not skip TC-ID mapping — Phase 3.1's scan of the entire test suite is unaffected. In 3.2's qualifying-file test, the diff limb is simply unavailable: qualify files by the active-ISSUE-ID limb alone (the ID appears in the file or its path) until the diff can be computed again.
