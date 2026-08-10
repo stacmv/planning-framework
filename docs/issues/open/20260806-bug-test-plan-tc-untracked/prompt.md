@@ -1,6 +1,11 @@
 ---
 doc_language: Russian
 size_tier: small
+roles:
+  analysis: { write: claude, review: [claude] }
+  test_plan: { write: claude, review: [claude] }
+  implementation_plan: { write: claude, review: [claude] }
+  code: { write: claude, review: [claude] }
 ---
 
 Баг-репорт, полученный от другого проекта, использующего Planning Framework:
