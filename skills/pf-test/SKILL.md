@@ -32,7 +32,7 @@ Run the detected command. Capture all stdout and stderr output along with the ex
 
 ### 3.1 Find test files on the issue branch
 
-Run `git diff --name-only develop...HEAD` and filter the output to files that look like test files (paths or names containing `test`, `spec`, or `__tests__`; extensions `.test.*`, `.spec.*`, `_test.*`).
+Scan the entire test suite for test-looking files, regardless of whether they were changed on this branch — `git diff --name-only develop...HEAD` is not the only source: in addition to the diff, also scan pre-existing test files. A file "looks like a test file" if its path or name contains `test`, `spec`, or `__tests__`, or its extension matches `.test.*`, `.spec.*`, `_test.*`.
 
 ### 3.2 Scan for TC-ID patterns
 
@@ -207,4 +207,4 @@ This matters more here than anywhere else in the pipeline: `manual_test_checklis
 - **Never skip the failure gate** — a partial pass is a failure. All Auto TCs must be `✓` before the checklist is generated.
 - **Do not invent pass/fail status** — only update Status Tracker rows where you found a matching test in the runner output. Leave unmatched rows as `[ ]`.
 - **TC-ID format in test_plan.md is `TC-NNN`** (hyphen, three digits). When scanning test files, match both `TC-001` (with hyphen) and `TC001` (without) as the same TC.
-- **If the issue branch does not exist** (`git diff develop...HEAD` returns an error), run the full test suite and skip the TC-ID mapping step; report mapped count as 0.
+- **If the branch diff errors** (`git diff --name-only develop...HEAD` returns an error), do not skip TC-ID mapping — degrade Phase 3.1 to scanning the entire test suite for test-looking files (as described above) and proceed with TC-ID mapping as normal.
