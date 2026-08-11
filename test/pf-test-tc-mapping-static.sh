@@ -319,6 +319,20 @@ if [ "$have_develop" -eq 0 ]; then
   pf_note "TC-007: 'develop' ref not found locally — develop...HEAD cannot be computed; skipping this issue's self-check."
 elif [ "$current_branch" = "develop" ]; then
   pf_note "TC-007: currently on develop — develop...HEAD is empty by definition; self-check only means something on the issue branch."
+elif git -C "$REPO_ROOT" cat-file -e "develop:$EXPECTED_NEW_FILE" 2>/dev/null; then
+  # One-shot, pre-merge-only self-check. It asserts a property of ITS OWN
+  # issue branch's diff ("this fix added exactly one file under test/ and
+  # modified none"), so it is only meaningful while that fix is unmerged.
+  # Once $EXPECTED_NEW_FILE is in develop, develop...HEAD on any LATER issue
+  # branch describes that branch's work instead — every future branch adding
+  # a test file would fail step 2, and any branch editing a pre-existing one
+  # (including this very file) would fail step 1. Skipping both steps
+  # together is deliberate: guarding step 2 alone leaves step 1 red for the
+  # commit that adds this guard. Keying on presence-in-develop rather than a
+  # hardcoded branch name states the real precondition — verified
+  # discriminating: absent from develop at the pre-merge tip 1a0a558^1,
+  # present after.
+  pf_note "TC-007: $EXPECTED_NEW_FILE is already in develop — this one-shot self-check only means something on its own issue branch before merge; skipping."
 else
   modified="$(git -C "$REPO_ROOT" diff --name-only --diff-filter=M develop...HEAD -- test/ 2>/dev/null)"
   added="$(git -C "$REPO_ROOT" diff --name-only --diff-filter=A develop...HEAD -- test/ 2>/dev/null)"
