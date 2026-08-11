@@ -24,7 +24,7 @@ Check the project root for the following files in order. Use the first match:
 
 ## Phase 2: Run the Test Suite
 
-Run the detected command. Capture all stdout and stderr output along with the exit code.
+Run the detected command. Capture stdout and stderr **combined into one stream** (e.g. via `2>&1`), along with the exit code. This matters beyond convenience: this repo's own `pf_fail` (`test/lib.sh:65-68`) writes to stderr while `pf_pass` writes to stdout, and 3.3 below searches this one combined stream — if the two are captured separately instead, no `pf_fail` label is ever found where 3.3 looks, and a genuinely failing test is misread as "not matched" instead of `✗`.
 
 ---
 
@@ -60,22 +60,82 @@ containing the TC-ID:
 - A TC-ID as an object field value — `tcId: "TC-001"` (`tools/manual-test-ui/test/checklist-git.test.js:101`) — data describing a case, not a label passed to a test-registration or reporting helper.
 - A TC-ID as a selector or parameter — `prepareOk("TC-001")`, `const runs = [null, "TC-001", ...]` (`tools/manual-test-ui/test/prepare-repo-state.test.js`), `CASE_IDS = ["TC-001", "TC-002"]` (`prepare.test.js:35`) — the TC-ID picks or lists a case; it does not label this test.
 - A TC-ID inside a string used as fixture or sample test data — the string is data under test, not a label. Example: `tools/manual-test-ui/test/checklist-ru.test.js` embeds `## TC-001:` inside a fixture constant (also `## TC-002:`); that is data under test, not a declaration that this file tests TC-001.
+- A banner announcing which case is about to run, printed unconditionally before its checks — `printf '=== TC-009: ...'` (`test/skills-role-matrix-static.sh:20`), `printf '=== TC-001: ...'` (`test/pf-test-tc-mapping-static.sh:40`) — the string names the case but carries no pass/fail information: it is printed whether the case goes on to pass or fail, so it is not a result-reporting label and does not decide anything in 3.3.
 
-These four are the same rule, not separate exceptions: a TC-ID does not count
+These five are the same rule, not separate exceptions: a TC-ID does not count
 and must not match — is ignored — unless the string is the label a
 test-registration or result-reporting helper uses to name this case.
 
-For each qualifying file, collect a map of TC-ID → the exact label string
-matched above, verbatim (not just the bare TC-ID) — 3.3 searches the runner
-output for this full label, not the bare ID. When the matched text is not
-itself something the runner prints (a comment directly above a test, or a
-bare function name) — record the adjacent test's own name/title instead: the
-string the runner does print for that test, so 3.3 still has something to
-find in captured stdout.
+For each qualifying file, collect a map of TC-ID → the list of every
+**candidate** label string matched above for it, recorded in its
+**matchable form** — not the bare TC-ID, and not the full source literal
+either. This repo's convention routinely interpolates a shell variable (or
+equivalent) inside the label — `pf_fail "TC-001 step 4: aggregation rule
+incomplete (absence-not-failure: $has_absence_not_failure, ...)"`
+(`test/pf-test-tc-mapping-static.sh:92`) is typical — and at runtime the
+shell substitutes that value **before** the label is printed, so the line
+the runner actually prints never contains the literal `$has_...` text: a
+candidate recorded as the full, untruncated source literal can never appear
+in the output, no matter how the check site resolves at runtime. To record
+a matchable candidate, truncate the label at the first interpolation
+point — a `$name`, `${...}`, or an equivalent variable-substitution/format
+placeholder in the file's language — and keep only the text before it. That
+leading text is static: the source writes it literally, so it is exactly
+what prints at runtime; everything from the interpolation point onward is a
+runtime value and is not knowable from the source, so it is not part of the
+candidate. A label with no interpolation point has no truncation to make;
+its matchable form is the label in full, verbatim, exactly as before. 3.3
+matches each candidate's matchable form against the output — not the bare
+ID and not the untruncated source literal. They are called candidates
+deliberately, not expectations: 3.2 scans **source text**, where an
+`if`/`else` pair's two branches are both always present in the file, so
+both are always found and recorded here — but at runtime exactly one branch
+of that pair executes, so at most one of the two ever appears in the
+output. 3.2 does not decide which; 3.3 does, from what actually printed.
+
+A single TC-ID commonly collects more than one candidate, and all of them
+must be recorded, not only the first one found: this repo's own bash
+convention registers one candidate per check site (one step), each with its
+own text — and a single logical check site is itself commonly written as an
+`if`/`else` pair carrying a **pass-form** and a **fail-form** with different
+literal text. For example `test/pf-test-tc-mapping-static.sh:53-57` registers
+both `pf_pass "TC-001 step 2: 3.2 documents TC-ID inside a string
+literal/…"` and `pf_fail "TC-001 step 2: 3.2 does not document TC-ID inside a
+string literal/…"` for the very same site — record both as separate
+candidates for TC-001. A guard clause with no paired success text (e.g.
+`test/skills-role-matrix-static.sh:24`'s `pf_fail "TC-009: skills/pf-roles/
+SKILL.md does not exist"`, with no matching `pf_pass`) is recorded the same
+way: a candidate that simply has no sibling, still just a candidate that may
+or may not appear.
+
+For example, `test/skills-role-matrix-static.sh`'s TC-009 is checked at five
+**check sites** (step 1 twice, step 2, step 3, step 4), each written as one
+`if`/`else` pair — so 3.2 records ten pass/fail candidate strings for TC-009
+(plus the guard-only fail candidate above), not five: five is the count of
+check sites, not of candidate strings, and 3.2 records strings, one per
+literal actually in the source, with no collapsing of a pass/fail pair into a
+single "site label".
+
+When the matched text is not itself something the runner prints (a comment directly
+above a test, or a bare function name) — record the adjacent test's own
+name/title instead: the string the runner does print for that test, so 3.3
+still has something to find in the captured output.
 
 ### 3.3 Match to runner output
 
-For each TC-ID mapped in 3.2, search the captured stdout from Phase 2 for the **exact label string** recorded for it there — not the bare TC-ID — using the same substring-matching technique as 3.2: not limited to test names or function names; a matching label anywhere in captured stdout (for example printed verbatim by `pf_pass`) counts as a match for that TC. Matching the bare TC-ID alone is not enough: a bare `TC-001` collides with unrelated occurrences elsewhere in a full `make test` run — banners (e.g. `test/converge-fresh.sh:15`), other issues' TC-IDs, or the fixtures/selectors excluded in 3.2 — while the full label recorded in 3.2 is specific enough to avoid that collision. Determine pass or fail for each mapped TC-ID from that match, e.g. whether the label was printed by `pf_pass` or `pf_fail`, or from the runner's own pass/fail report for the test carrying that label.
+For each TC-ID mapped in 3.2, search the **combined stdout+stderr output** captured in Phase 2 (see Phase 2 above — the two streams are captured as one stream, not separately) for each candidate's **matchable form** recorded for it there — not the bare TC-ID, and not the untruncated source literal. A candidate matches when its matchable form appears as a **prefix-anchored substring** of a line in that combined output: the matchable form must line up with the start of the label on that line, while the rest of the line — whatever runtime-substituted text follows the interpolation point the matchable form was truncated at — may be anything.
+
+This is the same substring-matching technique as 3.2, with one difference: it is anchored. Two distinct freedoms must not be confused. **Position within the label is not free** — the matchable form must line up with the start of the label; a matchable form occurring partway inside a longer label does not match. **Which line carries it is free** — any line of the combined output qualifies, wherever it occurs in the run, and the match is not limited to test names or function names (for example a line printed by `pf_pass` to stdout, or by `pf_fail` to stderr). A candidate matched under those two conditions counts as an **appearing** candidate for that TC-ID.
+
+Degenerate case: if a candidate's matchable form carries no distinguishing text beyond the bare TC-ID — nothing survived truncation — it must not be matched by prefix alone; leave that TC-ID unmatched by this candidate rather than risk attributing an unrelated line to it (measured against this repo's convention, the *shortest* real check site still keeps nineteen static characters after the TC-ID — `test/pf-close.sh:58`, whose matchable form truncates to `TC-001: PARENT-BRANCH = '` — so this guard is a rare corner, not the common path, and no runner-section or suite-header fallback is used to resolve it).
+
+Matching the bare TC-ID alone is not enough: a bare `TC-001` collides with unrelated occurrences elsewhere in a full `make test` run — banners (e.g. `test/converge-fresh.sh:15`), other issues' TC-IDs, or the fixtures/selectors excluded in 3.2 — while the full label recorded in 3.2 is specific enough to avoid that collision. Determine pass or fail for each appearing candidate from its match, e.g. whether the label was printed by `pf_pass` or `pf_fail`, or from the runner's own pass/fail report for the test carrying that label. Search the *combined* output specifically, not stdout alone: this repo's own `pf_fail` (`test/lib.sh:65-68`) writes to stderr while `pf_pass` writes to stdout, so searching stdout alone would make every `pf_fail` candidate permanently non-appearing and the `✗` outcome below unreachable.
+
+**Aggregation rule, for every TC-ID mapped in 3.2** (whether it collected one candidate or several): 3.2 collected *candidates* — strings that could appear in the output — not a checklist all of which must appear. Only the candidates that actually appear in the combined output, as just decided above, count toward the verdict. A collected candidate that does **not** appear is not evidence of anything failing, and never by itself blocks `✓`: it is simply the branch of an `if`/`else` pair (or a guard) that did not execute this run, exactly as 3.2 describes. Decide the TC-ID's status from the appearing candidates alone:
+
+- **No candidate collected for this TC-ID appears anywhere in the output.** The TC-ID does not count as matched by this step — it is not `✓`. It is left for 3.4's "not matched" handling, which is what feeds the Phase 5 precondition.
+- **At least one candidate appears, and any appearing candidate reported failure.** The TC-ID is `✗`. One failing *appearing* candidate fails the whole TC-ID, no matter how many other appearing candidates for it reported success — this is what keeps a TC-ID whose step 1 passed and step 4 failed at `✗`, never `✓`.
+- **At least one candidate appears, and every appearing candidate reported success.** The TC-ID is `✓`.
 
 Tests that have no TC-ID pattern are counted in an aggregate total but are not mapped individually.
 
@@ -86,7 +146,7 @@ Open `test_plan.md`. In the **Status Tracker** table, for each row where the TC-
 - Replace `[ ]` in the **Status** column with `✓` if the test passed
 - Replace `[ ]` with `✗` if the test failed
 
-For rows not matched by any test file pattern, leave the Status column unchanged.
+For rows the TC-ID mapping did not match, leave the Status column unchanged. This covers both ways a row goes unmatched, not only the first: 3.2 found no candidate for that TC-ID at all, **or** 3.2 collected candidates but none of them appeared in the combined output (3.3's first aggregation outcome). Either way the row keeps its `[ ]`, which is what the Phase 5 precondition then acts on.
 
 Save `test_plan.md`.
 
@@ -114,7 +174,7 @@ Do NOT proceed to Phase 5 when this gate triggers.
 
 Proceed here only when all Auto-type TCs in the Status Tracker have Status `✓`, OR when the Status Tracker contains no rows with Type `Auto`.
 
-If, after Phase 3, one or more Auto-type rows remain unmatched — Status still `[ ]`, with no `✗` rows to trigger the gate above — this precondition is not met. Stop with message: "N Auto TC(s) have no matching test in the runner output — Status left as `[ ]`. Add a test using a convention from Phase 3.2, or re-run /pf-test, before generating the manual checklist."
+If, after Phase 3, one or more Auto-type rows remain unmatched — Status still `[ ]`, with no `✗` rows to trigger the gate above — this precondition is not met. Stop with message: "N Auto TC(s) have no matching test in the runner output — Status left as `[ ]`: TC-xxx, TC-yyy, ... . Add a test using a convention from Phase 3.2, or re-run /pf-test, before generating the manual checklist." (list every unmatched TC-ID, not just the count.)
 
 ### 5.1 Extract Manual TCs
 
