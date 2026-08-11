@@ -25,6 +25,39 @@
 PF_CLOSE_SKILL="$REPO_ROOT/skills/pf-close/SKILL.md"
 TP_MIXED="$REPO_ROOT/test/fixtures/pf-product-test-plan/issue-mixed-types/docs/issues/open/20990101-feat-fixture-mixed/test_plan.md"
 
+# TC-004/005/006 fixtures (docs/planning/test-plan.md itself, not an issue's
+# test_plan.md). Each lives at test/fixtures/pf-product-test-plan/<name>/docs/
+# planning/test-plan.md — a nested relative path that pf_setup_case cannot
+# take directly (its `cp -a "$src" "$parent/$fixture"` needs the intermediate
+# directory of the destination to already exist, which it does not for a
+# fixture name containing a slash — confirmed by running it against
+# "pf-product-test-plan/global-fresh": `cp: cannot create directory
+# '.../pf-product-test-plan/global-fresh': No such file or directory`).
+# pf_ptp_case_file below copies just the one file these three cases need into
+# a fresh pf_mktemp_d dir instead, keeping the fixture itself read-only (S-3)
+# and the temp dir registered for cleanup (S-4).
+PTP_FIX_FRESH="global-fresh"
+PTP_FIX_RETIRED_DELETED="global-after-retired-deleted"
+PTP_FIX_STALE_COUNTER="global-stale-counter"
+
+# pf_ptp_case_file <fixture name under test/fixtures/pf-product-test-plan/>
+#
+# Copies that fixture's docs/planning/test-plan.md into a fresh temp dir
+# (pf_mktemp_d — S-4: registered, cleaned on exit) and prints the path to the
+# writable copy. The source fixture under test/fixtures/ is only ever read.
+pf_ptp_case_file() {
+  local fixture="$1" src work
+  src="$PF_FIXTURES_DIR/pf-product-test-plan/$fixture/docs/planning/test-plan.md"
+  if [ ! -f "$src" ]; then
+    printf ''
+    return 1
+  fi
+  work="$(pf_mktemp_d)" || exit 1
+  mkdir -p "$work/docs/planning"
+  cp "$src" "$work/docs/planning/test-plan.md"
+  printf '%s' "$work/docs/planning/test-plan.md"
+}
+
 # ─── Helpers: transcribed Phase 4.5 algorithm (specs.md "Stage: /pf-close —
 # Phase 4.5", skills/pf-close/SKILL.md Phase 4.5) ──────────────────────────
 
@@ -134,6 +167,111 @@ pf_ptp_phase45_section() {
     /^## Phase 4\.5/ { started = 1 }
     started { print }
   ' "$PF_CLOSE_SKILL"
+}
+
+# ─── Helpers: PTC numbering (specs.md "Выделение номера", TC-004/005/006) ──
+
+# pf_ptp_counter_value <docs/planning/test-plan.md file> — the integer encoded
+# in its "Last allocated: PTC-NNNN" line, or 0 for "Last allocated: none" (the
+# fresh-template state).
+pf_ptp_counter_value() {
+  local file="$1" line digits
+  line="$(grep -m1 '^Last allocated:' "$file" 2>/dev/null || true)"
+  case "$line" in
+    *none*) printf '0' ;;
+    *PTC-*)
+      digits="$(printf '%s' "${line##*PTC-}" | tr -dc '0-9')"
+      printf '%s' "$((10#${digits:-0}))"
+      ;;
+    *) printf '0' ;;
+  esac
+}
+
+# pf_ptp_parse_global_rows <file> — one line per data row of the global
+# test-plan.md table (header resolved by the literal "| PTC |" cell, not by a
+# fixed line offset, so a fixture with extra prose above the table still
+# parses). Fields joined by \037: PTC, Area, Test case, Prio, Origin, Last
+# run, Status.
+pf_ptp_parse_global_rows() {
+  local file="$1"
+  awk -F'|' '
+    !header && /^\| *PTC *\|/ { header = 1; next }
+    header && !sep && /^\| *-/ { sep = 1; next }
+    header && sep && /^\|/ {
+      ptc = $2; area = $3; tcase = $4; prio = $5; origin = $6; lastrun = $7; status = $8
+      gsub(/^[ \t]+|[ \t]+$/, "", ptc)
+      gsub(/^[ \t]+|[ \t]+$/, "", area)
+      gsub(/^[ \t]+|[ \t]+$/, "", tcase)
+      gsub(/^[ \t]+|[ \t]+$/, "", prio)
+      gsub(/^[ \t]+|[ \t]+$/, "", origin)
+      gsub(/^[ \t]+|[ \t]+$/, "", lastrun)
+      gsub(/^[ \t]+|[ \t]+$/, "", status)
+      if (ptc == "") next
+      printf "%s\037%s\037%s\037%s\037%s\037%s\037%s\n", ptc, area, tcase, prio, origin, lastrun, status
+    }
+  ' "$file"
+}
+
+# pf_ptp_max_table_number <file> — highest PTC-NNNN numeric value already
+# written in the table, or 0 for an empty table.
+pf_ptp_max_table_number() {
+  local file="$1" max=0 n digits
+  while IFS= read -r n; do
+    [ -z "$n" ] && continue
+    digits="$(printf '%s' "${n#PTC-}" | tr -dc '0-9')"
+    n="$((10#${digits:-0}))"
+    [ "$n" -gt "$max" ] && max="$n"
+  done < <(pf_ptp_parse_global_rows "$file" | awk -F'\037' '{ print $1 }')
+  printf '%s' "$max"
+}
+
+# pf_ptp_next_number <file> — specs.md "Выделение номера": next PTC number is
+# the maximum of (a) the Last allocated: counter and (b) the highest PTC
+# already in the table, plus one. Formatted PTC-NNNN (4 digits).
+pf_ptp_next_number() {
+  local file="$1" counter table_max winner next
+  counter="$(pf_ptp_counter_value "$file")"
+  table_max="$(pf_ptp_max_table_number "$file")"
+  winner="$counter"
+  [ "$table_max" -gt "$winner" ] && winner="$table_max"
+  next=$((winner + 1))
+  printf 'PTC-%04d' "$next"
+}
+
+# pf_ptp_promote_row <file> <area> <test case> <prio> <origin> <last run>
+# <status> — simulates Phase 4.5 steps 3-4 for exactly one Manual case:
+# appends the new row with the number pf_ptp_next_number computes, then
+# updates the Last allocated: line to that same number. Mutates <file> (a
+# $TMP_WORK copy, never the read-only fixture — S-3). Prints the PTC assigned.
+pf_ptp_promote_row() {
+  local file="$1" area="$2" tcase="$3" prio="$4" origin="$5" lastrun="$6" status="$7"
+  local ptc
+  ptc="$(pf_ptp_next_number "$file")"
+  printf '| %s | %s | %s | %s | %s | %s | %s |\n' \
+    "$ptc" "$area" "$tcase" "$prio" "$origin" "$lastrun" "$status" >>"$file"
+  sed -i "s/^Last allocated:.*/Last allocated: $ptc/" "$file"
+  printf '%s' "$ptc"
+}
+
+# assert_numbering_rule_documented <step label> — shared drift-guard for
+# TC-004/005/006 step 3 (test_plan.md: "тот же grep... с тем же сообщением,
+# что TC-004 шаг 3" — one function so the wording never drifts between three
+# copies). Greps the live Phase 4.5 text for the rule "next number = maximum
+# of Last allocated: and the highest table PTC, plus one" (specs.md, Task 1
+# pt. 4). The core diagnostic text is identical across all three callers; only
+# the "<step label>:" prefix differs, per this suite's TC-ID-first convention.
+assert_numbering_rule_documented() {
+  local step_label="$1" sec45 has_rule=0
+  sec45="$(pf_ptp_phase45_section)"
+  if printf '%s\n' "$sec45" |
+    grep -qiE 'maximum of.*\(a\).*Last allocated.*\(b\).*highest.*PTC.*table.*plus one'; then
+    has_rule=1
+  fi
+  if [ "$has_rule" -eq 1 ]; then
+    pf_pass "$step_label: Phase 4.5 documents the PTC numbering rule (max of Last allocated: and highest table PTC, plus one)"
+  else
+    pf_fail "$step_label: Phase 4.5 не документирует правило выделения номера"
+  fi
 }
 
 # ══════════════════════════════════════════════════════════════════════════════
@@ -328,8 +466,106 @@ else
   fi
 fi
 
+# ══════════════════════════════════════════════════════════════════════════════
+printf '\n=== TC-004: PTC numbering on a fresh/empty docs/planning/test-plan.md\n'
+# ══════════════════════════════════════════════════════════════════════════════
+
+tp004="$(pf_ptp_case_file "$PTP_FIX_FRESH")"
+
+if [ ! -f "$tp004" ]; then
+  pf_fail "TC-004: fixture docs/planning/test-plan.md not found ($PTP_FIX_FRESH)"
+else
+  next004="$(pf_ptp_next_number "$tp004")"
+  if [ "$next004" = "PTC-0001" ]; then
+    pf_pass "TC-004 step 1: numbering on an empty table yields PTC-0001"
+  else
+    pf_fail "TC-004 step 1: numbering on an empty table yielded $next004, want PTC-0001"
+  fi
+
+  assigned004="$(pf_ptp_promote_row "$tp004" "explorer-ui" \
+    "Тема сохраняется между перезагрузками страницы" "High" \
+    "20990101-feat-fixture-mixed#TC-005" "—" "pending")"
+  last_alloc004="$(pf_ptp_counter_value "$tp004")"
+  row_count004="$(pf_ptp_parse_global_rows "$tp004" | grep -c . || true)"
+
+  if [ "$assigned004" = "PTC-0001" ] && [ "$last_alloc004" -eq 1 ] && [ "$row_count004" -eq 1 ]; then
+    pf_pass "TC-004 step 2: promoting one Manual case onto the fresh file gets PTC-0001 and Last allocated: is updated to it"
+  else
+    pf_fail "TC-004 step 2: promotion assigned '$assigned004' (want PTC-0001), Last allocated: now $last_alloc004, row count $row_count004"
+  fi
+fi
+
+assert_numbering_rule_documented "TC-004 step 3"
+
+# ══════════════════════════════════════════════════════════════════════════════
+printf '\n=== TC-005: PTC numbering after a retired row was deleted by hand (counter wins)\n'
+# ══════════════════════════════════════════════════════════════════════════════
+
+tp005="$(pf_ptp_case_file "$PTP_FIX_RETIRED_DELETED")"
+
+if [ ! -f "$tp005" ]; then
+  pf_fail "TC-005: fixture docs/planning/test-plan.md not found ($PTP_FIX_RETIRED_DELETED)"
+else
+  counter005="$(pf_ptp_counter_value "$tp005")"
+  table_max005="$(pf_ptp_max_table_number "$tp005")"
+  next005="$(pf_ptp_next_number "$tp005")"
+
+  if [ "$counter005" -eq 7 ] && [ "$table_max005" -eq 5 ] && [ "$next005" = "PTC-0008" ]; then
+    pf_pass "TC-005 step 1: max(Last allocated: PTC-0007, table max PTC-0005) + 1 = PTC-0008, not PTC-0006"
+  else
+    pf_fail "TC-005 step 1: counter=$counter005 table_max=$table_max005 next=$next005 (want counter=7 table_max=5 next=PTC-0008)"
+  fi
+
+  assigned005="$(pf_ptp_promote_row "$tp005" "pf-close" \
+    "Восстановление после сбоя в середине Phase 4.5" "Critical" \
+    "20990101-feat-fixture-mixed#TC-006" "—" "pending")"
+  n_0006="$(grep -c 'PTC-0006' "$tp005" || true)"
+  n_0007="$(grep -c 'PTC-0007' "$tp005" || true)"
+
+  if [ "$assigned005" = "PTC-0008" ] && [ "$n_0006" -eq 0 ] && [ "$n_0007" -eq 0 ]; then
+    pf_pass "TC-005 step 2: new row got PTC-0008; PTC-0006/PTC-0007 (deleted retired rows) do not reappear"
+  else
+    pf_fail "TC-005 step 2: new row got '$assigned005' (want PTC-0008); PTC-0006 occurrences=$n_0006 PTC-0007 occurrences=$n_0007 (want 0/0)"
+  fi
+fi
+
+assert_numbering_rule_documented "TC-005 step 3"
+
+# ══════════════════════════════════════════════════════════════════════════════
+printf '\n=== TC-006: PTC numbering with a stale counter behind written rows (table wins)\n'
+# ══════════════════════════════════════════════════════════════════════════════
+
+tp006="$(pf_ptp_case_file "$PTP_FIX_STALE_COUNTER")"
+
+if [ ! -f "$tp006" ]; then
+  pf_fail "TC-006: fixture docs/planning/test-plan.md not found ($PTP_FIX_STALE_COUNTER)"
+else
+  counter006="$(pf_ptp_counter_value "$tp006")"
+  table_max006="$(pf_ptp_max_table_number "$tp006")"
+  next006="$(pf_ptp_next_number "$tp006")"
+
+  if [ "$counter006" -eq 3 ] && [ "$table_max006" -eq 5 ] && [ "$next006" = "PTC-0006" ]; then
+    pf_pass "TC-006 step 1: max(Last allocated: PTC-0003, table max PTC-0005) + 1 = PTC-0006, not PTC-0004"
+  else
+    pf_fail "TC-006 step 1: counter=$counter006 table_max=$table_max006 next=$next006 (want counter=3 table_max=5 next=PTC-0006)"
+  fi
+
+  assigned006="$(pf_ptp_promote_row "$tp006" "scripts" \
+    "Идемпотентность повторного запуска Phase 4.5 при одинаковых названиях" "High" \
+    "20990101-feat-fixture-mixed#TC-007" "—" "pending")"
+  last_alloc006="$(pf_ptp_counter_value "$tp006")"
+
+  if [ "$assigned006" = "PTC-0006" ] && [ "$last_alloc006" -eq 6 ]; then
+    pf_pass "TC-006 step 2: new row got PTC-0006 (not a re-issue of an existing row's number) and Last allocated: is updated to it"
+  else
+    pf_fail "TC-006 step 2: new row got '$assigned006' (want PTC-0006), Last allocated: now $last_alloc006 (want 6)"
+  fi
+fi
+
+assert_numbering_rule_documented "TC-006 step 3"
+
 # ─── Insertion point ────────────────────────────────────────────────────────
-# Tasks 3-7 of this issue (TC-004..TC-012, TC-015, TC-017..TC-019) each add
+# Tasks 4-7 of this issue (TC-007..TC-012, TC-015, TC-017..TC-019) each add
 # their own "=== TC-NNN: ... ===" section HERE — ABOVE assert_repo_untouched /
 # pf_summary below, never below them. pf_summary only tallies PASS/FAIL calls
 # made before it runs; appending a new TC section after it would make that
