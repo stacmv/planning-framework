@@ -1029,6 +1029,7 @@ if [ -z "$area_d" ] || [ ! -d "$area_d" ]; then
   pf_fail "TC-010 step 2: skipped — fixture setup failed"
   pf_fail "TC-010 step 3: skipped — fixture setup failed"
   pf_fail "TC-010 step 4: skipped — fixture setup failed"
+  pf_fail "TC-010 step 5: skipped — fixture setup failed"
 else
   git -C "$area_d" branch develop
   git -C "$area_d" checkout -q -b "issue/$AREA_ID" develop
@@ -1096,6 +1097,34 @@ else
     pf_pass "TC-010 step 4: Phase 4.5 documents the HEAD^1 HEAD^2 diff, the docs/issues/ exclusion, segmentation and majority-wins"
   else
     pf_fail "TC-010 step 4: Phase 4.5 не документирует правило вычисления Area (cmd=$has_area_cmd exclude=$has_area_exclude segment=$has_area_segment majority=$has_area_majority general=$has_area_general)"
+  fi
+
+  # ─── step 5 (added by code review pass 2, P2-6) ────────────────────────────
+  # The exclusion list was widened beyond docs/issues/ to also drop the
+  # bookkeeping files sitting directly in docs/planning/. Step 4 above cannot
+  # notice that: its pattern only requires the docs/issues/ clause, so removing
+  # the docs/planning/ half tomorrow would leave every assertion green.
+  #
+  # Both halves are asserted, and they pull in opposite directions on purpose:
+  #   (a) the top-level docs/planning/*.md files ARE excluded — otherwise a merge
+  #       differing only by session-log.md/test-plan.md yields Area: docs;
+  #   (b) subdirectories of docs/planning/ are NOT excluded — docs/planning/
+  #       templates/ holds real product artifacts (this very issue added
+  #       docs/planning/templates/global/test-plan.md there), so an issue whose
+  #       whole change is a template edit must still get a meaningful Area.
+  # Asserting (a) alone would be satisfied by excluding the whole tree, which is
+  # the over-broad version this finding rejected — (b) is what pins it down.
+  has_planning_excl=0
+  has_subdir_kept=0
+  printf '%s\n' "$sec45" | grep -qiE 'docs/planning/\*\.md' &&
+    printf '%s\n' "$sec45" | grep -qiE 'top level only|top-level' && has_planning_excl=1
+  printf '%s\n' "$sec45" | grep -qiE 'not exclude subdirectories|do not exclude subdirector' &&
+    printf '%s\n' "$sec45" | grep -qF 'docs/planning/templates/' && has_subdir_kept=1
+
+  if [ "$has_planning_excl" -eq 1 ] && [ "$has_subdir_kept" -eq 1 ]; then
+    pf_pass "TC-010 step 5: Phase 4.5 excludes the top-level docs/planning/*.md bookkeeping files while explicitly keeping docs/planning/ subdirectories (templates/) in scope"
+  else
+    pf_fail "TC-010 step 5: Phase 4.5 не документирует сужённое исключение docs/planning/ (верхний уровень исключён=$has_planning_excl, подкаталоги сохранены=$has_subdir_kept)"
   fi
 fi
 
