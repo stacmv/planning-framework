@@ -1651,5 +1651,150 @@ else
   pf_fail "TC-020 step 8: Phase 4.5 не называет явно тихий режим отказа (sed-подстановка exit 0, файл не изменён)"
 fi
 
+# ══════════════════════════════════════════════════════════════════════════════
+printf '\n=== TC-021: восстановление Phase 4.5 — частичная запись выбрасывается, а не сохраняется\n'
+# ══════════════════════════════════════════════════════════════════════════════
+# code_review.md pass 2 findings covered here: the documented recovery from a
+# crash inside Phase 4.5 is NOT executable in a common shape (issue branch cut
+# before docs/planning/test-plan.md existed on PARENT-BRANCH) unless the
+# partial write is discarded before switching branches, and even where the
+# naive checkout WOULD succeed, keeping the partial write makes Phase 4's
+# re-run a second real merge commit instead of a no-op, so Area is computed
+# from a bookkeeping-only diff instead of the issue's real file set.
+#
+# Steps 1-5 reproduce both halves for real in one throwaway git repo built
+# under pf_mktemp_d (never $REPO_ROOT — S-5), continuing the SAME repo from
+# the failed naive attempt into the successful discard-first attempt, exactly
+# as the two recipes in the issue's own worked example share one scenario.
+# Steps 6-7 drift-guard the documented rule itself, following TC-020's
+# precedent: each pattern below was grepped and confirmed present in the live
+# SKILL.md before being written here (implementation_plan.md P1-D — a guard on
+# absent text is permanently red, never write one).
+
+tc021_repo="$(pf_mktemp_d)"
+if [ -z "$tc021_repo" ] || [ ! -d "$tc021_repo" ]; then
+  # Checked non-empty before any use — same shape as pf_ptp_area_setup's call
+  # site: an unguarded empty path here would let every git -C command below
+  # silently target the caller's cwd instead of a throwaway temp dir (S-5
+  # KNOWN GAP note in test/lib.sh).
+  pf_fail "TC-021 step 1: pf_mktemp_d did not return a usable temp dir — probe repo skipped"
+  pf_fail "TC-021 step 2: skipped — repo setup failed"
+  pf_fail "TC-021 step 3: skipped — repo setup failed"
+  pf_fail "TC-021 step 4: skipped — repo setup failed"
+  pf_fail "TC-021 step 5: skipped — repo setup failed"
+else
+  git -C "$tc021_repo" init -q -b develop
+  git -C "$tc021_repo" config user.email 'pf-test@example.invalid'
+  git -C "$tc021_repo" config user.name 'PF Test'
+
+  printf '# README\n' >"$tc021_repo/README.md"
+  mkdir -p "$tc021_repo/docs/planning"
+  printf '# Session Log\n' >"$tc021_repo/docs/planning/session-log.md"
+  git -C "$tc021_repo" add -A
+  git -C "$tc021_repo" commit -q -m 'initial commit'
+
+  # Issue branch cut BEFORE docs/planning/test-plan.md exists anywhere in the
+  # repo — the common shape code_review.md's finding turns on.
+  git -C "$tc021_repo" checkout -q -b issue/X
+  mkdir -p "$tc021_repo/skills/pf-close"
+  printf '# probe skill change\n' >"$tc021_repo/skills/pf-close/SKILL.md"
+  git -C "$tc021_repo" add -A
+  git -C "$tc021_repo" commit -q -m 'issue change under skills/pf-close/'
+
+  # test-plan.md introduced only on the parent, after the issue branch forked.
+  git -C "$tc021_repo" checkout -q develop
+  {
+    printf '# Manual Test Plan\n\n'
+    printf 'Last allocated: none\n\n'
+    printf '| PTC | Area | Test case | Prio | Origin | Last run | Status |\n'
+    printf '| --- | --- | --- | --- | --- | --- | --- |\n'
+  } >"$tc021_repo/docs/planning/test-plan.md"
+  git -C "$tc021_repo" add -A
+  git -C "$tc021_repo" commit -q -m 'add test-plan.md (parent only)'
+
+  # Phase 4.
+  git -C "$tc021_repo" merge -q --no-ff issue/X -m 'merge: close X'
+  merge_sha1_021="$(git -C "$tc021_repo" rev-parse HEAD)"
+
+  # Phase 4.5 writes, then "crashes": an uncommitted append to the file the
+  # merge just carried onto develop.
+  printf 'probe promoted row\n' >>"$tc021_repo/docs/planning/test-plan.md"
+
+  # ── Probe 1: the naive recovery step ("just switch back") is not
+  # executable — the branch predates the file, so switching would have to
+  # delete a locally-modified file and git refuses. ──────────────────────
+  out_naive021="$(git -C "$tc021_repo" checkout issue/X 2>&1)"
+  rc_naive021=$?
+  branch_after_naive021="$(git -C "$tc021_repo" branch --show-current)"
+
+  if [ "$rc_naive021" -ne 0 ]; then
+    pf_pass "TC-021 step 1: наивное восстановление (git checkout issue/X сразу после сбоя, без выбрасывания частичной записи) завершается ненулевым кодом ($rc_naive021) — issue-ветка создана до появления docs/planning/test-plan.md на родителе, переключение удалило бы локально изменённый файл"
+  else
+    pf_fail "TC-021 step 1: наивный git checkout issue/X неожиданно завершился успешно (exit 0) при незакоммиченной частичной записи (output: $out_naive021)"
+  fi
+
+  if [ "$branch_after_naive021" = "develop" ]; then
+    pf_pass "TC-021 step 2: после сбойного checkout текущая ветка осталась develop — переключения не произошло"
+  else
+    pf_fail "TC-021 step 2: текущая ветка после сбойного checkout — '$branch_after_naive021' (ожидалось develop)"
+  fi
+
+  # ── Probe 2: same scenario, discard first — the whole recovery works,
+  # including Area on the re-merge. ───────────────────────────────────────
+  git -C "$tc021_repo" checkout -q -- docs/planning/test-plan.md
+  out_switch021="$(git -C "$tc021_repo" checkout issue/X 2>&1)"
+  rc_switch021=$?
+
+  if [ "$rc_switch021" -eq 0 ]; then
+    pf_pass "TC-021 step 3: после git checkout -- docs/planning/test-plan.md (выбрасывание частичной записи) git checkout issue/X завершается успешно (exit 0)"
+  else
+    pf_fail "TC-021 step 3: git checkout issue/X после выбрасывания частичной записи всё равно завершился с кодом $rc_switch021 (output: $out_switch021)"
+  fi
+
+  git -C "$tc021_repo" checkout -q develop
+  git -C "$tc021_repo" merge -q --no-ff issue/X -m 'merge: close X'
+  rc_remerge021=$?
+  merge_sha2_021="$(git -C "$tc021_repo" rev-parse HEAD)"
+
+  if [ "$rc_remerge021" -eq 0 ] && [ -n "$merge_sha1_021" ] && [ "$merge_sha2_021" = "$merge_sha1_021" ]; then
+    pf_pass "TC-021 step 4: повторный git merge --no-ff после выбрасывания частичной записи — настоящий no-op: HEAD побайтово совпадает с первым merge-коммитом ($merge_sha1_021)"
+  else
+    pf_fail "TC-021 step 4: повторный merge не no-op (exit $rc_remerge021) — HEAD было $merge_sha1_021, стало $merge_sha2_021"
+  fi
+
+  diff021="$(git -C "$tc021_repo" diff --name-only 'HEAD^1' 'HEAD^2')"
+  has_skills_path021=0
+  printf '%s\n' "$diff021" | grep -qF 'skills/pf-close/' && has_skills_path021=1
+  if [ "$has_skills_path021" -eq 1 ]; then
+    pf_pass "TC-021 step 5: git diff --name-only HEAD^1 HEAD^2 после восстановления по-прежнему содержит путь issue-ветки skills/pf-close/SKILL.md, а не только docs/planning/test-plan.md — Area вычислится из реального диффа issue, не из бухгалтерии"
+  else
+    pf_fail "TC-021 step 5: git diff --name-only HEAD^1 HEAD^2 не содержит skills/pf-close/SKILL.md — Area посчитался бы по бухгалтерии, а не по реальному диффу issue (diff: $diff021)"
+  fi
+fi
+
+# TC-021 steps 6-7 — drift-guards on the recovery rule itself (code_review.md
+# pass 2). Each pattern was grepped against the live SKILL.md and confirmed
+# present before being written here.
+line_discard021="$(grep -nF 'Throw the partial write away' "$PF_CLOSE_SKILL" | head -1 | cut -d: -f1)"
+# shellcheck disable=SC2016  # backtick+period is markdown in a grep pattern, not command substitution
+line_switch021="$(grep -nF '`git checkout issue/ISSUE-ID`.' "$PF_CLOSE_SKILL" | head -1 | cut -d: -f1)"
+
+if [ -n "$line_discard021" ] && [ -n "$line_switch021" ] && [ "$line_discard021" -lt "$line_switch021" ]; then
+  pf_pass "TC-021 step 6: 'Throw the partial write away' (line $line_discard021) идёт раньше 'git checkout issue/ISSUE-ID' (line $line_switch021) — выбрасывание частичной записи предписано ДО переключения веток"
+else
+  pf_fail "TC-021 step 6: порядок инструкций восстановления нарушен или текст не найден — discard=${line_discard021:-<missing>} switch=${line_switch021:-<missing>} (нужно discard < switch)"
+fi
+
+sec45_021="$(pf_ptp_phase45_section)"
+has_abort_consequence021=0
+has_area_consequence021=0
+printf '%s\n' "$sec45_021" | grep -qiE 'Step 2 aborts outright' && has_abort_consequence021=1
+printf '%s\n' "$sec45_021" | grep -qiE 'second.{0,10}merge commit' && has_area_consequence021=1
+if [ "$has_abort_consequence021" -eq 1 ] && [ "$has_area_consequence021" -eq 1 ]; then
+  pf_pass "TC-021 step 7: Phase 4.5 явно называет оба следствия сохранения частичной записи — отказ checkout (Step 2 aborts outright) и неверный Area из-за второго merge-коммита"
+else
+  pf_fail "TC-021 step 7: Phase 4.5 не называет оба следствия сохранения частичной записи (abort found: $has_abort_consequence021, second-merge/Area found: $has_area_consequence021)"
+fi
+
 assert_repo_untouched
 pf_summary
