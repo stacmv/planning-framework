@@ -571,5 +571,226 @@ assert_numbering_rule_documented "TC-006 step 3"
 # made before it runs; appending a new TC section after it would make that
 # section's results invisible to the suite's exit code.
 
+# ─── pf_validate_test_plan_file: shared row-shape validator (Task 4) ───────
+# Defined here, ABOVE its first call (TC-007 below), on purpose: Task 5's
+# TC-009 and Task 7's TC-018/TC-019 call this same function later in this
+# file, and this suite executes top to bottom in one interpreter pass — the
+# definition must physically precede every call site (implementation_plan.md
+# Task 4 note on task ordering). Nothing here is a stub; this is the one real
+# implementation all four call sites share.
+
+# _pf_ptp_trim <string> — strip leading/trailing whitespace from one table
+# cell after it has been split out of a row.
+_pf_ptp_trim() {
+  local s="$1"
+  s="${s#"${s%%[![:space:]]*}"}"
+  s="${s%"${s##*[![:space:]]}"}"
+  printf '%s' "$s"
+}
+
+# pf_validate_test_plan_file <path to a docs/planning/test-plan.md-shaped file>
+#
+# Read-only structural validator for the global list's format (specs.md "Data
+# model", "Устойчивость к ручной правке"). Contract:
+#   - Never writes to <path> — TC-019 (Task 7) diffs the file before/after a
+#     run to prove this.
+#   - Prints one diagnostic line per violation to stdout, each naming the
+#     concrete rule broken (a duplicate PTC number and its value, the bad
+#     field and the value it held, or the missing counter line) — never a
+#     generic "invalid file".
+#   - Returns 0 iff zero violations were found (a well-formed file with zero
+#     data rows, e.g. the fresh template, is valid). Returns 1 otherwise,
+#     including when <path> itself does not exist.
+# Checks performed, in specs.md order: (1) a "Last allocated:" counter line
+# exists above the table; (2) every data row splits into exactly 7 fields
+# (PTC | Area | Test case | Prio | Origin | Last run | Status) once `\|`
+# escape sequences are masked out of the split — an escaped pipe inside Area/
+# Test case/Origin must never be mistaken for a column boundary; (3) `PTC` is
+# exactly `PTC-NNNN` (4 digits); (4) no two rows share the same `PTC` (BR-2's
+# uniqueness is DETECTED post-hoc here, deliberately not prevented at write
+# time — specs.md: two branches promoting in parallel both write the same
+# next number and git merges that silently, so the first `make test` after
+# the merge is where this is meant to be caught); (5) `Prio` is one of the
+# closed dictionary {Critical, High, Med, Low}; (6) `Status` is one of the
+# closed dictionary {pending, ✓, ✗, retired}.
+pf_validate_test_plan_file() {
+  local file="$1"
+  local ok=0
+  local seen_ptcs=$'\002'
+
+  if [ ! -f "$file" ]; then
+    printf 'file not found: %s\n' "$file"
+    return 1
+  fi
+
+  if ! grep -q '^Last allocated:' "$file"; then
+    printf 'missing "Last allocated:" counter line above the table\n'
+    ok=1
+  fi
+
+  local header_done=0 sep_done=0 rawline masked needle n_fields
+  local ptc prio status
+  local -a cells
+  while IFS= read -r rawline; do
+    if [ "$header_done" -eq 0 ]; then
+      if [[ "$rawline" =~ ^\|[[:space:]]*PTC[[:space:]]*\| ]]; then
+        header_done=1
+      fi
+      continue
+    fi
+    if [ "$sep_done" -eq 0 ]; then
+      if [[ "$rawline" =~ ^\|[[:space:]]*-{2,} ]]; then
+        sep_done=1
+      fi
+      continue
+    fi
+    [[ "$rawline" =~ ^\| ]] || continue
+
+    # Mask \| before splitting on | — an escaped pipe inside a cell (specs.md:
+    # "|" in Area/Test case/Origin is written as "\|") is not a column
+    # boundary. Unmasking isn't needed below: only PTC/Prio/Status are
+    # inspected, and none of those three ever legitimately contains a pipe.
+    masked="${rawline//\\|/$'\001'}"
+    IFS='|' read -ra cells <<<"$masked"
+    n_fields=$(( ${#cells[@]} - 1 )) # cells[0] is the empty slot before the leading "|"
+    if [ "$n_fields" -ne 7 ]; then
+      printf 'row has %d field(s), expected 7 (PTC | Area | Test case | Prio | Origin | Last run | Status): %s\n' \
+        "$n_fields" "$rawline"
+      ok=1
+      continue
+    fi
+
+    ptc="$(_pf_ptp_trim "${cells[1]}")"
+    prio="$(_pf_ptp_trim "${cells[4]}")"
+    status="$(_pf_ptp_trim "${cells[7]}")"
+
+    if [[ ! "$ptc" =~ ^PTC-[0-9]{4}$ ]]; then
+      printf "PTC field '%s' does not match PTC-NNNN (exactly 4 digits): %s\n" "$ptc" "$rawline"
+      ok=1
+    fi
+
+    needle=$'\002'"$ptc"$'\002'
+    case "$seen_ptcs" in
+      *"$needle"*)
+        printf 'duplicate PTC %s found (row: %s)\n' "$ptc" "$rawline"
+        ok=1
+        ;;
+      *) seen_ptcs="${seen_ptcs}${ptc}"$'\002' ;;
+    esac
+
+    case "$prio" in
+      Critical | High | Med | Low) : ;;
+      *)
+        printf "Prio value '%s' outside the closed dictionary (Critical|High|Med|Low): %s\n" "$prio" "$rawline"
+        ok=1
+        ;;
+    esac
+
+    case "$status" in
+      pending | "✓" | "✗" | retired) : ;;
+      *)
+        printf "Status value '%s' outside the closed dictionary (pending|✓|✗|retired): %s\n" "$status" "$rawline"
+        ok=1
+        ;;
+    esac
+  done <"$file"
+
+  return "$ok"
+}
+
+PTP_SUITE_SELF="$REPO_ROOT/test/pf-product-test-plan.sh"
+
+# ══════════════════════════════════════════════════════════════════════════════
+printf '\n=== TC-007: a duplicate PTC across two rows is detected, not prevented\n'
+# ══════════════════════════════════════════════════════════════════════════════
+
+if [ ! -f "$PTP_SUITE_SELF" ]; then
+  pf_fail "TC-007 step 1: test/pf-product-test-plan.sh ещё не создан (задача реализации)"
+else
+  pf_pass "TC-007 step 1: test/pf-product-test-plan.sh существует"
+
+  tp007="$(pf_ptp_case_file "global-duplicate-ptc")"
+  if [ ! -f "$tp007" ]; then
+    pf_fail "TC-007: fixture docs/planning/test-plan.md not found (global-duplicate-ptc)"
+  else
+    out007="$(pf_validate_test_plan_file "$tp007" 2>&1)"
+    rc007=$?
+
+    if [ "$rc007" -ne 0 ]; then
+      pf_pass "TC-007 step 2: validator exits non-zero on a table containing two PTC-0012 rows"
+    else
+      pf_fail "TC-007 step 2: детектор дублей PTC не реализован — validator exited 0 on a duplicate PTC-0012"
+    fi
+
+    if printf '%s\n' "$out007" | grep -qF 'PTC-0012'; then
+      pf_pass "TC-007 step 3: validator output names the duplicated number PTC-0012"
+    else
+      pf_fail "TC-007 step 3: детектор дублей PTC не реализован — output does not name PTC-0012 (got: $out007)"
+    fi
+  fi
+fi
+
+# ══════════════════════════════════════════════════════════════════════════════
+printf '\n=== TC-008: row shape and the closed Prio/Status dictionaries\n'
+# ══════════════════════════════════════════════════════════════════════════════
+
+if [ ! -f "$PTP_SUITE_SELF" ]; then
+  pf_fail "TC-008 step 1: test/pf-product-test-plan.sh ещё не создан (задача реализации)"
+else
+  pf_pass "TC-008 step 1: test/pf-product-test-plan.sh существует"
+
+  tp008_prio="$(pf_ptp_case_file "global-malformed-rows/prio-bad")"
+  if [ ! -f "$tp008_prio" ]; then
+    pf_fail "TC-008 step 2: fixture not found (global-malformed-rows/prio-bad)"
+  else
+    out="$(pf_validate_test_plan_file "$tp008_prio" 2>&1)"
+    rc=$?
+    if [ "$rc" -ne 0 ] && printf '%s\n' "$out" | grep -qF 'Prio'; then
+      pf_pass "TC-008 step 2: validator rejects 'Prio: Medium' (outside Critical/High/Med/Low), naming the Prio field ($out)"
+    else
+      pf_fail "TC-008 step 2: валидация Prio не реализована (rc=$rc, output: $out)"
+    fi
+  fi
+
+  tp008_status="$(pf_ptp_case_file "global-malformed-rows/status-bad")"
+  if [ ! -f "$tp008_status" ]; then
+    pf_fail "TC-008 step 3: fixture not found (global-malformed-rows/status-bad)"
+  else
+    out="$(pf_validate_test_plan_file "$tp008_status" 2>&1)"
+    rc=$?
+    if [ "$rc" -ne 0 ] && printf '%s\n' "$out" | grep -qF 'Status'; then
+      pf_pass "TC-008 step 3: validator rejects 'Status: Passed' (a made-up value), naming the Status field ($out)"
+    else
+      pf_fail "TC-008 step 3: валидация Status не реализована (rc=$rc, output: $out)"
+    fi
+  fi
+
+  tp008_ptc="$(pf_ptp_case_file "global-malformed-rows/ptc-bad")"
+  if [ ! -f "$tp008_ptc" ]; then
+    pf_fail "TC-008 step 4: fixture not found (global-malformed-rows/ptc-bad)"
+  else
+    out="$(pf_validate_test_plan_file "$tp008_ptc" 2>&1)"
+    rc=$?
+    if [ "$rc" -ne 0 ] && printf '%s\n' "$out" | grep -qF 'PTC-12'; then
+      pf_pass "TC-008 step 4: validator rejects the malformed number PTC-12 (not 4 digits), naming the bad form ($out)"
+    else
+      pf_fail "TC-008 step 4: валидация формы PTC не реализована (rc=$rc, output: $out)"
+    fi
+  fi
+
+  tp008_nocounter="$(pf_ptp_case_file "global-malformed-rows/no-counter")"
+  if [ ! -f "$tp008_nocounter" ]; then
+    pf_fail "TC-008 step 5: fixture not found (global-malformed-rows/no-counter)"
+  else
+    out="$(pf_validate_test_plan_file "$tp008_nocounter" 2>&1)"
+    rc=$?
+    if [ "$rc" -ne 0 ] && printf '%s\n' "$out" | grep -qF 'Last allocated'; then
+      pf_pass "TC-008 step 5: validator rejects a table with no 'Last allocated:' line above it, naming the missing counter ($out)"
+    else
+      pf_fail "TC-008 step 5: проверка наличия Last allocated: не реализована (rc=$rc, output: $out)"
+    fi
+  fi
+fi
+
 assert_repo_untouched
 pf_summary
