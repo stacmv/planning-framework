@@ -1510,5 +1510,146 @@ else
   fi
 fi
 
+# ══════════════════════════════════════════════════════════════════════════════
+printf '\n=== TC-020: правки по code review — порядок создания файла, stop-and-surface, восстановление счётчика\n'
+# ══════════════════════════════════════════════════════════════════════════════
+# code_review.md findings covered here:
+#   P0 (finding 1) — Phase 4.5 step 1 now creates docs/planning/test-plan.md
+#     BEFORE step 2's "no Manual rows -> proceed to Phase 5" early exit, not
+#     after it (the pre-fix order broke Phase 8's git add on Auto-only issues).
+#   P1 (finding 3) — step 2's three "stop and surface, never drop silently"
+#     guards (Type neither Manual nor Auto; no Status Tracker table at all;
+#     empty Test Case cell) and step 4's "Last allocated: line missing ->
+#     recreate it" rule plus its called-out silent-failure mode.
+#
+# Boundary, stated once for steps 1-2 together: Phase 4.5 is prose an LLM agent
+# executes, not code this file can run. Step 1 below asserts the SKILL.md TEXT
+# is ordered correctly (line numbers only — reading the phase, not running it).
+# Step 2 below runs a REAL `git add` in a throwaway repo to prove what actually
+# happens when that ordering is violated — the P0 hazard itself, fully
+# executable because it is plain git behaviour, not phase prose. Neither step
+# claims to execute Phase 4.5; step 1 checks the recipe's order, step 2 checks
+# the consequence of getting that order wrong.
+
+if [ ! -f "$PF_CLOSE_SKILL" ]; then
+  pf_fail "TC-020 step 1: skills/pf-close/SKILL.md does not exist"
+else
+  # Both sentences existed before the fix too (the early-exit line and the
+  # file-creation instruction were both already in the text) — the defect was
+  # purely their ORDER, so a plain "grep and confirm both exist" would have
+  # passed on the broken revision as well. Only a line-number comparison
+  # catches it.
+  # shellcheck disable=SC2016  # backticks are markdown in a grep pattern, not command substitution
+  line_ensure020="$(grep -n -F 'Ensure `docs/planning/test-plan.md` exists' "$PF_CLOSE_SKILL" | head -1 | cut -d: -f1)"
+  line_earlyexit020="$(grep -n -F 'this phase has nothing more to do; proceed to Phase 5' "$PF_CLOSE_SKILL" | head -1 | cut -d: -f1)"
+
+  if [ -n "$line_ensure020" ] && [ -n "$line_earlyexit020" ] && [ "$line_ensure020" -lt "$line_earlyexit020" ]; then
+    pf_pass "TC-020 step 1: 'Ensure docs/planning/test-plan.md exists' (line $line_ensure020) идёт раньше выхода 'no Manual rows -> proceed to Phase 5' (line $line_earlyexit020) — файл создаётся до раннего выхода из фазы"
+  else
+    pf_fail "TC-020 step 1: порядок нарушен или текст не найден — ensure=${line_ensure020:-<missing>} earlyexit=${line_earlyexit020:-<missing>} (нужно ensure < earlyexit)"
+  fi
+fi
+
+# TC-020 step 2 — the hazard itself, reproduced for real: Phase 8's git add
+# with docs/planning/test-plan.md absent, exactly as measured in
+# code_review.md's P0 finding. A throwaway git repo under pf_mktemp_d, never
+# $REPO_ROOT (S-5).
+tc020_repo="$(pf_mktemp_d)"
+if [ -z "$tc020_repo" ] || [ ! -d "$tc020_repo" ]; then
+  # Checked non-empty before any use — same shape as pf_ptp_area_setup's call
+  # site: an unguarded empty path here would let `git -C`/`mkdir` below
+  # silently target the caller's cwd instead of a throwaway temp dir (S-5
+  # KNOWN GAP note in test/lib.sh).
+  pf_fail "TC-020 step 2: pf_mktemp_d did not return a usable temp dir — probe repo skipped"
+else
+  git -C "$tc020_repo" init -q
+  mkdir -p "$tc020_repo/docs/issues/closed/some-past-issue" "$tc020_repo/docs/planning"
+  printf '# probe archived issue file\n' >"$tc020_repo/docs/issues/closed/some-past-issue/probe.md"
+  printf '# Session Log\n' >"$tc020_repo/docs/planning/session-log.md"
+  # docs/planning/test-plan.md is deliberately ABSENT — the pre-fix state for
+  # an Auto-only issue, where step 1 never ran because it used to sit after
+  # the early exit.
+
+  git -C "$tc020_repo" \
+    -c user.name='PF Test' -c user.email='pf-test@example.invalid' \
+    add docs/issues/ docs/planning/session-log.md docs/planning/test-plan.md 2>/dev/null
+  rc_add020=$?
+  staged020="$(git -C "$tc020_repo" diff --cached --name-only)"
+  n_staged020="$(printf '%s\n' "$staged020" | grep -c . || true)"
+
+  if [ "$rc_add020" -ne 0 ]; then
+    pf_pass "TC-020 step 2a: git add docs/issues/ docs/planning/session-log.md docs/planning/test-plan.md с отсутствующим test-plan.md завершается ненулевым кодом ($rc_add020)"
+  else
+    pf_fail "TC-020 step 2a: git add неожиданно завершился успешно (exit 0) с несуществующим test-plan.md в pathspec"
+  fi
+
+  if [ "$n_staged020" -eq 0 ]; then
+    pf_pass "TC-020 step 2b: индекс остаётся пустым — ни docs/issues/, ни session-log.md не застейджены, хотя оба существуют и валидны"
+  else
+    pf_fail "TC-020 step 2b: индекс не пуст ($n_staged020 файл(ов)) — одна несуществующая pathspec не должна позволять частичный git add: $staged020"
+  fi
+fi
+
+# TC-020 steps 3-6 — the stop-and-surface drift-guards (code_review.md P1,
+# finding 3). Each guard's text was grepped for and confirmed present in the
+# live SKILL.md before being written here — a guard on absent text would be
+# permanently red, the anti-pattern implementation_plan.md's own P1-D
+# condemns.
+sec45_020="$(pf_ptp_phase45_section)"
+
+has_stop_instruction020=0
+printf '%s\n' "$sec45_020" | grep -qF 'stop and report the problem to the user instead of proceeding to Phase 5' && has_stop_instruction020=1
+if [ "$has_stop_instruction020" -eq 1 ]; then
+  pf_pass "TC-020 step 3: Phase 4.5 требует останавливаться и сообщать пользователю о нераспознанном входе, а не молча пропускать Phase 5"
+else
+  pf_fail "TC-020 step 3: Phase 4.5 не документирует правило stop-and-surface"
+fi
+
+has_guard_bad_type020=0
+printf '%s\n' "$sec45_020" | grep -qiE 'Type.{0,10}is neither.{0,10}Manual.{0,10}nor.{0,10}Auto' && has_guard_bad_type020=1
+if [ "$has_guard_bad_type020" -eq 1 ]; then
+  pf_pass "TC-020 step 4: Phase 4.5 документирует останов на Type, который не Manual и не Auto (опечатка регистра, decorated-значение)"
+else
+  pf_fail "TC-020 step 4: Phase 4.5 не документирует останов при Type, не равном ни Manual, ни Auto"
+fi
+
+has_guard_no_table020=0
+printf '%s\n' "$sec45_020" | grep -qF 'no Status Tracker table found at all' && has_guard_no_table020=1
+if [ "$has_guard_no_table020" -eq 1 ]; then
+  pf_pass "TC-020 step 5: Phase 4.5 отдельно документирует случай 'таблица Status Tracker не найдена вовсе' — отличный от легитимного 'нет строк Manual'"
+else
+  pf_fail "TC-020 step 5: Phase 4.5 не документирует останов при полном отсутствии таблицы Status Tracker (как случай, отдельный от 'нет Manual-строк')"
+fi
+
+has_guard_empty_title020=0
+# shellcheck disable=SC2016  # backticks are markdown in a grep pattern, not command substitution
+printf '%s\n' "$sec45_020" | grep -qF 'row whose `Test Case` cell is empty' && has_guard_empty_title020=1
+if [ "$has_guard_empty_title020" -eq 1 ]; then
+  pf_pass "TC-020 step 6: Phase 4.5 документирует останов на выбранной Manual-строке с пустой ячейкой Test Case"
+else
+  pf_fail "TC-020 step 6: Phase 4.5 не документирует останов при пустой ячейке Test Case у выбранной Manual-строки"
+fi
+
+# TC-020 steps 7-8 — the "Last allocated:" recreation rule (code_review.md P1,
+# finding 3, 4th bullet) and its called-out silent-failure mode.
+has_recreate_counter020=0
+printf '%s\n' "$sec45_020" | grep -qiE 'Last allocated.{0,10}line is missing entirely, recreate it' && has_recreate_counter020=1
+if [ "$has_recreate_counter020" -eq 1 ]; then
+  pf_pass "TC-020 step 7: Phase 4.5 документирует восстановление отсутствующей строки Last allocated: (а не останов и не тихий пропуск)"
+else
+  pf_fail "TC-020 step 7: Phase 4.5 не документирует восстановление строки Last allocated: при её отсутствии"
+fi
+
+has_silent_failure_note020=0
+if printf '%s\n' "$sec45_020" | grep -qiE 'sed.{0,10}style in-place substitution' &&
+  printf '%s\n' "$sec45_020" | grep -qiE 'exits? 0 and changes nothing'; then
+  has_silent_failure_note020=1
+fi
+if [ "$has_silent_failure_note020" -eq 1 ]; then
+  pf_pass "TC-020 step 8: Phase 4.5 явно называет тихий отказ (sed-подстановка без совпадения завершается кодом 0 и ничего не меняет) как режим, которого нужно избегать"
+else
+  pf_fail "TC-020 step 8: Phase 4.5 не называет явно тихий режим отказа (sed-подстановка exit 0, файл не изменён)"
+fi
+
 assert_repo_untouched
 pf_summary
