@@ -1256,5 +1256,104 @@ else
   fi
 fi
 
+# ─── Helpers: converge behavior for docs/planning/test-plan.md (TC-011,
+# TC-012) ────────────────────────────────────────────────────────────────────
+
+GLOBAL_TEST_PLAN_TEMPLATE="$REPO_ROOT/docs/planning/templates/global/test-plan.md"
+
+# ══════════════════════════════════════════════════════════════════════════════
+printf '\n=== TC-011: converge создаёт docs/planning/test-plan.md из шаблона, если файла нет\n'
+# ══════════════════════════════════════════════════════════════════════════════
+
+if [ ! -f "$GLOBAL_TEST_PLAN_TEMPLATE" ]; then
+  pf_fail "TC-011 step 1: шаблон global/test-plan.md ещё не создан (задача реализации)"
+else
+  pf_pass "TC-011 step 1: docs/planning/templates/global/test-plan.md существует"
+
+  pf_setup_case v3-incomplete >/dev/null
+  rc011=0
+  # shellcheck disable=SC2119  # pf_run_converge's args are optional; a deliberate zero-arg call (uses its default --target $TMP_WORK), same pattern as test/converge-migrate.sh
+  pf_run_converge >/dev/null 2>&1 || rc011=$?
+  target011="$TMP_WORK/docs/planning/test-plan.md"
+
+  if [ "$rc011" -eq 0 ] && [ -f "$target011" ] && cmp -s "$GLOBAL_TEST_PLAN_TEMPLATE" "$target011"; then
+    pf_pass "TC-011 step 2: pf_run_converge создаёт docs/planning/test-plan.md, побайтово совпадающий с шаблоном (exit $rc011)"
+  elif [ ! -f "$target011" ]; then
+    pf_fail "TC-011 step 2: t5_global_docs() не создаёт test-plan.md (файл отсутствует после pf_run_converge, exit $rc011)"
+  else
+    pf_fail "TC-011 step 2: t5_global_docs() не создаёт test-plan.md (файл создан, но отличается от шаблона побайтово, exit $rc011)"
+    diff "$GLOBAL_TEST_PLAN_TEMPLATE" "$target011" >&2 || true
+  fi
+fi
+
+# Precedent: test/safety-audit.sh assembles the convergence script's file name
+# from adjacent string literals ("converge""-to-v3") so the auditor itself
+# never becomes the extra file under test/ that names the script (rule S-1,
+# test/lib.sh header). TC-012 step 1 needs to READ that script's source (to
+# inspect t5_global_docs()'s file list) — the SAME trick is required here:
+# spelling the name/path out as one literal would make this file the second
+# place under test/ naming the script, and test/safety-audit.sh (TC-032, step
+# 1) would go red. Do not "clean this up" into a plain literal.
+PTP_CONVERGE_SCRIPT_NAME="converge""-to-v3"
+PTP_CONVERGE_SCRIPT_PATH="$REPO_ROOT/scripts/${PTP_CONVERGE_SCRIPT_NAME}.sh"
+
+# pf_ptp_t5_global_docs_body — the literal source of t5_global_docs() in the
+# convergence script, from its opening line to its closing brace. A line-range
+# extraction, not a whole-file grep: a mention of test-plan.md elsewhere in the
+# script must not be able to satisfy TC-012 step 1 (implementation_plan.md
+# Task 6).
+pf_ptp_t5_global_docs_body() {
+  awk '/^t5_global_docs\(\) \{/,/^}/' "$PTP_CONVERGE_SCRIPT_PATH"
+}
+
+VTP_EXISTING="$REPO_ROOT/test/fixtures/pf-product-test-plan/v3-with-existing-test-plan/docs/planning/test-plan.md"
+
+# ══════════════════════════════════════════════════════════════════════════════
+printf '\n=== TC-012: converge никогда не перезаписывает существующий docs/planning/test-plan.md\n'
+# ══════════════════════════════════════════════════════════════════════════════
+
+t5_body012="$(pf_ptp_t5_global_docs_body)"
+if ! printf '%s\n' "$t5_body012" | grep -qF 'test-plan.md'; then
+  pf_fail "TC-012 step 1: t5_global_docs() ещё не знает про test-plan.md"
+else
+  pf_pass "TC-012 step 1: t5_global_docs() перечисляет test-plan.md в переносимом списке файлов"
+
+  if [ ! -f "$VTP_EXISTING" ]; then
+    pf_fail "TC-012: fixture docs/planning/test-plan.md not found (v3-with-existing-test-plan)"
+  else
+    pf_setup_case v3-incomplete >/dev/null
+    mkdir -p "$TMP_WORK/docs/planning"
+    cp "$VTP_EXISTING" "$TMP_WORK/docs/planning/test-plan.md"
+
+    snapshot_dir012="$(pf_mktemp_d)" || exit 1
+    # Checked non-empty (and a real dir) before any use, same shape as
+    # pf_ptp_area_setup's call site: an unguarded empty path here would let a
+    # later `cp` write to bare "/before.md" instead of a throwaway temp dir —
+    # the exact leak class this suite must never reproduce (S-4/S-5).
+    if [ -z "$snapshot_dir012" ] || [ ! -d "$snapshot_dir012" ]; then
+      pf_fail "TC-012: pf_mktemp_d did not return a usable temp dir for the before/after snapshot"
+    else
+      cp "$TMP_WORK/docs/planning/test-plan.md" "$snapshot_dir012/before.md"
+
+      rc012=0
+      # shellcheck disable=SC2119  # pf_run_converge's args are optional; a deliberate zero-arg call (uses its default --target $TMP_WORK), same pattern as test/converge-migrate.sh
+      pf_run_converge >/dev/null 2>&1 || rc012=$?
+
+      if [ "$rc012" -eq 0 ]; then
+        pf_pass "TC-012 step 2: pf_run_converge завершается успешно на фикстуре с нешаблонным test-plan.md (exit $rc012)"
+      else
+        pf_fail "TC-012 step 2: pf_run_converge завершился с ошибкой на фикстуре с нешаблонным test-plan.md (exit $rc012)"
+      fi
+
+      if cmp -s "$snapshot_dir012/before.md" "$TMP_WORK/docs/planning/test-plan.md"; then
+        pf_pass "TC-012 step 3: docs/planning/test-plan.md побайтово не изменился после pf_run_converge"
+      else
+        pf_fail "TC-012 step 3: t5_global_docs() перезаписывает пользовательский test-plan.md"
+        diff "$snapshot_dir012/before.md" "$TMP_WORK/docs/planning/test-plan.md" >&2 || true
+      fi
+    fi
+  fi
+fi
+
 assert_repo_untouched
 pf_summary
