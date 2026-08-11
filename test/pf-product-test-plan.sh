@@ -1355,5 +1355,130 @@ else
   fi
 fi
 
+# ─── Helpers: TC-018/TC-019 (Task 7) — both reuse pf_validate_test_plan_file
+# (Task 4) and pf_ptp_promote_row (Task 3); no new helpers of their own. ──────
+
+GLOBAL_MANUAL_EDIT_FIX="global-manual-edit"
+
+# ══════════════════════════════════════════════════════════════════════════════
+printf '\n=== TC-018: a hand edit to Status survives a later promotion (AC-3.1)\n'
+# ══════════════════════════════════════════════════════════════════════════════
+
+if ! declare -F pf_validate_test_plan_file >/dev/null 2>&1; then
+  pf_fail "TC-018 step 1: pf_validate_test_plan_file ещё не реализована (Task 4 не выполнена)"
+else
+  pf_pass "TC-018 step 1: pf_validate_test_plan_file реализована"
+
+  tp018="$(pf_ptp_case_file "$GLOBAL_MANUAL_EDIT_FIX")"
+  if [ -z "$tp018" ] || [ ! -f "$tp018" ]; then
+    pf_fail "TC-018: fixture docs/planning/test-plan.md not found ($GLOBAL_MANUAL_EDIT_FIX)"
+  else
+    # Step 2: emulate a human hand-editing the row: Status pending -> ✓, and
+    # filling in Last run. A literal substring replace (bash's single-slash
+    # ${var/search/replace}, not sed) so no regex metacharacter in the row text
+    # (there is none here, but the intent is to never rely on that) can bite.
+    row018_pending="| PTC-0001 | explorer-ui | Тема сохраняется между перезагрузками страницы | High | 20260729-improve-manual-test-data#TC-020 | — | pending |"
+    row018_edited="| PTC-0001 | explorer-ui | Тема сохраняется между перезагрузками страницы | High | 20260729-improve-manual-test-data#TC-020 | 2026-08-11 | ✓ |"
+
+    content018="$(cat "$tp018")"
+    if [[ "$content018" != *"$row018_pending"* ]]; then
+      pf_fail "TC-018: global-manual-edit fixture's data row does not match the expected literal text (fixture drifted)"
+    else
+      content018="${content018/$row018_pending/$row018_edited}"
+      printf '%s\n' "$content018" >"$tp018"
+
+      handedited_row018_before="$(grep -E '^\| *PTC-0001 *\|' "$tp018" | head -1)"
+      n_pipes018="$(printf '%s' "$handedited_row018_before" | grep -o -F '|' | grep -c . || true)"
+
+      if [ "$handedited_row018_before" = "$row018_edited" ] && [ "$n_pipes018" -eq 8 ]; then
+        pf_pass "TC-018 step 2: hand edit applied — Status: pending -> ✓, Last run filled in, row still an 8-pipe/7-field markdown table row"
+      else
+        pf_fail "TC-018 step 2: hand edit did not land as expected (row: '$handedited_row018_before', pipe count: $n_pipes018, want 8)"
+      fi
+
+      out018="$(pf_validate_test_plan_file "$tp018" 2>&1)"
+      rc018=$?
+      if [ "$rc018" -eq 0 ]; then
+        pf_pass "TC-018 step 3: pf_validate_test_plan_file accepts the hand-edited ✓ status"
+      else
+        pf_fail "TC-018 step 3: pf_validate_test_plan_file rejected the hand-edited row: $out018"
+      fi
+
+      # Step 4: promote one new Manual case (same pf_ptp_promote_row helper
+      # TC-004..006/009 use) onto the same file, and prove the hand-edited row
+      # is untouched — not just "still parses", but byte-identical to what the
+      # human left after step 2.
+      pf_ptp_promote_row "$tp018" "explorer-ui" \
+        "Ещё один новый Manual-кейс поверх ручной правки" "High" \
+        "20990101-feat-fixture-manualedit#TC-002" "—" "pending" >/dev/null
+
+      handedited_row018_after="$(grep -E '^\| *PTC-0001 *\|' "$tp018" | head -1)"
+
+      if [ "$handedited_row018_after" = "$handedited_row018_before" ]; then
+        pf_pass "TC-018 step 4: hand-edited row (PTC-0001) is byte-identical after promoting a new Manual case"
+      else
+        pf_fail "TC-018 step 4: promotion altered the hand-edited row — before: '$handedited_row018_before' after: '$handedited_row018_after'"
+      fi
+    fi
+  fi
+fi
+
+# ─── Helper: TC-019 fixture name ────────────────────────────────────────────
+
+GLOBAL_RETIRED_FIX="global-retired-row"
+
+# ══════════════════════════════════════════════════════════════════════════════
+printf '\n=== TC-019: a retired row is neither deleted nor its number reused (AC-3.3)\n'
+# ══════════════════════════════════════════════════════════════════════════════
+
+if ! declare -F pf_validate_test_plan_file >/dev/null 2>&1; then
+  pf_fail "TC-019 step 1: pf_validate_test_plan_file ещё не реализована (Task 4 не выполнена)"
+else
+  pf_pass "TC-019 step 1: pf_validate_test_plan_file реализована"
+
+  tp019="$(pf_ptp_case_file "$GLOBAL_RETIRED_FIX")"
+  if [ -z "$tp019" ] || [ ! -f "$tp019" ]; then
+    pf_fail "TC-019: fixture docs/planning/test-plan.md not found ($GLOBAL_RETIRED_FIX)"
+  else
+    snapshot019_dir="$(pf_mktemp_d)" || exit 1
+    # Checked non-empty (and a real dir) before any use — same shape as
+    # pf_ptp_area_setup's call site and TC-012's snapshot_dir012: an unguarded
+    # empty path here would let the cp below write outside any throwaway temp
+    # dir (S-4/S-5).
+    if [ -z "$snapshot019_dir" ] || [ ! -d "$snapshot019_dir" ]; then
+      pf_fail "TC-019: pf_mktemp_d did not return a usable temp dir for the before/after snapshot"
+    else
+      cp "$tp019" "$snapshot019_dir/before.md"
+
+      out019="$(pf_validate_test_plan_file "$tp019" 2>&1)"
+      rc019=$?
+      if [ "$rc019" -eq 0 ]; then
+        pf_pass "TC-019 step 2: pf_validate_test_plan_file accepts 'retired' as a valid Status dictionary value"
+      else
+        pf_fail "TC-019 step 2: pf_validate_test_plan_file rejected the retired row: $out019"
+      fi
+
+      if cmp -s "$snapshot019_dir/before.md" "$tp019" && grep -qF 'PTC-0003' "$tp019"; then
+        pf_pass "TC-019 step 3: the file is byte-identical after validation (read-only), PTC-0003 is still present"
+      else
+        pf_fail "TC-019 step 3: the validator mutated the file, or PTC-0003 disappeared"
+        diff "$snapshot019_dir/before.md" "$tp019" >&2 || true
+      fi
+
+      assigned019="$(pf_ptp_promote_row "$tp019" "explorer-ui" \
+        "Ещё один новый Manual-кейс поверх файла со снятой строкой" "Low" \
+        "20990101-feat-fixture-retired#TC-001" "—" "pending")"
+      n_ptc0003_after="$(grep -c -F 'PTC-0003' "$tp019" || true)"
+      retired_row019="$(grep -E '^\| *PTC-0003 *\|' "$tp019" | head -1)"
+
+      if [ "$assigned019" = "PTC-0006" ] && [ "$n_ptc0003_after" -eq 1 ] && printf '%s' "$retired_row019" | grep -qF 'retired'; then
+        pf_pass "TC-019 step 4: new row got PTC-0006 (max(Last allocated: PTC-0005, table max PTC-0005) + 1); PTC-0003 appears exactly once, row still present and still retired"
+      else
+        pf_fail "TC-019 step 4: new row got '$assigned019' (want PTC-0006); PTC-0003 occurrences=$n_ptc0003_after (want 1); retired row: '$retired_row019'"
+      fi
+    fi
+  fi
+fi
+
 assert_repo_untouched
 pf_summary
