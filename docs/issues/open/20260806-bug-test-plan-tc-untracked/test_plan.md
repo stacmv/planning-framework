@@ -361,4 +361,4 @@ Status Tracker (Phase 3.4) — эта строка (`TC-008` в *этом* до�
 | TC-005 | `pf-test-plan/SKILL.md` описывает объявление, которое `pf-test` может найти | Auto | High | ✓ | |
 | TC-006 | JS/Python-конвенции TC-ID по-прежнему распознаются | Auto | High | ✓ | |
 | TC-007 | Ни один существующий файл под `test/` не изменён фиксом | Auto | Medium | ✓ | |
-| TC-008 | Сквозная сцепка: Auto TC из `/pf-test-plan` находится `/pf-test` в живом прогоне | Manual | Critical | [ ] | закрывается ручным подтверждением, не автопрогоном `/pf-test` |
+| TC-008 | Сквозная сцепка: Auto TC из `/pf-test-plan` находится `/pf-test` в живом прогоне | Manual | Critical | ✓ | подтверждён агентом 2026-08-11, см. manual_test_checklist.md и session-log.md |
