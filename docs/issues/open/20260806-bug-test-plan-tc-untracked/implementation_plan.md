@@ -28,7 +28,7 @@
 - Заодно поправить «Important Notes» (текущая строка 210): «skip the TC-ID mapping step; report mapped count as 0» при отсутствующей/ошибающейся ветке — это тот же Д3 через чёрный ход, раз сканирование больше не завязано на диф. Переформулировать: при ошибке `git diff develop...HEAD` деградировать к сканированию всего дерева (как в 3.1 выше), а не пропускать маппинг целиком.
 
 **Acceptance Criteria:**
-- [ ] TC-002 passes
+- [x] TC-002 passes
 
 #### Task 2: Phase 3.2/3.3 — bash-конвенция и исключение фикстур (Д1 + TC-004)
 
@@ -45,9 +45,9 @@
 - В `### 3.3` распространить приём (подстроки) на вывод раннера. Обязан содержать `substring` и `not limited to test names`: "Use the same substring-matching technique as 3.2 against runner output — not limited to test names or function names; a TC-ID anywhere in captured stdout (e.g. printed verbatim by `pf_pass`) counts as a match."
 
 **Acceptance Criteria:**
-- [ ] TC-001 passes
-- [ ] TC-004 passes
-- [ ] TC-006 passes
+- [x] TC-001 passes
+- [x] TC-004 passes
+- [x] TC-006 passes
 
 #### Task 3: Замкнуть ветку Phase 4 → Phase 5 (Д2)
 
@@ -60,7 +60,7 @@
 - Сразу после «Proceed here only when all Auto-type TCs … OR … no rows with Type `Auto`.» добавить абзац про ветку «гейт не сработал, но предусловие Phase 5 не выполнено»: обязан содержать `unmatched` (или `precondition`/`left as`) **и** буквально `Stop with message` (регистрозависимо): "If, after Phase 3, one or more Auto-type rows remain unmatched — Status still `[ ]`, with no `✗` rows to trigger the gate above — this precondition is not met. Stop with message: \"N Auto TC(s) have no matching test in the runner output — Status left as `[ ]`. Add a test using a convention from Phase 3.2, or re-run /pf-test, before generating the manual checklist.\""
 
 **Acceptance Criteria:**
-- [ ] TC-003 passes
+- [x] TC-003 passes
 
 #### Task 4: `pf-test-plan/SKILL.md` Step 4 — связать `Auto` с обнаружимостью (TC-005)
 
@@ -73,7 +73,7 @@
 - Добавить в Step 4 предложение, называющее `Auto` **discoverable** сканированием `/pf-test` — слово `discoverable` должно встретиться буквально: "A TC marked `Auto` must be discoverable by `/pf-test`'s TC-ID scanning (Phase 3.2/3.3 in `skills/pf-test/SKILL.md`) — written using a convention that phase recognizes. If it cannot be, mark it `Manual` instead."
 
 **Acceptance Criteria:**
-- [ ] TC-005 passes
+- [x] TC-005 passes
 
 #### Task 5: `test/pf-test-tc-mapping-static.sh` — Auto-проверки TC-001..TC-007
 
@@ -90,8 +90,8 @@
 - TC-007 предполагает прогон на закоммиченной ветке issue (см. Prerequisites в `test_plan.md`): на `develop` или до коммита `develop...HEAD` пуст. Для этого шага использовать `pf_note` вместо `pf_fail`, когда `git diff --name-only --diff-filter=A develop...HEAD -- test/` не может однозначно определить ветку issue (по образцу отложенной проверки T11-inv в `test/lib.sh`), а не жёсткий `pf_fail`.
 
 **Acceptance Criteria:**
-- [ ] `bash test/pf-test-tc-mapping-static.sh` завершается кодом 0
-- [ ] TC-007 passes
+- [x] `bash test/pf-test-tc-mapping-static.sh` завершается кодом 0
+- [x] TC-007 passes
 
 #### Task 6: Сквозная валидация — TC-008 в изолированной копии
 
@@ -105,5 +105,5 @@
 - При расхождении с текстом `SKILL.md` — вернуться к Task 1-4, поправить формулировку, повторить.
 
 **Acceptance Criteria:**
-- [ ] TC-008 passes (`TC-001` фикстуры — `✓`, Phase 5 без остановки,
+- [x] TC-008 passes (`TC-001` фикстуры — `✓`, Phase 5 без остановки,
       временная копия удалена)
