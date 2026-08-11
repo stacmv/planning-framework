@@ -31,6 +31,7 @@ This will:
   • Commit any uncommitted changes on the issue branch
   • Detect parent branch (from git config or fallback to develop/main)
   • Merge issue/ISSUE-ID into <parent-branch> with --no-ff
+  • Transfer the issue's Manual test cases into docs/planning/test-plan.md
   • Move docs/issues/open/ISSUE-ID/ → docs/issues/closed/ISSUE-ID/
   • Record LLM usage/cost in docs/issues/closed/ISSUE-ID/usage_report.md
   • Append a closure entry to docs/planning/session-log.md
@@ -69,6 +70,42 @@ Run on the issue branch.
 1. Run `git checkout PARENT-BRANCH`.
 2. Run `git merge --no-ff issue/ISSUE-ID -m "merge: close ISSUE-ID"`.
 3. If the merge reports a conflict, stop: "Merge conflict detected. Resolve conflicts manually on PARENT-BRANCH, then re-run /pf-close."
+
+---
+
+## Phase 4.5
+
+Runs after Phase 4 (Merge) and before Phase 5 (Archive Issue Folder), while `docs/issues/open/ISSUE-ID/` still exists. This ordering is required: `/pf-close` resolves the active issue by scanning `docs/issues/open/` alone (see the top of this file). If this phase fails after Phase 5 has already moved the issue folder to `docs/issues/closed/`, a re-run of `/pf-close` reports "No active issue found" and the issue's Manual test cases are lost with no way to recover them. Placed before archiving instead, a failure here leaves the folder in place and a re-run picks the issue back up and finishes the phase idempotently.
+
+1. Read `docs/issues/open/ISSUE-ID/test_plan.md`'s Status Tracker table and select only the rows whose `Type` is `Manual`. Rows with `Type: Auto` are never promoted — skip them entirely, including every one of their fields. If no `Manual` rows exist, this phase does nothing; proceed to Phase 5.
+
+   **Columns are resolved by header name, not by position.** Locate the columns literally named `Type`, `Test Case`, `Priority`, and `Status` in the table's header row, wherever they appear. The repo's own template (`docs/planning/templates/issue/test_plan.md`) orders columns `TC | Type | Test Case | Priority | Status | Remarks`, while the `pf-test-plan` skill generates `TC | Test Case | Type | Priority | Status | Remarks` — both orders exist in real issues and disagree with each other. A parser that reads a fixed column position instead of the header name reads the case title as the `Type` on one of the two orders and promotes nothing.
+
+2. If `docs/planning/test-plan.md` does not exist yet, create it by copying `docs/planning/templates/global/test-plan.md`.
+
+3. For each selected `Manual` row not already present in the list, append a row. Identity for "already present" is the pair (`ISSUE-ID`, `TC-NNN`) — never the case title: two `Manual` cases in the same issue may share a title and must still get separate `PTC` numbers and separate rows.
+
+   | Issue field | → | List field |
+   |---|---|---|
+   | case title | → | `Test case` (see self-containedness rule below) |
+   | `Priority` | → | `Prio` (see normalization below) |
+   | `Status` `[ ]` / `✓` / `✗` | → | `Status` `pending` / `✓` / `✗` |
+   | ISSUE-ID + TC-NNN | → | `Origin`, formatted `ISSUE-ID#TC-NNN` (not a filesystem path) |
+   | the issue's closing date, when `Status` is not `pending` | → | `Last run` (`—` when `pending`) |
+   | — | → | `PTC` (see numbering below) |
+   | — | → | `Area` (see below) |
+
+   **Priority normalization.** `Critical`→`Critical`, `High`→`High`, `Medium`→`Med`, `Low`→`Low`. Any value outside this dictionary is normalized to `Med`, and the original value is noted in `Test case` so a closed dictionary doesn't silently swallow an unrecognized priority.
+
+   **Self-containedness.** If a case title only reads in the context of the issue (e.g. "Verify step 3"), expand it into a self-contained phrase when transferring it. Titles that already stand alone are transferred verbatim.
+
+   **Escaping.** Any `|` inside `Area`, `Test case`, or `Origin` is written as `\|` when the row is written. Each cell stays a single line.
+
+4. **PTC numbering.** The next `PTC` number is the maximum of (a) the number in the `Last allocated:` line and (b) the highest `PTC` number already in the table, plus one. Both sources matter: the `Last allocated:` counter still remembers a number whose row was later deleted by hand (e.g. a `retired` row removed manually), while the table still remembers rows written by a previous run that was interrupted before it could update the counter. After writing the new row(s), update `Last allocated:` to the new highest number.
+
+5. **Area.** Derive it from the file list of the merge commit Phase 4 just created: run `git diff --name-only HEAD^1 HEAD^2` (`HEAD` is the fresh merge commit on PARENT-BRANCH that Phase 4 just made; `HEAD^1` is the parent-branch tip before the merge, `HEAD^2` is the tip of `issue/ISSUE-ID`). **Do not use the three-dot form** `git diff --name-only PARENT-BRANCH...issue/ISSUE-ID` — after Phase 4's `--no-ff` merge, the merge-base of the two branches has become the tip of `issue/ISSUE-ID` itself, so a three-dot diff at this point always returns an empty file list (measured on a real close: 0 files vs. 15 files for the `HEAD^1 HEAD^2` form on the same repository state). Exclude any paths under `docs/issues/` from the result — the issue's own planning documents don't describe a subsystem. Of the remaining paths, take the second path segment for anything under `skills/` or `tools/` (e.g. `skills/pf-close/…` → `pf-close`), and the first segment for everything else (e.g. `scripts/…` → `scripts`). The segment with the most files wins; if nothing remains after excluding `docs/issues/`, use `general`.
+
+6. Leave the updated `docs/planning/test-plan.md` in the working tree — it is committed on Phase 8, whose `git add` now includes this path.
 
 ---
 
@@ -144,7 +181,7 @@ This phase produces `docs/issues/closed/ISSUE-ID/usage_report.md`, a best-effort
 
 ## Phase 8: Archive Commit
 
-1. Run `git add docs/issues/ docs/planning/session-log.md`.
+1. Run `git add docs/issues/ docs/planning/session-log.md docs/planning/test-plan.md`.
 2. Run `git commit -m "close: archive ISSUE-ID"`.
 
 ---
