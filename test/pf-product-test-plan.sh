@@ -792,5 +792,469 @@ else
   fi
 fi
 
+# ─── Helpers: escaping `|` on write, reading a source cell that already
+# carries the same escape (TC-009) ──────────────────────────────────────────
+
+# pf_ptp_escape_pipe <string> — Phase 4.5 "Escaping": any "|" is written as
+# "\|" when a row is appended to the global list.
+pf_ptp_escape_pipe() {
+  local s="$1"
+  printf '%s' "${s//|/\\|}"
+}
+
+# pf_ptp_read_manual_field <issue test_plan.md> <TC-NNN> <column 1..6> — like
+# TC-001..003's pf_ptp_field_for_tc, but masks `\|` before splitting on `|` so
+# a Test case title that itself contains an escaped pipe (valid: the issue's
+# own Status Tracker table needs that same escape, or ITS table would not
+# parse either) does not shift every column after it. Column order fixed to
+# this fixture's own header (TC | Test Case | Type | Priority | Status |
+# Remarks) — narrower than pf_ptp_parse_rows on purpose, since that helper's
+# unmasked split is exactly what a `|`-bearing title would break. Prints the
+# trimmed cell with the escape UNMASKED back to a real "|".
+pf_ptp_read_manual_field() {
+  local file="$1" tc="$2" col="$3" rawline masked cell
+  local -a cells
+  rawline="$(grep -E "^\| *${tc} *\|" "$file" | head -1)"
+  if [ -z "$rawline" ]; then
+    return 1
+  fi
+  masked="${rawline//\\|/$'\001'}"
+  IFS='|' read -ra cells <<<"$masked"
+  cell="$(_pf_ptp_trim "${cells[$col]}")"
+  printf '%s' "${cell//$'\001'/|}"
+}
+
+TP_PIPES="$REPO_ROOT/test/fixtures/pf-product-test-plan/issue-pipe-in-fields/docs/issues/open/20990101-feat-fixture-pipes/test_plan.md"
+PIPE_ISSUE_ID="20990101-feat-fixture-pipes"
+
+# ══════════════════════════════════════════════════════════════════════════════
+printf '\n=== TC-009: | in Area/Test case/Origin survives write and re-parse\n'
+# ══════════════════════════════════════════════════════════════════════════════
+
+if [ ! -f "$TP_PIPES" ]; then
+  pf_fail "TC-009: fixture test_plan.md not found: $TP_PIPES"
+else
+  raw_title="$(pf_ptp_read_manual_field "$TP_PIPES" "TC-001" 2)"
+  prio_raw="$(pf_ptp_read_manual_field "$TP_PIPES" "TC-001" 4)"
+  status_raw="$(pf_ptp_read_manual_field "$TP_PIPES" "TC-001" 5)"
+
+  if printf '%s' "$raw_title" | grep -qF '|'; then
+    pf_pass "TC-009 setup: fixture title read back with its real | intact ('$raw_title')"
+  else
+    pf_fail "TC-009 setup: fixture title lost its | on read (got '$raw_title')"
+  fi
+
+  escaped_title="$(pf_ptp_escape_pipe "$raw_title")"
+  prio_out="$(pf_ptp_normalize_priority "$prio_raw")"
+  prio_norm="${prio_out%%$'\037'*}"
+  status_mapped="$(pf_ptp_map_status "$status_raw")"
+  lastrun009="$(pf_ptp_last_run "$status_mapped" "2026-08-11")"
+  origin009="${PIPE_ISSUE_ID}#TC-001"
+
+  target009="$(pf_ptp_case_file "$PTP_FIX_FRESH")"
+  if [ ! -f "$target009" ]; then
+    pf_fail "TC-009: fixture docs/planning/test-plan.md not found ($PTP_FIX_FRESH)"
+  else
+    assigned009="$(pf_ptp_promote_row "$target009" "explorer-ui" "$escaped_title" \
+      "$prio_norm" "$origin009" "$lastrun009" "$status_mapped")"
+
+    # Anchored on a leading "| PTC-NNNN |" so the "Last allocated: PTC-NNNN"
+    # counter line (which legitimately repeats the same PTC value) is never
+    # mistaken for a second data row.
+    row_line009="$(grep -E "^\| *${assigned009} *\|" "$target009" | head -1)"
+    n_rows_with_ptc="$(grep -cE "^\| *${assigned009} *\|" "$target009" || true)"
+    n_pipe_raw="$(printf '%s' "$raw_title" | grep -o -F '|' | grep -c . || true)"
+    n_pipe_escaped_written="$(printf '%s' "$row_line009" | grep -o -F '\|' | grep -c . || true)"
+
+    if [ "$n_rows_with_ptc" -eq 1 ] && [ "$n_pipe_escaped_written" -eq "$n_pipe_raw" ] && [ "$n_pipe_raw" -gt 0 ]; then
+      pf_pass "TC-009 step 1: all $n_pipe_raw '|' char(s) written as \\| in a single row, field count unchanged"
+    else
+      pf_fail "TC-009 step 1: row count=$n_rows_with_ptc, raw '|' count=$n_pipe_raw, escaped '\\|' count written=$n_pipe_escaped_written (want row count=1, both counts equal and >0)"
+    fi
+
+    out009="$(pf_validate_test_plan_file "$target009" 2>&1)"
+    rc009=$?
+    if [ "$rc009" -eq 0 ]; then
+      pf_pass "TC-009 step 2: pf_validate_test_plan_file parses the escaped row as one valid 7-field row"
+    else
+      pf_fail "TC-009 step 2: pf_validate_test_plan_file rejected the escaped row: $out009"
+    fi
+  fi
+
+  sec45="$(pf_ptp_phase45_section)"
+  has_escape_targets=0
+  has_escape_form=0
+  printf '%s\n' "$sec45" | grep -qE 'Area.*Test case.*Origin' && has_escape_targets=1
+  # shellcheck disable=SC2016  # backticks are markdown in a grep pattern, not command substitution
+  printf '%s\n' "$sec45" | grep -qF 'written as `\|`' && has_escape_form=1
+  if [ "$has_escape_targets" -eq 1 ] && [ "$has_escape_form" -eq 1 ]; then
+    pf_pass "TC-009 step 3: Phase 4.5 documents escaping | as \\| in Area/Test case/Origin"
+  else
+    pf_fail "TC-009 step 3: Phase 4.5 не документирует экранирование \\| (targets found: $has_escape_targets, form found: $has_escape_form)"
+  fi
+fi
+
+# ─── Helpers: Area by merge-commit diff (TC-010) ───────────────────────────
+
+# pf_ptp_area_diff_files <repo dir> — Phase 4.5 "Area": the two-parent form of
+# the merge-commit diff, NOT the three-dot <parent>...<issue-branch> form
+# (specs.md/SKILL.md: after Phase 4's --no-ff merge, the three-dot merge-base
+# has become the tip of the issue branch itself, so that diff is always
+# empty). HEAD is the fresh merge commit; HEAD^1 is the parent branch tip
+# before the merge, HEAD^2 is the tip of issue/ISSUE-ID.
+pf_ptp_area_diff_files() {
+  git -C "$1" diff --name-only 'HEAD^1' 'HEAD^2'
+}
+
+# pf_ptp_area_exclude_docs_issues — drops any path under docs/issues/ from a
+# newline-separated list on stdin (the issue's own planning docs don't
+# describe a subsystem).
+pf_ptp_area_exclude_docs_issues() {
+  grep -vE '^docs/issues/'
+}
+
+# pf_ptp_area_segment <path> — second path segment for anything under
+# skills/ or tools/, first segment for everything else.
+pf_ptp_area_segment() {
+  local path="$1"
+  case "$path" in
+    skills/*/* | tools/*/*)
+      path="${path#*/}"
+      printf '%s' "${path%%/*}"
+      ;;
+    *)
+      printf '%s' "${path%%/*}"
+      ;;
+  esac
+}
+
+# pf_ptp_area_winner — reads paths from stdin (already docs/issues/-excluded),
+# segments each with pf_ptp_area_segment, and prints the segment with the
+# most files; "general" if stdin has no non-empty lines.
+pf_ptp_area_winner() {
+  local -A counts=()
+  local path seg best="" best_n=-1
+  while IFS= read -r path; do
+    [ -z "$path" ] && continue
+    seg="$(pf_ptp_area_segment "$path")"
+    counts[$seg]=$((${counts[$seg]:-0} + 1))
+  done
+  if [ ${#counts[@]} -eq 0 ]; then
+    printf 'general'
+    return 0
+  fi
+  for seg in "${!counts[@]}"; do
+    if [ "${counts[$seg]}" -gt "$best_n" ]; then
+      best_n="${counts[$seg]}"
+      best="$seg"
+    fi
+  done
+  printf '%s' "$best"
+}
+
+# pf_ptp_area_setup — a --git case-setup for the "area-diff-repo" fixture,
+# built locally instead of calling `pf_setup_case "pf-product-test-plan/
+# area-diff-repo" --git`. pf_setup_case's `cp -a "$src" "$parent/$fixture"`
+# needs the destination's INTERMEDIATE directory to already exist, which it
+# does not for a fixture name containing a slash (the same bug
+# pf_ptp_case_file's header comment documents for global-fresh and friends).
+# Flattening the destination to the single leaf "area-diff-repo" (no slash)
+# avoids the bug; pf_git_init (test/lib.sh) gives the same baseline commit
+# --git would. Prints the path, or nothing (rc 1) if the fixture directory
+# itself is missing — callers MUST check the result before using it in any
+# git -C command: an empty path there silently targets the caller's cwd
+# instead of a throwaway repo, which is exactly the failure mode this
+# function exists to make impossible.
+pf_ptp_area_setup() {
+  local src="$PF_FIXTURES_DIR/pf-product-test-plan/area-diff-repo"
+  if [ ! -d "$src" ]; then
+    return 1
+  fi
+  local parent work
+  parent="$(pf_mktemp_d)" || return 1
+  work="$parent/area-diff-repo"
+  cp -a "$src" "$work"
+  pf_git_init "$work"
+  printf '%s' "$work"
+}
+
+AREA_ID="20990101-feat-fixture-area"
+
+# ══════════════════════════════════════════════════════════════════════════════
+printf '\n=== TC-010: Area is derived from the merge-commit diff, docs/issues/ excluded\n'
+# ══════════════════════════════════════════════════════════════════════════════
+# Builds develop + issue/<ID>, edits the 4 files on the issue branch, then
+# performs the SAME --no-ff merge Phase 4 performs BEFORE computing the diff
+# (implementation_plan.md Task 5 / P1-A review): a fixture that diffed the
+# pre-merge graph would pass even if Phase 4.5 used the three-dot form, which
+# is empty after a real --no-ff merge and would never be diagnostic.
+area_d="$(pf_ptp_area_setup)"
+
+if [ -z "$area_d" ] || [ ! -d "$area_d" ]; then
+  # Guarded on purpose (S-5): every git command below is scoped to this
+  # branch so a setup failure can never fall through to a `git -C ""` that
+  # silently operates on the caller's cwd instead of a throwaway repo.
+  pf_fail "TC-010: area-diff-repo fixture setup failed (fixture directory missing or pf_mktemp_d failed)"
+  pf_fail "TC-010 step 1: skipped — fixture setup failed"
+  pf_fail "TC-010 step 2: skipped — fixture setup failed"
+  pf_fail "TC-010 step 3: skipped — fixture setup failed"
+  pf_fail "TC-010 step 4: skipped — fixture setup failed"
+else
+  git -C "$area_d" branch develop
+  git -C "$area_d" checkout -q -b "issue/$AREA_ID" develop
+  mkdir -p "$area_d/skills/pf-close" "$area_d/scripts" "$area_d/docs/issues/open/$AREA_ID"
+  printf '# probe SKILL.md edit\n' >"$area_d/skills/pf-close/SKILL.md"
+  printf '# probe new file\n' >"$area_d/skills/pf-close/foo.md"
+  printf '# probe scripts/ edit\n' >"$area_d/scripts/build.sh"
+  printf '# probe issue specs.md\n' >"$area_d/docs/issues/open/$AREA_ID/specs.md"
+  git -C "$area_d" add -A
+  git -C "$area_d" -c user.name='PF Test' -c user.email='pf-test@example.invalid' \
+    commit -q -m "issue changes for TC-010"
+  git -C "$area_d" checkout -q develop
+  git -C "$area_d" -c user.name='PF Test' -c user.email='pf-test@example.invalid' \
+    merge -q --no-ff "issue/$AREA_ID" -m "merge: close $AREA_ID"
+
+  # The discriminating check this fixture exists for (specs.md / SKILL.md
+  # Phase 4.5 step 5, measured on a real close: three-dot gives 0 files after
+  # a --no-ff merge because merge-base(develop, issue/ID) has become the
+  # issue branch's own tip, while the two-parent form gives the real set).
+  # Asserted here, not just narrated, so a fixture that silently DIDN'T
+  # reproduce the degenerate post-merge graph (e.g. an accidental fast-forward
+  # merge) would be caught by this line, not misread as "Area works".
+  threedot010="$(git -C "$area_d" diff --name-only "develop...issue/$AREA_ID")"
+  n_threedot010="$(printf '%s\n' "$threedot010" | grep -c . || true)"
+
+  diff010="$(pf_ptp_area_diff_files "$area_d")"
+  n_diff010="$(printf '%s\n' "$diff010" | grep -c . || true)"
+  has_docs_issues010=0
+  printf '%s\n' "$diff010" | grep -qE '^docs/issues/' && has_docs_issues010=1
+  if [ "$n_threedot010" -eq 0 ] && [ "$n_diff010" -eq 4 ] && [ "$has_docs_issues010" -eq 1 ]; then
+    pf_pass "TC-010 step 1: three-dot develop...issue/$AREA_ID is empty (the degenerate post-merge graph, as documented) while HEAD^1..HEAD^2 lists the real 4 files, including a docs/issues/ path"
+  else
+    pf_fail "TC-010 step 1: three-dot gave $n_threedot010 file(s) (want 0 — fixture did not reproduce the post-merge graph), HEAD^1..HEAD^2 gave $n_diff010 file(s) (want 4), docs/issues/ path present: $has_docs_issues010 (want 1) — diff: $diff010"
+  fi
+
+  filtered010="$(printf '%s\n' "$diff010" | pf_ptp_area_exclude_docs_issues)"
+  n_filtered010="$(printf '%s\n' "$filtered010" | grep -c . || true)"
+  if [ "$n_filtered010" -eq 3 ]; then
+    pf_pass "TC-010 step 2: excluding docs/issues/ leaves 3 files"
+  else
+    pf_fail "TC-010 step 2: excluding docs/issues/ left $n_filtered010 file(s) (want 3) — filtered: $filtered010"
+  fi
+
+  winner010="$(printf '%s\n' "$filtered010" | pf_ptp_area_winner)"
+  if [ "$winner010" = "pf-close" ]; then
+    pf_pass "TC-010 step 3: pf-close (2 files, second segment of skills/pf-close/…) beats scripts (1 file, first segment)"
+  else
+    pf_fail "TC-010 step 3: Area winner was '$winner010' (want pf-close)"
+  fi
+
+  sec45="$(pf_ptp_phase45_section)"
+  has_area_cmd=0
+  has_area_exclude=0
+  has_area_segment=0
+  has_area_majority=0
+  has_area_general=0
+  printf '%s\n' "$sec45" | grep -qF 'HEAD^1 HEAD^2' && has_area_cmd=1
+  printf '%s\n' "$sec45" | grep -qiE 'Exclude any paths under.{0,20}docs/issues/' && has_area_exclude=1
+  printf '%s\n' "$sec45" | grep -qiE 'second path segment.{0,80}skills.{0,40}tools' && has_area_segment=1
+  printf '%s\n' "$sec45" | grep -qiE 'segment with the most files wins' && has_area_majority=1
+  # shellcheck disable=SC2016  # backticks are markdown in a grep pattern, not command substitution
+  printf '%s\n' "$sec45" | grep -qF '`general`' && has_area_general=1
+  if [ "$has_area_cmd" -eq 1 ] && [ "$has_area_exclude" -eq 1 ] && [ "$has_area_segment" -eq 1 ] &&
+    [ "$has_area_majority" -eq 1 ] && [ "$has_area_general" -eq 1 ]; then
+    pf_pass "TC-010 step 4: Phase 4.5 documents the HEAD^1 HEAD^2 diff, the docs/issues/ exclusion, segmentation and majority-wins"
+  else
+    pf_fail "TC-010 step 4: Phase 4.5 не документирует правило вычисления Area (cmd=$has_area_cmd exclude=$has_area_exclude segment=$has_area_segment majority=$has_area_majority general=$has_area_general)"
+  fi
+fi
+
+# ─── Helpers: idempotency by (ISSUE-ID, TC-NNN), never the title (TC-015) ──
+
+# pf_ptp_origin_exists <global test-plan.md file> <origin> — true (rc 0) iff a
+# row with this exact Origin already exists in the table.
+pf_ptp_origin_exists() {
+  local file="$1" origin="$2"
+  pf_ptp_parse_global_rows "$file" | awk -F'\037' -v o="$origin" '$5 == o { found = 1 } END { exit !found }'
+}
+
+# pf_ptp_promote_issue <issue test_plan.md> <ISSUE-ID> <global file>
+# <closing date> [<area>] — Phase 4.5 steps 1+3+4 end to end for every Manual
+# row of one issue. Idempotent: a row whose Origin (ISSUE-ID#TC-NNN) is
+# already in the target is skipped outright — the identity key is the pair
+# (ISSUE-ID, TC-NNN), never the case title (specs.md "Идемпотентность"),
+# which is exactly what TC-015 exercises.
+pf_ptp_promote_issue() {
+  local issue_file="$1" issue_id="$2" target="$3" closing_date="$4" area="${5:-general}"
+  local tc tcase type prio status origin prio_out prio_norm status_mapped lastrun
+  # shellcheck disable=SC2034  # type must still be consumed for field alignment; rows are already Manual-only (pf_ptp_select_manual)
+  while IFS=$'\037' read -r tc tcase type prio status; do
+    [ -z "$tc" ] && continue
+    origin="${issue_id}#${tc}"
+    if pf_ptp_origin_exists "$target" "$origin"; then
+      continue
+    fi
+    prio_out="$(pf_ptp_normalize_priority "$prio")"
+    prio_norm="${prio_out%%$'\037'*}"
+    status_mapped="$(pf_ptp_map_status "$status")"
+    lastrun="$(pf_ptp_last_run "$status_mapped" "$closing_date")"
+    pf_ptp_promote_row "$target" "$area" "$tcase" "$prio_norm" "$origin" "$lastrun" "$status_mapped" >/dev/null
+  done < <(pf_ptp_select_manual "$issue_file")
+}
+
+TP_DUP="$REPO_ROOT/test/fixtures/pf-product-test-plan/issue-duplicate-titles/docs/issues/open/20990101-feat-fixture-duplicate-titles/test_plan.md"
+DUP_ID="20990101-feat-fixture-duplicate-titles"
+
+# ══════════════════════════════════════════════════════════════════════════════
+printf '\n=== TC-015: idempotent re-run keyed on (ISSUE-ID, TC-NNN), not the title\n'
+# ══════════════════════════════════════════════════════════════════════════════
+
+if [ ! -f "$TP_DUP" ]; then
+  pf_fail "TC-015: fixture test_plan.md not found: $TP_DUP"
+else
+  target015="$(pf_ptp_case_file "$PTP_FIX_FRESH")"
+  if [ ! -f "$target015" ]; then
+    pf_fail "TC-015: fixture docs/planning/test-plan.md not found ($PTP_FIX_FRESH)"
+  else
+    pf_ptp_promote_issue "$TP_DUP" "$DUP_ID" "$target015" "2026-08-11" "explorer-ui"
+
+    n_rows015a="$(pf_ptp_parse_global_rows "$target015" | grep -c . || true)"
+    has_tc001_origin=0
+    has_tc002_origin=0
+    grep -qF "${DUP_ID}#TC-001" "$target015" && has_tc001_origin=1
+    grep -qF "${DUP_ID}#TC-002" "$target015" && has_tc002_origin=1
+    ptc_tc001="$(pf_ptp_parse_global_rows "$target015" | awk -F'\037' -v o="${DUP_ID}#TC-001" '$5 == o { print $1 }')"
+    ptc_tc002="$(pf_ptp_parse_global_rows "$target015" | awk -F'\037' -v o="${DUP_ID}#TC-002" '$5 == o { print $1 }')"
+
+    if [ "$n_rows015a" -eq 2 ] && [ "$has_tc001_origin" -eq 1 ] && [ "$has_tc002_origin" -eq 1 ] &&
+      [ -n "$ptc_tc001" ] && [ -n "$ptc_tc002" ] && [ "$ptc_tc001" != "$ptc_tc002" ]; then
+      pf_pass "TC-015 step 1: two identically-titled Manual cases got distinct PTC numbers ($ptc_tc001 / $ptc_tc002) and distinct Origins"
+    else
+      pf_fail "TC-015 step 1: row_count=$n_rows015a tc001_origin=$has_tc001_origin tc002_origin=$has_tc002_origin ptc001=$ptc_tc001 ptc002=$ptc_tc002 (want 2 rows, both origins present, distinct PTCs)"
+    fi
+
+    last_alloc_before015="$(pf_ptp_counter_value "$target015")"
+    pf_ptp_promote_issue "$TP_DUP" "$DUP_ID" "$target015" "2026-08-11" "explorer-ui"
+    n_rows015b="$(pf_ptp_parse_global_rows "$target015" | grep -c . || true)"
+    last_alloc_after015="$(pf_ptp_counter_value "$target015")"
+
+    if [ "$n_rows015b" -eq 2 ] && [ "$last_alloc_after015" -eq "$last_alloc_before015" ]; then
+      pf_pass "TC-015 step 2: re-running the promotion with no issue changes creates no new rows, Last allocated: unchanged"
+    else
+      pf_fail "TC-015 step 2: re-run row_count=$n_rows015b (want 2), Last allocated: $last_alloc_before015 -> $last_alloc_after015 (want unchanged)"
+    fi
+  fi
+
+  sec45="$(pf_ptp_phase45_section)"
+  has_idem_pair=0
+  has_idem_not_title=0
+  # shellcheck disable=SC2016  # backticks are markdown in a grep pattern, not command substitution
+  printf '%s\n' "$sec45" | grep -qF 'pair (`ISSUE-ID`, `TC-NNN`)' && has_idem_pair=1
+  printf '%s\n' "$sec45" | grep -qiE 'never the case title' && has_idem_not_title=1
+  if [ "$has_idem_pair" -eq 1 ] && [ "$has_idem_not_title" -eq 1 ]; then
+    pf_pass "TC-015 step 3: Phase 4.5 documents the idempotency key as (ISSUE-ID, TC-NNN), never the title"
+  else
+    pf_fail "TC-015 step 3: Phase 4.5 не документирует ключ идемпотентности (ISSUE-ID, TC-NNN) (pair found: $has_idem_pair, not-title found: $has_idem_not_title)"
+  fi
+fi
+
+# ─── Helpers: title self-containedness (TC-017) ────────────────────────────
+
+# pf_ptp_read_description <issue test_plan.md> <TC-NNN> — the text after
+# "**Description:**" for the "### TC-NNN: ..." section of that case. Empty if
+# not found.
+pf_ptp_read_description() {
+  local file="$1" tc="$2"
+  awk -v tc="$tc" '
+    $0 ~ ("^### " tc ":") { intc = 1; next }
+    intc && /^### / { exit }
+    intc && /^\*\*Description:\*\*/ {
+      sub(/^\*\*Description:\*\* */, "")
+      print
+      exit
+    }
+  ' "$file"
+}
+
+# pf_ptp_is_self_contained_title <title> — a title that names a bare step
+# number ("Проверить шаг 3" / "Verify step 3") only reads in the context of
+# the issue; anything else is treated as already self-contained. Transcribed
+# heuristic for this fixture's two cases, not a general NLP rule.
+pf_ptp_is_self_contained_title() {
+  local title="$1"
+  if [[ "$title" =~ ([Шш]аг|[Ss]tep)[[:space:]]+[0-9]+ ]]; then
+    return 1
+  fi
+  return 0
+}
+
+# pf_ptp_expand_title <issue test_plan.md> <TC-NNN> <raw title> — Phase 4.5
+# "Self-containedness": a context-dependent title is expanded using the
+# issue's own Description field for that case; a title that already stands
+# alone is returned verbatim.
+pf_ptp_expand_title() {
+  local file="$1" tc="$2" title="$3" desc
+  if pf_ptp_is_self_contained_title "$title"; then
+    printf '%s' "$title"
+    return 0
+  fi
+  desc="$(pf_ptp_read_description "$file" "$tc")"
+  if [ -n "$desc" ]; then
+    printf '%s — %s' "$title" "$desc"
+  else
+    printf '%s' "$title"
+  fi
+}
+
+TP_TITLE="$REPO_ROOT/test/fixtures/pf-product-test-plan/issue-non-self-contained-title/docs/issues/open/20990101-feat-fixture-title/test_plan.md"
+
+# ══════════════════════════════════════════════════════════════════════════════
+printf '\n=== TC-017: non-self-contained titles are expanded, self-contained ones transferred verbatim\n'
+# ══════════════════════════════════════════════════════════════════════════════
+
+if [ ! -f "$TP_TITLE" ]; then
+  pf_fail "TC-017: fixture test_plan.md not found: $TP_TITLE"
+else
+  title001="$(pf_ptp_field_for_tc "$TP_TITLE" "TC-001" 2)"
+  title002="$(pf_ptp_field_for_tc "$TP_TITLE" "TC-002" 2)"
+
+  expanded001="$(pf_ptp_expand_title "$TP_TITLE" "TC-001" "$title001")"
+  if [ "$expanded001" = "$title001" ]; then
+    pf_pass "TC-017 step 1: self-contained title '$title001' transferred verbatim"
+  else
+    pf_fail "TC-017 step 1: self-contained title changed ('$title001' -> '$expanded001')"
+  fi
+
+  expanded002="$(pf_ptp_expand_title "$TP_TITLE" "TC-002" "$title002")"
+  if [ "${#expanded002}" -gt "${#title002}" ] && [ "$expanded002" != "$title002" ]; then
+    pf_pass "TC-017 step 2: context-dependent title '$title002' expanded to a longer, non-bare phrase ('$expanded002')"
+  else
+    pf_fail "TC-017 step 2: '$title002' did not expand (got '$expanded002')"
+  fi
+
+  # Derived from the fixture's own Description, not a hardcoded word: the
+  # expansion is only "readable without opening Origin" if the actual context
+  # text made it into the transferred title, whatever that text happens to
+  # say. A hardcoded keyword would silently stop discriminating the moment
+  # the fixture's wording changed.
+  desc002="$(pf_ptp_read_description "$TP_TITLE" "TC-002")"
+  if [ -n "$desc002" ] && printf '%s' "$expanded002" | grep -qF "$desc002"; then
+    pf_pass "TC-017 step 3: expanded title carries the issue's own Description text, readable without opening Origin"
+  else
+    pf_fail "TC-017 step 3: expanded title '$expanded002' does not contain the fixture's Description ('$desc002')"
+  fi
+
+  sec45="$(pf_ptp_phase45_section)"
+  has_selfcontained_label=0
+  has_expand_rule=0
+  printf '%s\n' "$sec45" | grep -qF 'Self-containedness' && has_selfcontained_label=1
+  printf '%s\n' "$sec45" | grep -qiE 'expand it into a self-contained phrase' && has_expand_rule=1
+  if [ "$has_selfcontained_label" -eq 1 ] && [ "$has_expand_rule" -eq 1 ]; then
+    pf_pass "TC-017 step 4: Phase 4.5 documents expanding non-self-contained titles into a self-contained phrase"
+  else
+    pf_fail "TC-017 step 4: Phase 4.5 не документирует правило самодостаточности Test case (AC-1.2) (label found: $has_selfcontained_label, rule found: $has_expand_rule)"
+  fi
+fi
+
 assert_repo_untouched
 pf_summary
