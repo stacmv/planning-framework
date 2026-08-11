@@ -274,6 +274,35 @@ assert_numbering_rule_documented() {
   fi
 }
 
+# assert_number_format_documented <step label> — drift-guard for the WRITTEN FORM
+# of an allocated number, which is a separate rule from the arithmetic above.
+#
+# Added after a real close found the gap: TC-014's live /pf-close run against a
+# fresh list, on the revision of Phase 4.5 that documented only "maximum … plus
+# one", wrote the row `| 1 | general | … |` and the counter `Last allocated: 1`.
+# Arithmetically correct, and rejected by pf_validate_test_plan_file, which
+# requires exactly four digits. Every Auto case here missed it because each one
+# calls pf_ptp_next_number — a helper that TRANSCRIBES the intended formatting —
+# so the suite agreed with itself while the skill text left the form unspecified.
+# This guard reads the skill instead: it goes red if the written form (four
+# digits, zero-padded) or the `none` == 0 seeding stops being documented.
+assert_number_format_documented() {
+  local step_label="$1" sec45 has_pad=0 has_none=0
+  sec45="$(pf_ptp_phase45_section)"
+  if printf '%s\n' "$sec45" | grep -qE 'PTC-0001' &&
+    printf '%s\n' "$sec45" | grep -qiE 'four digits|4 digits'; then
+    has_pad=1
+  fi
+  if printf '%s\n' "$sec45" | grep -qiE 'none.*counts as.*0|none.*as \*\*0\*\*'; then
+    has_none=1
+  fi
+  if [ "$has_pad" -eq 1 ] && [ "$has_none" -eq 1 ]; then
+    pf_pass "$step_label: Phase 4.5 documents the written form PTC-NNNN (four digits, zero-padded) and 'none' == 0"
+  else
+    pf_fail "$step_label: Phase 4.5 не документирует формат записи номера (PTC-NNNN, четыре цифры; 'none' == 0) — pad=$has_pad none=$has_none"
+  fi
+}
+
 # ══════════════════════════════════════════════════════════════════════════════
 printf '=== TC-001: only Type: Manual rows are ever selected for promotion (BR-1)\n'
 # ══════════════════════════════════════════════════════════════════════════════
@@ -496,6 +525,7 @@ else
 fi
 
 assert_numbering_rule_documented "TC-004 step 3"
+assert_number_format_documented "TC-004 step 4"
 
 # ══════════════════════════════════════════════════════════════════════════════
 printf '\n=== TC-005: PTC numbering after a retired row was deleted by hand (counter wins)\n'
