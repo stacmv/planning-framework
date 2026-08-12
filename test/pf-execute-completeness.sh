@@ -253,7 +253,7 @@ fi
 # Direction self-test: the forward pattern must NOT be satisfied by
 # reverse-only phrasing (TC-015's own wording), independent of whether
 # SKILL.md has any of this text yet at all.
-_pf_fwd_re='(each|every)[^.\n]{0,60}(code )?task[^.\n]{0,80}(has|have|must have)[^.\n]{0,40}test'
+_pf_fwd_re='(each|every)[^.]{0,60}(code )?task[^.]{0,80}(has|have|must have)[^.]{0,40}test'
 _pf_reverse_sample='Every test case is mapped to a task via the Mapped Test Cases field.'
 if printf '%s' "$_pf_reverse_sample" | grep -qiE "$_pf_fwd_re"; then
   pf_fail "TC-014 step 3: forward-direction pattern is not direction-specific — it matches reverse-only (TC-015) phrasing"
@@ -294,7 +294,7 @@ fi
 
 # Direction self-test: the reverse pattern must NOT be satisfied by
 # forward-only phrasing (TC-014's own wording).
-_pf_rev_re='(each|every)[^.\n]{0,60}(test case|TC)[^.\n]{0,80}(is |must be )?mapped[^.\n]{0,40}(to (a|the) )?task'
+_pf_rev_re='(each|every)[^.]{0,60}(test case|TC)[^.]{0,80}(is |must be )?mapped[^.]{0,40}(to (a|the) )?task'
 _pf_forward_sample='Every code task has a test named in its Mapped Test Cases field.'
 if printf '%s' "$_pf_forward_sample" | grep -qiE "$_pf_rev_re"; then
   pf_fail "TC-015 step 3: reverse-direction pattern is not direction-specific — it matches forward-only (TC-014) phrasing"

@@ -76,9 +76,9 @@ else
     fi
 
     # ─── Step 1b: NEW — empty-diff-is-an-error anchors (2-3 independent) ───────
-    a1='(empty|nothing to (review|diff)|no changes)[^.\n]{0,120}\berror\b'
-    a2='(do not|never|must not|refuse)[^.\n]{0,120}(verdict:? *\*{0,2}PASS)'
-    a3='(nothing to review)[^.\n]{0,150}(clean|reviewed)'
+    a1='(empty|nothing to (review|diff)|no changes)[^.]{0,120}\berror\b'
+    a2='(do not|never|must not|refuse)[^.]{0,120}(verdict:? *\*{0,2}PASS)'
+    a3='(nothing to review)[^.]{0,150}(clean|reviewed)'
     found="$(count_anchors "$phase1_text" "$a1" "$a2" "$a3")"
     if [ "$found" -ge 2 ]; then
       pf_pass "TC-018 step 1b: pf-codereview Phase 1 empty-diff-is-an-error anchors found ($found/3)"
@@ -103,9 +103,9 @@ else
     # invocation chain specifically (the only place pf-check computes a diff
     # at all — its Claude review path never does, per implementation_plan.md
     # Task 9 note, and is correctly out of scope for this step). ────────────
-    a1='(empty|nothing to (review|diff)|no changes)[^.\n]{0,120}\berror\b'
-    a2='(do not|never|must not|refuse)[^.\n]{0,120}(verdict:? *\*{0,2}PASS)'
-    a3='(nothing to review)[^.\n]{0,150}(clean|reviewed)'
+    a1='(empty|nothing to (review|diff)|no changes)[^.]{0,120}\berror\b'
+    a2='(do not|never|must not|refuse)[^.]{0,120}(verdict:? *\*{0,2}PASS)'
+    a3='(nothing to review)[^.]{0,150}(clean|reviewed)'
     found="$(count_anchors "$chain_text" "$a1" "$a2" "$a3")"
     if [ "$found" -ge 2 ]; then
       pf_pass "TC-018 step 2: pf-check Codex-chain empty-diff-is-an-error anchors found ($found/3)"
@@ -120,9 +120,9 @@ else
   # before this scenario could ever arise, per implementation_plan.md Task 9
   # note, so pf-codereview is never checked for it). ─────────────────────────
   whole_text="$(cat "$CHECK")"
-  b1='issue branch[^.\n]{0,80}(does not exist|not exist|missing|absent)'
-  b2='(review|reviewing|switch(ing)? to)[^.\n]{0,40}\bby (its |the (document'"'"'s )?)?path\b'
-  b3='(no|missing|absent)[^.\n]{0,40}issue branch[^.\n]{0,120}(report|state|note|reason)'
+  b1='issue branch[^.]{0,80}(does not exist|not exist|missing|absent)'
+  b2='(review|reviewing|switch(ing)? to)[^.]{0,40}\bby (its |the (document'"'"'s )?)?path\b'
+  b3='(no|missing|absent)[^.]{0,40}issue branch[^.]{0,120}(report|state|note|reason)'
   found="$(count_anchors "$whole_text" "$b1" "$b2" "$b3")"
   if [ "$found" -ge 2 ]; then
     pf_pass "TC-018 step 3: pf-check off-branch -> review-by-path anchors found ($found/3)"
@@ -154,7 +154,7 @@ else
     note_text="$(block_text "$PF" "$note_line" "$note_end")"
 
     # ─── Step 2: reader references an explicit written marker ─────────────
-    reader_marker_re='(marker|explicit[^.\n]{0,40}(record|flag|line))[^.\n]{0,80}session-log\.md|session-log\.md[^.\n]{0,80}(marker|explicit[^.\n]{0,40}(record|flag|line))'
+    reader_marker_re='(marker|explicit[^.]{0,40}(record|flag|line))[^.]{0,80}session-log\.md|session-log\.md[^.]{0,80}(marker|explicit[^.]{0,40}(record|flag|line))'
     if printf '%s' "$note_text" | grep -qiE "$reader_marker_re"; then
       pf_pass "TC-021 step 2: pf/SKILL.md 'check passed' reader references an explicit written marker"
       reader_has_marker=1
@@ -188,7 +188,7 @@ else
     after_start=$((auto_end))
     total_lines="$(wc -l <"$CHECK")"
     after_text="$(block_text "$CHECK" "$after_start" "$total_lines")"
-    writer_marker_re='session-log\.md[^.\n]{0,120}(check passed|passed the check|check.s outcome)|(check passed|passed the check)[^.\n]{0,120}session-log\.md'
+    writer_marker_re='session-log\.md[^.]{0,120}(check passed|passed the check|check.s outcome)|(check passed|passed the check)[^.]{0,120}session-log\.md'
     if printf '%s\n%s' "$before_text" "$after_text" | grep -qiE "$writer_marker_re"; then
       writer_line="$(printf '%s\n%s' "$before_text" "$after_text" | grep -iE "$writer_marker_re" | head -1)"
     fi
