@@ -248,15 +248,32 @@ develop...issue/20260806-bug-test-plan-tc-untracked` → 0 файлов, тог�
 merge-коммит — ещё свежий `HEAD` родительской ветки (архивный коммит Phase 8
 случится позже), поэтому команда — `git diff --name-only HEAD^1 HEAD^2`:
 `HEAD^1` — состояние родительской ветки до мерджа, `HEAD^2` — вершина
-`issue/ISSUE-ID`; разница между ними — ровно набор файлов issue. Из
+`issue/ISSUE-ID`; разница между ними — ровно набор файлов issue.
+
+**Берутся родители ПЕРВОГО мерджа этой issue, а не текущего `HEAD`** (P2 code
+review, проход 3): `git log --merges --format=%H --grep "merge: close ISSUE-ID"
+<родитель> | tail -1`, затем `git diff --name-only <merge>^1 <merge>^2`. На чистом
+прогоне этот мердж и есть `HEAD`, поэтому поведение не меняется. Но правило
+stop-and-surface велит оператору починить строку и **закоммитить её на
+issue-ветке**, из-за чего повторный `git merge` создаёт второй merge-коммит, и
+родители `HEAD` описывают уже не набор файлов issue, а одну правку под
+`docs/issues/`, которая исключается — `Area` вырождается в `general`. Привязка к
+первому мерджу не требует состояния и не требует сбрасывать родительскую ветку. Из
 результата исключаются `docs/issues/` (документы самой issue не говорят о
-подсистеме) **и бухгалтерские файлы верхнего уровня `docs/planning/*.md`** —
-`session-log.md`, `decisions.md`, `implementation-plan.md` и сам `test-plan.md`;
-иначе мердж, отличающийся только ими, дал бы бессмысленное `Area: docs`.
-Подкаталоги `docs/planning/` при этом **не** исключаются: в
-`docs/planning/templates/` лежат настоящие продуктовые артефакты фреймворка (эта
-же issue добавила туда `global/test-plan.md`), и issue, вся работа которой —
-правка шаблона, обязана получить осмысленную `Area` (P2 code review). Из
+подсистеме) **и ровно четыре бухгалтерских файла, поимённо**:
+`docs/planning/session-log.md`, `decisions.md`, `implementation-plan.md` и сам
+`test-plan.md`; иначе мердж, отличающийся только ими, дал бы бессмысленное
+`Area: docs`.
+
+Именно список, а не glob и не каталог — оба обобщения неверны (P2 code review,
+проходы 2 и 3). `docs/planning/*.md` захватил бы настоящую документацию того же
+уровня (`FRAMEWORK.md`, `QUICKSTART.md`, `MIGRATION-GUIDE-V3.md`,
+`v2.0-design-analysis.md`), и issue про правку `FRAMEWORK.md` получила бы
+`general` — ровно то бессмысленное значение, от которого исключение защищает.
+Исключение каталога целиком дополнительно захватило бы
+`docs/planning/templates/` с продуктовыми артефактами фреймворка (эта же issue
+добавила туда `global/test-plan.md`). Подкаталоги `docs/planning/` не
+исключаются никогда. Из
 оставшихся путей берётся второй сегмент для `skills/` и
 `tools/` (`skills/pf-close/…` → `pf-close`, `tools/manual-test-ui/…` →
 `manual-test-ui`), первый — для остальных (`scripts/…` → `scripts`).

@@ -1030,6 +1030,8 @@ if [ -z "$area_d" ] || [ ! -d "$area_d" ]; then
   pf_fail "TC-010 step 3: skipped — fixture setup failed"
   pf_fail "TC-010 step 4: skipped — fixture setup failed"
   pf_fail "TC-010 step 5: skipped — fixture setup failed"
+  pf_fail "TC-010 step 6: skipped — fixture setup failed"
+  pf_fail "TC-010 step 7: skipped — fixture setup failed"
 else
   git -C "$area_d" branch develop
   git -C "$area_d" checkout -q -b "issue/$AREA_ID" develop
@@ -1114,17 +1116,99 @@ else
   #       whole change is a template edit must still get a meaningful Area.
   # Asserting (a) alone would be satisfied by excluding the whole tree, which is
   # the over-broad version this finding rejected — (b) is what pins it down.
-  has_planning_excl=0
+  # The exclusion must be a NAMED LIST of four files. Two over-broad readings
+  # were rejected in review and both are asserted against here, because each
+  # would pass a check written only against the other:
+  #   (a) the four bookkeeping files are named;
+  #   (b) a `docs/planning/*.md` glob is rejected — real documentation lives at
+  #       that level (FRAMEWORK.md and friends) and must keep a real Area;
+  #   (c) subdirectories are never excluded — docs/planning/templates/ holds
+  #       product artifacts.
+  # Asserting (a) alone would be satisfied by the glob wording, and (a)+(c)
+  # alone would be satisfied by the glob-plus-subdir-exception wording that
+  # pass 3 flagged. All three are required.
+  has_named_four=0
+  has_glob_rejected=0
   has_subdir_kept=0
-  printf '%s\n' "$sec45" | grep -qiE 'docs/planning/\*\.md' &&
-    printf '%s\n' "$sec45" | grep -qiE 'top level only|top-level' && has_planning_excl=1
-  printf '%s\n' "$sec45" | grep -qiE 'not exclude subdirectories|do not exclude subdirector' &&
+  named_hits=0
+  for f in session-log.md decisions.md implementation-plan.md test-plan.md; do
+    printf '%s\n' "$sec45" | grep -qF "docs/planning/$f" && named_hits=$((named_hits + 1))
+  done
+  [ "$named_hits" -eq 4 ] && has_named_four=1
+  printf '%s\n' "$sec45" | grep -qF 'FRAMEWORK.md' &&
+    printf '%s\n' "$sec45" | grep -qiE 'not a glob|would also swallow' && has_glob_rejected=1
+  printf '%s\n' "$sec45" | grep -qiE 'never excluded|not exclude subdirector' &&
     printf '%s\n' "$sec45" | grep -qF 'docs/planning/templates/' && has_subdir_kept=1
 
-  if [ "$has_planning_excl" -eq 1 ] && [ "$has_subdir_kept" -eq 1 ]; then
-    pf_pass "TC-010 step 5: Phase 4.5 excludes the top-level docs/planning/*.md bookkeeping files while explicitly keeping docs/planning/ subdirectories (templates/) in scope"
+  if [ "$has_named_four" -eq 1 ] && [ "$has_glob_rejected" -eq 1 ] && [ "$has_subdir_kept" -eq 1 ]; then
+    pf_pass "TC-010 step 5: Phase 4.5 excludes exactly the four named bookkeeping files, explicitly rejects a docs/planning/*.md glob (real docs live there), and keeps docs/planning/ subdirectories in scope"
   else
-    pf_fail "TC-010 step 5: Phase 4.5 не документирует сужённое исключение docs/planning/ (верхний уровень исключён=$has_planning_excl, подкаталоги сохранены=$has_subdir_kept)"
+    pf_fail "TC-010 step 5: Phase 4.5 не документирует поимённое исключение docs/planning (названы все четыре=$has_named_four [$named_hits/4], glob отвергнут=$has_glob_rejected, подкаталоги сохранены=$has_subdir_kept)"
+  fi
+
+  # ─── steps 6-7 (added by code review pass 3, Codex P2) ─────────────────────
+  # Area must key on the FIRST merge that brought the issue in, not on HEAD.
+  # The stop-and-surface rule (step 2) tells the operator to commit a test_plan
+  # fix ON THE ISSUE BRANCH, which gives the branch a new commit — so Phase 4's
+  # re-run merges a second time and HEAD's parents no longer describe the
+  # issue's files. Step 6 is a real git probe of that topology; step 7 guards
+  # the rule text. Step 6 is the load-bearing one: it fails on the naive form
+  # regardless of how the prose is worded.
+  retry_d="$(pf_mktemp_d)"
+  if [ -z "$retry_d" ] || [ ! -d "$retry_d" ]; then
+    pf_fail "TC-010 step 6: skipped — pf_mktemp_d failed (never fall through to a git -C \"\")"
+  else
+    (
+      cd "$retry_d" || exit 1
+      git init -q -b develop . >/dev/null 2>&1
+      git config user.email t@t
+      git config user.name t
+      mkdir -p docs/planning skills/pf-close docs/issues/open/ISS
+      printf 'log\n' > docs/planning/session-log.md
+      printf 'base\n' > README.md
+      git add -A && git commit -q -m init
+      git checkout -q -b issue/ISS
+      printf 'product\n' > skills/pf-close/SKILL.md
+      printf 'tp\n' > docs/issues/open/ISS/test_plan.md
+      git add -A && git commit -q -m "issue work"
+      git checkout -q develop
+      git merge -q --no-ff issue/ISS -m "merge: close ISS"
+      # Written INSIDE .git so the probe never adds its own bookkeeping
+      # file to the tracked tree — a first attempt wrote it to the work
+      # tree, `git add -A` committed it, and it then showed up in the
+      # very diff this assertion measures.
+      git rev-parse HEAD > .git/first-merge
+      # stop-and-surface path: fix the row on the issue branch and commit it
+      git checkout -q issue/ISS
+      printf 'tp fixed\n' > docs/issues/open/ISS/test_plan.md
+      git add -A && git commit -q -m "fix malformed row"
+      git checkout -q develop
+      git merge -q --no-ff issue/ISS -m "merge: close ISS"
+    ) >/dev/null 2>&1
+
+    first_merge="$(cat "$retry_d/.git/first-merge" 2>/dev/null || true)"
+    head_now="$(git -C "$retry_d" rev-parse HEAD 2>/dev/null || true)"
+    naive="$(git -C "$retry_d" diff --name-only 'HEAD^1' 'HEAD^2' 2>/dev/null | LC_ALL=C sort | tr '\n' ' ')"
+    resolved="$(git -C "$retry_d" log --merges --format=%H --grep 'merge: close ISS' develop 2>/dev/null | tail -1)"
+    firstform="$(git -C "$retry_d" diff --name-only "${resolved}^1" "${resolved}^2" 2>/dev/null | LC_ALL=C sort | tr '\n' ' ')"
+
+    if [ -n "$first_merge" ] && [ "$head_now" != "$first_merge" ] &&
+      [ "$resolved" = "$first_merge" ] &&
+      [ "$naive" = "docs/issues/open/ISS/test_plan.md " ] &&
+      printf '%s' "$firstform" | grep -qF 'skills/pf-close/SKILL.md'; then
+      pf_pass "TC-010 step 6: на повторном мердже наивный HEAD^1 HEAD^2 даёт только исключаемую правку под docs/issues/, а родители первого мерджа сохраняют продуктовый путь skills/pf-close/"
+    else
+      pf_fail "TC-010 step 6: топология повтора не воспроизведена (first=$first_merge head=$head_now resolved=$resolved naive='$naive' firstform='$firstform')"
+    fi
+  fi
+
+  has_first_merge_rule=0
+  printf '%s\n' "$sec45" | grep -qiE 'first merge commit that brought this issue' &&
+    printf '%s\n' "$sec45" | grep -qF 'tail -1' && has_first_merge_rule=1
+  if [ "$has_first_merge_rule" -eq 1 ]; then
+    pf_pass "TC-010 step 7: Phase 4.5 documents keying Area on the first merge commit of this issue (git log --merges --grep … | tail -1), not on HEAD"
+  else
+    pf_fail "TC-010 step 7: Phase 4.5 не документирует привязку Area к первому мерджу issue (а не к HEAD)"
   fi
 fi
 
