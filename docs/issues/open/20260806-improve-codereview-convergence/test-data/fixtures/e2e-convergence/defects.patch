@@ -1,0 +1,71 @@
+diff --git a/bin/run.sh b/bin/run.sh
+new file mode 100644
+index 0000000..f0298c1
+--- /dev/null
++++ b/bin/run.sh
+@@ -0,0 +1,9 @@
++#!/usr/bin/env bash
++# bin/run.sh — orchestrator. Per Task 3 of implementation_plan.md, run.sh
++# must call validate_config() after load_config() and before using any
++# looked-up value, so an invalid config is caught before it is acted on.
++set -euo pipefail
++source "$(dirname "$0")/../lib/config.sh"
++
++load_config
++echo "host=$(get_value host)"
+diff --git a/config/app.conf b/config/app.conf
+new file mode 100644
+index 0000000..0182d07
+--- /dev/null
++++ b/config/app.conf
+@@ -0,0 +1,2 @@
++host=localhost
++port=8080
+diff --git a/lib/config.sh b/lib/config.sh
+new file mode 100644
+index 0000000..c4772e3
+--- /dev/null
++++ b/lib/config.sh
+@@ -0,0 +1,42 @@
++#!/usr/bin/env bash
++# lib/config.sh — configuration loading and validation helpers.
++#
++# Per Task 1 of implementation_plan.md: load_config() reads key=value pairs
++# from config/app.conf, with the path resolved relative to the repository
++# root. If the file is missing, load_config() must print an error to
++# stderr and exit with a non-zero status — callers rely on this to
++# distinguish "config missing" from "config present but empty".
++CONFIG_PATH="./app.conf"
++
++declare -A CONFIG_VALUES
++
++load_config() {
++  if [ ! -f "$CONFIG_PATH" ]; then
++    return 0
++  fi
++  while IFS='=' read -r key value; do
++    [ -z "$key" ] && continue
++    CONFIG_VALUES["$key"]="$value"
++  done < "$CONFIG_PATH"
++}
++
++# Per Task 2 of implementation_plan.md: get_value(key) looks up a key in
++# the loaded config map. On a missing key, it must return an empty string
++# AND print a warning to stderr — unknown keys are logged, never silently
++# ignored, so a typo in a key name is visible to whoever is reading the
++# script's output.
++get_value() {
++  local key="$1"
++  if [ -z "${CONFIG_VALUES[$key]+set}" ]; then
++    echo ""
++    return 0
++  fi
++  echo "${CONFIG_VALUES[$key]}"
++}
++
++# Per Task 4 of implementation_plan.md: validate_config() checks that every
++# key in REQUIRED_KEYS is present in CONFIG_VALUES. On a missing required
++# key, it must print which key is missing and exit non-zero.
++validate_config() {
++  return 0
++}

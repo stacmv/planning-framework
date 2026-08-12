@@ -359,6 +359,7 @@ Untestable AC: нет. Все 26 AC проверяемы либо статиче
 
 **Требуемые данные:**
 - `triage-severity/prompt.md`
+- `triage-severity/brd.md`
 - `triage-severity/implementation_plan.md`
 - `triage-severity/test_plan.md`
 - `triage-severity/triage-severity.patch`
@@ -597,6 +598,8 @@ Untestable AC: нет. Все 26 AC проверяемы либо статиче
 
 **Требуемые данные:**
 - `empty-diff/prompt.md`
+- `empty-diff/brd.md`
+- `empty-diff/test_plan.md`
 - `empty-diff/implementation_plan.md`
 
 **Expected Outcome:** Пустой предмет ревью не проходит как чистый результат — стадия останавливается с явной ошибкой.
@@ -786,6 +789,7 @@ Untestable AC: нет. Все 26 AC проверяемы либо статиче
 
 **Требуемые данные:**
 - `e2e-convergence/prompt.md`
+- `e2e-convergence/brd.md`
 - `e2e-convergence/implementation_plan.md`
 - `e2e-convergence/test_plan.md`
 - `e2e-convergence/defects.patch`
@@ -798,32 +802,32 @@ Untestable AC: нет. Все 26 AC проверяемы либо статиче
 
 | TC     | Test Case | Type   | Priority | Status | Remarks |
 | ------ | --------- | ------ | -------- | ------ | ------- |
-| TC-001 | `review_rounds` — поле и дефолт 3 | Auto | High | [ ] | test-first |
-| TC-002 | Ранний бросок назад — ≥3 блокирующих в раунде 1 | Auto | Critical | [ ] | test-first |
-| TC-003 | Исчерпание бюджета — возврат на /pf-execute | Auto | Critical | [ ] | test-first |
-| TC-004 | Раунд N проверяет закрытие И свой дифф | Auto | High | [ ] | test-first |
-| TC-005 | Ledger append-only, CR-NNN, раунд, состояние | Auto | Critical | [ ] | test-first |
-| TC-006 | Закрытый словарь состояний находки | Auto | High | [ ] | test-first |
-| TC-007 | Промпт ревьюера раунда N несёт ledger + «не повторяй» | Auto | High | [ ] | test-first |
-| TC-008 | На выходе PASS каждая находка имеет состояние | Auto | Critical | [ ] | test-first |
+| TC-001 | `review_rounds` — поле и дефолт 3 | Auto | High | ✓ | test-first |
+| TC-002 | Ранний бросок назад — ≥3 блокирующих в раунде 1 | Auto | Critical | ✓ | test-first |
+| TC-003 | Исчерпание бюджета — возврат на /pf-execute | Auto | Critical | ✓ | test-first |
+| TC-004 | Раунд N проверяет закрытие И свой дифф | Auto | High | ✓ | test-first |
+| TC-005 | Ledger append-only, CR-NNN, раунд, состояние | Auto | Critical | ✓ | test-first |
+| TC-006 | Закрытый словарь состояний находки | Auto | High | ✓ | test-first |
+| TC-007 | Промпт ревьюера раунда N несёт ledger + «не повторяй» | Auto | High | ✓ | test-first |
+| TC-008 | На выходе PASS каждая находка имеет состояние | Auto | Critical | ✓ | test-first |
 | TC-009 | Находка без сценария отказа понижается, ось важности одна | Manual | Critical | [ ] | требует живого прогона /pf-codereview |
-| TC-010 | Переклассификация — явный шаг, причина, видимость | Auto | Medium | [ ] | test-first |
-| TC-011 | Открытый P0 никогда не даёт PASS (regression guard) | Auto | Critical | [ ] | baseline |
-| TC-012 | Follow-up issue — доступно для P1, не для P0 | Auto | High | [ ] | test-first |
-| TC-013 | Гейт полноты — все пункты плана выполнены | Auto | High | [ ] | test-first |
-| TC-014 | Гейт полноты — у задачи есть тест (прямое направление) | Auto | Critical | [ ] | test-first |
-| TC-015 | Гейт полноты — у TC есть задача (обратное направление) | Auto | High | [ ] | test-first |
-| TC-016 | Все три проверки полноты блокирующие | Auto | High | [ ] | test-first |
-| TC-017 | Проверки полноты механические, не судейские | Auto | Medium | [ ] | test-first |
-| TC-018 | Пустой дифф / вне ветки issue — задокументировано в обеих стадиях (AC-5.1/AC-5.2) | Auto | Critical | [ ] | test-first |
+| TC-010 | Переклассификация — явный шаг, причина, видимость | Auto | Medium | ✓ | test-first |
+| TC-011 | Открытый P0 никогда не даёт PASS (regression guard) | Auto | Critical | ✓ | baseline |
+| TC-012 | Follow-up issue — доступно для P1, не для P0 | Auto | High | ✓ | test-first |
+| TC-013 | Гейт полноты — все пункты плана выполнены | Auto | High | ✓ | test-first |
+| TC-014 | Гейт полноты — у задачи есть тест (прямое направление) | Auto | Critical | ✓ | test-first |
+| TC-015 | Гейт полноты — у TC есть задача (обратное направление) | Auto | High | ✓ | test-first |
+| TC-016 | Все три проверки полноты блокирующие | Auto | High | ✓ | test-first |
+| TC-017 | Проверки полноты механические, не судейские | Auto | Medium | ✓ | test-first |
+| TC-018 | Пустой дифф / вне ветки issue — задокументировано в обеих стадиях (AC-5.1/AC-5.2) | Auto | Critical | ✓ | test-first |
 | TC-019 | Пустой дифф — ошибка стадии, не чистый результат | Manual | Critical | [ ] | требует живого прогона |
 | TC-020 | Документ вне ветки issue — ревью по пути | Manual | High | [ ] | требует живого прогона |
-| TC-021 | Явный признак пройденной проверки | Auto | High | [ ] | test-first |
-| TC-022 | /pf-close — ни одна фаза не виснет без отчёта | Auto | Critical | [ ] | частично baseline (Phase 4.5) |
-| TC-023 | Частичная остановка — описанный путь до конца | Auto | Medium | [ ] | частично baseline (Phase 4.5) |
-| TC-024 | Задание сабагенту — пятиэлементный минимум | Auto | High | [ ] | частично baseline |
-| TC-025 | Задание не требует недоступных TaskGet/TaskUpdate | Auto | Critical | [ ] | test-first, текущий текст нарушает AC |
-| TC-026 | Расхождение нумерации не путает задачу | Auto | High | [ ] | test-first |
+| TC-021 | Явный признак пройденной проверки | Auto | High | ✓ | test-first |
+| TC-022 | /pf-close — ни одна фаза не виснет без отчёта | Auto | Critical | ✓ | частично baseline (Phase 4.5) |
+| TC-023 | Частичная остановка — описанный путь до конца | Auto | Medium | ✓ | частично baseline (Phase 4.5) |
+| TC-024 | Задание сабагенту — пятиэлементный минимум | Auto | High | ✓ | частично baseline |
+| TC-025 | Задание не требует недоступных TaskGet/TaskUpdate | Auto | Critical | ✓ | test-first, текущий текст нарушает AC |
+| TC-026 | Расхождение нумерации не путает задачу | Auto | High | ✓ | test-first |
 | TC-027 | Сквозной прогон — сходимость за 2-3 раунда либо возврат | Manual | Critical | [ ] | требует живого многораундового прогона |
 
 ## Known Issues

@@ -1,0 +1,30 @@
+diff --git a/tools/greet.sh b/tools/greet.sh
+new file mode 100644
+index 0000000..794268d
+--- /dev/null
++++ b/tools/greet.sh
+@@ -0,0 +1,24 @@
++#!/usr/bin/env bash
++set -euo pipefail
++
++CONFIG_FILE="config/name.txt"
++
++# load_name reads the configured name from CONFIG_FILE. Per Task 1 of
++# implementation_plan.md, a missing config file is a documented error case:
++# the function must print an error to stderr and return a non-zero exit
++# status, so callers can tell "no name configured" apart from "name is empty".
++load_name() {
++  if [ ! -f "$CONFIG_FILE" ]; then
++    return 0
++  fi
++  cat "$CONFIG_FILE"
++}
++
++# greeting_message builds the final greeting string shown to the user.
++greeting_message() {
++  local n
++  n="$(load_name)"
++  echo "Hello, ${n}!"
++}
++
++greeting_message
