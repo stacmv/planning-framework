@@ -21,6 +21,16 @@
 # It is distinguishable from an infra defect (a SKILL.md file missing, or a
 # malformed heading set) by message text: infra failures are always tagged
 # "INFRA" so a red run here is never mistaken for a broken harness.
+#
+# TC-021 steps 10-11 added in code review round 2 (CR: the round-1 fix for
+# CR-002 made "check passed" bimodal — PASSED/OPEN — but the reader still
+# matched on "is a PASSED line present for TARGET anywhere", not on which
+# marker for TARGET is last in the append-only session-log.md. A
+# check-then-revise-then-recheck-and-skip cycle leaves an earlier PASSED line
+# sitting above a later OPEN one, and the old reader wording counted the
+# earlier PASSED — reproducing the exact defect the round-1 fix was meant to
+# close. Steps 10-11 pin the last-marker-wins rule and its concrete
+# PASSED-then-OPEN scenario so this cannot regress silently again.
 
 # shellcheck source=test/lib.sh
 . "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)/lib.sh"
@@ -147,12 +157,16 @@ else
     pf_pass "TC-021 step 1: 'Note on \"check passed\"' section located in pf/SKILL.md"
 
     step7_line="$(grep -n '^## Step 7' "$PF" | head -1 | cut -d: -f1)"
-    # +8, not +5: wide enough to also cover the OPEN-marker line and the
-    # sentence explaining it does not count as passed (steps 6/7 below),
-    # still capped at Step 7's heading so it never runs past this section.
-    note_end=$((note_line + 8))
-    if [ -n "$step7_line" ] && [ "$((step7_line - 1))" -lt "$note_end" ]; then
+    # Run to the line right before '## Step 7' — the section's real end, not a
+    # fixed +N guess. A hardcoded offset window has zero margin against the
+    # section growing (or shrinking) and can silently stop covering its own
+    # content — the same "guard that can't go red" class of defect CR-004
+    # named in round 1. Fall back to a small fixed window only in the
+    # degenerate case the heading itself is missing.
+    if [ -n "$step7_line" ]; then
       note_end=$((step7_line - 1))
+    else
+      note_end=$((note_line + 8))
     fi
     note_text="$(block_text "$PF" "$note_line" "$note_end")"
 
@@ -298,6 +312,47 @@ if [ -n "$writer_open_tag" ]; then
   fi
 else
   pf_fail "TC-021 step 9: cannot compare literal non-PASSED marker formats — writer side (step 8) not established"
+fi
+
+# ─── Step 10 (reader, round-2 regression): the reader must pick the LAST
+# marker line for TARGET by its position in the file, never "a PASSED line is
+# present for TARGET somewhere" — session-log.md is append-only and a
+# document can be checked, revised, and checked again, leaving several marker
+# lines for the same TARGET behind. Three independent anchors, same
+# count_anchors technique as TC-018 above (need >=2 of 3): an explicit
+# last/most-recent-by-position rule, and the append-only/history framing that
+# motivates it. ───────────────────────────────────────────────────────────────
+if [ -n "${note_text:-}" ]; then
+  o1='(last|latest|most recent(ly)?)[^.]{0,60}marker[^.]{0,100}TARGET'
+  o2='(position|order)[^.]{0,30}in the file'
+  o3='append-only[^.]{0,250}(several|multiple)[^.]{0,100}marker'
+  found="$(count_anchors "$note_text" "$o1" "$o2" "$o3")"
+  if [ "$found" -ge 2 ]; then
+    pf_pass "TC-021 step 10: pf/SKILL.md reader determines outcome by the LAST marker line for TARGET, by position in the file ($found/3 anchors)"
+  else
+    pf_fail "TC-021 step 10: pf/SKILL.md reader does not document picking the last-by-position marker for TARGET ($found/3 anchors, need >=2) — mere 'PASSED present somewhere' reading is still possible"
+  fi
+else
+  pf_fail "TC-021 step 10: INFRA — pf/SKILL.md 'check passed' note text unavailable (step 1 above did not locate the section)"
+fi
+
+# ─── Step 11 (reader, round-2 regression — the exact failure scenario): an
+# earlier PASSED line for TARGET must NOT override a later OPEN line for the
+# same TARGET. This is the literal accumulation scenario both round-2
+# reviewers named independently (check passes at 10:00 -> PASSED written;
+# document revised; check reruns at 11:00, P0 skipped -> OPEN appended below
+# the earlier PASSED) — step 10 alone would also pass on prose that mentions
+# "last"/"position" in some unrelated sense, so this step pins down the one
+# concrete case that must resolve to "not passed". ─────────────────────────
+if [ -n "${note_text:-}" ]; then
+  order_re='(earlier|previous)[^.]{0,60}PASSED[^.]{0,80}does[^.]{0,15}not[^.]{0,60}override[^.]{0,60}(later|OPEN)'
+  if printf '%s' "$note_text" | grep -qiE "$order_re"; then
+    pf_pass "TC-021 step 11: pf/SKILL.md reader explicitly states an earlier PASSED line does not override a later OPEN line for the same TARGET"
+  else
+    pf_fail "TC-021 step 11: pf/SKILL.md reader does not state that an earlier PASSED is overridden by a later OPEN — round-2 regression: check-then-revise-then-skip would still read as passed"
+  fi
+else
+  pf_fail "TC-021 step 11: INFRA — pf/SKILL.md 'check passed' note text unavailable (step 1 above did not locate the section)"
 fi
 
 # ══════════════════════════════════════════════════════════════════════════════
