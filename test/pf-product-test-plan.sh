@@ -725,6 +725,22 @@ pf_validate_test_plan_file() {
     esac
   done <"$file"
 
+  # The table itself must exist. Without this, a hand-edited file that kept its
+  # "Last allocated:" line but lost the header (or the --- separator under it)
+  # validated clean: the loop simply never left its header-hunting state and
+  # inspected no rows, so `ok` stayed 0. That accepted a document which no
+  # longer matches the schema in specs.md ("Колонки"), and the next promotion
+  # would append rows into a file that cannot hold them. Found by Codex on
+  # review pass 5; BR-4 (the file is hand-edited, the format must survive it)
+  # is exactly what makes this reachable rather than theoretical.
+  if [ "$header_done" -eq 0 ]; then
+    printf 'no table header row found (expected a line starting "| PTC |")\n'
+    ok=1
+  elif [ "$sep_done" -eq 0 ]; then
+    printf 'table header present but the "| --- |" separator row under it is missing\n'
+    ok=1
+  fi
+
   return "$ok"
 }
 
@@ -818,6 +834,41 @@ else
       pf_pass "TC-008 step 5: validator rejects a table with no 'Last allocated:' line above it, naming the missing counter ($out)"
     else
       pf_fail "TC-008 step 5: проверка наличия Last allocated: не реализована (rc=$rc, output: $out)"
+    fi
+  fi
+
+  # ─── steps 6-7 (added by code review pass 5, Codex P2) ─────────────────────
+  # The counter check above and the row checks below both pass over a file that
+  # kept "Last allocated:" but lost the table itself: the parse loop never
+  # leaves its header-hunting state, inspects zero rows, and returns clean.
+  # BR-4 makes this reachable — the file is hand-edited by design — and the
+  # consequence is that the next promotion appends rows into a document that no
+  # longer matches the schema. Two shapes, because they fail at different
+  # points of the same loop: no header row at all, and a header with no "| --- |"
+  # separator under it.
+  tp008_notable="$(pf_ptp_case_file "global-malformed-rows/no-table")"
+  if [ -z "$tp008_notable" ] || [ ! -f "$tp008_notable" ]; then
+    pf_fail "TC-008 step 6: fixture not found (global-malformed-rows/no-table)"
+  else
+    out="$(pf_validate_test_plan_file "$tp008_notable" 2>&1)"
+    rc=$?
+    if [ "$rc" -ne 0 ] && printf '%s\n' "$out" | grep -qiF 'no table header row found'; then
+      pf_pass "TC-008 step 6: validator rejects a file that kept 'Last allocated:' but lost the table entirely, naming the missing header ($out)"
+    else
+      pf_fail "TC-008 step 6: файл со счётчиком, но без таблицы, проходит валидацию (rc=$rc, output: $out)"
+    fi
+  fi
+
+  tp008_nosep="$(pf_ptp_case_file "global-malformed-rows/no-separator")"
+  if [ -z "$tp008_nosep" ] || [ ! -f "$tp008_nosep" ]; then
+    pf_fail "TC-008 step 7: fixture not found (global-malformed-rows/no-separator)"
+  else
+    out="$(pf_validate_test_plan_file "$tp008_nosep" 2>&1)"
+    rc=$?
+    if [ "$rc" -ne 0 ] && printf '%s\n' "$out" | grep -qiF 'separator row'; then
+      pf_pass "TC-008 step 7: validator rejects a header with no '| --- |' separator under it, naming the missing separator ($out)"
+    else
+      pf_fail "TC-008 step 7: заголовок без строки-разделителя проходит валидацию (rc=$rc, output: $out)"
     fi
   fi
 fi
