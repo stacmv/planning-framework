@@ -1,12 +1,12 @@
 ---
 doc_language: Russian
-size_tier: medium
-reviewers:
-  brd: codex
-  specs: codex
-  test_plan: codex
-  implementation_plan: both
-  code: both
+size_tier: large
+roles:
+  brd: { write: claude, review: [codex] }
+  specs: { write: claude, review: [codex] }
+  test_plan: { write: claude, review: [codex] }
+  implementation_plan: { write: claude, review: [claude, codex] }
+  code: { write: claude, review: [claude, codex] }
 ---
 
 Ускорить `/pf-codereview`: ревью должно сходиться за 2-3 раунда, при этом код с
