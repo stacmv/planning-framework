@@ -82,9 +82,13 @@ Dispatch a single sub-agent (Agent tool, default/general-purpose type) with a pr
 >
 > Your reply is the only thing the orchestrator will see. Return ONLY the prioritized findings (as your final message).
 
+**Round 2 and later:** extend the prompt above with the current findings ledger from `code_review.md` (every prior round's `CR-NNN` rows, Phase 3 below) alongside the diff, plus this explicit instruction: *these findings are already triaged — do not repeat them; look specifically for new problems introduced by this round's fix diff.* Passing the ledger, not just the diff, is what lets the reviewer separate "already-known" from "new" (AC-2.3) — a bare re-run of this same prompt with no ledger attached would just re-report round 1's findings all over again.
+
 ### Codex path (`codex` or the Codex half of `both`)
 
 Run `pf-check`'s **"Codex invocation chain"** exactly as documented in `skills/pf-check/SKILL.md` — this skill references that chain by name rather than restating or redefining it. The only adaptation is scope: instead of "the whole target document," `<base-ref>` is PARENT-BRANCH from Phase 1 above, and the brief given to Codex is "review this diff against PARENT-BRANCH for bugs, regressions, security issues, and inconsistency with implementation_plan.md/test_plan.md" in place of the document-review brief — `pf-check`'s own chain text already anticipates this exact split ("the code-review case in `pf-codereview` where the same `--base <base-ref>` diff spans the entire issue implementation instead of one file").
+
+**Round 2 and later:** extend that brief the same way as the Claude review path above — include the current findings ledger from `code_review.md` (every prior round's `CR-NNN` rows) alongside the diff, plus the same explicit instruction: these findings are already triaged, do not repeat them; look specifically for new problems introduced by this round's fix diff.
 
 ### Severity → priority mapping
 
@@ -96,9 +100,9 @@ When the resolved `review` is `{ mode: parallel, by: [claude, codex] }`, run the
 
 ---
 
-## Phase 3: Write `code_review.md`
+## Phase 3: Write `code_review.md` — the append-only `CR-NNN` findings ledger
 
-Write `docs/issues/open/ISSUE-ID/code_review.md`, mirroring `qa_report.md`'s verdict-field pattern:
+Write `docs/issues/open/ISSUE-ID/code_review.md`, mirroring `qa_report.md`'s verdict-field pattern. Findings are **never** poured into rewritable `### P0`/`### P1`/`### P2` list-sections — that shape has no stable identity across rounds, and a fresh list silently replacing the old one is exactly how a real P2 finding vanished, unnoticed, from round 1 of a prior issue. Findings instead live in a single **append-only ledger table**, one row per finding, keyed by a stable ID:
 
 ```markdown
 # Code Review Report
@@ -109,16 +113,12 @@ Write `docs/issues/open/ISSUE-ID/code_review.md`, mirroring `qa_report.md`'s ver
 
 ---
 
-## Findings
+## Findings Ledger
 
-### P0 (Blocker)
-[list, or _None._]
-
-### P1 (Important)
-[list, or _None._]
-
-### P2 (Minor)
-[list, or _None._]
+| ID | Round | Priority | Description | State |
+|----|-------|----------|--------------|-------|
+| CR-001 | 1 | P0 | [failure scenario the finding names] | open |
+| CR-002 | 1 | P2 | [description] | open |
 
 ---
 
@@ -127,12 +127,33 @@ Write `docs/issues/open/ISSUE-ID/code_review.md`, mirroring `qa_report.md`'s ver
 **PASS**
 ```
 
+**Append-only (BR-8).** Each row's ID is a stable, permanent identifier in the format `CR-NNN` — three digits, zero-padded (e.g. `CR-001`, `CR-014`) — assigned once, sequentially (highest existing number + 1), and never reused. A later Phase 3 run, on this round or any later one, only ever does one of two things to this table: **appends** a brand-new `CR-NNN` row for a newly reported finding, or **updates the `State` cell** of an already-existing row. It never rewrites or deletes a previously written row's ID, round number, or description — that identity is permanent once written.
+
+**Fields, at minimum, per row:**
+- **ID** — the stable `CR-NNN` described above.
+- **Round** — the review round this finding was first reported in. This is the one authoritative round counter this skill uses anywhere (Phase 4's round-budget/escalation logic reads it) — no second, separate round counter is introduced.
+- **Priority** — P0 (blocker) / P1 (important) / P2 (minor).
+- **Description** — the finding itself (for a P1 later resolved via a follow-up issue, its created issue's ID/path is recorded here too — see Phase 4/6's triage rubric).
+- **State** — exactly one of the six values below.
+
+**Closed state dictionary — exactly six values, verbatim.** A finding's `State` cell holds exactly one of:
+- `open` — the initial state assigned to a finding when it is first created.
+- `fixed` — terminal: the fix has been applied and re-reviewed.
+- `accepted-risk` — terminal: the risk is knowingly accepted as-is.
+- `deferred` — terminal: postponed (this includes the P1-via-follow-up-issue path — see Phase 4/6's triage rubric).
+- `wont-fix` — terminal: rejected as not worth fixing.
+- `duplicate-of CR-NNN` — terminal: the same underlying issue as another row, cited by its ID.
+
+No seventh value is added, and none of these five terminal values is renamed or replaced with a synonym — `open` is the one non-terminal, initial value; the other five are terminal resolutions.
+
+**`PASS` validation (AC-2.4).** Before writing `verdict: PASS`, confirm every row in the ledger carries an explicit, non-empty `State` — no finding without an explicit state may reach `PASS`. A genuinely empty `State` cell is a violation of this rule regardless of that row's priority (this is exactly the class of defect that let a P2 vanish silently in a prior round-1 review with no row, no record, no trace). A row whose `State` is the literal value `open` is **not** a violation of this rule — `open` is a real, explicit value from the six-value dictionary above, not a missing record. Whether an open P0/P1 blocks `PASS` is the separate rule immediately below, layered on top of this one, not a substitute for it.
+
 Rules for the Verdict section (identical in spirit to `pf-qa`'s):
-- If there is no open P0 or P1 finding (P2-or-none): write `**PASS**` on its own line.
-- If any P0 or P1 finding is open: write `**FAIL**` on its own line.
+- If there is no open P0 or P1 finding (every P0/P1 row's `State` is one of the five terminal values, never `open`) **and** the `PASS` validation above holds (no row of any priority has an empty `State`): write `**PASS**` on its own line.
+- If any P0 or P1 finding is open: write `**FAIL**` on its own line. This condition is unconditional — no round number and no review-round budget ever turns an open P0/P1 into a `PASS` (Phase 4's round-budget/escalation logic reads this same ledger but never overrides this line).
 - The verdict must appear as a standalone line (`**PASS**` or `**FAIL**`) so `/pf-test`'s prerequisite check can detect it with a simple text search, the same way `/pf-close` reads `qa_report.md`.
 
-Write finding prose in the issue's `doc_language` (default English), keeping `[Claude]`/`[Codex]` tags, priority headings and the verdict markers in English exactly as shown above.
+Write finding prose in the issue's `doc_language` (default English), keeping `[Claude]`/`[Codex]` tags, the ledger's column headers, and the verdict markers in English exactly as shown above.
 
 ---
 
