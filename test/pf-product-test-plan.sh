@@ -1909,5 +1909,50 @@ else
   pf_fail "TC-021 step 7: Phase 4.5 не называет оба следствия сохранения частичной записи (abort found: $has_abort_consequence021, second-merge/Area found: $has_area_consequence021)"
 fi
 
+# ─── step 8 (added by code review pass 3, P2-2) ──────────────────────────────
+# Steps 1-5 above only exercise the "file already tracked on PARENT-BRANCH and
+# modified" flavour of recovery. Phase 4.5 documents a second flavour: when the
+# phase created docs/planning/test-plan.md in this same run, the file is still
+# UNTRACKED, `git checkout --` cannot restore it, and the instruction is to `rm`
+# it instead. Nothing executed that branch, so deleting the `rm` sentence from
+# the skill would leave the whole suite green while the first close in any
+# project without a pre-existing global file would strand on a command that
+# cannot work. Probe the real git behaviour, then guard the sentence.
+untracked_d="$(pf_mktemp_d)"
+if [ -z "$untracked_d" ] || [ ! -d "$untracked_d" ]; then
+  pf_fail "TC-021 step 8: skipped — pf_mktemp_d failed (never fall through to a git -C \"\")"
+else
+  (
+    cd "$untracked_d" || exit 1
+    git init -q -b develop . >/dev/null 2>&1
+    git config user.email t@t
+    git config user.name t
+    mkdir -p docs/planning
+    printf 'log\n' > docs/planning/session-log.md
+    git add -A && git commit -q -m init
+    # Phase 4.5 creates the global file for the first time, then "crashes":
+    # it exists in the work tree but was never committed anywhere.
+    printf '# Manual Test Plan\n\nLast allocated: PTC-0001\n' > docs/planning/test-plan.md
+  ) >/dev/null 2>&1
+
+  co_out="$(git -C "$untracked_d" checkout -- docs/planning/test-plan.md 2>&1)"
+  co_rc=$?
+  rm -f "$untracked_d/docs/planning/test-plan.md"
+  still_there=1
+  [ -f "$untracked_d/docs/planning/test-plan.md" ] || still_there=0
+  dirty_after="$(git -C "$untracked_d" status --porcelain 2>/dev/null)"
+
+  has_rm_rule021=0
+  printf '%s\n' "$sec45_021" | grep -qiE 'still untracked' &&
+    printf '%s\n' "$sec45_021" | grep -qF 'rm docs/planning/test-plan.md' && has_rm_rule021=1
+
+  if [ "$co_rc" -ne 0 ] && printf '%s' "$co_out" | grep -qiE 'did not match|pathspec' &&
+    [ "$still_there" -eq 0 ] && [ -z "$dirty_after" ] && [ "$has_rm_rule021" -eq 1 ]; then
+    pf_pass "TC-021 step 8: на неотслеживаемом файле git checkout -- падает (pathspec), только rm возвращает дерево в чистое состояние — и Phase 4.5 предписывает именно rm для этого случая"
+  else
+    pf_fail "TC-021 step 8: вариант с неотслеживаемым файлом не воспроизведён или не задокументирован (checkout rc=$co_rc, файл удалён=$((1 - still_there)), дерево чистое='$dirty_after', правило rm найдено=$has_rm_rule021)"
+  fi
+fi
+
 assert_repo_untouched
 pf_summary
