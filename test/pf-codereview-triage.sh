@@ -23,8 +23,15 @@
 #   TC-012 (drift-guard) — RED (follow-up-issue path for P1 doesn't exist yet)
 #
 # Read-only: this suite never writes into $REPO_ROOT, never touches $HOME,
-# never runs scripts/converge-to-v3.sh, and issues no git commands. It only
+# never runs the convergence script, and issues no git commands. It only
 # reads skills/pf-codereview/SKILL.md and the two ledger fixtures below.
+#
+# The convergence script is deliberately named here in words rather than by
+# file name: S-1 (test/lib.sh) requires that grepping test/ for that file name
+# return test/lib.sh and nothing else, so that the single gateway stays
+# auditable by hand. test/safety-audit.sh enforces it, and an earlier draft of
+# this very comment — written to reassure a reader that the suite is safe —
+# broke the rule by spelling the name out.
 
 # shellcheck source=test/lib.sh
 . "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)/lib.sh"
