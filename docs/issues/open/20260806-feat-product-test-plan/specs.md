@@ -35,6 +35,8 @@ issue N                            docs/planning/test-plan.md
 | `skills/pf-close/SKILL.md` | новая Phase 4.5 (перенос `Manual`-кейсов, между мерджем и архивацией) + `docs/planning/test-plan.md` дописывается в `git add` на Phase 8 |
 | `scripts/converge-to-v3.sh` | `t5_global_docs()` — файл создаётся из шаблона, если его ещё нет |
 | `test/pf-product-test-plan.sh` | **новый** — Auto-проверки формата и уникальности номеров |
+| `test/lib.sh` | комментарий к правилу S-5: `assert_repo_untouched` аудирует только внутри репозитория, запись за его пределы остаётся незамеченной (добавлено по P2-5 code review) |
+| `test/pf-test-tc-mapping-static.sh` | guard на TC-007: одноразовая самопроверка issue `20260806-bug-test-plan-tc-untracked` считала `develop...HEAD` и после мерджа той issue стала вечно красной на любой следующей ветке. Правка не относится к предмету этой issue, но без неё `make test` красный на этой ветке |
 
 `Makefile` не трогается: цикл `test:` подхватывает новый `test/*.sh` сам
 (исключены только `lib.sh` и `converge-migrate.sh`).
