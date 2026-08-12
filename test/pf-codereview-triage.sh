@@ -332,4 +332,38 @@ EOF
   fi
 fi
 
+# ─── Step 4: BR-5's first half must be an INSTRUCTION, not a mention ──────────
+# Step 3 above only proves the two mechanisms are described as distinct things.
+# It is satisfied by prose that merely names tech-debt.md in passing — which is
+# exactly what the skill had: one contrast sentence ("this is not the same
+# mechanism as ...") and one conditional staging clause ("when this run actually
+# wrote to them"), with no phase telling the agent to write anything. The rule
+# read as implemented and was not, so a PASS silently dropped its P2 rows: the
+# very "a finding disappears with nobody noticing" failure this issue exists to
+# remove. This step therefore requires an imperative on the PASS path, not a
+# reference: an append/record verb aimed at the file, near the PASS branch.
+if [ ! -f "$SKILL" ]; then
+  pf_fail "TC-012 step 4: skills/pf-codereview/SKILL.md does not exist (test infrastructure defect, not a rule failure)"
+else
+  # The instruction line itself, then a WINDOW after it for the id requirement.
+  # A line-scoped check for both would be wrong here: the id naturally appears in
+  # the example block a few lines below the sentence, and grep cannot cross a
+  # newline — a line-scoped guard would force the rule's wording to be shaped
+  # around the guard instead of the guard around the rule.
+  remnant_ln="$(grep -inE '(append|write|record|carry)[^.]{0,160}tech-debt\.md|tech-debt\.md[^.]{0,160}(append|write|record|carry)' "$SKILL" | head -1 | cut -d: -f1)"
+  id_near=0
+  if [ -n "$remnant_ln" ]; then
+    if sed -n "${remnant_ln},$((remnant_ln + 12))p" "$SKILL" | grep -qE 'CR-NNN|CR-[0-9]'; then
+      id_near=1
+    fi
+  fi
+  if [ -n "$remnant_ln" ] &&
+    grep -qiE 'remnant|left[- ]over|leftover' "$SKILL" &&
+    [ "$id_near" -eq 1 ]; then
+    pf_pass "TC-012 step 4: PASS-time remnants are written to tech-debt.md by an explicit instruction carrying the finding's ID, not merely mentioned"
+  else
+    pf_fail "TC-012 step 4: tech-debt.md is referenced but no step instructs writing remnants to it with their CR-NNN id — rule not documented in SKILL.md"
+  fi
+fi
+
 pf_summary

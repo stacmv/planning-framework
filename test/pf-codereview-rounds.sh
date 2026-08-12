@@ -299,7 +299,16 @@ else
   # technique required for TC-002/TC-004 — a bare unscoped grep for
   # "/pf-execute" and "PASS" would false-positive on Phase 0's prerequisite
   # messages and Phase 3's verdict rules elsewhere in this same file.
-  block="$(_pf_cr_block "$SKILL" 'budget exhaustion' '^(\*\*|## )')"
+  #
+  # Anchor on the block's OWN bold heading, not on any mention of the phrase.
+  # The earlier anchor ('budget exhaustion', case-insensitive) matched the
+  # cross-reference inside the PASS branch above it — "see Budget exhaustion
+  # immediately below" — and then ran to the next bold line, so the block it
+  # returned happened to include the real paragraph and the step passed for the
+  # wrong reason. It broke the moment another paragraph was inserted between the
+  # two, which is how this was found. Anchoring on the heading makes the step
+  # independent of what sits above it.
+  block="$(_pf_cr_block "$SKILL" '^\*\*Budget exhaustion' '^(\*\*|## )')"
   if [ -z "$block" ]; then
     pf_fail "TC-003 step 4: rule not documented in SKILL.md — no 'Budget exhaustion' section found"
   else
