@@ -85,6 +85,14 @@ For `size_tier` small/medium/large, read `docs/issues/open/[ACTIVE-ISSUE-ID]/imp
 3. **Identify dependencies** between tasks (what must be done before what)
 4. **Create each task** with:
    - Clear description including the specific files to create/modify
+   - **What counts as done** — an explicit, task-level completion criterion,
+     stated plainly rather than folded into the sub-agent instructions below:
+     this task is done when the files listed above reflect the change
+     described AND its mapped test cases (TCs) below pass. This is what
+     "Implement functionality to pass mapped TCs" in "For Each Task —
+     `write: claude`" below actually verifies against — stating it here too
+     makes it a completion criterion at task-creation time, not only an
+     instruction buried inside the sub-agent's own steps.
    - Mapped test cases (TCs) that verify the task
    - `blocked_by`: tasks that must complete first
    - `blocks`: tasks that depend on this one
@@ -132,16 +140,18 @@ Execute tasks using sub-agents for parallel processing:
    - Only start the next wave after this commit succeeds. A failed **push** does not block the next wave (the wave is committed locally); a failed **commit** does.
 
 ### For Each Task — `write: claude` (Sub-Agent Instructions)
-Unchanged from today (TC-013 — no regression):
-1. Use `TaskGet` to read full task details
+Dispatch via the `Agent` tool is unchanged (no regression on that mechanism). The steps below are revised so they stop asking the sub-agent for tools it does not have (AC-6.2, KI-1: confirmed via `ToolSearch` on two separate test sub-agents that `write: claude` sub-agents have no access to `TaskGet` or `TaskUpdate`):
+1. Work from the task's full content already included in this dispatch prompt — description, files, the "what counts as done" completion criterion, mapped TCs, and dependencies (the five-element minimum from "Create Tasks from Implementation Plan" above). Never fetch it via `TaskGet` — you do not have access to that tool.
 2. Create/modify specified files
 3. Implement functionality to pass mapped TCs
 4. **Self-verify the implementation:**
    - Check that code compiles/runs without errors
    - Verify the functionality matches test expectations
    - Ensure design consistency with existing patterns
-5. Use `TaskUpdate` to mark task complete with a brief summary of what was done
-6. Note any deviations, concerns, or discovered issues
+5. Return a completion summary as your final message, briefly describing what was done. Do not call `TaskUpdate` — you do not have access to that tool either. The orchestrator reads this final-message summary and calls `TaskUpdate` itself (see "Execution Strategy" point 6 above).
+6. Note any deviations, concerns, or discovered issues in that same final-message summary.
+
+**Numbering-mismatch immunity (AC-6.3).** The dispatch prompt above always includes the task's full content — description, files, completion criterion, mapped TCs, dependencies — never a bare task number or identifier alone. This explicitly covers the case where the orchestrator's own internal wave/task dispatch numbering does not match `implementation_plan.md`'s own `Task N` labels: a sub-agent must never be told to go look up "Task 3" by number alone, because that numbering does not always match, and doing so risks executing the wrong task entirely (the exact failure `prompt.md` item 7's second paragraph describes).
 
 ### For Each Task — `write != claude` (delegated actor)
 Not a sub-agent dispatch. The **orchestrating `pf-execute` session itself** performs every step below — sequentially, per delegated task, at the point in the wave described in "Execution Strategy" point 4 above:
@@ -153,7 +163,7 @@ Not a sub-agent dispatch. The **orchestrating `pf-execute` session itself** perf
 5. The orchestrator itself calls `TaskUpdate` to mark the task complete, with a brief summary of what was done. The delegated actor never calls `TaskUpdate` — it has no access to it.
 6. Note any deviations, concerns, or discovered issues the same way as for a `write: claude` task (see "If Issues Are Discovered" below).
 
-**Why the orchestrator, not the actor, reads and marks the task.** Today's `write: claude` path (above) instructs the dispatched Claude sub-agent to call `TaskGet` as its first action and `TaskUpdate` as its last. Per `prompt.md`'s "Учесть при реализации" note (2026-08-06, see also `20260806-improve-codereview-convergence` item 7), that channel does not actually work in practice: sub-agents were confirmed (via `ToolSearch`, on two separate test sub-agents) to have no access to `TaskGet`/`TaskUpdate` at all. **This task does not fix that existing `write: claude` breakage — it is explicitly out of scope here.** What it does do is avoid inheriting the same broken assumption in the new delegated path: a Codex actor invoked via `codex-companion.mjs` is not a Claude sub-agent at all, and has no access to these framework tools whatsoever — not merely "unavailable from sub-agent context" the way the `write: claude` case turned out to be, but genuinely inapplicable, since it isn't a Claude Code sub-agent in the first place. The orchestrating `pf-execute` session already holds `TaskGet`/`TaskUpdate` access (it is what called `TaskCreate` in Phase 1), so for delegated tasks it reads the task before the call and marks it complete after the call returns, instead of asking the actor to do either.
+**Why the orchestrator, not the actor, reads and marks the task.** Historically the `write: claude` path (above) instructed the dispatched Claude sub-agent to call `TaskGet` as its first action and `TaskUpdate` as its last. Per `prompt.md`'s "Учесть при реализации" note (2026-08-06, see also `20260806-improve-codereview-convergence` item 7), that channel does not work in practice: sub-agents were confirmed (via `ToolSearch`, on two separate test sub-agents) to have no access to `TaskGet`/`TaskUpdate` at all. **That breakage is now fixed** — `20260806-improve-codereview-convergence` rewrote those two steps (see the `write: claude` block above: the sub-agent works from the task content already in its dispatch prompt, and returns a completion summary the orchestrator reads before calling `TaskUpdate` itself). Both paths therefore now agree on who holds these tools, and both reach the same place from different directions: a Codex actor invoked via `codex-companion.mjs` is not a Claude sub-agent at all, and has no access to these framework tools whatsoever — not merely "unavailable from sub-agent context" the way the `write: claude` case turned out to be, but genuinely inapplicable, since it isn't a Claude Code sub-agent in the first place. The orchestrating `pf-execute` session already holds `TaskGet`/`TaskUpdate` access (it is what called `TaskCreate` in Phase 1), so for delegated tasks it reads the task before the call and marks it complete after the call returns, instead of asking the actor to do either.
 
 ### If Issues Are Discovered
 - Use `TaskCreate` to add new fix/bug tasks
