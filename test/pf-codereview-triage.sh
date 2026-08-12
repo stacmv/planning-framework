@@ -235,23 +235,92 @@ else
 
   grep -qiE 'tech-debt\.md' "$SKILL" && has_tech_debt=1
 
-  # "follow-up issue" mechanism, and it must be tied to P1 (not P0, not "all
-  # remnants") — require the word P1 to co-occur with "follow-up issue" in a
-  # small window, and require P0 NOT to co-occur with it (P0 must never gain
-  # this path).
-  followup_context="$(grep -inE -B2 -A2 'follow-up issue' "$SKILL")"
+  # The "follow-up issue" mechanism must be tied to P1, and P0 must be
+  # explicitly denied it (BR-1, AC-3.4).
+  #
+  # An earlier version of this check required simply that `P0` NOT appear
+  # within +-2 lines of any `follow-up issue` mention. That was inverted on
+  # the very invariant it exists to protect, in two ways at once:
+  #
+  #   1. It never required the P0 prohibition to be stated at all — text that
+  #      merely never mentions P0 passed. The most safety-critical sentence in
+  #      this section was therefore unchecked, and omitting it was rewarded.
+  #   2. It could not tell "P0 may never use this path" from "P0 may use this
+  #      path" — both put `P0` near the term — so writing the mandated
+  #      prohibition in the obvious words turned this step RED for correct
+  #      text, pushing an author toward wording that dodges the window
+  #      instead of toward saying the thing plainly.
+  #
+  # It now checks both directions positively: the prohibition must be present,
+  # and no granting phrasing may be. `pf_grants_p0` is deliberately the narrow
+  # half — a window mentioning P0 counts as granting only when it carries no
+  # negation, so a prohibition sentence is not mistaken for a grant.
+  followup_context="$(grep -inE -B2 -A2 'follow-up[- ]issue' "$SKILL")"
+
+  # Positive requirement: P0 is explicitly denied the follow-up route, and the
+  # denial must live in the section that documents that route — not just
+  # anywhere in the file. Scoping matters: a whole-file search is satisfied by
+  # any unrelated "P0 ... never" sentence (Phase 3's unconditional FAIL rule
+  # and Phase 3.5's bail-out text both contain one), so it would pass even
+  # with this section's prohibition deleted outright. Measured: deleting the
+  # prohibition left an unscoped version of this check green.
+  #
+  # The section is located by its own heading rather than by a hardcoded
+  # number, so renumbering a phase does not silently disable the check.
+  p0_denied=0
+  followup_section_start="$(grep -nE '^## Phase [0-9.]+:.*[Ff]ollow-[Uu]p' "$SKILL" | head -1 | cut -d: -f1)"
+  if [ -n "$followup_section_start" ]; then
+    followup_section_end="$(awk -v s="$followup_section_start" \
+      'NR > s && /^## / { print NR - 1; exit }' "$SKILL")"
+    [ -z "$followup_section_end" ] && followup_section_end="$(wc -l < "$SKILL")"
+    followup_section="$(sed -n "${followup_section_start},${followup_section_end}p" "$SKILL")"
+    if printf '%s' "$followup_section" |
+      grep -qiE '(not available|unavailable|never|no such path|not open|denied|cannot)[^.]{0,140}\bP0\b|\bP0\b[^.]{0,140}(never|not available|unavailable|no such path|cannot|denied)'; then
+      p0_denied=1
+    fi
+  fi
+
+  # Negative requirement: no passage may grant P0 the path. Scope this to
+  # lines that themselves name the mechanism — NOT the +-2 line window used
+  # above. Measured reason: the ledger's own priority-vocabulary bullet
+  # ("**Priority** — P0 (blocker) / P1 ...") sits within two lines of the
+  # Description bullet that mentions the follow-up-issue path, so a windowed
+  # check flags a plain vocabulary enumeration as if it granted P0 a route.
+  # A grant has to say both things in one breath, so one line is the right
+  # unit: "a P0 finding may also be resolved via a follow-up issue" is caught,
+  # an adjacent list of what P0/P1/P2 mean is not.
+  p0_granted=0
+  while IFS= read -r ctx_line; do
+    case "$ctx_line" in
+      *P0*)
+        printf '%s' "$ctx_line" |
+          grep -qiE 'never|not available|unavailable|no such path|cannot|not open|denied' ||
+          p0_granted=1
+        ;;
+    esac
+  done <<EOF
+$(grep -inE 'follow-up[- ]issue' "$SKILL")
+EOF
+
   if [ -n "$followup_context" ] &&
     printf '%s' "$followup_context" | grep -qE '\bP1\b' &&
-    ! printf '%s' "$followup_context" | grep -qE '\bP0\b'; then
+    [ "$p0_denied" -eq 1 ] &&
+    [ "$p0_granted" -eq 0 ]; then
     has_followup_p1=1
   fi
 
   if [ "$has_tech_debt" -eq 1 ] && [ "$has_followup_p1" -eq 1 ]; then
-    pf_pass "TC-012 step 3: PASS-time remnants (tech-debt.md) and the P1-only follow-up-issue gate path are documented as two distinct mechanisms"
+    pf_pass "TC-012 step 3: PASS-time remnants (tech-debt.md) and the P1-only follow-up-issue gate path are documented as two distinct mechanisms, with P0 explicitly denied that path and nowhere granted it"
   else
     missing=()
     [ "$has_tech_debt" -eq 0 ] && missing+=("PASS-time remnants -> docs/planning/tech-debt.md not documented")
-    [ "$has_followup_p1" -eq 0 ] && missing+=("follow-up issue as a P1-only gate-passing path not documented (or not scoped to P1 only)")
+    if [ "$has_followup_p1" -eq 0 ]; then
+      [ -z "$followup_context" ] && missing+=("no 'follow-up issue' mechanism documented at all")
+      [ -n "$followup_context" ] && ! printf '%s' "$followup_context" | grep -qE '\bP1\b' &&
+        missing+=("follow-up-issue path not scoped to P1")
+      [ "$p0_denied" -eq 0 ] && missing+=("P0 is never explicitly denied the follow-up-issue path (BR-1/AC-3.4 prohibition absent)")
+      [ "$p0_granted" -eq 1 ] && missing+=("a follow-up-issue passage mentions P0 without denying it the path — reads as granting P0 a gate-passing route")
+    fi
     pf_fail "TC-012 step 3: BR-5's two mechanisms are not both documented distinctly — rule not documented in SKILL.md (${missing[*]})"
   fi
 fi
