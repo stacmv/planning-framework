@@ -198,16 +198,41 @@ _pf_status_tracker_rows() {
 # of calls on this platform's process-substitution implementation. Fully
 # materializing the rows (now done once, by the caller) removes the live
 # pipe entirely.
+#
+# CR-015 (round 3 code review): <tc-id> can legitimately have MORE THAN ONE
+# row in a malformed <rows-text> (a duplicated TC-ID in test_plan.md's
+# Status Tracker — a defect in that document, not in this helper, but one
+# this helper must not paper over). An earlier version returned the FIRST
+# matching row's Type and silently ignored every later one: with `TC-001`
+# listed twice — `Manual` first, `Auto` below — an unclosed Acceptance
+# Criteria line naming only `TC-001` read as "Manual" and slipped through
+# Check 1's carve-out, even though the case is actually Auto. This version
+# scans EVERY row for <tc-id> and returns `Manual` only when ALL of them
+# say exactly `Manual`; if any matching row disagrees, it returns a value
+# that is deliberately never the literal string `Manual` (so every caller's
+# existing `[ "$t" = "Manual" ]` check fails closed on the divergence,
+# without those callers needing to know anything changed here).
 _pf_status_tracker_type_of() {
   local tc="$1" rows="$2"
   local row_tc row_type
+  local found=0 all_manual=1 first_type=""
   while IFS=$'\t' read -r row_tc row_type; do
     if [ "$row_tc" = "$tc" ]; then
-      printf '%s' "$row_type"
-      return 0
+      found=1
+      [ -z "$first_type" ] && first_type="$row_type"
+      [ "$row_type" = "Manual" ] || all_manual=0
     fi
   done <<<"$rows"
-  return 1
+
+  if [ "$found" -eq 0 ]; then
+    return 1
+  fi
+  if [ "$all_manual" -eq 1 ]; then
+    printf '%s' "Manual"
+  else
+    printf 'CONFLICT:%s' "$first_type"
+  fi
+  return 0
 }
 
 # _pf_status_tracker_tc_ids <test_plan.md>
@@ -262,20 +287,44 @@ pf_execute_all_tasks_checked() {
   return 0
 }
 
-# _pf_task_rule_ok <task-type> <mapped-field-text> <acceptance-criteria-text> <test_plan.md>
+# _pf_task_rule_ok <task-type> <mapped-field-text> <acceptance-criteria-text> <tracker-tc-ids>
 #
 # Task-Type-aware rule for a single task (Check 2 for `code`, Check 2b for
 # `tests`; every other/missing Task Type falls back to the Check 2 / `code`
 # rule, matching pf-execute/SKILL.md's own documented missing-field default).
 #
+# <tracker-tc-ids> is the FULL, already-materialized, newline-separated set
+# of every TC-ID that has a Status Tracker row (the caller's own
+# `_pf_status_tracker_tc_ids "$test_plan" | sort -u`, computed ONCE per
+# `pf_execute_task_has_test` call) — never a file path this function reads
+# and re-parses itself. Before round 3 code review (CR-016), the `tests`
+# branch below took <test_plan.md> instead and called
+# `_pf_status_tracker_tc_ids "$test_plan"` fresh inside its own per-TC-ID
+# loop — the exact re-parse-per-iteration pattern CR-012 had already been
+# fixed out of Check 1 (`pf_execute_all_tasks_checked`, above), reintroduced
+# next to it by the fix that added Check 2b's tracker cross-reference. No
+# reproducible timing failure was ever demonstrated for either case (real
+# issue files: ~1s; a synthetic 50x50 plan: ~0s, unloaded machine) — this is
+# a consistency cleanup, not a fix for a measured slowdown.
+#
 # Check 2b (round 2 code review, Finding 1): naming a `TC-\d+` literal in
 # Acceptance Criteria is not enough by itself — every such literal must also
-# have a real row in <test_plan.md>'s Status Tracker, the same fail-closed
-# cross-reference Check 1 uses. A task whose Acceptance Criteria names only
-# a fabricated ID (e.g. `TC-999`, no Status Tracker row at all) still fails
-# this rule, even though a `TC-\d+`-shaped literal is syntactically present.
+# have a real row in the Status Tracker, the same fail-closed cross-reference
+# Check 1 uses. A task whose Acceptance Criteria names only a fabricated ID
+# (e.g. `TC-999`, no Status Tracker row at all) still fails this rule, even
+# though a `TC-\d+`-shaped literal is syntactically present.
+#
+# Check 2 (round 3 code review, CR-013): the exact same tracker-existence
+# requirement now applies to the `code` branch — naming a `TC-\d+` literal in
+# `**Mapped Test Cases:**` is not enough by itself either; every such literal
+# must also have a real Status Tracker row. Before this fix, a `code` task
+# could self-certify against a fabricated case (`TC-999`, no tracker row) and
+# every check in the completeness gate stayed green: Check 1 doesn't look at
+# this task's field at all, this rule only checked the literal's shape, and
+# Check 3 is sourced from the tracker so it never saw the fabricated ID
+# either — three green checks around one undetected gap.
 _pf_task_rule_ok() {
-  local ttype="$1" mapped="$2" ac="$3" test_plan="$4"
+  local ttype="$1" mapped="$2" ac="$3" tracker_tc_ids="$4"
   case "$ttype" in
     tests)
       # Check 2b: at least one TC-\d+ literal named in Acceptance Criteria,
@@ -284,13 +333,21 @@ _pf_task_rule_ok() {
       while IFS= read -r tc; do
         [ -z "$tc" ] && continue
         found_any=1
-        _pf_status_tracker_tc_ids "$test_plan" | grep -qx "$tc" || return 1
+        printf '%s\n' "$tracker_tc_ids" | grep -qx "$tc" || return 1
       done < <(printf '%s' "$ac" | grep -oE 'TC-[0-9]+')
       [ "$found_any" -eq 1 ]
       ;;
     *)
-      # Check 2: Mapped Test Cases field itself must be non-empty.
-      printf '%s' "$mapped" | grep -qE 'TC-[0-9]+'
+      # Check 2: Mapped Test Cases field must name at least one TC-\d+, AND
+      # every TC-\d+ it names must exist as a Status Tracker row (CR-013 —
+      # the same fail-closed cross-reference Check 2b already applies above).
+      local tc found_any=0
+      while IFS= read -r tc; do
+        [ -z "$tc" ] && continue
+        found_any=1
+        printf '%s\n' "$tracker_tc_ids" | grep -qx "$tc" || return 1
+      done < <(printf '%s' "$mapped" | grep -oE 'TC-[0-9]+')
+      [ "$found_any" -eq 1 ]
       ;;
   esac
 }
@@ -303,19 +360,24 @@ _pf_task_rule_ok() {
 # prose is ever consulted. Prints the name of every task that fails its
 # Task-Type rule (one per line) and returns 1 if any did; returns 0 (no
 # output) if every task passed. `test_plan.md` is REQUIRED (round 2 code
-# review, Finding 1): Check 2b's `tests` branch cross-references every named
-# `TC-\d+` against its Status Tracker via `_pf_task_rule_ok` above — Check 2
-# (`code` branch) does not read it, but the parameter is shared across both
-# branches of one Task-Type-aware helper.
+# review, Finding 1; round 3, CR-013): both the `tests` branch (Check 2b)
+# and the `code` branch (Check 2) cross-reference every named `TC-\d+`
+# against the Status Tracker via `_pf_task_rule_ok` above. The tracker's
+# TC-ID set is read ONCE here — via `_pf_status_tracker_tc_ids | sort -u` —
+# and passed into every `_pf_task_rule_ok` call below, rather than each call
+# (or, worse, each TC-ID within a call) re-reading and re-parsing
+# test_plan.md itself (CR-016; see `_pf_task_rule_ok`'s docstring).
 pf_execute_task_has_test() {
   local plan="$1" test_plan="$2"
   local failing=()
   local task_name="" task_type="" mapped="" ac_text="" in_ac=0 have_task=0
   local line
+  local tracker_tc_ids
+  tracker_tc_ids="$(_pf_status_tracker_tc_ids "$test_plan" | LC_ALL=C sort -u)"
 
   while IFS= read -r line || [ -n "$line" ]; do
     if [[ "$line" =~ ^####[[:space:]]+(Task[^:]*): ]]; then
-      if [ "$have_task" -eq 1 ] && ! _pf_task_rule_ok "$task_type" "$mapped" "$ac_text" "$test_plan"; then
+      if [ "$have_task" -eq 1 ] && ! _pf_task_rule_ok "$task_type" "$mapped" "$ac_text" "$tracker_tc_ids"; then
         failing+=("$task_name")
       fi
       task_name="${BASH_REMATCH[1]}"
@@ -356,7 +418,7 @@ $line"
     fi
   done <"$plan"
 
-  if [ "$have_task" -eq 1 ] && ! _pf_task_rule_ok "$task_type" "$mapped" "$ac_text" "$test_plan"; then
+  if [ "$have_task" -eq 1 ] && ! _pf_task_rule_ok "$task_type" "$mapped" "$ac_text" "$tracker_tc_ids"; then
     failing+=("$task_name")
   fi
 
@@ -504,6 +566,21 @@ else
   pf_pass "TC-013 step 2e (Finding 1, empty Type column): pf_execute_all_tasks_checked(notype-unchecked) == false, names: ${out#*:} — empty-Type-column row still blocks"
 fi
 
+# ─── round 3 code review, CR-015: duplicate Status Tracker row, divergent Type
+# TC-001 has TWO rows in the companion test_plan.md's Status Tracker — first
+# Manual, then Auto. A helper that trusts only the first match would read
+# "Manual" and let this unchecked line through the carve-out even though the
+# case is actually Auto. It must still block: the carve-out only applies when
+# EVERY row for a named case exists and says exactly Manual.
+DUP_TYPE_PLAN="$FIX/tracker-duplicate-type/implementation_plan.md"
+DUP_TYPE_TP="$FIX/tracker-duplicate-type/test_plan.md"
+
+if out="$(pf_execute_all_tasks_checked "$DUP_TYPE_PLAN" "$DUP_TYPE_TP")"; then
+  pf_fail "TC-013 step 2f (CR-015 mutation proof): pf_execute_all_tasks_checked(tracker-duplicate-type) unexpectedly true — TC-001 has a duplicated Status Tracker row (Manual then Auto); the divergence must still block, not resolve to whichever row came first"
+else
+  pf_pass "TC-013 step 2f (CR-015 mutation proof): pf_execute_all_tasks_checked(tracker-duplicate-type) == false, names: ${out#*:} — duplicate row with divergent Type still blocks"
+fi
+
 if block="$(_pf_anchor_slice "$EXEC_SKILL" 'Check 1' 12)" &&
   printf '%s' "$block" | grep -qiE 'block|blocking|hard stop|блокир|останавлив'; then
   pf_pass "TC-013 step 3: checkbox-completeness rule (Check 1) documented and marked blocking in skills/pf-execute/SKILL.md"
@@ -552,6 +629,28 @@ if [ "$unknown_tc_rc" -ne 0 ] && printf '%s\n' "$unknown_tc_out" | grep -qx 'Tas
   pf_pass "TC-014 step 2b (Finding 1 mutation proof): pf_execute_task_has_test(coverage-forward-tests-unknown-tc) flags Task 2 — TC-999 named in Acceptance Criteria has no Status Tracker row at all"
 else
   pf_fail "TC-014 step 2b (Finding 1 mutation proof): unexpected result (rc=$unknown_tc_rc, failing task(s): [$unknown_tc_out]) — a fabricated TC-ID with no tracker row must still block Check 2b"
+fi
+
+# ─── round 3 code review, CR-013: Check 2 (`code` branch) tracker-existence
+# mutation proof — the symmetric half of Finding 1 above, for `code` tasks
+# instead of `tests` tasks. Task 1 is `code`-typed and names `TC-999` in its
+# own `**Mapped Test Cases:**` field — a well-formed literal, but `TC-999`
+# has NO row at all in the companion test_plan.md's Status Tracker. Task 2
+# (also `code`-typed) names `TC-001`, which DOES have a tracker row, and
+# alone closes Check 3 (every TC has a task) — before this fix, Check 1,
+# Check 2 and Check 3 were all green on this exact input and Task 1
+# self-certified against a fabricated case undetected.
+CODE_UNKNOWN_TC_PLAN="$FIX/coverage-forward-code-unknown-tc/implementation_plan.md"
+CODE_UNKNOWN_TC_TP="$FIX/coverage-forward-code-unknown-tc/test_plan.md"
+
+code_unknown_tc_out="$(pf_execute_task_has_test "$CODE_UNKNOWN_TC_PLAN" "$CODE_UNKNOWN_TC_TP")"
+code_unknown_tc_rc=$?
+if [ "$code_unknown_tc_rc" -ne 0 ] &&
+  printf '%s\n' "$code_unknown_tc_out" | grep -qx 'Task 1' &&
+  ! printf '%s\n' "$code_unknown_tc_out" | grep -qx 'Task 2'; then
+  pf_pass "TC-014 step 2c (CR-013 mutation proof): pf_execute_task_has_test(coverage-forward-code-unknown-tc) flags Task 1 (TC-999 in Mapped Test Cases has no Status Tracker row at all) and spares Task 2 (TC-001, a real row)"
+else
+  pf_fail "TC-014 step 2c (CR-013 mutation proof): unexpected result (rc=$code_unknown_tc_rc, failing task(s): [$code_unknown_tc_out]) — a code task naming a fabricated TC-ID with no tracker row must still block Check 2, symmetric with Check 2b"
 fi
 
 # Direction self-test: the forward pattern must NOT be satisfied by
