@@ -1902,11 +1902,24 @@ sec45_021="$(pf_ptp_phase45_section)"
 has_abort_consequence021=0
 has_area_consequence021=0
 printf '%s\n' "$sec45_021" | grep -qiE 'Step 2 aborts outright' && has_abort_consequence021=1
-printf '%s\n' "$sec45_021" | grep -qiE 'second.{0,10}merge commit' && has_area_consequence021=1
-if [ "$has_abort_consequence021" -eq 1 ] && [ "$has_area_consequence021" -eq 1 ]; then
-  pf_pass "TC-021 step 7: Phase 4.5 явно называет оба следствия сохранения частичной записи — отказ checkout (Step 2 aborts outright) и неверный Area из-за второго merge-коммита"
+printf '%s\n' "$sec45_021" | grep -qiE 'half-written row is committed|truncated mid-line' && has_area_consequence021=1
+# The second consequence used to be "Area comes out wrong", and this guard used
+# to grep for it. That claim stopped being true once step 5 was keyed on the
+# issue's FIRST merge instead of HEAD (pass 3 fix): a second merge commit no
+# longer changes the file set Area measures. Grepping the old wording did not
+# just go stale — it actively pinned an internally contradictory statement in
+# place, so correcting the prose would have turned this assertion red (pass 4,
+# P1). The guard now asserts the consequence that IS still true: a preserved
+# partial write commits a possibly-truncated row into the issue branch. Area's
+# own correctness on that topology is covered where it belongs, by the real git
+# probe in TC-010 step 6, not by grepping prose here.
+has_area_superseded021=0
+printf '%s\n' "$sec45_021" | grep -qiE 'no longer corrupts .?Area' && has_area_superseded021=1
+if [ "$has_abort_consequence021" -eq 1 ] && [ "$has_area_consequence021" -eq 1 ] &&
+  [ "$has_area_superseded021" -eq 1 ]; then
+  pf_pass "TC-021 step 7: Phase 4.5 называет действующие следствия сохранения частичной записи (отказ checkout, закоммиченная недописанная строка) и явно отмечает, что Area больше не страдает — привязка к первому мерджу"
 else
-  pf_fail "TC-021 step 7: Phase 4.5 не называет оба следствия сохранения частичной записи (abort found: $has_abort_consequence021, second-merge/Area found: $has_area_consequence021)"
+  pf_fail "TC-021 step 7: Phase 4.5 не согласована по следствиям сохранения частичной записи (abort=$has_abort_consequence021, half-written row=$has_area_consequence021, Area-superseded=$has_area_superseded021)"
 fi
 
 # ─── step 8 (added by code review pass 3, P2-2) ──────────────────────────────
