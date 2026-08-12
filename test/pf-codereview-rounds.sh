@@ -174,9 +174,17 @@ else
     threshold=0
     destination=0
     plan_tasks=0
+    # CR-004: the digit/word must sit right next to the threshold phrase
+    # itself ("<N|three> or more block...") — NOT just anywhere in the whole
+    # Phase 3.5 block. A bare whole-block search for a lone "3" is satisfied
+    # by this same block's own introductory sentence ("This check runs
+    # immediately after Phase 3 first writes…"), which supplies a "3" from
+    # "Phase 3" regardless of what the real escalation threshold says.
+    # Flattened to one line first so the anchor still works if this paragraph
+    # is ever hard-wrapped across multiple physical lines.
+    flat_block="$(printf '%s' "$block" | tr '\n' ' ')"
     if printf '%s\n' "$block" | grep -qiE 'round 1' &&
-      printf '%s\n' "$block" | grep -qE '(^|[^0-9])3([^0-9]|$)|\bthree\b' &&
-      printf '%s\n' "$block" | grep -qiE 'block'; then
+      printf '%s' "$flat_block" | grep -qiE '(^|[^0-9])3[[:space:]]+or[[:space:]]+more[[:space:]]+block|\bthree[[:space:]]+or[[:space:]]+more[[:space:]]+block'; then
       threshold=1
     fi
     printf '%s\n' "$block" | grep -qE '/pf-execute' && destination=1
@@ -227,6 +235,30 @@ else
     pf_pass "TC-003 step 1: pf_cr_budget_decision(round=budget, open_blocking>0) = return-to-execute"
   else
     pf_fail "TC-003 step 1: expected return-to-execute, got '$got'"
+  fi
+fi
+
+# Step 1b (CR-001): round > budget, not just round == budget. The ledger's
+# round counter is append-only and never resets — including across this
+# exact escalation path — so a later cycle's first fresh round can already
+# start above the budget. Before CR-001, Phase 4 branched only on
+# `round < review_rounds` and `round == review_rounds`; a round strictly
+# greater than the budget fell into neither branch. The helper above already
+# uses `-lt`/`else` rather than `-eq`, so it was never the gap — this fixture
+# is what was missing (test_plan.md's TC-003 Preconditions never listed a
+# round > budget case at all).
+if [ ! -f "$FIXDIR/budget-exceeded-open.md" ]; then
+  pf_fail "TC-003 step 1b: (infra) fixture missing — $FIXDIR/budget-exceeded-open.md"
+else
+  fx="$FIXDIR/budget-exceeded-open.md"
+  round="$(_pf_cr_read_field "$fx" round)"
+  budget="$(_pf_cr_read_field "$fx" budget)"
+  open_blocking="$(_pf_cr_read_field "$fx" open_blocking)"
+  got="$(pf_cr_budget_decision "$round" "$budget" "$open_blocking")"
+  if [ "$got" = "return-to-execute" ]; then
+    pf_pass "TC-003 step 1b: pf_cr_budget_decision(round=4, budget=3, open_blocking>0) = return-to-execute — round > budget is also exhausted, not just round == budget"
+  else
+    pf_fail "TC-003 step 1b: expected return-to-execute, got '$got'"
   fi
 fi
 

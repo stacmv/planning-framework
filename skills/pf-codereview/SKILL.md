@@ -130,10 +130,10 @@ Write `docs/issues/open/ISSUE-ID/code_review.md`, mirroring `qa_report.md`'s ver
 
 ## Findings Ledger
 
-| ID | Round | Priority | Description | State |
-|----|-------|----------|--------------|-------|
-| CR-001 | 1 | P0 | [failure scenario the finding names] | open |
-| CR-002 | 1 | P2 | [description] | open |
+| ID | Round | Priority | Description | Follow-up Issue | State |
+|----|-------|----------|--------------|------------------|-------|
+| CR-001 | 1 | P0 | [failure scenario the finding names] |  | open |
+| CR-002 | 1 | P2 | [description] |  | open |
 
 ---
 
@@ -142,13 +142,14 @@ Write `docs/issues/open/ISSUE-ID/code_review.md`, mirroring `qa_report.md`'s ver
 **PASS**
 ```
 
-**Append-only (BR-8).** Each row's ID is a stable, permanent identifier in the format `CR-NNN` — three digits, zero-padded (e.g. `CR-001`, `CR-014`) — assigned once, sequentially (highest existing number + 1), and never reused. A later Phase 3 run, on this round or any later one, only ever does one of two things to this table: **appends** a brand-new `CR-NNN` row for a newly reported finding, or **updates the `State` cell** of an already-existing row. It never rewrites or deletes a previously written row's ID, round number, or description — that identity is permanent once written.
+**Append-only (BR-8).** Each row's ID is a stable, permanent identifier in the format `CR-NNN` — three digits, zero-padded (e.g. `CR-001`, `CR-014`) — assigned once, sequentially (highest existing number + 1), and never reused. A later Phase 3 run, on this round or any later one, only ever does one of three things to this table: **appends** a brand-new `CR-NNN` row for a newly reported finding, **updates the `State` cell** of an already-existing row, or **fills in the `Follow-up Issue` cell** of an already-existing row (Phase 3.6) — the one other cell a row may receive a value into after its initial append. It never rewrites or deletes a previously written row's ID, round number, or description — that identity is permanent once written.
 
 **Fields, at minimum, per row:**
 - **ID** — the stable `CR-NNN` described above.
 - **Round** — the review round this finding was first reported in. This is the one authoritative round counter this skill uses anywhere (Phase 4's round-budget/escalation logic reads it) — no second, separate round counter is introduced.
 - **Priority** — P0 (blocker) / P1 (important) / P2 (minor).
-- **Description** — the finding itself (for a P1 resolved via Phase 3.6's follow-up-issue path, its created issue's ID/path is recorded here too).
+- **Description** — the finding itself (Phase 2.5's reclassification note, when one applies, is part of this text from the row's first write — see Phase 2.5). Permanent once written, exactly like ID and Round above — it never gains a follow-up-issue reference or any other text appended later (see the dedicated field below).
+- **Follow-up Issue** — empty for almost every row. It is the only column a row may receive a value into after that row's first append: Phase 3.6 fills it in later, once a P1 finding is resolved via a follow-up issue instead of a fix, holding that issue's created ID or path. `ID`, `Priority`, and `Description` keep the permanence rule above with no qualification of any kind — this dedicated column is what makes that possible.
 - **State** — exactly one of the six values below.
 
 **Closed state dictionary — exactly six values, verbatim.** A finding's `State` cell holds exactly one of:
@@ -186,7 +187,7 @@ Each finding converted into a task this way must carry a non-empty `**Mapped Tes
 
 This is a ledger-level resolution, not a third choice in Phase 4's gate — Phase 4 still asks only its two documented options, and this mechanism never becomes a third `AskUserQuestion` option there. It is another way a `CR-NNN` row reaches a terminal `State`, alongside the other terminal values in Phase 3's closed state dictionary.
 
-When a P1 finding is judged better handled as its own follow-up issue than fixed in this review cycle: file a new issue for it the normal way (`docs/issues/open/<new-issue-id>/`), set that finding's `CR-NNN` row `State` to `deferred`, and append the new issue's ID or path into that same row's Description cell (e.g. "... — deferred, see follow-up issue <new-issue-id>"). Recording the ID there is not optional — an unlinked `deferred` reads exactly like a silently dropped finding, which is what US-2 ("a finding never disappears silently") forbids. Once the row reads `deferred`, Phase 3's Verdict rule treats it like any other terminal state, not open — the same open/terminal distinction TC-006 and TC-008 already establish, not a new blocking rule of its own.
+When a P1 finding is judged better handled as its own follow-up issue than fixed in this review cycle: file a new issue for it the normal way (`docs/issues/open/<new-issue-id>/`), set that finding's `CR-NNN` row `State` to `deferred`, and record the new issue's ID or path in that same row's dedicated `Follow-up Issue` field (Phase 3's field list above) — never in the `Description` cell, which BR-8 keeps permanent from the row's first write. Recording the ID there is not optional — an unlinked `deferred` reads exactly like a silently dropped finding, which is what US-2 ("a finding never disappears silently") forbids. Once the row reads `deferred`, Phase 3's Verdict rule treats it like any other terminal state, not open — the same open/terminal distinction TC-006 and TC-008 already establish, not a new blocking rule of its own.
 
 This changes only the row's `State`, never its `Priority` — a P1 finding resolved this way stays `P1` in the ledger; it is not the same operation as Phase 2.5's reclassification, which changes `Priority` itself. `State` and `Priority` remain two separate columns doing two separate jobs.
 
@@ -204,11 +205,11 @@ This section's resolution is not available to P0: a P0 row never reaches `deferr
 
 **Round number.** This skill keeps exactly one round counter: the highest `Round` value recorded anywhere in `code_review.md`'s findings ledger (Phase 3), plus 1 for a fresh review about to run — or round `1` when the ledger is empty (the first review ever run for this issue). No second, separate round counter is introduced anywhere in this skill; that would be exactly the kind of "two mechanisms for one fact" the BRD flags as a defect (the same principle behind AC-3.2's ban on a parallel `blocking:` field alongside priority).
 
-**If Phase 3 produced `verdict: PASS`** (no open P0/P1): report the result and stop here — no `AskUserQuestion` is needed, there is nothing to resolve. State the next step: "Code review passed. Run /pf-test." This holds regardless of round number — a clean review closes the cycle even on the round equal to the budget (see Budget exhaustion immediately below).
+**If Phase 3 produced `verdict: PASS`** (no open P0/P1): report the result and stop here — no `AskUserQuestion` is needed, there is nothing to resolve. State the next step: "Code review passed. Run /pf-test." This holds regardless of round number — a clean review closes the cycle even on a round at or beyond the budget (see Budget exhaustion immediately below).
 
-**Budget exhaustion (AC-1.3, BR-7).** When the current round equals `review_rounds` (the budget) and at least one P0/P1 finding is still open in the ledger, this cycle has exhausted its budget: write `verdict` as not `PASS` (never `PASS` while a blocking finding remains open — Phase 3's unconditional FAIL rule above already guarantees this) and do not loop again into another round — an exhausted budget must never turn into an infinite loop of further rounds; instead, take the same path as Phase 3.5's early bail-out above: convert every remaining open P0/P1 finding into a new task appended to `implementation_plan.md`, each with a non-empty `Mapped Test Cases:` field naming the TC-ID(s) it must keep passing, and route the issue back to `/pf-execute`. When the current round equals the budget but this round's own review is clean (no open P0/P1 — the `verdict: PASS` bullet above already covers this case), the cycle closes as `PASS` regardless of round number: the budget is a trigger for escalation, never a ceiling that blocks a legitimate `PASS`.
+**Budget exhaustion (AC-1.3, BR-7).** The round budget is exhausted for any round **at or beyond** `review_rounds` (`round >= review_rounds`), not only the round that matches it exactly: the ledger's round counter is append-only and never resets — including after this very escalation path routes the issue back to `/pf-execute` and a fix returns for re-review — so a later cycle's first fresh round can already sit above the budget the moment it starts, and that round is exhausted from the outset, not exempt from this rule because no round happens to equal the budget precisely. When the current round is `>= review_rounds` and at least one P0/P1 finding is still open in the ledger, this cycle has exhausted its budget: write `verdict` as not `PASS` (never `PASS` while a blocking finding remains open — Phase 3's unconditional FAIL rule above already guarantees this) and do not loop again into another round — an exhausted budget must never turn into an infinite loop of further rounds; instead, take the same path as Phase 3.5's early bail-out above: convert every remaining open P0/P1 finding into a new task appended to `implementation_plan.md`, each with a non-empty `Mapped Test Cases:` field naming the TC-ID(s) it must keep passing, and route the issue back to `/pf-execute`. When the current round is `>= review_rounds` but this round's own review is clean (no open P0/P1 — the `verdict: PASS` bullet above already covers this case), the cycle closes as `PASS` regardless of round number: the budget is a trigger for escalation, never a ceiling that blocks a legitimate `PASS`.
 
-**If Phase 3 produced `verdict: FAIL`** (at least one open P0/P1) **and the current round is below the budget** (`round < review_rounds` — once the round reaches the budget, the Budget exhaustion rule above applies instead): present the findings, then use `AskUserQuestion` with **exactly these two options — never a third "skip" option**:
+**If Phase 3 produced `verdict: FAIL`** (at least one open P0/P1) **and the current round is below the budget** (`round < review_rounds` — once the round reaches or exceeds the budget, the Budget exhaustion rule above applies instead, covering every round from that point on, not just the one round that equals the budget): present the findings, then use `AskUserQuestion` with **exactly these two options — never a third "skip" option**:
 
 **"How would you like to proceed?"**
 - **Fix now** — I'll address all P0 and P1 findings and update the code. I'll ask you clarifying questions where needed.

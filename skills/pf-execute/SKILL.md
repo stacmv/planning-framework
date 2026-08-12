@@ -106,10 +106,12 @@ For `size_tier` small/medium/large, read `docs/issues/open/[ACTIVE-ISSUE-ID]/imp
      **Missing-field fallback:** a plan generated before this issue, or
      hand-edited without the field, may have a task with no `Task Type` at
      all. Carry no `Task Type` for that task rather than inventing one here
-     — Phase 2 is the single place that applies the "absent → `code`"
-     default (see "Execution Strategy" point 2 there). Do not stamp
-     `Task Type: code` at creation time; that would create a second,
-     redundant fallback mechanism instead of one.
+     — Phase 2 applies the "absent → `code`" default when it resolves this
+     task's write actor (see "Execution Strategy" point 2 there; the
+     completeness gate below separately reads the same default for its own,
+     different purpose). Do not stamp `Task Type: code` at creation time;
+     that would create a second, redundant fallback mechanism instead of
+     one.
 
 ---
 
@@ -120,7 +122,7 @@ Execute tasks using sub-agents for parallel processing:
 
 1. **Group tasks into waves** based on dependencies
 2. **Resolve each task's write actor before dispatching it.** For `size_tier` small/medium/large, each task's `Task Type` (`code` | `tests`) was already carried into the task's own description/metadata at creation time (Phase 1, "Create Tasks from Implementation Plan") — read it from there, not by re-reading `implementation_plan.md` from scratch for each task.
-   - **Missing-field fallback — the single place this default is applied.** If a task has no `Task Type` at all (a plan generated before this issue, or hand-edited without the field, so Phase 1 carried nothing), default to `code` here — not `tests`, and not a stop/error. This keeps an old or hand-edited plan executable instead of breaking role resolution below. Phase 1 deliberately does not stamp this default at creation time, to avoid two mechanisms for one rule.
+   - **Missing-field fallback.** If a task has no `Task Type` at all (a plan generated before this issue, or hand-edited without the field, so Phase 1 carried nothing), default to `code` here — not `tests`, and not a stop/error. This keeps an old or hand-edited plan executable instead of breaking role resolution below. Phase 1 deliberately does not stamp this default at creation time, to avoid two mechanisms for one rule. **This is not the only place this default is read:** the completeness gate later in this skill (Phase 3.5) applies the same absent-`Task Type`-means-`code` rule for a different purpose — not resolving a write actor, but deciding which forward-direction completeness check applies to a task that carries no `Task Type` at all. Both places must stay in sync with this one rule; changing the default here changes what that gate does too.
    - **`size_tier: trivial` has no `Task Type` field at all** (Phase 1 says so explicitly) — always resolve for `code`, never `tests`, for every task in that tier. This is the same `code` default as the missing-field fallback above, for the same reason: trivial-tier plans simply never carry the field.
    - **`Task Type: docs` should never reach this point.** Phase 1's task-creation step (point 2 there) stops before creating any tasks if `implementation_plan.md` contains a `docs`-typed task, specifically so this dispatch-time check never has to strand a partially-run wave. If a `docs`-typed task is somehow encountered here anyway (e.g. `TaskCreate` was called by hand, bypassing Phase 1), treat it the same way: stop and surface it to the user as an unsupported task type — do not resolve it as `code` or `tests`, and do not dispatch it. A wave containing a stopped task cannot be confirmed complete (point 6 below), so the wave, and any wave after it, does not proceed until this is resolved.
 

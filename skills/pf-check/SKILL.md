@@ -156,10 +156,20 @@ If "I'll fix manually" or "Skip and continue": confirm the choice and state the 
 
 The **"Fix now"** path always has something to commit (the document the fix actor edited). The other two options ("I'll fix manually" / "Skip and continue") change no file on their own — **except** when the automigration step above fired for this issue during this same invocation, in which case `prompt.md` changed even though the review gate itself changed nothing; stage and commit that edit too. Only skip this whole section (no commit at all) when neither the fix actor nor automigration touched anything this run.
 
-**Unconditional check-passed marker (AC-5.3).** Regardless of which of the three gate options above was chosen, and regardless of autopilot, append the line below to the issue's session log, filling in `<TARGET>` and `<UTC-ISO-8601-timestamp>`. This write always happens — it is independent of the autopilot-only `[autopilot default]` line above, which only fires inside that branch and does not cover the ordinary interactive path:
+**Check-outcome marker (AC-5.3) — always written, but its content carries the gate's outcome, not merely the fact that the stage ran.** Regardless of which of the three gate options above was chosen, and regardless of autopilot, append exactly one of the two lines below to the issue's session log, filling in `<TARGET>` and `<UTC-ISO-8601-timestamp>`. This write always happens — it is independent of the autopilot-only `[autopilot default]` line above, which only fires inside that branch and does not cover the ordinary interactive path. Which line to write is decided by whether the findings that fed the gate above contained any P0/P1, and — if so — whether this run's own "Fix now" actually resolved them.
+
+**No P0/P1 left open** (either the analysis step's findings contained no P0/P1 at all — P2-only, or a clean review — or "Fix now" was chosen and the fix sub-agent has already applied its fix to TARGET) — write:
 
 `[pf-check PASSED] <TARGET> @ <UTC-ISO-8601-timestamp>` — marker: `session-log.md` — check passed for `<TARGET>`, written by `/pf-check`, read by `/pf`.
 
+**P0/P1 left open** ("I'll fix manually" or "Skip and continue" was chosen while the findings included at least one P0 or P1) — write instead:
+
+`[pf-check OPEN] <TARGET> @ <UTC-ISO-8601-timestamp> — <reason>` — marker: `session-log.md` — check ran but did NOT pass for `<TARGET>` (open P0/P1 remain), written by `/pf-check`, read by `/pf` (not counted as a passed check — see `/pf`'s "Note on 'check passed'").
+
+Fill `<reason>` with `manual fix pending` for "I'll fix manually", or `skipped with open P0/P1` for "Skip and continue".
+
+These two lines are mutually exclusive for a single run — write exactly one, never both, and never the `PASSED` line just because a stage always writes something when its findings still have open P0/P1. That was exactly the CR-002 defect this convention exists to prevent: a stage reporting success regardless of what it actually did (the same class of defect this issue already fixed once, elsewhere, for `code_review.md`).
+
 Stage `session-log.md` alongside whatever else this run touched, so the marker travels with the same commit.
 
-After relaying the fix summary (if any), run the shared commit & push procedure in `~/.claude/skills/pf-git/SKILL.md` ("Stage commit & push") as the last action of this skill. The orchestrator does this, never a delegated fix actor. Do not restate the procedure here: it defines the commit message, the push guard, and the one-line report. Stage the document(s) actually edited (the review's TARGET, for "Fix now"), plus `prompt.md` if automigration wrote to it this run, plus `session-log.md` for the check-passed marker written above. Review corrections are work like any other — they are not finished until they are committed and pushed.
+After relaying the fix summary (if any), run the shared commit & push procedure in `~/.claude/skills/pf-git/SKILL.md` ("Stage commit & push") as the last action of this skill. The orchestrator does this, never a delegated fix actor. Do not restate the procedure here: it defines the commit message, the push guard, and the one-line report. Stage the document(s) actually edited (the review's TARGET, for "Fix now"), plus `prompt.md` if automigration wrote to it this run, plus `session-log.md` for the check-outcome marker written above. Review corrections are work like any other — they are not finished until they are committed and pushed.

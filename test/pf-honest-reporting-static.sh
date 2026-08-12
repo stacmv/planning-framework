@@ -147,7 +147,10 @@ else
     pf_pass "TC-021 step 1: 'Note on \"check passed\"' section located in pf/SKILL.md"
 
     step7_line="$(grep -n '^## Step 7' "$PF" | head -1 | cut -d: -f1)"
-    note_end=$((note_line + 5))
+    # +8, not +5: wide enough to also cover the OPEN-marker line and the
+    # sentence explaining it does not count as passed (steps 6/7 below),
+    # still capped at Step 7's heading so it never runs past this section.
+    note_end=$((note_line + 8))
     if [ -n "$step7_line" ] && [ "$((step7_line - 1))" -lt "$note_end" ]; then
       note_end=$((step7_line - 1))
     fi
@@ -212,6 +215,89 @@ else
   else
     pf_fail "TC-021 step 5: cannot compare literal marker formats — at least one side (reader step 2 / writer step 4) does not define one yet"
   fi
+fi
+
+# ─── Step 6 (reader, CR-002): a SECOND marker outcome, distinct from PASSED,
+# is documented for "I'll fix manually" / "Skip and continue" with P0/P1
+# still open. This is the crux of CR-002: the marker's CONTENT must carry the
+# gate's outcome, not just the fact that the stage ran — a suite that only
+# ever looks for one marker tag (as TC-021 did before this step) cannot tell
+# "PASSED written unconditionally" (the CR-002 regression) from "PASSED
+# written only when it's true" (the fix), because both produce a PASSED line
+# somewhere in the file. ─────────────────────────────────────────────────────
+reader_tags=""
+non_passed_tag=""
+if [ -f "$PF" ] && [ -n "${note_text:-}" ]; then
+  reader_tags="$(printf '%s' "$note_text" | grep -oE '\[pf-check [A-Z]+\]' | LC_ALL=C sort -u)"
+  n_tags="$(printf '%s' "$reader_tags" | grep -c . || true)"
+  non_passed_tag="$(printf '%s' "$reader_tags" | grep -vFx '[pf-check PASSED]' | head -1)"
+  if [ "$n_tags" -ge 2 ] && [ -n "$non_passed_tag" ]; then
+    pf_pass "TC-021 step 6: pf/SKILL.md reader documents a second marker outcome distinct from PASSED ($non_passed_tag)"
+  else
+    pf_fail "TC-021 step 6: pf/SKILL.md reader documents only the PASSED marker — CR-002: no distinct non-passed outcome documented, so /pf cannot tell a real pass from 'ran but did not pass'"
+  fi
+else
+  pf_fail "TC-021 step 6: INFRA — pf/SKILL.md 'check passed' note text unavailable (step 1 above did not locate the section)"
+fi
+
+# ─── Step 7 (reader, CR-002): the reader explicitly does NOT treat the
+# non-PASSED marker as a passed check. CR-002's failure scenario is a reader
+# that advances the pipeline on ANY marker's mere presence — this must not
+# be true of the non-PASSED one. ─────────────────────────────────────────────
+if [ -n "$non_passed_tag" ]; then
+  reader_open_context="$(printf '%s' "$note_text" | grep -A4 -F "$non_passed_tag")"
+  not_counted_a1='not[^.]{0,60}count(ed)?[^.]{0,50}(a |the )?passed'
+  not_counted_a2='do not[^.]{0,60}(advance|proceed|treat[^.]{0,30}as if)'
+  not_counted_a3='does[^.]{0,20}not[^.]{0,60}count[^.]{0,50}passed'
+  nc_found="$(count_anchors "$reader_open_context" "$not_counted_a1" "$not_counted_a2" "$not_counted_a3")"
+  if [ "$nc_found" -ge 1 ]; then
+    pf_pass "TC-021 step 7: pf/SKILL.md reader explicitly states the non-PASSED marker does NOT count as a passed check ($nc_found/3 anchors)"
+  else
+    pf_fail "TC-021 step 7: pf/SKILL.md reader does not explicitly say the non-PASSED marker fails to count as passed — CR-002: /pf could still advance on its mere presence"
+  fi
+else
+  pf_fail "TC-021 step 7: cannot check — no non-PASSED marker tag found (step 6)"
+fi
+
+# ─── Step 8 (writer, CR-002): the non-PASSED marker's write is actually
+# CONDITIONED on open P0/P1 remaining after "I'll fix manually" / "Skip and
+# continue" — not inert prose sitting next to an otherwise-still-unconditional
+# PASSED write (the literal shape of the original CR-002 defect). ───────────
+writer_open_tag=""
+if [ -f "$CHECK" ] && [ -n "$non_passed_tag" ]; then
+  tag_lineno="$(grep -nF "$non_passed_tag" "$CHECK" | head -1 | cut -d: -f1)"
+  if [ -n "$tag_lineno" ]; then
+    win_start=$((tag_lineno - 6))
+    [ "$win_start" -lt 1 ] && win_start=1
+    window="$(block_text "$CHECK" "$win_start" "$((tag_lineno + 2))")"
+    cond_re='(Skip and continue|I.ll fix manually)[^.]{0,250}(P0|P1)|(P0|P1)[^.]{0,250}(Skip and continue|I.ll fix manually)'
+    if printf '%s' "$window" | grep -qiE "$cond_re"; then
+      pf_pass "TC-021 step 8: pf-check writer conditions the non-PASSED marker on open P0/P1 remaining after 'I'll fix manually'/'Skip and continue'"
+      writer_open_tag="$non_passed_tag"
+    else
+      pf_fail "TC-021 step 8: pf-check writer's non-PASSED marker is not conditioned on open P0/P1 / the two non-fixing gate options — CR-002: still looks unconditional"
+    fi
+  else
+    pf_fail "TC-021 step 8: pf-check writer does not contain the reader's non-PASSED marker tag ($non_passed_tag) anywhere — formats disagree"
+  fi
+else
+  pf_fail "TC-021 step 8: cannot check — no non-PASSED marker tag available (step 6) or pf-check/SKILL.md missing"
+fi
+
+# ─── Step 9: literal non-PASSED marker line format agrees between reader and
+# writer — the same cross-check step 5 already does for PASSED, repeated for
+# the second outcome so a format drift between the two files is caught here
+# too, not just for the marker that was already there before CR-002. ────────
+if [ -n "$writer_open_tag" ]; then
+  reader_open_line="$(printf '%s' "${note_text:-}" | grep -F "$writer_open_tag" | head -1)"
+  writer_open_line="$(grep -F "$writer_open_tag" "$CHECK" | head -1)"
+  if [ -n "$reader_open_line" ] && [ "$reader_open_line" = "$writer_open_line" ]; then
+    pf_pass "TC-021 step 9: literal non-PASSED marker format named by the reader matches the literal format the writer emits"
+  else
+    pf_fail "TC-021 step 9: reader and writer's non-PASSED marker tag matches but the surrounding literal line format differs — rule not documented consistently in SKILL.md"
+  fi
+else
+  pf_fail "TC-021 step 9: cannot compare literal non-PASSED marker formats — writer side (step 8) not established"
 fi
 
 # ══════════════════════════════════════════════════════════════════════════════

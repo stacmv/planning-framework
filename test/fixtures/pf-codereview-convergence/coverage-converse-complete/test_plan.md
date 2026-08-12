@@ -5,6 +5,14 @@
 TC-001, TC-002 and TC-003 are each named in some task's
 `**Mapped Test Cases:**` field in `implementation_plan.md`.
 
+## Status Tracker
+
+| TC     | Test Case | Type   | Priority | Status | Remarks |
+| ------ | --------- | ------ | -------- | ------ | ------- |
+| TC-001 | Alpha behaves as documented | Auto | Medium | [ ] | |
+| TC-002 | Beta step one | Auto | Medium | [ ] | |
+| TC-003 | Beta step two | Auto | Medium | [ ] | |
+
 ## Test Cases
 
 ### TC-001: Alpha behaves as documented
