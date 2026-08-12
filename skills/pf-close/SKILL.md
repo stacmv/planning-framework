@@ -31,6 +31,7 @@ This will:
   • Commit any uncommitted changes on the issue branch
   • Detect parent branch (from git config or fallback to develop/main)
   • Merge issue/ISSUE-ID into <parent-branch> with --no-ff
+  • Transfer the issue's Manual test cases into docs/planning/test-plan.md
   • Move docs/issues/open/ISSUE-ID/ → docs/issues/closed/ISSUE-ID/
   • Record LLM usage/cost in docs/issues/closed/ISSUE-ID/usage_report.md
   • Append a closure entry to docs/planning/session-log.md
@@ -69,6 +70,102 @@ Run on the issue branch.
 1. Run `git checkout PARENT-BRANCH`.
 2. Run `git merge --no-ff issue/ISSUE-ID -m "merge: close ISSUE-ID"`.
 3. If the merge reports a conflict, stop: "Merge conflict detected. Resolve conflicts manually on PARENT-BRANCH, then re-run /pf-close."
+
+---
+
+## Phase 4.5
+
+Runs after Phase 4 (Merge) and before Phase 5 (Archive Issue Folder), while `docs/issues/open/ISSUE-ID/` still exists. This ordering is required: `/pf-close` resolves the active issue by scanning `docs/issues/open/` alone (see the top of this file). If this phase fails after Phase 5 has already moved the issue folder to `docs/issues/closed/`, a re-run of `/pf-close` reports "No active issue found" and the issue's Manual test cases are lost with no way to recover them. Placed before archiving instead, a failure here leaves the issue folder in `docs/issues/open/`, so the issue is still discoverable and nothing is lost.
+
+**Recovering from a failure inside this phase.** By the time this phase runs, Phase 4 has already checked out PARENT-BRANCH and merged, so a failure here leaves you **on PARENT-BRANCH** with a modified-but-uncommitted `docs/planning/test-plan.md`. A re-run of `/pf-close` does not resume by itself — Phase 0's third check requires the current branch to be `issue/ISSUE-ID` and stops with "Switch to the issue branch first". Recover in this order, and **discard the partial write first — do not try to preserve it**:
+
+1. **Throw the partial write away.** On PARENT-BRANCH, restore the file from the last commit: `git checkout -- docs/planning/test-plan.md`. If this phase had just created the file in this same run so it is still untracked (`git checkout --` then fails with "pathspec did not match"), delete it instead: `rm docs/planning/test-plan.md`. Nothing is lost either way — the rows are re-derived from the issue's own `test_plan.md`, which is the source of truth, and rows promoted by *previous* issues are in the committed version of the file, untouched.
+2. `git checkout issue/ISSUE-ID`.
+3. Re-run `/pf-close`. It proceeds normally from Phase 0.
+
+**Why discarding is required and not merely tidier.** Keeping the partial write costs you two distinct things, both measured — the first blocks the recovery outright, the second quietly damages history even when the recovery completes:
+
+- **Step 2 aborts outright** when the issue branch was cut before `docs/planning/test-plan.md` existed on PARENT-BRANCH — a very common shape, since every branch older than the file lacks it. Switching would have to delete a file that has local modifications, so git refuses: `error: Your local changes to the following files would be overwritten by checkout: docs/planning/test-plan.md … Aborting`, exit 1. The documented recovery would simply not be executable for those branches.
+- **A half-written row is committed into the issue branch's history** even where the checkout does succeed. A preserved partial write makes Phase 2 commit it as `chore: pre-close cleanup [ISSUE-ID]` on the issue branch, so whatever the interrupted run had managed to write — possibly a row truncated mid-line — becomes a permanent commit, and the branch gains a commit it never did any work for. Phase 4's re-run then creates a **second** merge commit instead of a no-op. There is nothing to gain in exchange: this phase re-derives every row from the issue's own `test_plan.md` on the next run, so the preserved text is never read.
+
+  **This no longer corrupts `Area`** — step 5 keys on the *first* merge that brought the issue in, not on `HEAD`, precisely so that a second merge cannot change the file set it measures — whether that second merge comes from this recovery path or from the operator committing a `test_plan.md` fix under the stop-and-surface rule of the main procedure below. (That rule lives in the numbered procedure that starts after this block; it is not the `git checkout issue/ISSUE-ID` step numbered 2 just above.) Earlier revisions of this phase did compute `Area` from `HEAD`'s parents and did produce a meaningless value here; that is fixed, and this bullet is kept only to explain why discarding is still the right move.
+
+Discarding avoids both: the tree stays clean, Phase 2 has nothing to commit, and Phase 4's re-merge really is `Already up to date` with `HEAD` still pointing at the original merge commit.
+
+Re-running is safe: no row is duplicated, because identity is the pair (`ISSUE-ID`, `TC-NNN`) (step 3 below) and the number is the maximum of the counter and the table plus one (step 4 below).
+
+1. **Ensure `docs/planning/test-plan.md` exists — do this first, before selecting anything.** If it does not exist, create it by copying `docs/planning/templates/global/test-plan.md`. If that template is also missing (an older project that has never been converged), write the file inline with exactly this content instead:
+
+   ```markdown
+   # Manual Test Plan
+
+   Ручные тест-кейсы продукта. Автотесты — `make test`.
+   Прогон перед релизом: пройти строки со статусом `pending`, начиная с `Critical`.
+
+   Last allocated: none
+
+   | PTC | Area | Test case | Prio | Origin | Last run | Status |
+   | --- | --- | --- | --- | --- | --- | --- |
+   ```
+
+   **This step runs unconditionally, even when the issue turns out to have no `Manual` rows at all.** It is deliberately ordered before selection because Phase 8's `git add` names `docs/planning/test-plan.md` unconditionally, and `git add` with a single non-existent pathspec exits 128 and stages **nothing at all** — not even the other paths on the same command line. Creating the file only when a row is promoted would therefore break the archive commit of every issue whose test plan is `Auto`-only, leaving the issue moved on disk but never committed. Measured: `git add docs/issues/ docs/planning/session-log.md docs/planning/test-plan.md` with the last path absent → `fatal: pathspec ... did not match any files`, exit 128, empty index.
+
+2. Read `docs/issues/open/ISSUE-ID/test_plan.md`'s Status Tracker table and select only the rows whose `Type` is `Manual`. Rows with `Type: Auto` are never promoted — skip them entirely, including every one of their fields. If the table exists and contains no `Manual` rows, this phase has nothing more to do; proceed to Phase 5 (the file from step 1 stays, empty table and all).
+
+   **Columns are resolved by header name, not by position.** Locate the columns literally named `Type`, `Test Case`, `Priority`, and `Status` in the table's header row, wherever they appear. The repo's own template (`docs/planning/templates/issue/test_plan.md`) orders columns `TC | Type | Test Case | Priority | Status | Remarks`, while the `pf-test-plan` skill generates `TC | Test Case | Type | Priority | Status | Remarks` — both orders exist in real issues and disagree with each other. A parser that reads a fixed column position instead of the header name reads the case title as the `Type` on one of the two orders and promotes nothing.
+
+   **Stop and surface anything you cannot classify — never drop a row silently.** Three malformed inputs are indistinguishable from a legitimate "nothing to promote" if you just skip them, and each one silently discards a manual test case, which is precisely the loss this whole phase exists to prevent. In every one of these cases, **stop and report the problem to the user instead of proceeding to Phase 5**:
+
+   - a row whose `Type` is neither `Manual` nor `Auto` (an empty cell, a different casing like `manual`, or a decorated value like `Manual (blocked)`) — do not treat it as `Auto` by default; a `Critical` manual case must not vanish over a typo;
+   - no Status Tracker table found at all (the section is missing, renamed, or its header row does not carry the columns named above) — this is not the same as a table with no `Manual` rows, and must not be reported as such;
+   - a selected `Manual` row whose `Test Case` cell is empty — an empty title cannot be made self-contained (see the rule below) and would land in a human-readable checklist as a blank line.
+
+   **When you stop here, say what the operator has to do — the fix is not on the branch they are standing on.** Phase 4 has already merged and switched to PARENT-BRANCH, so the offending `docs/issues/open/ISSUE-ID/test_plan.md` is not what is in front of them. Report the concrete defect (which row, which cell, what is wrong with it) and tell them to: follow "Recovering from a failure inside this phase" above (discard the partial write, `git checkout issue/ISSUE-ID`), **fix the offending row in `test_plan.md` on the issue branch, commit it**, and only then re-run `/pf-close`. Without the fix step spelled out, a re-run simply stops at the same row again — the loop is not obvious from the stop message alone.
+
+3. For each selected `Manual` row not already present in the list, append a row. Identity for "already present" is the pair (`ISSUE-ID`, `TC-NNN`) — never the case title: two `Manual` cases in the same issue may share a title and must still get separate `PTC` numbers and separate rows.
+
+   | Issue field | → | List field |
+   |---|---|---|
+   | case title | → | `Test case` (see self-containedness rule below) |
+   | `Priority` | → | `Prio` (see normalization below) |
+   | `Status` `[ ]` / `✓` / `✗` | → | `Status` `pending` / `✓` / `✗` |
+   | ISSUE-ID + TC-NNN | → | `Origin`, formatted `ISSUE-ID#TC-NNN` (not a filesystem path) |
+   | the issue's closing date, when `Status` is not `pending` | → | `Last run` (`—` when `pending`) |
+   | — | → | `PTC` (see numbering below) |
+   | — | → | `Area` (see below) |
+
+   **Priority normalization.** `Critical`→`Critical`, `High`→`High`, `Medium`→`Med`, `Low`→`Low`. Any value outside this dictionary is normalized to `Med`, and the original value is noted in `Test case` so a closed dictionary doesn't silently swallow an unrecognized priority.
+
+   **Self-containedness.** If a case title only reads in the context of the issue (e.g. "Verify step 3"), expand it into a self-contained phrase when transferring it. Titles that already stand alone are transferred verbatim.
+
+   **Escaping.** Any `|` inside `Area`, `Test case`, or `Origin` is written as `\|` when the row is written. Each cell stays a single line.
+
+4. **PTC numbering.** The next `PTC` number is the maximum of (a) the number in the `Last allocated:` line and (b) the highest `PTC` number already in the table, plus one.
+
+   **If the `Last allocated:` line is missing entirely, recreate it** — do not stop, and do not skip updating it. `BR-4` allows this file to be hand-edited, so the line can simply have been deleted. It is reconstructible: treat the missing counter as `none` (i.e. `0`) for the arithmetic above, which leaves the table's own highest `PTC` as the effective maximum, then write the line back above the table in the form below. Silently proceeding without it is the failure to avoid: a `sed`-style in-place substitution on a file that has no such line succeeds with exit 0 and changes nothing, so the counter would vanish while the row still gets written.
+
+   **Write it as `PTC-` followed by exactly four digits, zero-padded** — `PTC-0001`, never a bare `1` and never `PTC-1`. This applies to both the `PTC` cell of the new row and the `Last allocated:` line. A fresh list starts at `Last allocated: none`, which counts as **0** for the arithmetic above, so the first number ever allocated is `PTC-0001`. Stating the written form here is not redundant with the arithmetic: a real close of a fresh list, run against an earlier revision of this phase that specified only "maximum … plus one", produced the row `| 1 | general | … |` and the counter `Last allocated: 1` — arithmetically right, and rejected by the project's own format validator, which requires exactly four digits. Both sources matter: the `Last allocated:` counter still remembers a number whose row was later deleted by hand (e.g. a `retired` row removed manually), while the table still remembers rows written by a previous run that was interrupted before it could update the counter. After writing the new row(s), update `Last allocated:` to the new highest number.
+
+5. **Area.** Derive it from the file list of **the first merge commit that brought this issue into PARENT-BRANCH**, not from whatever `HEAD` happens to be:
+
+   ```
+   MERGE=$(git log --merges --format=%H --grep "merge: close ISSUE-ID" PARENT-BRANCH | tail -1)
+   git diff --name-only "$MERGE^1" "$MERGE^2"
+   ```
+
+   `git log` lists newest first, so `tail -1` picks the **earliest** such merge. On a clean run that merge is `HEAD` itself — the fresh commit Phase 4 just made — so this is exactly `git diff --name-only HEAD^1 HEAD^2` and nothing changes.
+
+   **Why not just `HEAD^1 HEAD^2`.** A retry can put a *second* merge on PARENT-BRANCH, and then `HEAD`'s parents no longer describe the issue's file set. This is reachable through the stop-and-surface rule in step 2: it tells the operator to fix the offending row in `test_plan.md` **on the issue branch and commit it**, which gives the branch a new commit, so Phase 4's re-run really does merge again. `HEAD^1 HEAD^2` then contains nothing but that one `docs/issues/…/test_plan.md` fix — which the exclusion below drops — leaving `Area: general` for every promoted row instead of the issue's real subsystem. Measured on a throwaway repo: naive form → `docs/issues/open/ISS/test_plan.md` only (→ `general`); first-merge form → that plus `skills/pf-close/SKILL.md` (→ `pf-close`). Keying on the first merge is stateless and needs no reset of the parent branch.
+
+   **Do not use the three-dot form** `git diff --name-only PARENT-BRANCH...issue/ISSUE-ID` — after Phase 4's `--no-ff` merge, the merge-base of the two branches has become the tip of `issue/ISSUE-ID` itself, so a three-dot diff at this point always returns an empty file list (measured on a real close: 0 files vs. 15 files for the `HEAD^1 HEAD^2` form on the same repository state). Exclude any paths under `docs/issues/`, **plus exactly these four bookkeeping files and no others**: `docs/planning/session-log.md`, `docs/planning/decisions.md`, `docs/planning/implementation-plan.md`, and `docs/planning/test-plan.md`. None of the four describes a product subsystem, and excluding them keeps a row from being labelled the meaningless `Area: docs` when the merge diff happens to contain nothing else.
+
+   **The exclusion is that named list — not a glob, and not the directory.** Two ways of over-reaching are both wrong here:
+   - `docs/planning/*.md` would also swallow real documentation that lives at the same level — in this repository `FRAMEWORK.md`, `QUICKSTART.md`, `MIGRATION-GUIDE-V3.md` and `v2.0-design-analysis.md`. An issue whose whole change is rewriting `FRAMEWORK.md` would then get `Area: general`, which is precisely the meaningless value the exclusion exists to prevent.
+   - Excluding the `docs/planning/` tree would additionally swallow `docs/planning/templates/`, which holds real product artifacts of this framework — the issue that added `docs/planning/templates/global/test-plan.md` did product work there. **Subdirectories of `docs/planning/` are never excluded.**
+
+   Of the remaining paths, take the second path segment for anything under `skills/` or `tools/` (e.g. `skills/pf-close/…` → `pf-close`), and the first segment for everything else (e.g. `scripts/…` → `scripts`). The segment with the most files wins; if nothing remains after the exclusions, use `general`.
+
+6. Leave the updated `docs/planning/test-plan.md` in the working tree — it is committed on Phase 8, whose `git add` now includes this path.
 
 ---
 
@@ -144,7 +241,7 @@ This phase produces `docs/issues/closed/ISSUE-ID/usage_report.md`, a best-effort
 
 ## Phase 8: Archive Commit
 
-1. Run `git add docs/issues/ docs/planning/session-log.md`.
+1. Run `git add docs/issues/ docs/planning/session-log.md docs/planning/test-plan.md`.
 2. Run `git commit -m "close: archive ISSUE-ID"`.
 
 ---

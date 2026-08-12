@@ -396,7 +396,8 @@ issue (specs.md, «Files to Create/Modify») и сегодня не сущест
 |------|--------|-----------------|
 | 1 | Снять свежую копию репозитория в новую временную директорию вне `<repo-root>` (например, `mktemp -d`, `cp -a`, включая `.git`); внутри копии выполнить `git remote remove origin`, затем `git remote -v` | `git remote -v` не выводит ничего — в копии нет ни одного remote, Phase 8.5 физически некуда пушить |
 | 2 | Внутри копии удалить все реальные issue из `docs/issues/open/` и `docs/issues/closed/`, затем материализовать фикстур-issue из Требуемых данных под `docs/issues/open/<fixture-ID>/` на ветке `issue/<fixture-ID>` | Под `docs/issues/open/` в копии присутствует только фикстур-issue; текущая ветка копии — `issue/<fixture-ID>` |
-| 3 | Открыть Claude Code сессию с рабочей директорией = корень изолированной копии (НЕ реального репозитория) и выполнить `/pf-close` | Закрытие проходит без ошибок; отчёт Phase 9 называет push «skipped — no remote configured» |
+| 3 | Открыть Claude Code сессию с рабочей директорией = корень изолированной копии (НЕ реального репозитория) и выполнить процедуру закрытия, **предписав сессии читать `./skills/pf-close/SKILL.md` из рабочего дерева копии и игнорировать установленный скилл** | Закрытие проходит без ошибок; отчёт Phase 9 называет push «skipped — no remote configured» |
+| 3a | _Почему не просто `/pf-close`:_ слэш-команда исполняет **установленный** `~/.claude/skills/pf-close/SKILL.md`, в котором Phase 4.5 отсутствует (`grep -c '## Phase 4.5'` → `0`), а распространение скиллов (`make update-skills` / `/pf-update`) вынесено за объём issue. Прогон по буквальной формулировке проверял бы устаревший артефакт, а не предмет issue | — |
 | 4 | Открыть `docs/planning/test-plan.md` внутри копии | Появилась ровно одна новая строка на каждый `Type: Manual` кейс; строк на `Type: Auto`-кейс нет |
 | 5 | Проверить состав коммита `close: archive <fixture-ID>` внутри копии (`git show --stat`) | В списке изменённых файлов присутствует `docs/planning/test-plan.md` |
 | 6 | В РЕАЛЬНОМ репозитории (`<repo-root>`) выполнить `git status --porcelain` и сравнить с состоянием непосредственно перед шагом 1 | Вывод идентичен — рабочее дерево и история реального репозитория не изменились; всё случилось только в изолированной копии |
@@ -444,7 +445,7 @@ issue (specs.md, «Files to Create/Modify») и сегодня не сущест
 |------|--------|-----------------|
 | 1 | Снять свежую копию репозитория в новую временную директорию вне `<repo-root>` (включая `.git`); внутри копии выполнить `git remote remove origin`, затем `git remote -v` | `git remote -v` не выводит ничего |
 | 2 | Внутри копии удалить все реальные issue из `docs/issues/open/` и `docs/issues/closed/`; материализовать фикстур-issue и частично-промоутнутый `docs/planning/test-plan.md` из Требуемых данных на ветке `issue/<fixture-ID>` | Под `docs/issues/open/` — только фикстур-issue; `docs/planning/test-plan.md` в копии уже содержит одну (не две) строки промоушена этой issue |
-| 3 | Открыть Claude Code сессию с рабочей директорией = корень копии и выполнить `/pf-close` | Команда находит issue в `docs/issues/open/`, а не завершается с «No active issue found» |
+| 3 | Открыть Claude Code сессию с рабочей директорией = корень копии и выполнить процедуру закрытия, предписав сессии читать `./skills/pf-close/SKILL.md` из рабочего дерева копии (см. TC-014 шаг 3a) | Команда находит issue в `docs/issues/open/`, а не завершается с «No active issue found» |
 | 4 | Дождаться завершения Phase 4.5 | Вторая Manual-строка добавлена, дублей по первой строке не возникло, `Last allocated:` обновлён до нового максимума |
 | 5 | Дождаться завершения закрытия и проверить коммит `close: archive <fixture-ID>` | Issue архивируется штатно, коммит закрытия содержит `docs/planning/test-plan.md` |
 | 6 | В РЕАЛЬНОМ репозитории (`<repo-root>`) выполнить `git status --porcelain` и сравнить с состоянием непосредственно перед шагом 1 | Вывод идентичен — реальное рабочее дерево не изменилось |
@@ -531,25 +532,27 @@ issue (specs.md, «Files to Create/Modify») и сегодня не сущест
 
 | TC     | Test Case | Type   | Priority | Status | Remarks |
 | ------ | --------- | ------ | -------- | ------ | ------- |
-| TC-001 | Только Manual-кейсы переносятся в глобальный список (BR-1) | Auto | Critical | [ ] | |
-| TC-002 | Нормализация Priority Medium → Med | Auto | High | [ ] | |
-| TC-003 | Отображение статусов issue-кейса в статус глобального списка | Auto | Critical | [ ] | |
-| TC-004 | Выделение номера в отсутствующем/пустом файле | Auto | High | [ ] | |
-| TC-005 | Выделение номера после ручного удаления retired-строки | Auto | Critical | [ ] | |
-| TC-006 | Выделение номера при отставшем счётчике | Auto | Critical | [ ] | |
-| TC-007 | Дубликат PTC между параллельными ветками обнаруживается | Auto | Critical | [ ] | |
-| TC-008 | Форма строк и закрытые словари Prio/Status | Auto | High | [ ] | |
-| TC-009 | Экранирование `\|` в Area/Test case/Origin | Auto | Medium | [ ] | |
-| TC-010 | Area определяется по diff между родительской и issue-веткой | Auto | Medium | [ ] | |
-| TC-011 | converge создаёт test-plan.md из шаблона, если файла нет | Auto | High | [ ] | |
-| TC-012 | converge никогда не перезаписывает существующий test-plan.md | Auto | High | [ ] | |
-| TC-013 | Порядок фаз /pf-close и состав коммита закрытия | Auto | Critical | [ ] | |
-| TC-014 | Реальное закрытие issue переносит ручные кейсы и коммитит файл | Manual | Critical | [ ] | |
-| TC-015 | Идемпотентность повторного запуска Phase 4.5 при одинаковых названиях | Auto | High | [ ] | |
-| TC-016 | Восстановление после сбоя в середине Phase 4.5 | Manual | Critical | [ ] | |
-| TC-017 | Самодостаточность Test case для нечитаемых названий (AC-1.2) | Auto | High | [ ] | |
-| TC-018 | Ручная правка статуса переживает формат (AC-3.1) | Auto | Medium | [ ] | |
-| TC-019 | Строка retired остаётся и её номер не переиспользуется (AC-3.3) | Auto | High | [ ] | |
+| TC-001 | Только Manual-кейсы переносятся в глобальный список (BR-1) | Auto | Critical | ✓ | |
+| TC-002 | Нормализация Priority Medium → Med | Auto | High | ✓ | |
+| TC-003 | Отображение статусов issue-кейса в статус глобального списка | Auto | Critical | ✓ | |
+| TC-004 | Выделение номера в отсутствующем/пустом файле | Auto | High | ✓ | |
+| TC-005 | Выделение номера после ручного удаления retired-строки | Auto | Critical | ✓ | |
+| TC-006 | Выделение номера при отставшем счётчике | Auto | Critical | ✓ | |
+| TC-007 | Дубликат PTC между параллельными ветками обнаруживается | Auto | Critical | ✓ | |
+| TC-008 | Форма строк и закрытые словари Prio/Status | Auto | High | ✓ | |
+| TC-009 | Экранирование `\|` в Area/Test case/Origin | Auto | Medium | ✓ | |
+| TC-010 | Area определяется по diff между родительской и issue-веткой | Auto | Medium | ✓ | |
+| TC-011 | converge создаёт test-plan.md из шаблона, если файла нет | Auto | High | ✓ | |
+| TC-012 | converge никогда не перезаписывает существующий test-plan.md | Auto | High | ✓ | |
+| TC-013 | Порядок фаз /pf-close и состав коммита закрытия | Auto | Critical | ✓ | |
+| TC-014 | Реальное закрытие issue переносит ручные кейсы и коммитит файл | Manual | Critical | ✓ | Agent-performed 2026-08-12, изолированная копия. Шаг 3 выполнен через чтение `./skills/pf-close/SKILL.md` из рабочего дерева, а не установленного скилла — см. отклонение в session-log. Первый прогон нашёл дефект формата номера (`1` вместо `PTC-0001`), исправлено в `8d267d4`, перепрогон зелёный. |
+| TC-015 | Идемпотентность повторного запуска Phase 4.5 при одинаковых названиях | Auto | High | ✓ | |
+| TC-016 | Восстановление после сбоя в середине Phase 4.5 | Manual | Critical | ✓ | Agent-performed 2026-08-12, изолированная копия. `TC-002` получил `PTC-0007` = max(0005, 0006)+1; `PTC-0006` не продублирован, `TC-001` не перенесён повторно; шаг 6 идентичен побайтово. **Объём прогона уже, чем название кейса** (P1-2 code review): фикстура материализует частичное состояние на issue-ветке БЕЗ предшествующего merge-коммита, поэтому живой прогон сделал первый merge, а не повторный, и не прошёл ни Phase 0 проверку 3, ни повторный merge, ни подметание Phase 2. Проверена идемпотентность нумерации и отсутствие дублей — не полный сценарий сбоя после мерджа. Фактическое поведение окружающих фаз на этом пути описано в Phase 4.5 («Recovering from a failure inside this phase») и в `specs.md`. |
+| TC-017 | Самодостаточность Test case для нечитаемых названий (AC-1.2) | Auto | High | ✓ | |
+| TC-018 | Ручная правка статуса переживает формат (AC-3.1) | Auto | Medium | ✓ | |
+| TC-019 | Строка retired остаётся и её номер не переиспользуется (AC-3.3) | Auto | High | ✓ | |
+| TC-020 | Sanity-checks from code review: file-creation ordering, stop-and-surface, counter recreation | Auto | Critical | ✓ | Added as a result of code review (P0 + P1). Asserts the ORDER of the instructions, not their presence: the defect was purely one of order. |
+| TC-021 | Phase 4.5 recovery: the partial write is discarded | Auto | Critical | ✓ | Added as a result of code review (pass 2, Codex). Executable git probes: naive recovery aborts, discard-first succeeds. |
 
 _Примечание о порядке колонок:_ здесь используется порядок `TC | Test Case | Type | Priority | Status | Remarks` — так задаёт `~/.claude/skills/pf-test-plan/SKILL.md` Step 4, и именно этим порядком сгенерированы все недавние test-план'ы, а `/pf-test` в последний раз писался под него. Репозиторный шаблон `docs/planning/templates/issue/test_plan.md` использует другой порядок (`TC | Type | Test Case | Priority | Status | Remarks`) — это расхождение самого фреймворка, не опечатка здесь.
 

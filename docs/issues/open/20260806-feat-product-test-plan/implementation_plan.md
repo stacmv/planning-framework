@@ -177,14 +177,14 @@ Auto-кейсов из задач 2–7: без него drift-guard'ы груп
   бы отдельной нормализации в фикстурах Task 3/Task 6.
 
 **Acceptance Criteria:**
-- [ ] `docs/planning/templates/global/test-plan.md` существует, содержит
+- [x] `docs/planning/templates/global/test-plan.md` существует, содержит
   `Last allocated: none` и таблицу без строк данных
-- [ ] `skills/pf-close/SKILL.md` содержит `## Phase 4.5` между `## Phase 4`
+- [x] `skills/pf-close/SKILL.md` содержит `## Phase 4.5` между `## Phase 4`
   и `## Phase 5`
-- [ ] `git add` в Phase 8 включает `docs/planning/test-plan.md`
-- [ ] `t5_global_docs()` в `scripts/converge-to-v3.sh` перечисляет
+- [x] `git add` в Phase 8 включает `docs/planning/test-plan.md`
+- [x] `t5_global_docs()` в `scripts/converge-to-v3.sh` перечисляет
   `test-plan.md`
-- [ ] Phase 1 confirmation text в `skills/pf-close/SKILL.md` упоминает перенос
+- [x] Phase 1 confirmation text в `skills/pf-close/SKILL.md` упоминает перенос
   ручных кейсов в `docs/planning/test-plan.md`
 
 ---
@@ -256,10 +256,10 @@ Task 1)
   Manual» / «...нормализацию Priority → Prio» / «...отображение статусов».
 
 **Acceptance Criteria:**
-- [ ] TC-001 passes
-- [ ] TC-002 passes
-- [ ] TC-003 passes
-- [ ] TC-013 passes
+- [x] TC-001 passes
+- [x] TC-002 passes
+- [x] TC-003 passes
+- [x] TC-013 passes
 
 ---
 
@@ -310,9 +310,9 @@ Task 1)
   между копиями.
 
 **Acceptance Criteria:**
-- [ ] TC-004 passes
-- [ ] TC-005 passes
-- [ ] TC-006 passes
+- [x] TC-004 passes
+- [x] TC-005 passes
+- [x] TC-006 passes
 
 ---
 
@@ -380,8 +380,8 @@ Dependencies)
   ссылается на заглушку.
 
 **Acceptance Criteria:**
-- [ ] TC-007 passes
-- [ ] TC-008 passes
+- [x] TC-007 passes
+- [x] TC-008 passes
 
 ---
 
@@ -457,10 +457,10 @@ Dependencies)
   (Task 1, пункт 8).
 
 **Acceptance Criteria:**
-- [ ] TC-009 passes
-- [ ] TC-010 passes
-- [ ] TC-015 passes
-- [ ] TC-017 passes
+- [x] TC-009 passes
+- [x] TC-010 passes
+- [x] TC-015 passes
+- [x] TC-017 passes
 
 ---
 
@@ -501,8 +501,8 @@ Dependencies)
   `test/safety-audit.sh` (TC-032), не этой задачей.
 
 **Acceptance Criteria:**
-- [ ] TC-011 passes
-- [ ] TC-012 passes
+- [x] TC-011 passes
+- [x] TC-012 passes
 
 ---
 
@@ -544,8 +544,8 @@ Dependencies)
   проверяется, что остался в конце).
 
 **Acceptance Criteria:**
-- [ ] TC-018 passes
-- [ ] TC-019 passes
+- [x] TC-018 passes
+- [x] TC-019 passes
 
 ---
 
@@ -650,8 +650,8 @@ Dependencies)
   собственное закрытие).
 
 **Acceptance Criteria:**
-- [ ] TC-014 passes (confirmed manually per the isolated-copy protocol above)
-- [ ] TC-016 passes (confirmed manually per the isolated-copy protocol above)
+- [x] TC-014 passes (confirmed manually per the isolated-copy protocol above)
+- [x] TC-016 passes (confirmed manually per the isolated-copy protocol above)
 
 ---
 
