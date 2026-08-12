@@ -532,25 +532,27 @@ issue (specs.md, «Files to Create/Modify») и сегодня не сущест
 
 | TC     | Test Case | Type   | Priority | Status | Remarks |
 | ------ | --------- | ------ | -------- | ------ | ------- |
-| TC-001 | Только Manual-кейсы переносятся в глобальный список (BR-1) | Auto | Critical | [ ] | |
-| TC-002 | Нормализация Priority Medium → Med | Auto | High | [ ] | |
-| TC-003 | Отображение статусов issue-кейса в статус глобального списка | Auto | Critical | [ ] | |
-| TC-004 | Выделение номера в отсутствующем/пустом файле | Auto | High | [ ] | |
-| TC-005 | Выделение номера после ручного удаления retired-строки | Auto | Critical | [ ] | |
-| TC-006 | Выделение номера при отставшем счётчике | Auto | Critical | [ ] | |
-| TC-007 | Дубликат PTC между параллельными ветками обнаруживается | Auto | Critical | [ ] | |
-| TC-008 | Форма строк и закрытые словари Prio/Status | Auto | High | [ ] | |
-| TC-009 | Экранирование `\|` в Area/Test case/Origin | Auto | Medium | [ ] | |
-| TC-010 | Area определяется по diff между родительской и issue-веткой | Auto | Medium | [ ] | |
-| TC-011 | converge создаёт test-plan.md из шаблона, если файла нет | Auto | High | [ ] | |
-| TC-012 | converge никогда не перезаписывает существующий test-plan.md | Auto | High | [ ] | |
-| TC-013 | Порядок фаз /pf-close и состав коммита закрытия | Auto | Critical | [ ] | |
+| TC-001 | Только Manual-кейсы переносятся в глобальный список (BR-1) | Auto | Critical | ✓ | |
+| TC-002 | Нормализация Priority Medium → Med | Auto | High | ✓ | |
+| TC-003 | Отображение статусов issue-кейса в статус глобального списка | Auto | Critical | ✓ | |
+| TC-004 | Выделение номера в отсутствующем/пустом файле | Auto | High | ✓ | |
+| TC-005 | Выделение номера после ручного удаления retired-строки | Auto | Critical | ✓ | |
+| TC-006 | Выделение номера при отставшем счётчике | Auto | Critical | ✓ | |
+| TC-007 | Дубликат PTC между параллельными ветками обнаруживается | Auto | Critical | ✓ | |
+| TC-008 | Форма строк и закрытые словари Prio/Status | Auto | High | ✓ | |
+| TC-009 | Экранирование `\|` в Area/Test case/Origin | Auto | Medium | ✓ | |
+| TC-010 | Area определяется по diff между родительской и issue-веткой | Auto | Medium | ✓ | |
+| TC-011 | converge создаёт test-plan.md из шаблона, если файла нет | Auto | High | ✓ | |
+| TC-012 | converge никогда не перезаписывает существующий test-plan.md | Auto | High | ✓ | |
+| TC-013 | Порядок фаз /pf-close и состав коммита закрытия | Auto | Critical | ✓ | |
 | TC-014 | Реальное закрытие issue переносит ручные кейсы и коммитит файл | Manual | Critical | ✓ | Agent-performed 2026-08-12, изолированная копия. Шаг 3 выполнен через чтение `./skills/pf-close/SKILL.md` из рабочего дерева, а не установленного скилла — см. отклонение в session-log. Первый прогон нашёл дефект формата номера (`1` вместо `PTC-0001`), исправлено в `8d267d4`, перепрогон зелёный. |
-| TC-015 | Идемпотентность повторного запуска Phase 4.5 при одинаковых названиях | Auto | High | [ ] | |
+| TC-015 | Идемпотентность повторного запуска Phase 4.5 при одинаковых названиях | Auto | High | ✓ | |
 | TC-016 | Восстановление после сбоя в середине Phase 4.5 | Manual | Critical | ✓ | Agent-performed 2026-08-12, изолированная копия. `TC-002` получил `PTC-0007` = max(0005, 0006)+1; `PTC-0006` не продублирован, `TC-001` не перенесён повторно; шаг 6 идентичен побайтово. **Объём прогона уже, чем название кейса** (P1-2 code review): фикстура материализует частичное состояние на issue-ветке БЕЗ предшествующего merge-коммита, поэтому живой прогон сделал первый merge, а не повторный, и не прошёл ни Phase 0 проверку 3, ни повторный merge, ни подметание Phase 2. Проверена идемпотентность нумерации и отсутствие дублей — не полный сценарий сбоя после мерджа. Фактическое поведение окружающих фаз на этом пути описано в Phase 4.5 («Recovering from a failure inside this phase») и в `specs.md`. |
-| TC-017 | Самодостаточность Test case для нечитаемых названий (AC-1.2) | Auto | High | [ ] | |
-| TC-018 | Ручная правка статуса переживает формат (AC-3.1) | Auto | Medium | [ ] | |
-| TC-019 | Строка retired остаётся и её номер не переиспользуется (AC-3.3) | Auto | High | [ ] | |
+| TC-017 | Самодостаточность Test case для нечитаемых названий (AC-1.2) | Auto | High | ✓ | |
+| TC-018 | Ручная правка статуса переживает формат (AC-3.1) | Auto | Medium | ✓ | |
+| TC-019 | Строка retired остаётся и её номер не переиспользуется (AC-3.3) | Auto | High | ✓ | |
+| TC-020 | Sanity-checks from code review: file-creation ordering, stop-and-surface, counter recreation | Auto | Critical | ✓ | Added as a result of code review (P0 + P1). Asserts the ORDER of the instructions, not their presence: the defect was purely one of order. |
+| TC-021 | Phase 4.5 recovery: the partial write is discarded | Auto | Critical | ✓ | Added as a result of code review (pass 2, Codex). Executable git probes: naive recovery aborts, discard-first succeeds. |
 
 _Примечание о порядке колонок:_ здесь используется порядок `TC | Test Case | Type | Priority | Status | Remarks` — так задаёт `~/.claude/skills/pf-test-plan/SKILL.md` Step 4, и именно этим порядком сгенерированы все недавние test-план'ы, а `/pf-test` в последний раз писался под него. Репозиторный шаблон `docs/planning/templates/issue/test_plan.md` использует другой порядок (`TC | Type | Test Case | Priority | Status | Remarks`) — это расхождение самого фреймворка, не опечатка здесь.
 
