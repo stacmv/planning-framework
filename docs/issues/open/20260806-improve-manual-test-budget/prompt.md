@@ -1,11 +1,11 @@
 ---
 doc_language: Russian
 size_tier: medium
-reviewers:
-  brd: codex
-  test_plan: codex
-  implementation_plan: both
-  code: both
+roles:
+  brd:                 { write: claude, review: [codex] }
+  test_plan:            { write: claude, review: [codex] }
+  implementation_plan:  { write: claude, review: [claude, codex] }
+  code:                 { write: claude, review: [claude, codex] }
 ---
 
 Сократить объём ручных тестов ещё на стадии `/pf-test-plan`: их должно быть
