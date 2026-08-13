@@ -146,8 +146,7 @@ fi
 # Left untouched on purpose.
 # ══════════════════════════════════════════════════════════════════════════════
 
-rp_rc=0
-rp_out="$(cd "$REPO_ROOT" && node --test --test-reporter=tap tools/manual-test-ui/test/read-paths.test.js 2>&1)" || rp_rc=$?
+rp_out="$(cd "$REPO_ROOT" && node --test --test-reporter=tap tools/manual-test-ui/test/read-paths.test.js 2>&1)"
 
 # subcheck_state <output> <name> — echoes exactly one of: pass | failed | skip | missing
 # for the named node --test subtest, decided by TAP line shape alone:
@@ -221,49 +220,49 @@ fi
 if [ "$tc001_state_positive" = "pass" ]; then
   pf_pass "TC-001 step 3a: positive control passed despite EPERM"
 else
-  pf_fail "TC-001 step 3a: positive control passed despite EPERM"
+  pf_fail "TC-001 step 3a: positive control did not pass"
 fi
 
 if [ "$tc001_state_step1" = "pass" ]; then
   pf_pass "TC-001 step 3b: traversal-refusal (step 1) subcheck passed despite EPERM"
 else
-  pf_fail "TC-001 step 3b: traversal-refusal (step 1) subcheck passed despite EPERM"
+  pf_fail "TC-001 step 3b: traversal-refusal (step 1) subcheck did not pass"
 fi
 
 if [ "$tc001_state_step3a" = "pass" ]; then
   pf_pass "TC-001 step 3c: sibling-prefix (step 3a) subcheck passed despite EPERM"
 else
-  pf_fail "TC-001 step 3c: sibling-prefix (step 3a) subcheck passed despite EPERM"
+  pf_fail "TC-001 step 3c: sibling-prefix (step 3a) subcheck did not pass"
 fi
 
 if [ "$tc001_state_step3b" = "pass" ]; then
   pf_pass "TC-001 step 3d: public-sibling (step 3b) subcheck passed despite EPERM"
 else
-  pf_fail "TC-001 step 3d: public-sibling (step 3b) subcheck passed despite EPERM"
+  pf_fail "TC-001 step 3d: public-sibling (step 3b) subcheck did not pass"
 fi
 
 if [ "$tc001_state_step4" = "pass" ]; then
   pf_pass "TC-001 step 3e: memory-prefix (step 4) subcheck passed despite EPERM"
 else
-  pf_fail "TC-001 step 3e: memory-prefix (step 4) subcheck passed despite EPERM"
+  pf_fail "TC-001 step 3e: memory-prefix (step 4) subcheck did not pass"
 fi
 
 if [ "$tc001_state_step5" = "pass" ]; then
   pf_pass "TC-001 step 3f: prefix-normalisation (step 5) subcheck passed despite EPERM"
 else
-  pf_fail "TC-001 step 3f: prefix-normalisation (step 5) subcheck passed despite EPERM"
+  pf_fail "TC-001 step 3f: prefix-normalisation (step 5) subcheck did not pass"
 fi
 
 if [ "$tc001_state_step6" = "pass" ]; then
   pf_pass "TC-001 step 3g: transcript-isolation (step 6) subcheck passed despite EPERM"
 else
-  pf_fail "TC-001 step 3g: transcript-isolation (step 6) subcheck passed despite EPERM"
+  pf_fail "TC-001 step 3g: transcript-isolation (step 6) subcheck did not pass"
 fi
 
 if [ "$tc001_state_browser" = "pass" ]; then
   pf_pass "TC-001 step 3h: browser-module allowlist subcheck passed despite EPERM"
 else
-  pf_fail "TC-001 step 3h: browser-module allowlist subcheck passed despite EPERM"
+  pf_fail "TC-001 step 3h: browser-module allowlist subcheck did not pass"
 fi
 
 printf '\n=== TC-002: symlink subcheck (step 2) is skipped-with-reason, executed, or missing — never silently swallowed\n'
