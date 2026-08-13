@@ -38,6 +38,7 @@ The review target is `git diff <parent>...HEAD` — what this issue actually cha
    - Run `git config branch.issue/ISSUE-ID.merge`. **Self-tracking upstream guard:** if the result is empty, the command fails, or it equals `refs/heads/issue/ISSUE-ID` itself, ignore it and fall through. Otherwise strip the `refs/heads/` prefix and use that as PARENT-BRANCH.
    - Fallback: if `develop` is listed in `git branch --list develop`, PARENT-BRANCH is `develop`; otherwise `main`.
 3. **Compute the diff:** `git diff PARENT-BRANCH...HEAD` (three-dot: everything reachable from `HEAD` since it diverged from PARENT-BRANCH — the same base ref `pf-check`'s Codex invocation chain calls `<base-ref>` when it runs `--scope branch --base <base-ref>`, so both reviews of this issue always agree on what "the diff" means).
+4. **Empty diff is a stage error, not a clean result (AC-5.1, BR-6).** If this diff is empty, stop: this is an empty review target, and an empty target is an explicit stage error, not evidence of a clean pass. Do not proceed to Phase 2 or Phase 3, and do not write `verdict: PASS` with empty findings lists — state plainly that there was nothing to review, phrased so it cannot be mistaken for a genuine reviewed-and-clean result. (`pf-codereview`'s branch guard in step 1 above already makes the off-branch scenario unreachable here — this step covers only the on-branch, nothing-changed-yet case.)
 
 This diff — plus `implementation_plan.md` and `test_plan.md` for intent/context — is what gets reviewed below, whichever reviewer(s) run it. Never widen scope to the whole working tree or to files outside the diff.
 
@@ -82,9 +83,13 @@ Dispatch a single sub-agent (Agent tool, default/general-purpose type) with a pr
 >
 > Your reply is the only thing the orchestrator will see. Return ONLY the prioritized findings (as your final message).
 
+**Round 2 and later:** extend the prompt above with the current findings ledger from `code_review.md` (every prior round's `CR-NNN` rows, Phase 3 below) alongside the diff, plus this explicit instruction: *these findings are already triaged — do not repeat them; look specifically for new problems introduced by this round's fix diff.* Passing the ledger, not just the diff, is what lets the reviewer separate "already-known" from "new" (AC-2.3) — a bare re-run of this same prompt with no ledger attached would just re-report round 1's findings all over again.
+
 ### Codex path (`codex` or the Codex half of `both`)
 
 Run `pf-check`'s **"Codex invocation chain"** exactly as documented in `skills/pf-check/SKILL.md` — this skill references that chain by name rather than restating or redefining it. The only adaptation is scope: instead of "the whole target document," `<base-ref>` is PARENT-BRANCH from Phase 1 above, and the brief given to Codex is "review this diff against PARENT-BRANCH for bugs, regressions, security issues, and inconsistency with implementation_plan.md/test_plan.md" in place of the document-review brief — `pf-check`'s own chain text already anticipates this exact split ("the code-review case in `pf-codereview` where the same `--base <base-ref>` diff spans the entire issue implementation instead of one file").
+
+**Round 2 and later:** extend that brief the same way as the Claude review path above — include the current findings ledger from `code_review.md` (every prior round's `CR-NNN` rows) alongside the diff, plus the same explicit instruction: these findings are already triaged, do not repeat them; look specifically for new problems introduced by this round's fix diff.
 
 ### Severity → priority mapping
 
@@ -96,9 +101,23 @@ When the resolved `review` is `{ mode: parallel, by: [claude, codex] }`, run the
 
 ---
 
-## Phase 3: Write `code_review.md`
+## Phase 2.5: Triage — Failure-Scenario Requirement and Reclassification
 
-Write `docs/issues/open/ISSUE-ID/code_review.md`, mirroring `qa_report.md`'s verdict-field pattern:
+This step runs immediately after Phase 2 produces its findings (from whichever reviewer path resolved above) and before Phase 3 writes them into the ledger. It applies to every finding reported at P0 or P1 — P2 findings are unaffected.
+
+**Failure-scenario requirement (AC-3.1).** A P0 or P1 finding must name a concrete failure scenario: an input or state that leads to a wrong output, a crash, a regression, or a violation of a stated requirement (from `specs.md`, `implementation_plan.md`, or `test_plan.md`). A finding that only describes a style preference, a hypothetical improvement, or a general code-quality observation — with no such input/state → bad-outcome chain — does not meet this bar, whatever priority the reviewer originally assigned it.
+
+**Reclassification step (AC-3.2, BR-4).** For every P0/P1 finding that fails the requirement above, run this reclassification step before Phase 3 writes the ledger: lower its priority to P2. This changes the finding's one Priority value — it does not add a second, parallel `blocking: yes/no` field next to the existing P0/P1/P2 axis. Phase 3's Verdict rule reads Priority alone, so a finding reclassified to P2 stops counting as an open P0/P1 for that rule, the same as any other P2 finding.
+
+**Reason retention (AC-3.3).** Record a one-line reason for every reclassified finding at the point of reclassification — why it was judged to lack a failure scenario. This reason travels with the finding into Phase 3; it is not discarded once the priority changes.
+
+**Visibility in `code_review.md` (AC-3.3).** A reclassified finding's row in Phase 3's ledger must show that the reclassification happened, not just its final P2 priority as if it had always been P2: append a short note to the row's Description cell, e.g. "(reclassified from P1 — no failure scenario named: <one-line reason>)". A reader of `code_review.md` must be able to tell, from the ledger alone, that a reclassification occurred and why — this is an explicit, attributed, visible step, never an invisible adjustment folded silently into "group by priority" before the report is written.
+
+---
+
+## Phase 3: Write `code_review.md` — the append-only `CR-NNN` findings ledger
+
+Write `docs/issues/open/ISSUE-ID/code_review.md`, mirroring `qa_report.md`'s verdict-field pattern. Findings are **never** poured into rewritable `### P0`/`### P1`/`### P2` list-sections — that shape has no stable identity across rounds, and a fresh list silently replacing the old one is exactly how a real P2 finding vanished, unnoticed, from round 1 of a prior issue. Findings instead live in a single **append-only ledger table**, one row per finding, keyed by a stable ID:
 
 ```markdown
 # Code Review Report
@@ -109,16 +128,12 @@ Write `docs/issues/open/ISSUE-ID/code_review.md`, mirroring `qa_report.md`'s ver
 
 ---
 
-## Findings
+## Findings Ledger
 
-### P0 (Blocker)
-[list, or _None._]
-
-### P1 (Important)
-[list, or _None._]
-
-### P2 (Minor)
-[list, or _None._]
+| ID | Round | Priority | Description | Follow-up Issue | State |
+|----|-------|----------|--------------|------------------|-------|
+| CR-001 | 1 | P0 | [failure scenario the finding names] |  | open |
+| CR-002 | 1 | P2 | [description] |  | open |
 
 ---
 
@@ -127,12 +142,58 @@ Write `docs/issues/open/ISSUE-ID/code_review.md`, mirroring `qa_report.md`'s ver
 **PASS**
 ```
 
+**Append-only (BR-8).** Each row's ID is a stable, permanent identifier in the format `CR-NNN` — three digits, zero-padded (e.g. `CR-001`, `CR-014`) — assigned once, sequentially (highest existing number + 1), and never reused. A later Phase 3 run, on this round or any later one, only ever does one of three things to this table: **appends** a brand-new `CR-NNN` row for a newly reported finding, **updates the `State` cell** of an already-existing row, or **fills in the `Follow-up Issue` cell** of an already-existing row (Phase 3.6) — the one other cell a row may receive a value into after its initial append. It never rewrites or deletes a previously written row's ID, round number, or description — that identity is permanent once written.
+
+**Fields, at minimum, per row:**
+- **ID** — the stable `CR-NNN` described above.
+- **Round** — the review round this finding was first reported in. This is the one authoritative round counter this skill uses anywhere (Phase 4's round-budget/escalation logic reads it) — no second, separate round counter is introduced.
+- **Priority** — P0 (blocker) / P1 (important) / P2 (minor).
+- **Description** — the finding itself (Phase 2.5's reclassification note, when one applies, is part of this text from the row's first write — see Phase 2.5). Permanent once written, exactly like ID and Round above — it never gains a follow-up-issue reference or any other text appended later (see the dedicated field below).
+- **Follow-up Issue** — empty for almost every row. It is the only column a row may receive a value into after that row's first append: Phase 3.6 fills it in later, once a P1 finding is resolved via a follow-up issue instead of a fix, holding that issue's created ID or path. `ID`, `Priority`, and `Description` keep the permanence rule above with no qualification of any kind — this dedicated column is what makes that possible.
+- **State** — exactly one of the six values below.
+
+**Closed state dictionary — exactly six values, verbatim.** A finding's `State` cell holds exactly one of:
+- `open` — the initial state assigned to a finding when it is first created.
+- `fixed` — terminal: the fix has been applied and re-reviewed.
+- `accepted-risk` — terminal: the risk is knowingly accepted as-is.
+- `deferred` — terminal: postponed (this includes the P1-via-follow-up-issue path — see Phase 3.6).
+- `wont-fix` — terminal: rejected as not worth fixing.
+- `duplicate-of CR-NNN` — terminal: the same underlying issue as another row, cited by its ID.
+
+No seventh value is added, and none of these five terminal values is renamed or replaced with a synonym — `open` is the one non-terminal, initial value; the other five are terminal resolutions.
+
+**`PASS` validation (AC-2.4).** Before writing `verdict: PASS`, confirm every row in the ledger carries an explicit, non-empty `State` — no finding without an explicit state may reach `PASS`. A genuinely empty `State` cell is a violation of this rule regardless of that row's priority (this is exactly the class of defect that let a P2 vanish silently in a prior round-1 review with no row, no record, no trace). A row whose `State` is the literal value `open` is **not** a violation of this rule — `open` is a real, explicit value from the six-value dictionary above, not a missing record. Whether an open P0/P1 blocks `PASS` is the separate rule immediately below, layered on top of this one, not a substitute for it.
+
 Rules for the Verdict section (identical in spirit to `pf-qa`'s):
-- If there is no open P0 or P1 finding (P2-or-none): write `**PASS**` on its own line.
-- If any P0 or P1 finding is open: write `**FAIL**` on its own line.
+- If there is no open P0 or P1 finding (every P0/P1 row's `State` is one of the five terminal values, never `open`) **and** the `PASS` validation above holds (no row of any priority has an empty `State`): write `**PASS**` on its own line.
+- If any P0 or P1 finding is open: write `**FAIL**` on its own line. This condition is unconditional — no round number and no review-round budget ever turns an open P0/P1 into a `PASS` (Phase 4's round-budget/escalation logic reads this same ledger but never overrides this line).
 - The verdict must appear as a standalone line (`**PASS**` or `**FAIL**`) so `/pf-test`'s prerequisite check can detect it with a simple text search, the same way `/pf-close` reads `qa_report.md`.
 
-Write finding prose in the issue's `doc_language` (default English), keeping `[Claude]`/`[Codex]` tags, priority headings and the verdict markers in English exactly as shown above.
+Write finding prose in the issue's `doc_language` (default English), keeping `[Claude]`/`[Codex]` tags, the ledger's column headers, and the verdict markers in English exactly as shown above.
+
+---
+
+## Phase 3.5: Round 1 Early Bail-Out
+
+This check runs immediately after Phase 3 first writes `code_review.md` for **round 1** specifically — a separate, named point between Phase 3 and Phase 4. It does not run again for round 2 or later; from round 2 onward, Phase 4's "Round N>1 dual check" (below) is what governs the loop instead.
+
+Count the round-1 findings whose `Priority` is P0 or P1 (blocking) in the ledger Phase 3 just wrote. **If round 1 found 3 or more blocking (P0/P1) findings**, do not enter Phase 4's fix loop at all: convert each blocking finding into a new task appended to `docs/issues/open/ISSUE-ID/implementation_plan.md`, and route the issue back to `/pf-execute` for a fresh implementation pass — three or more blockers in the first round means the implementation itself is not ready, not that a quick fix loop will converge it. Below this threshold — 0, 1, or 2 blocking findings in round 1 — Phase 4 runs exactly as documented below, unmodified.
+
+Each finding converted into a task this way must carry a non-empty `**Mapped Test Cases:**` field, naming the original TC-ID(s) from `test_plan.md`'s Status Tracker whose passing behavior the finding's fix must preserve — never a newly invented TC-ID absent from that Status Tracker. An empty field here would block the very next `/pf-execute` → `/pf-codereview` handoff at `/pf-execute`'s own completeness gate. Reusing an existing TC-ID across more than one task is legal — that gate only requires the field non-empty on every `code` task and every TC named by at least one task; it does not require a one-to-one mapping.
+
+---
+
+## Phase 3.6: P1 Follow-Up-Issue Resolution — a Ledger State, Not a Gate Option
+
+This is a ledger-level resolution, not a third choice in Phase 4's gate — Phase 4 still asks only its two documented options, and this mechanism never becomes a third `AskUserQuestion` option there. It is another way a `CR-NNN` row reaches a terminal `State`, alongside the other terminal values in Phase 3's closed state dictionary.
+
+When a P1 finding is judged better handled as its own follow-up issue than fixed in this review cycle: file a new issue for it the normal way (`docs/issues/open/<new-issue-id>/`), set that finding's `CR-NNN` row `State` to `deferred`, and record the new issue's ID or path in that same row's dedicated `Follow-up Issue` field (Phase 3's field list above) — never in the `Description` cell, which BR-8 keeps permanent from the row's first write. Recording the ID there is not optional — an unlinked `deferred` reads exactly like a silently dropped finding, which is what US-2 ("a finding never disappears silently") forbids. Once the row reads `deferred`, Phase 3's Verdict rule treats it like any other terminal state, not open — the same open/terminal distinction TC-006 and TC-008 already establish, not a new blocking rule of its own.
+
+This changes only the row's `State`, never its `Priority` — a P1 finding resolved this way stays `P1` in the ledger; it is not the same operation as Phase 2.5's reclassification, which changes `Priority` itself. `State` and `Priority` remain two separate columns doing two separate jobs.
+
+**Distinct from PASS-time remnants (BR-5).** This is not the same mechanism as what a `PASS`-verdict review does with its own left-over P2/`deferred` rows — those are carried forward as ordinary technical debt into `docs/planning/tech-debt.md`. One is a way to legitimately close a still-open P1 finding before the gate can pass; the other is where already-non-blocking remnants get tracked once the gate already has passed. The two must not collapse into one reading: `tech-debt.md` is not a way to pass this gate, and this section's resolution is not where ordinary remnants go.
+
+This section's resolution is not available to P0: a P0 row never reaches `deferred` by this route, ever (BR-1, AC-3.4), at any round number, budget state, or reviewer configuration. Phase 3's six-value dictionary itself is unchanged for P0 — what is closed off here is this one route into `deferred`, not a value in the dictionary.
 
 ---
 
@@ -140,9 +201,23 @@ Write finding prose in the issue's `doc_language` (default English), keeping `[C
 
 **This phase does not run at all when Phase 1.5's skip confirmation came back "yes"** (skip stands, confirmed) — that path already wrote `verdict: SKIPPED` and went straight to Phase 5, bypassing Phase 2, Phase 3, and this gate entirely (see Phase 1.5 above). If Phase 1.5's confirmation came back **"no"** instead, the skip was declined and review actually ran (Phase 1.5's "no" branch) — this gate runs normally, exactly as if `review` had never been `skip`.
 
-**If Phase 3 produced `verdict: PASS`** (no open P0/P1): report the result and stop here — no `AskUserQuestion` is needed, there is nothing to resolve. State the next step: "Code review passed. Run /pf-test."
+**`review_rounds` field.** The round budget for this issue is read from `docs/issues/open/ISSUE-ID/prompt.md`'s YAML frontmatter field `review_rounds`; when the field is absent, the default is `3`. Every check below that compares "the current round" against a budget compares it against this value.
 
-**If Phase 3 produced `verdict: FAIL`** (at least one open P0/P1): present the findings, then use `AskUserQuestion` with **exactly these two options — never a third "skip" option**:
+**Round number.** This skill keeps exactly one round counter: the highest `Round` value recorded anywhere in `code_review.md`'s findings ledger (Phase 3), plus 1 for a fresh review about to run — or round `1` when the ledger is empty (the first review ever run for this issue). No second, separate round counter is introduced anywhere in this skill; that would be exactly the kind of "two mechanisms for one fact" the BRD flags as a defect (the same principle behind AC-3.2's ban on a parallel `blocking:` field alongside priority).
+
+**If Phase 3 produced `verdict: PASS`** (no open P0/P1): first carry the remnants out (below), then report the result and stop here — no `AskUserQuestion` is needed, there is nothing to resolve. State the next step: "Code review passed. Run /pf-test." This holds regardless of round number — a clean review closes the cycle even on a round at or beyond the budget (see Budget exhaustion immediately below).
+
+**Carry PASS-time remnants into `docs/planning/tech-debt.md` (BR-5).** Before reporting the `PASS`, walk the ledger and collect every row that is *not* `fixed` — in practice the `P2` rows and any row left `deferred`, `accepted-risk` or `wont-fix`. Append one line per collected row to `docs/planning/tech-debt.md`, creating the file with a `# Tech Debt` heading if it does not exist yet, in the form:
+
+```
+- `CR-NNN` (P2, ISSUE-ID) — <description> — state: `wont-fix`
+```
+
+Each line carries the finding's stable ID, its priority, the issue it came from, and its final state, so a remnant can always be traced back to the review that produced it. Appending is idempotent per `CR-NNN`+issue pair: a row already listed from an earlier run of this same issue is not written twice. This is the "where remnants land at `PASS`" half of BR-5 and it is deliberately not the follow-up-issue path of Phase 3.6 — that one is a way to resolve a specific `P1` at the gate, this one is bookkeeping for everything left over once the gate is already passed. A `PASS` that silently drops its `P2` rows is exactly the "a finding disappears with nobody noticing" failure this skill exists to prevent, so this step is not optional; a run with no non-`fixed` rows simply writes nothing and says so.
+
+**Budget exhaustion (AC-1.3, BR-7).** The round budget is exhausted for any round **at or beyond** `review_rounds` (`round >= review_rounds`), not only the round that matches it exactly: the ledger's round counter is append-only and never resets — including after this very escalation path routes the issue back to `/pf-execute` and a fix returns for re-review — so a later cycle's first fresh round can already sit above the budget the moment it starts, and that round is exhausted from the outset, not exempt from this rule because no round happens to equal the budget precisely. When the current round is `>= review_rounds` and at least one P0/P1 finding is still open in the ledger, this cycle has exhausted its budget: write `verdict` as not `PASS` (never `PASS` while a blocking finding remains open — Phase 3's unconditional FAIL rule above already guarantees this) and do not loop again into another round — an exhausted budget must never turn into an infinite loop of further rounds; instead, take the same path as Phase 3.5's early bail-out above: convert every remaining open P0/P1 finding into a new task appended to `implementation_plan.md`, each with a non-empty `Mapped Test Cases:` field naming the TC-ID(s) it must keep passing, and route the issue back to `/pf-execute`. When the current round is `>= review_rounds` but this round's own review is clean (no open P0/P1 — the `verdict: PASS` bullet above already covers this case), the cycle closes as `PASS` regardless of round number: the budget is a trigger for escalation, never a ceiling that blocks a legitimate `PASS`.
+
+**If Phase 3 produced `verdict: FAIL`** (at least one open P0/P1) **and the current round is below the budget** (`round < review_rounds` — once the round reaches or exceeds the budget, the Budget exhaustion rule above applies instead, covering every round from that point on, not just the one round that equals the budget): present the findings, then use `AskUserQuestion` with **exactly these two options — never a third "skip" option**:
 
 **"How would you like to proceed?"**
 - **Fix now** — I'll address all P0 and P1 findings and update the code. I'll ask you clarifying questions where needed.
@@ -156,6 +231,8 @@ This is the one deliberate difference from `pf-check`'s gate: `pf-check` always 
 
 After the fix returns, **loop**: go back to Phase 1 (recompute the diff — it has changed), re-run Phase 2 (the same resolved `review` reviewer(s)) and Phase 3 (rewrite `code_review.md`), then re-evaluate this Phase 4 gate. Repeat automatically — no need to re-ask the user to re-invoke the skill — until `verdict: PASS`. Relay each iteration's fix summary to the user as it happens.
 
+**Round N>1 dual check (AC-1.4).** Starting with round 2 and every round after it, re-running Phase 2 in this loop must do two things together, not one instead of the other: (a) verify closure of every blocking (P0/P1) finding from the previous round's ledger rows — confirm each one's `State` cell (Phase 3's ledger) is now a terminal value, not `open`, checked directly against the ledger rather than assumed from the fixer's own summary; and (b) review the round's own diff for new problems the fix itself may have introduced. A one-sided version of this instruction — only (a), or only (b) — is exactly what let a prior round ship new P0 findings unreviewed; do not phrase this loop step as merely "re-run Phase 2" without naming both halves. Phase 2's round-2+ reviewer brief (above, in both the Claude review path and the Codex path) is what makes (a) checkable — it hands the reviewer the prior ledger and an instruction not to repeat it — and what performs (b) — its "look specifically for new problems introduced by this round's fix diff" instruction; this loop step requires that both actually happen on every round-2+ iteration, not just one of them.
+
 **Exception — this run started from Phase 1.5's "no" branch (declined skip):** "re-run Phase 2" here means re-running the **Claude review path directly**, the same one-time override Phase 1.5 established, not re-entering Phase 2's role resolution — `prompt.md` still literally reads `roles.code.review: skip`, unconfirmed, so a fresh Phase 2 resolution would see `skip` again and the loop would silently stop reviewing on iteration 2. The `[claude]` override, once triggered by a "no" answer, holds for every iteration of this loop for the rest of this invocation; the skip-confirmation question is not re-asked within it.
 
 **If "I'll fix manually, then re-run /pf-codereview":** confirm the choice, state that `code_review.md` currently records `verdict: FAIL`, and stop. Do not loop — the next `/pf-codereview` invocation starts a fresh Phase 0.
@@ -164,7 +241,7 @@ After the fix returns, **loop**: go back to Phase 1 (recompute the diff — it h
 
 ## Phase 5: Commit & Push
 
-As the last action of this skill invocation — after the loop above (if any) has settled, whether it ends in `verdict: PASS`, `verdict: SKIPPED` (Phase 1.5), or the user chose to fix manually and left `verdict: FAIL` — run the shared commit & push procedure in `~/.claude/skills/pf-git/SKILL.md` ("Stage commit & push"). Do not restate the procedure here: it defines the push guard and the one-line git report. Stage `docs/issues/open/ISSUE-ID/code_review.md`, plus `prompt.md` if Phase 0.5's automigration or Phase 1.5's `confirmed:` write touched it this run, plus any file(s) a fix actor actually edited during this invocation's Fix-now loop (never `git add -A` — same scoped-staging rule every other `pf-*` stage follows). Commit message: `docs: code_review.md — <PASS|FAIL|SKIPPED> [<ISSUE-ID>]` (mirrors `pf-qa`'s `qa_report.md — <PASS|FAIL> [<ISSUE-ID>]` message; see `~/.claude/skills/pf-git/SKILL.md`'s Step 2 table).
+As the last action of this skill invocation — after the loop above (if any) has settled, whether it ends in `verdict: PASS`, `verdict: SKIPPED` (Phase 1.5), the user chose to fix manually and left `verdict: FAIL`, or Phase 3.5's round-1 early bail-out / Phase 4's budget-exhaustion path escalated back to `/pf-execute` (verdict remains `FAIL`) — run the shared commit & push procedure in `~/.claude/skills/pf-git/SKILL.md` ("Stage commit & push"). Do not restate the procedure here: it defines the push guard and the one-line git report. Stage `docs/issues/open/ISSUE-ID/code_review.md`, plus `prompt.md` if Phase 0.5's automigration or Phase 1.5's `confirmed:` write touched it this run, plus `implementation_plan.md` if Phase 3.5's early bail-out or Phase 4's budget-exhaustion path appended tasks to it this run, plus any file(s) a fix actor actually edited during this invocation's Fix-now loop, plus the created follow-up issue's files and `docs/planning/tech-debt.md`, when this run actually wrote to them (never `git add -A` — same scoped-staging rule every other `pf-*` stage follows). Commit message: `docs: code_review.md — <PASS|FAIL|SKIPPED> [<ISSUE-ID>]` (mirrors `pf-qa`'s `qa_report.md — <PASS|FAIL> [<ISSUE-ID>]` message; see `~/.claude/skills/pf-git/SKILL.md`'s Step 2 table).
 
 ---
 

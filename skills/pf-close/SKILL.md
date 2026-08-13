@@ -42,6 +42,10 @@ Proceed? (yes/no)
 
 If the user does not confirm (answers no or anything other than yes), stop: "Close cancelled. No changes made."
 
+To resume:
+1. Make whatever changes prompted you to answer no.
+2. Re-run `/pf-close` when you are ready to close this issue.
+
 ---
 
 ## Phase 2: Pre-Close Cleanup
@@ -54,6 +58,8 @@ Run on the issue branch.
    - Run `git commit -m "chore: pre-close cleanup [ISSUE-ID]"`
 3. If the output is empty, skip — nothing to commit.
 
+Proceed to Phase 3.
+
 ---
 
 ## Phase 3: Detect Parent Branch
@@ -63,13 +69,22 @@ Run on the issue branch.
    - Run `git branch --list develop`. If `develop` is listed, set PARENT-BRANCH to `develop`.
    - Otherwise set PARENT-BRANCH to `main`.
 
+Proceed to Phase 4.
+
 ---
 
 ## Phase 4: Merge
 
 1. Run `git checkout PARENT-BRANCH`.
 2. Run `git merge --no-ff issue/ISSUE-ID -m "merge: close ISSUE-ID"`.
-3. If the merge reports a conflict, stop: "Merge conflict detected. Resolve conflicts manually on PARENT-BRANCH, then re-run /pf-close."
+3. If the merge reports a conflict, stop: "Merge conflict detected. Resolve conflicts, then re-run /pf-close."
+
+   **Recovering from a merge conflict:**
+   1. Run `git status` to list the conflicting files.
+   2. Open each conflicting file and resolve its conflict markers.
+   3. Run `git add <file>` for each file you resolved.
+   4. Run `git commit` to complete the merge.
+   5. Re-run `/pf-close`. It proceeds normally from Phase 0.
 
 ---
 
@@ -174,6 +189,8 @@ Re-running is safe: no row is duplicated, because identity is the pair (`ISSUE-I
 1. Ensure `docs/issues/closed/` directory exists. If it does not, create it (e.g. `mkdir -p docs/issues/closed/`).
 2. Move `docs/issues/open/ISSUE-ID/` to `docs/issues/closed/ISSUE-ID/` (e.g. `mv docs/issues/open/ISSUE-ID docs/issues/closed/ISSUE-ID`).
 
+Proceed to Phase 6.
+
 ---
 
 ## Phase 6: Compute LLM Usage & Cost
@@ -219,6 +236,8 @@ This phase produces `docs/issues/closed/ISSUE-ID/usage_report.md`, a best-effort
 
    If no data was available from either source, write the file stating that plainly instead of omitting it.
 
+Proceed to Phase 7.
+
 ---
 
 ## Phase 7: Update Session Log
@@ -237,12 +256,16 @@ This phase produces `docs/issues/closed/ISSUE-ID/usage_report.md`, a best-effort
    If Phase 6 found no usage data at all, omit the "LLM usage" clause.
 4. Write the updated content back to `docs/planning/session-log.md`.
 
+Proceed to Phase 8.
+
 ---
 
 ## Phase 8: Archive Commit
 
 1. Run `git add docs/issues/ docs/planning/session-log.md docs/planning/test-plan.md`.
 2. Run `git commit -m "close: archive ISSUE-ID"`.
+
+Proceed to Phase 8.5.
 
 ---
 
@@ -256,6 +279,8 @@ After the archive commit, push PARENT-BRANCH to its remote automatically — but
 2. **Resolve the remote:** use PARENT-BRANCH's configured remote (`git config branch.PARENT-BRANCH.remote`); if unset, use `origin` when it exists, otherwise skip per the guard above.
 3. **Push, safely:** run `git push <remote> PARENT-BRANCH` (add `-u` if the branch has no upstream yet). Never use `--force` / `--force-with-lease`, never `--no-verify`.
 4. **On push failure** (auth, non-fast-forward, network): do NOT abort — the closure is already committed locally. Capture the git error and surface it in the Phase 9 report with an instruction to push manually once resolved.
+
+Proceed to Phase 9.
 
 ---
 

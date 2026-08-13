@@ -14,21 +14,23 @@ Overview, `brd.md`) явно оставляют их за скобками; вс
 и drift-guard'а, сверяющего хелпер с реальным текстом `SKILL.md` — и обе
 части обязаны появиться в одной **`tests`**-задаче. Правил, которые эти
 drift-guard'ы ищут, в `skills/` сегодня физически нет (кроме TC-011,
-единственного baseline/regression-кейса), поэтому 22 из 23 Auto TC дают
+единственного baseline/regression-кейса), поэтому 23 из 24 Auto TC дают
 **ожидаемо RED** сразу после создания соответствующей `tests`-задачи —
 это не брак плана, а прямое следствие test-first-подхода, которого
 требует сама issue (see `test_plan.md`, пункт 3 Overview). План поэтому
 разбит на пары «`tests`-задача → `code`-задача» по областям user stories:
 сначала тест, ожидаемо красный, затем правка `SKILL.md`, которая его
 зеленит — шесть `tests`-задач (1, 3, 5, 7, 9, 13) и восемь `code`-задач
-(2, 4, 6, 8, 10, 11, 12, 14). Порядок задач в этом документе — тот
+(2, 4, 6, 8, 10, 11, 12, 14). Позже к ним добавилась Task 15 (`tests`),
+заведённая эскалацией `/pf-codereview` по исчерпании бюджета раундов, —
+итого пятнадцать. Порядок задач в этом документе — тот
 порядок, в котором они перечислены ниже, а не обязательный порядок
 исполнения `/pf-execute` (см. раздел Dependencies за реальным графом).
 
-**Каждый TC-ID из 27 в `test_plan.md` привязан ровно к одной задаче** — к
-`code`-задаче, которая делает соответствующий drift-guard зелёным (или,
-для четырёх Manual TC, которая реализует проверяемое ими поведение).
-`tests`-задачи (1, 3, 5, 7, 9, 13) сами несут `Mapped Test Cases: None` —
+**Каждый TC-ID из 24 в `test_plan.md` привязан ровно к одной задаче** — к
+`code`-задаче, которая делает соответствующий drift-guard зелёным.
+`tests`-задачи (1, 3, 5, 7, 9, 13) несут в поле `Mapped Test Cases` не номера
+кейсов, а короткое обоснование (`нет — infrastructure task: …`) —
 они инфраструктурные: пишут харнесс для TC, которые формально числятся за
 их парной `code`-задачей, по образцу `20260806-bug-test-plan-tc-
 untracked`'s `implementation_plan.md` (его Task 5 тоже не несёт
@@ -148,17 +150,17 @@ passes» означает то же, что везде — TC полностью
 - New file — no `Makefile` edit needed; `make test`'s `for t in test/*.sh` loop picks it up automatically.
 
 **Acceptance Criteria:**
-- [ ] TC-001 harness implemented; helper steps (1-2) pass now, drift-guard step (3) is RED pending Task 2
-- [ ] TC-002 harness implemented; helper steps (1-3) pass now, drift-guard step (4) is RED pending Task 2
-- [ ] TC-003 harness implemented; helper steps (1-3) pass now, drift-guard step (4) is RED pending Task 2
-- [ ] TC-004 harness implemented; RED pending Task 2 (no fixtures, pure static audit)
+- [x] TC-001 harness implemented; helper steps (1-2) pass now, drift-guard step (3) is RED pending Task 2
+- [x] TC-002 harness implemented; helper steps (1-3) pass now, drift-guard step (4) is RED pending Task 2
+- [x] TC-003 harness implemented; helper steps (1-3) pass now, drift-guard step (4) is RED pending Task 2
+- [x] TC-004 harness implemented; RED pending Task 2 (no fixtures, pure static audit)
 
 ---
 
 #### Task 2: `pf-codereview` — бюджет раундов и эскалация
 
 **Task Type:** code
-**Mapped Test Cases:** TC-001, TC-002, TC-003, TC-004, TC-027
+**Mapped Test Cases:** TC-001, TC-002, TC-003, TC-004
 **Files:**
 - `skills/pf-codereview/SKILL.md` - модифицирован: поле `review_rounds` в `prompt.md` (дефолт 3), ранний бросок назад в раунде 1, исчерпание бюджета, дельта-проверка раунда N>1
 
@@ -172,14 +174,12 @@ passes» означает то же, что везде — TC полностью
 - **Round N>1 dual check (AC-1.4).** Rewrite the Phase 4 loop instruction for the second and later rounds so it explicitly requires BOTH: (a) verifying that every blocking finding from the previous round's ledger is actually closed, AND (b) reviewing the current round's own fix diff for new problems. A one-sided instruction ("only verify closure" or "only review the new diff") is exactly what let round 9 of `20260709-feat-dockerize` ship 2 new P0s unreviewed — do not phrase this as "re-run Phase 2" alone, as today's text does.
 - **Do not weaken Phase 3's existing `FAIL` condition** ("any open P0 or P1 → FAIL") while adding round/budget logic — Task 6's regression guard (TC-011) depends on this staying true independent of round number; a bug here would silently pass TC-003 while failing TC-011.
 - **Phase 5 staging must cover the new artifact this task can produce.** When Phase 3.5's early bail-out or Phase 4's budget-exhaustion path fires, it appends new tasks to `docs/issues/open/ISSUE-ID/implementation_plan.md` before handing back to `/pf-execute`. Extend Phase 5's existing staging sentence ("Stage `docs/issues/open/ISSUE-ID/code_review.md`, plus `prompt.md` if…, plus any file(s) a fix actor actually edited…") to also include `implementation_plan.md`, **when this task's escalation path actually wrote to it this run** — conditional staging, mirroring the sentence's existing "if…touched it this run" clauses, not an unconditional addition. Extend the sentence in place; do not restate or duplicate Phase 5's commit procedure itself (message format and push guard stay defined once, in `~/.claude/skills/pf-git/SKILL.md`). Task 6 also extends this same sentence with its own clause (see its Implementation Notes) — land this one first, per the corrected `Task 4 → Task 2 → Task 6 → Task 10` order.
-- TC-027 (Manual, e2e) is mapped here because it is primarily an acceptance check of this task's mechanism (round budget driving early bail-out or convergence) exercised live, on top of the ledger (Task 4) and triage (Task 6) machinery — it does not add new SKILL.md text of its own.
 
 **Acceptance Criteria:**
-- [ ] TC-001 passes
-- [ ] TC-002 passes
-- [ ] TC-003 passes
-- [ ] TC-004 passes
-- [ ] TC-027 — verified via live multi-round `/pf-codereview`/`/pf-execute` run on the prepared 5-defect fixture (see `test_plan.md` TC-027 Steps)
+- [x] TC-001 passes
+- [x] TC-002 passes
+- [x] TC-003 passes
+- [x] TC-004 passes
 
 ---
 
@@ -201,10 +201,10 @@ passes» означает то же, что везде — TC полностью
 - TC-008 step 3 is a **negative control**: a ledger row with `state: open` must NOT be flagged by this validator (an explicit `open` is a real word from the six-value dictionary, not a missing record) — only a genuinely empty State cell is a violation. Do not let the helper conflate "empty" and "open"; TC-011 (Task 5) is the separate rule that blocks `PASS` on an `open` P0, not this one.
 
 **Acceptance Criteria:**
-- [ ] TC-005 harness implemented; steps 1-3 pass now, step 4 (drift-guard) is RED pending Task 4
-- [ ] TC-006 harness implemented; steps 1-2 pass now, steps 3-4 (drift-guards) are RED pending Task 4
-- [ ] TC-007 harness implemented; RED pending Task 4 (no fixtures, pure static audit)
-- [ ] TC-008 harness implemented; steps 1-3 pass now, step 4 (drift-guard) is RED pending Task 4
+- [x] TC-005 harness implemented; steps 1-3 pass now, step 4 (drift-guard) is RED pending Task 4
+- [x] TC-006 harness implemented; steps 1-2 pass now, steps 3-4 (drift-guards) are RED pending Task 4
+- [x] TC-007 harness implemented; RED pending Task 4 (no fixtures, pure static audit)
+- [x] TC-008 harness implemented; steps 1-3 pass now, step 4 (drift-guard) is RED pending Task 4
 
 ---
 
@@ -219,14 +219,15 @@ passes» означает то же, что везде — TC полностью
 - **This replaces KI-3.** Today's Phase 3 rewrites the `### P0`/`### P1`/`### P2` sections wholesale on every run — no stable IDs, no append-only guarantee. Redesign `code_review.md`'s findings section as a table (or equivalent structured list) keyed by a stable `CR-NNN` ID, carrying at minimum: ID, round number, priority (P0/P1/P2), description, and **state**. A later Phase 3 run only ever appends new `CR-NNN` rows or updates the `state` cell of an existing row — it never rewrites or deletes a previously written row's identity/round/description (BR-8).
 - **Six-value state dictionary**, spelled out verbatim: `open` (assigned when a finding is first created) plus five terminal resolutions — `fixed`, `accepted-risk`, `deferred`, `wont-fix`, `duplicate-of CR-NNN`. This is the same closed set `brd.md`/`test_plan.md` already fixed — do not add a seventh value or rename any of the five.
 - **Reviewer prompt for round 2+** (both the "Claude review path" and the Codex path's brief): pass the current ledger of prior findings alongside the diff, with an explicit instruction that these are already triaged — do not re-report them, look specifically for what the round's fixes introduced (AC-2.3). This is the text TC-007's drift-guard checks.
+- **This addition lands in Phase 2, not Phase 4 — and TC-007's harness already anchors on Phase 2.** `test_plan.md`'s TC-007 step 1 says parenthetically "(Phase 4 loop)"; that parenthetical is loose and must not be followed. Measured against the real file: Phase 2 is "Reviewer Selection" and is where both reviewer briefs are actually constructed (its `### Claude review path` subsection, and its by-name reference to `pf-check`'s Codex invocation chain); Phase 4 is "The Hard Gate — no 'Skip and continue'" and dispatches no reviewer at all. The ledger has to reach the reviewer at dispatch time, so Phase 2 is the only place this text can work. Task 3's harness anchors on Phase 2 accordingly — put the edit there, or TC-007 stays RED no matter how correct the wording is.
 - **`PASS` validation (AC-2.4).** Before writing `verdict: PASS`, every ledger row must carry an explicit, non-empty `state` — an empty cell is a violation (this is what silently lost the P2 from round 1 of `20260709-feat-dockerize`); a row with `state: open` is not itself a violation of *this* rule (it is a real, explicit value) — whether an `open` P0 blocks `PASS` is Task 6's separate rule (TC-011), layered on top, not replaced by this one.
 - Round-number bookkeeping for the ledger is what Task 2 reads to compute the current round — keep the row's `round` field authoritative; do not introduce a second counter.
 
 **Acceptance Criteria:**
-- [ ] TC-005 passes
-- [ ] TC-006 passes
-- [ ] TC-007 passes
-- [ ] TC-008 passes
+- [x] TC-005 passes
+- [x] TC-006 passes
+- [x] TC-007 passes
+- [x] TC-008 passes
 
 ---
 
@@ -245,9 +246,9 @@ passes» означает то же, что везде — TC полностью
 - TC-012's `pf_cr_followup_allowed(priority)` is pure bash (`P1` → `allowed`, `P0` → `rejected`) — GREEN from the start; its drift-guard (step 3) checks that the **two separate BR-5 mechanisms** — "where PASS-time remnants go" (`tech-debt.md`) vs. "what is available to pass the gate" (follow-up issue, P1-only) — are documented as two distinct things, not merged into one, and RED until Task 6.
 
 **Acceptance Criteria:**
-- [ ] TC-010 harness implemented; RED pending Task 6 (no fixtures, pure static audit)
-- [ ] TC-011 harness implemented and passes now (baseline/regression guard)
-- [ ] TC-012 harness implemented; helper step passes now, drift-guard step is RED pending Task 6
+- [x] TC-010 harness implemented; RED pending Task 6 (no fixtures, pure static audit)
+- [x] TC-011 harness implemented and passes now (baseline/regression guard)
+- [x] TC-012 harness implemented; helper step passes now, drift-guard step is RED pending Task 6
 
 ---
 
@@ -265,13 +266,13 @@ passes» означает то же, что везде — TC полностью
 - **Follow-up issue — a terminal ledger resolution, not a third gate option (AC-3.5, BR-5).** This does **not** add a third branch to Phase 4's `AskUserQuestion` — Phase 4's two-option gate and its "never a third 'skip' option" text stay exactly as they are today (see the `Files` note above). Instead, wire this in at Task 4's ledger level: a P1 finding can be resolved by filing a separate follow-up issue and setting that finding's `CR-NNN` row `state` to `deferred`, **with the created issue's ID/path recorded in that same row** (e.g. appended to the finding's description or a dedicated column) — an unlinked `deferred` is indistinguishable from a silently dropped finding, which directly contradicts US-2's "a finding never disappears silently." Once a finding's state is terminal (this `deferred`-via-follow-up case included), Phase 3's existing "any open P0/P1 → FAIL" condition no longer treats it as open — the same mechanism TC-006/TC-008/TC-011 already establish (a terminal state is not `open`), not a new blocking rule of its own. **P0 has no such path, ever (BR-1, AC-3.4)** — this specific route into `deferred` (via a follow-up issue) is available starting from P1 only, per AC-3.5's own wording ("для средней важности... для высшей — недоступен"), independent of the pre-existing dictionary of terminal states. Document this as clearly distinct from where PASS-time remnants (P2/`deferred` for any other reason) go (`docs/planning/tech-debt.md`, per BR-5's "куда попадают остатки на выходе `PASS`" vs. "что доступно как способ пройти гейт") — these are two different mechanisms and must read as two different mechanisms in the text, not one.
 - **Phase 5 staging must cover the follow-up-issue path.** When a P1 finding is resolved via a follow-up issue, that creates the new issue's own files (`docs/issues/open/<new-issue-id>/prompt.md` etc.), and, separately, `docs/planning/tech-debt.md` may also be written per BR-5. Extend Phase 5's staging sentence (the same one Task 2 already extends — see its Implementation Notes) with its own conditional clause: "plus the created follow-up issue's files and `docs/planning/tech-debt.md`, when this run actually wrote to them." Append this task's clause to the sentence Task 2 leaves behind rather than overwriting it — this task lands after Task 2 in the corrected `Task 4 → Task 2 → Task 6 → Task 10` order.
 - **Do not touch Phase 3's unconditional "any open P0/P1 → FAIL" line** while writing this task — TC-011 (Task 5) is the guard that this stays true.
-- TC-009 (Manual) is mapped here — it is the live verification that a real reviewer run actually reclassifies a no-failure-scenario finding to P2 while keeping a real bug as a blocking P0/P1, with no second blocking flag anywhere in the resulting `code_review.md`.
+- TC-009 is mapped here — it is the static drift-guard that confirms Phase 2.5 documents both the failure-scenario requirement (AC-3.1) and the single-blocking-axis prohibition (AC-3.2, no second `blocking: yes/no` field). Originally planned as a Manual live-run TC; the owner decided at `/pf-qa` to convert it to an Auto static audit instead (`test/pf-codereview-triage.sh`) — no live verification of a real reviewer run is performed by this test plan.
 
 **Acceptance Criteria:**
-- [ ] TC-009 — verified via live `/pf-codereview` run on the `triage-severity` fixture (see `test_plan.md` TC-009 Steps)
-- [ ] TC-010 passes
-- [ ] TC-011 passes (still — no regression introduced)
-- [ ] TC-012 passes
+- [x] TC-009 passes
+- [x] TC-010 passes
+- [x] TC-011 passes (still — no regression introduced)
+- [x] TC-012 passes
 
 ---
 
@@ -295,17 +296,17 @@ passes» означает то же, что везде — TC полностью
 **Implementation Notes:**
 - All three helpers parse the literal `**Mapped Test Cases:**` field in a task's heading block — exactly the field this very document uses — never a TC-ID mentioned in prose elsewhere in a task's description. The `-gap` fixtures each plant a negative control: a TC-ID mentioned in prose (Task 3's description, or the plan's Overview) that must **not** count as a mapping. This is the exact P0 a prior BRD review of this issue caught on the reversed-direction confusion between TC-014 and TC-015 — get the direction right in both helpers independently.
 - TC-013's two fixtures and helper are pure bash (checkbox scan) — GREEN from the start; only its drift-guard (step 3) is RED pending Task 8.
-- **Known coverage gap: TC-013 does not exercise Task 8's new checkbox-writing step.** TC-013 only transcribes and drift-guards the reading/blocking side of Check 1 (`pf_execute_all_tasks_checked` on a fixture `implementation_plan.md`) — it says nothing about who actually flips `- [ ]` to `- [x]` in a real run. Task 8 adds that writing step to `pf-execute`'s Phase 2 ("Execution Strategy" point 6) to make Check 1 satisfiable at all in practice (see its Implementation Notes), but no Auto TC in this issue's `test_plan.md` covers the writing step itself — it is prose in `pf-execute`'s task-execution flow, not a fixture-and-drift-guard shape. TC-027's live multi-round run is the closest live exercise of it, incidentally, not by design. This is a known, accepted test-plan gap, not fixed by editing `test_plan.md` here.
-- **TC-014's helper must be `Task Type`-aware (Task 8's Check 2 / Check 2b split).** `pf_execute_task_has_test` cannot simply require every task's `Mapped Test Cases:` field to be non-empty — this issue's own `implementation_plan.md` has six `tests`-typed tasks whose field is deliberately `None`/empty by convention (see this plan's Overview and every `tests` task above). The helper must read each task's `**Task Type:**` and apply Check 2's rule (`Mapped Test Cases:` non-empty) only to `code` tasks, and Check 2b's rule (at least one `TC-\d+` literal named somewhere in `**Acceptance Criteria:**`) to `tests` tasks. Extend the `-gap` fixture to cover both branches independently: a `code` task with an empty `Mapped Test Cases:` field (must fail/block), and a `tests` task with an empty `Mapped Test Cases:` field but at least one TC-ID named in its `Acceptance Criteria` (must NOT fail/block). `test_plan.md`'s TC-014 text is not changed by this issue — this is a refinement of the transcribed helper beyond the TC's literal wording, tracked here rather than there.
+- **Known coverage gap: TC-013 does not exercise Task 8's new checkbox-writing step.** TC-013 only transcribes and drift-guards the reading/blocking side of Check 1 (`pf_execute_all_tasks_checked` on a fixture `implementation_plan.md`) — it says nothing about who actually flips `- [ ]` to `- [x]` in a real run. Task 8 adds that writing step to `pf-execute`'s Phase 2 ("Execution Strategy" point 6) to make Check 1 satisfiable at all in practice (see its Implementation Notes), but no Auto TC in this issue's `test_plan.md` covers the writing step itself — it is prose in `pf-execute`'s task-execution flow, not a fixture-and-drift-guard shape. This is a known, accepted test-plan gap, not fixed by editing `test_plan.md` here — the owner decided at `/pf-qa` to leave it uncovered rather than reintroduce a live-run TC for it (see `test_plan.md`'s Known Issues KI-2).
+- **TC-014's helper must be `Task Type`-aware (Task 8's Check 2 / Check 2b split).** `pf_execute_task_has_test` cannot simply require every task's `Mapped Test Cases:` field to be non-empty — this issue's own `implementation_plan.md` has six `tests`-typed tasks whose field is deliberately free of TC-IDs by convention — it carries a short prose reason instead of case numbers (see this plan's Overview and every `tests` task above). The helper must read each task's `**Task Type:**` and apply Check 2's rule (`Mapped Test Cases:` non-empty) only to `code` tasks, and Check 2b's rule (at least one `TC-\d+` literal named somewhere in `**Acceptance Criteria:**`) to `tests` tasks. Extend the `-gap` fixture to cover both branches independently: a `code` task with an empty `Mapped Test Cases:` field (must fail/block), and a `tests` task with an empty `Mapped Test Cases:` field but at least one TC-ID named in its `Acceptance Criteria` (must NOT fail/block). `test_plan.md`'s TC-014 text is not changed by this issue — this is a refinement of the transcribed helper beyond the TC's literal wording, tracked here rather than there.
 - TC-014/TC-015 helper steps (parsing `Mapped Test Cases:` correctly, including the negative control and the `Task Type` awareness above) are GREEN from the start; each TC's step-3 drift-guard is direction-sensitive — TC-014 greps for the forward-direction phrasing ("every task has a test") and explicitly must **not** be satisfied by the reverse phrasing alone (and vice versa for TC-015) — write both drift-guards to check this exclusion, not just presence.
 - TC-016/TC-017 are pure static audits (no fixtures) of the same gate block — RED until Task 8 exists at all.
 
 **Acceptance Criteria:**
-- [ ] TC-013 harness implemented; helper steps pass now, drift-guard is RED pending Task 8
-- [ ] TC-014 harness implemented; helper steps pass now, drift-guard is RED pending Task 8
-- [ ] TC-015 harness implemented; helper steps pass now, drift-guard is RED pending Task 8
-- [ ] TC-016 harness implemented; RED pending Task 8
-- [ ] TC-017 harness implemented; RED pending Task 8
+- [x] TC-013 harness implemented; helper steps pass now, drift-guard is RED pending Task 8
+- [x] TC-014 harness implemented; helper steps pass now, drift-guard is RED pending Task 8
+- [x] TC-015 harness implemented; helper steps pass now, drift-guard is RED pending Task 8
+- [x] TC-016 harness implemented; RED pending Task 8
+- [x] TC-017 harness implemented; RED pending Task 8
 
 ---
 
@@ -320,19 +321,19 @@ passes» означает то же, что везде — TC полностью
 - **Location.** This gate belongs only here — per US-4, it is an output gate of the implementation stage (a condition on *handing off* to review), not an input gate of `/pf-codereview`. Insert it into Phase 3 ("Completion Summary"), before the final "Ready for Testing" report, or as a new Phase 3.5 — either way, before this skill's own completion is reported.
 - **Prerequisite for Check 1 — a writer for the checkboxes it reads.** Check 1 below only works if something actually flips `implementation_plan.md`'s `- [ ]` to `- [x]` — today, nothing in `pf-execute` does: task completion is judged from a sub-agent's final summary or the orchestrator's own disk re-read (Phase 2, "Execution Strategy" point 6), never written back into the plan document itself. Add this writing step to Phase 2, "Execution Strategy" point 6 — the exact point that reads: "Once every task in a wave is confirmed complete, the orchestrator runs the shared commit & push procedure... for that wave, on the issue branch." Insert the new sub-step **there, per task, immediately after that task is confirmed complete and before the wave's `git add -A`/commit** — for both confirmation paths point 6 already describes (a `write: claude` task, confirmed from the dispatched sub-agent's own final summary; a `write != claude` task, confirmed from the orchestrator's own disk re-read): edit `implementation_plan.md` and change **only that task's own** `**Acceptance Criteria:**` checkboxes from `- [ ]` to `- [x]` — never the whole document in one pass. **Ordering is load-bearing:** this write must land before the wave's commit (so it rides the same `git add -A`), and Check 1 below must only ever run after every wave has already gone through this step — a gate reading its own successful work as still-unchecked is a false block, not a real gap.
 - **Partial confirmation.** If a task's confirmation (sub-agent summary or orchestrator disk re-read) reports the task as incomplete, deviated, or only partially done, do **not** check any of its boxes — leave them `- [ ]` exactly as written. This is correct, not a bug: Check 1 is supposed to block on genuinely incomplete work, and an inaccurately checked box would defeat that.
-- **Check 1 — all plan checkboxes done (AC-4.1), scoped to Auto TCs.** Mechanically scan `implementation_plan.md` for any remaining `- [ ]` line. For each one, extract the `TC-\d+` it names and look up that TC's `Type` column in `test_plan.md`'s Status Tracker (the same cross-reference Check 3 already does): if `Type: Auto` (or the line names no TC-ID at all), it blocks; **if `Type: Manual`, it is explicitly out of scope for this check.** This carve-out exists because this very plan has four Manual-TC Acceptance Criteria lines that cannot be true at hand-off time by design — "TC-027 — verified via live multi-round `/pf-codereview`/`/pf-execute` run..." (Task 2), "TC-009 — verified via live `/pf-codereview` run..." (Task 6), "TC-019/TC-020 — verified via live run..." (Task 10) — this issue's own "Внешние зависимости" note that the Manual-TC live runs happen only after `make update-skills` is run post-`/pf-execute`, and the Dependencies section already establishes that an Acceptance Criteria line need not close the moment its task reaches the head of its wave. Blocking on a still-unchecked Manual-TC line here would make this gate unsatisfiable by this plan's own design — the carve-out is narrow (one cross-referenced lookup per line) and stays fully mechanical (AC-4.5), not a general judgment call. Manual-TC criteria are closed later, when the tester actually runs them (`/pf-test`'s manual checklist / `/pf-manual-test`), not by this gate.
-- **Check 2 — forward: every `code` task has a test (AC-4.2).** Applies only to tasks whose `**Task Type:**` is `code`. For every such task, its `**Mapped Test Cases:**` field must be non-empty. This is the direction that would have caught rounds 5 and 8 of `20260709-feat-dockerize` (functionality declared, not built) — a TC-ID mentioned only in a task's prose description does not count. **`tests`-typed tasks are exempt from this specific check** — this issue's own plan is the reason: a `tests`-typed task's `Mapped Test Cases:` field is deliberately `None`/empty by convention (see every `tests` task in this document), because the field is machine-parsed and a TC-ID sitting in its prose would be read as a real mapping; the TC-IDs it exercises belong to its paired `code` task, which is the one that makes the corresponding drift-guards green. A `tests`-typed task's harness adds no behavior of its own — it is checked by Check 2b instead.
+- **Check 1 — all plan checkboxes done (AC-4.1), scoped to Auto TCs.** Mechanically scan `implementation_plan.md` for any remaining `- [ ]` line. For each one, extract the `TC-\d+` it names and look up that TC's `Type` column in `test_plan.md`'s Status Tracker (the same cross-reference Check 3 already does): if `Type: Auto` (or the line names no TC-ID at all), it blocks; **if `Type: Manual`, it is explicitly out of scope for this check.** This carve-out was written for the case where a plan carries Manual-TC Acceptance Criteria lines that cannot be true at hand-off time by design (a live run the tester performs later, after `make update-skills`) — the Dependencies section already establishes that an Acceptance Criteria line need not close the moment its task reaches the head of its wave, so blocking on a still-unchecked Manual-TC line here would make the gate unsatisfiable by a plan's own design. The carve-out is narrow (one cross-referenced lookup per line) and stays fully mechanical (AC-4.5), not a general judgment call. **This plan itself no longer has any Manual-TC line to exercise this carve-out against** — the four originally planned (TC-009, TC-019, TC-020, TC-027) were resolved at `/pf-qa`: TC-009 converted to an Auto static audit (Task 6), the other three removed outright (see `test_plan.md`'s Known Issues KI-2) — but the mechanism in `pf-execute/SKILL.md` stays general-purpose for a future plan that does carry one.
+- **Check 2 — forward: every `code` task has a test (AC-4.2).** Applies only to tasks whose `**Task Type:**` is `code`. For every such task, its `**Mapped Test Cases:**` field must be non-empty. This is the direction that would have caught rounds 5 and 8 of `20260709-feat-dockerize` (functionality declared, not built) — a TC-ID mentioned only in a task's prose description does not count. **`tests`-typed tasks are exempt from this specific check** — this issue's own plan is the reason: a `tests`-typed task's `Mapped Test Cases:` field is deliberately free of TC-IDs by convention — a short prose reason stands in place of case numbers (see every `tests` task in this document) — because the field is machine-parsed and a TC-ID sitting in its prose would be read as a real mapping; the TC-IDs it exercises belong to its paired `code` task, which is the one that makes the corresponding drift-guards green. A `tests`-typed task's harness adds no behavior of its own — it is checked by Check 2b instead.
 - **Check 2b — `tests`-typed tasks: Acceptance Criteria names at least one TC-ID (AC-4.2, `tests` variant).** For every task whose `**Task Type:**` is `tests`, its `**Acceptance Criteria:**` section must name at least one TC-ID (any `TC-\d+` literal there counts — it is prose there by design, unlike the machine-parsed `Mapped Test Cases:` field). A `tests` task with an empty `Mapped Test Cases:` field AND no TC-ID anywhere in its `Acceptance Criteria` is a real gap (an infrastructure task nobody is tracking against any test case) and blocks exactly like Check 2 does for `code` tasks.
 - **Check 3 — reverse: every TC has a task (AC-4.3).** For every TC row in `test_plan.md`'s Status Tracker, at least one task's `Mapped Test Cases:` field must name it. This is a **different** gap from Check 2/2b (a requirement nobody picked up) and does not substitute for either.
 - **All checks blocking (AC-4.4).** State plainly that these are hard stops, not advisory warnings — a soft warning is exactly what "the gate didn't hold" meant in the source incident (dockerize case, finding 4).
 - **All checks mechanical (AC-4.5).** Phrase each check as a deterministic parse/scan — no "use your judgment whether coverage is sufficient" language anywhere in this block; a model that can be talked past the gate is not a gate.
 
 **Acceptance Criteria:**
-- [ ] TC-013 passes
-- [ ] TC-014 passes
-- [ ] TC-015 passes
-- [ ] TC-016 passes
-- [ ] TC-017 passes
+- [x] TC-013 passes
+- [x] TC-014 passes
+- [x] TC-015 passes
+- [x] TC-016 passes
+- [x] TC-017 passes
 
 ---
 
@@ -351,17 +352,17 @@ passes» означает то же, что везде — TC полностью
 - TC-023 reuses TC-022's list of stop messages and requires a concrete recovery path (a command, a numbered step list) next to each — Phase 4.5's own "Recovering from a failure inside this phase" is the passing exemplar (baseline); Phase 4's bare "Resolve conflicts manually on PARENT-BRANCH" is the known gap this TC is built to catch.
 
 **Acceptance Criteria:**
-- [ ] TC-018 harness implemented; RED pending Task 10
-- [ ] TC-021 harness implemented; RED pending Task 11
-- [ ] TC-022 harness implemented; Phase 4.5 sub-check passes now (baseline), full-coverage check is RED pending Task 12
-- [ ] TC-023 harness implemented; Phase 4.5 sub-check passes now (baseline), full-coverage check is RED pending Task 12
+- [x] TC-018 harness implemented; RED pending Task 10
+- [x] TC-021 harness implemented; RED pending Task 11
+- [x] TC-022 harness implemented; Phase 4.5 sub-check passes now (baseline), full-coverage check is RED pending Task 12
+- [x] TC-023 harness implemented; Phase 4.5 sub-check passes now (baseline), full-coverage check is RED pending Task 12
 
 ---
 
 #### Task 10: `pf-codereview` + `pf-check` — пустой предмет ревью и предмет вне ветки issue
 
 **Task Type:** code
-**Mapped Test Cases:** TC-018, TC-019, TC-020
+**Mapped Test Cases:** TC-018
 **Files:**
 - `skills/pf-codereview/SKILL.md` - модифицирован: пустой дифф — явная ошибка стадии
 - `skills/pf-check/SKILL.md` - модифицирован: пустой дифф — явная ошибка стадии; отсутствие ветки issue — ревью по пути документа
@@ -369,12 +370,10 @@ passes» означает то же, что везде — TC полностью
 **Implementation Notes:**
 - **Empty review target = stage error, not clean (AC-5.1, BR-6).** In `pf-codereview`, add this check right after Phase 1 computes `git diff PARENT-BRANCH...HEAD`: if the diff is empty, stop with an explicit error ("nothing to review" / "empty review target") — do **not** proceed to Phase 2/3 and do **not** write `verdict: PASS` with empty findings lists. **In `pf-check`, this guard belongs only around the Codex invocation chain** — its step 2b (`--scope branch --base <base-ref>`) is the only place `pf-check` computes a diff at all; add the same empty-diff-is-an-error check there. `pf-check`'s Claude review path has **no equivalent to add**: it dispatches a sub-agent to read TARGET and its predecessor documents by path — no `git diff` call anywhere in that path — so "empty diff" is not a state that path can be in. Do not write prose implying a parallel diff-check exists for it. At most, note in the report which review mechanism actually ran (diff-based Codex chain vs. path-based Claude review), so the two are never confused. Both stop-messages (`pf-codereview`'s, and `pf-check`'s Codex-chain one) must read distinctly from a genuine "reviewed, found nothing" result — TC-018 (per the revised split in `test_plan.md`, see Task 9's Implementation Notes) checks for this distinction explicitly, not just the word "empty".
 - **Off-branch document — review by path, reported explicitly (AC-5.2).** This is `pf-check`'s scenario **only** — `pf-codereview` does not carry an equivalent, see below. When TARGET was authored before an `issue/ISSUE-ID` branch exists (still on `develop`), `pf-check` must not compute a diff against a nonexistent branch and read "empty" as "clean": detect the missing branch, switch to reviewing the document by its current on-disk content instead, and state the reason ("no issue branch yet") in the report. `pf-codereview`'s Phase 1 already hard-stops if the current branch isn't `issue/ISSUE-ID` (a different, pre-existing guard), which makes the off-branch scenario structurally unreachable there — so `pf-codereview`'s text does **not** need review-by-path anchors at all. Per the revised TC-018 (see `test_plan.md` and Task 9's Implementation Notes): `pf-codereview` is checked only for its pre-existing branch guard plus the empty-diff rule above; `pf-check` is checked for the empty-diff rule (around its Codex chain) plus this off-branch/review-by-path rule. Do not invent a review-by-path behavior for `pf-codereview` that its Phase 1 guard already makes unreachable.
-- TC-019 (Manual) and TC-020 (Manual) map here — TC-019 is the live empty-diff run (either skill), TC-020 is the live off-branch run (`pf-check` specifically, per its own Preconditions).
+- TC-019 and TC-020 originally mapped here as Manual live-run TCs (TC-019 the empty-diff run, TC-020 the off-branch run). The owner decided at `/pf-qa` to remove both outright — TC-018's static drift-guard is this issue's only remaining coverage of AC-5.1/AC-5.2 (see `test_plan.md`'s Known Issues KI-2).
 
 **Acceptance Criteria:**
-- [ ] TC-018 passes
-- [ ] TC-019 — verified via live run on the `empty-diff` fixture (see `test_plan.md` TC-019 Steps)
-- [ ] TC-020 — verified via live `/pf-check` run on the `off-branch` fixture (see `test_plan.md` TC-020 Steps)
+- [x] TC-018 passes
 
 ---
 
@@ -393,7 +392,7 @@ passes» означает то же, что везде — TC полностью
 - This directly reproduces and fixes `prompt.md` item 6: `/pf-check` had already run (commit `d3f2b32`) but `/pf` could not see it, because "check passed" was defined circularly through the next document's readiness.
 
 **Acceptance Criteria:**
-- [ ] TC-021 passes
+- [x] TC-021 passes
 
 ---
 
@@ -407,14 +406,16 @@ passes» означает то же, что везде — TC полностью
 **Implementation Notes:**
 - **Audit every phase (AC-5.4).** Walk Phase 0 through Phase 9 (including 4.5 and 8.5). Phase 0's three prerequisite checks and Phase 1's confirmation already stop with a concrete next command each — leave those as-is. Phase 4.5 already has the fullest example of the target shape ("Recovering from a failure inside this phase", three numbered steps with real `git` commands) — treat it as the pattern to match, not to rewrite.
 - **The one gap `test_plan.md` names explicitly (AC-5.5): Phase 4's merge-conflict stop.** Today it reads "Merge conflict detected. Resolve conflicts manually on PARENT-BRANCH, then re-run /pf-close." — a bare "resolve manually" with no concrete steps, exactly the shape AC-5.5 forbids. Extend it with an actual numbered recovery path (e.g.: identify conflicting files via `git status`, resolve them, `git add` the resolved files, `git commit` to complete the merge, then re-run `/pf-close` — adapt to this framework's actual recovery need, matching Phase 4.5's level of concreteness).
-- **Phases 2, 3, 5, 6, 7, 8 have neither signal today — add an explicit one-line continuation to each (AC-5.4).** Confirmed by direct inspection: these six phases contain no "stop:"/"Merge conflict detected"/"Stop and surface"-style construction anywhere in their block, and no sentence naming the next phase either — they simply run out of numbered steps into the next `## Phase N` heading, which is not a signal TC-022's drift-guard counts. Append one short sentence at the end of each phase's numbered steps, in the file's existing plain style: Phase 2 → "Proceed to Phase 3." Phase 3 → "Proceed to Phase 4." Phase 5 → "Proceed to Phase 6." Phase 6 → "Proceed to Phase 7." Phase 7 → "Proceed to Phase 8." Phase 8 → "Proceed to Phase 8.5." Do not invent a failure mode for a phase that has none (e.g. Phase 5's `mkdir -p`/`mv` are not expected to fail in normal operation) — an explicit continuation sentence, not a fabricated stop condition, is what TC-022's disjunctive check ("either explicit continuation or explicit stop") asks for here.
-- **Phase 4, Phase 0, Phase 1, and Phase 8.5 already satisfy TC-022 today — leave all four untouched.** Phase 4 has an explicit stop for its own failure mode (the conflict case); Phase 0's three prerequisite checks and Phase 1's confirmation each stop with a concrete next command; Phase 8.5 already has its own explicit non-fatal handling ("On push failure... do NOT abort... surface it in the Phase 9 report"). Each of the four satisfies one half of TC-022's disjunctive check ("either explicit continuation or explicit stop") via an explicit stop/non-fatal-report path, so none needs an added "Proceed to Phase N" sentence. Phase 4's only real gap is AC-5.5's concreteness requirement, handled by the bullet above (extending the conflict message itself).
+- **Phases 2, 3, 5, 6, 7, 8 and 8.5 have no signal a mechanical guard can match — add an explicit one-line continuation to each (AC-5.4).** Confirmed by direct inspection **and by Task 9's harness, which measured this**: these seven phases contain no "stop:"/"Merge conflict detected"/"Stop and surface"-style construction anywhere in their block, and no sentence naming the next phase either — they simply run out of numbered steps into the next `## Phase N` heading, which is not a signal TC-022's drift-guard counts. Append one short sentence at the end of each phase's numbered steps, in the file's existing plain style: Phase 2 → "Proceed to Phase 3." Phase 3 → "Proceed to Phase 4." Phase 5 → "Proceed to Phase 6." Phase 6 → "Proceed to Phase 7." Phase 7 → "Proceed to Phase 8." Phase 8 → "Proceed to Phase 8.5." **Phase 8.5 → "Proceed to Phase 9."** Do not invent a failure mode for a phase that has none (e.g. Phase 5's `mkdir -p`/`mv` are not expected to fail in normal operation) — an explicit continuation sentence, not a fabricated stop condition, is what TC-022's disjunctive check ("either explicit continuation or explicit stop") asks for here.
+- **Phase 8.5 is included in the list above, and this corrects an earlier claim in this plan.** An earlier revision of these notes asserted that Phase 8.5 "already satisfies TC-022 today" on the strength of its non-fatal handling ("On push failure... do NOT abort... surface it in the Phase 9 report"). That reading is semantic, and Task 9's drift-guard cannot make it: 8.5 carries neither a `stop:`-style construction nor a phrase naming the next phase, and Task 9's measured run reports Phase 8.5 as FAIL alongside 2/3/5/6/7/8. Leaving 8.5 out would have left `TC-022 passes` in this task's own Acceptance Criteria unmet after the task reported success — the exact "a stage reports success without having done the work" defect this issue exists to remove. A mechanical gate must be satisfied mechanically (AC-4.5's principle, applied to this drift-guard): add the literal sentence rather than relying on a reader inferring continuation from "do NOT abort".
+- **Phase 4, Phase 0 and Phase 1 already satisfy TC-022 today — leave their TC-022 status untouched.** Phase 4 has an explicit stop for its own failure mode (the conflict case); Phase 0's three prerequisite checks and Phase 1's confirmation each stop with an explicit message. Each satisfies the "explicit stop" half of TC-022's disjunctive check, so none needs an added "Proceed to Phase N" sentence. Their remaining gaps are TC-023's, not TC-022's — see the next bullet.
+- **TC-023 gap in Phase 1 (AC-5.5), also measured by Task 9.** Phase 1's stop is `stop: "Close cancelled. No changes made."` — an explicit stop (so TC-022 passes) with **no recovery path at all**, which is what TC-023 requires next to every stop message; Task 9's run reports Phase 1 as FAIL on TC-023 step 3. An earlier revision of these notes claimed Phase 1 "stops with a concrete next command"; it does not — there is no command in that line. The honest recovery path here is short, because nothing was changed: extend the message so it names the way forward explicitly, e.g. "Close cancelled. No changes made. Re-run `/pf-close` when you are ready to close this issue." Phase 0's three stops already carry concrete next commands (`Run /pf-qa first`, `git checkout issue/ISSUE-ID`) and pass TC-023 today — leave them as they are.
 - **Do not weaken Phase 4.5's existing recovery text** while editing nearby phases — TC-023's baseline sub-check depends on it staying intact.
 - **Keep Task 9's TC-022 drift-guard in sync with the literal phrase added here.** Task 9's Implementation Notes call for the drift-guard's "explicit continuation" signal to match "Proceed to Phase N." verbatim, alongside the pre-existing stop constructions — if this task ends up phrasing the continuation differently, update Task 9's note (or the phrase here) so the two stay the same string; what one writes, the other must search for.
 
 **Acceptance Criteria:**
-- [ ] TC-022 passes
-- [ ] TC-023 passes
+- [x] TC-022 passes
+- [x] TC-023 passes
 
 ---
 
@@ -433,9 +434,9 @@ passes» означает то же, что везде — TC полностью
 - TC-026's `pf_execute_resolve_task_content` helper is pure bash: a payload carrying only a task number resolves to nothing (step 1); a payload carrying full task content resolves to that content regardless of a mismatched number (step 2) — both GREEN from the start. Its drift-guard (step 3) is RED pending Task 14.
 
 **Acceptance Criteria:**
-- [ ] TC-024 harness implemented; RED pending Task 14 (missing-criterion (в) only — (а)(б)(г)(д) baseline-pass today per `test_plan.md`)
-- [ ] TC-025 harness implemented and RED right now (KI-1) — this is the expected state, not a defect in the test
-- [ ] TC-026 harness implemented; helper steps pass now, drift-guard is RED pending Task 14
+- [x] TC-024 harness implemented; RED pending Task 14 (missing-criterion (в) only — (а)(б)(г)(д) baseline-pass today per `test_plan.md`)
+- [x] TC-025 harness implemented and RED right now (KI-1) — this is the expected state, not a defect in the test
+- [x] TC-026 harness implemented; helper steps pass now, drift-guard is RED pending Task 14
 
 ---
 
@@ -453,11 +454,80 @@ passes» означает то же, что везде — TC полностью
 - Reconcile with Phase 2's `write != claude` (delegated actor) path, which already **does** use `TaskGet`/`TaskUpdate` legitimately — that's the orchestrating session itself, not a dispatched sub-agent, and is explicitly out of scope for this task's changes (see `skills/pf-execute/SKILL.md`'s own "Why the orchestrator, not the actor, reads and marks the task" note).
 
 **Acceptance Criteria:**
-- [ ] TC-024 passes
-- [ ] TC-025 passes
-- [ ] TC-026 passes
+- [x] TC-024 passes
+- [x] TC-025 passes
+- [x] TC-026 passes
 
 ---
+
+---
+
+#### Task 15: Гейт полноты — симметрия кросс-ссылки с трекером и fail-closed на дублях
+
+**Task Type:** tests
+**Mapped Test Cases:** нет — задача заведена эскалацией `/pf-codereview` по
+исчерпании бюджета раундов (AC-1.3, BR-7). Номера кейсов не перечислены в этом
+поле по той же причине, что и у остальных задач `tests`: поле машинно парсится
+гейтом полноты (AC-4.2/AC-4.3), и номер кейса, стоящий в его прозе, был бы
+прочитан как настоящее сопоставление. Перечень — в Acceptance Criteria ниже.
+**Files:**
+- `skills/pf-execute/SKILL.md` - модифицирован: Check 2 получает ту же кросс-ссылку с Status Tracker, что и Check 2b; из Check 2b убирается обещание проверки `Type`
+- `test/pf-execute-completeness.sh` - модифицирован: ветка `code` в `_pf_task_rule_ok` сверяет номера с трекером; `_pf_status_tracker_type_of` закрывается на дублях; ветка `tests` перестаёт перепарсивать трекер в цикле
+- `test/fixtures/pf-codereview-convergence/coverage-forward-code-unknown-tc/` - новый: задача `code`, маппящаяся на несуществующий кейс
+- `test/fixtures/pf-codereview-convergence/tracker-duplicate-type/` - новый: кейс, дважды присутствующий в трекере с разными `Type`
+
+**Происхождение:** находки CR-013…CR-016 раунда 3 ревью кода. Раунд 3 —
+последний в бюджете (`review_rounds` по умолчанию 3), на выходе осталась
+открытая P1, поэтому по AC-1.3 и BR-7 находки переведены в задачи плана, а issue
+возвращена на `/pf-execute` вместо выдачи `PASS`.
+
+**Implementation Notes:**
+- **CR-013 (P1) — симметрия Check 2.** Check 2 сегодня требует лишь, чтобы поле
+  `**Mapped Test Cases:**` содержало литерал вида `TC-NNN` по форме, и никогда не
+  проверяет существование строки в Status Tracker. Ту же дыру для задач `tests`
+  уже закрыл CR-010 в Check 2b — здесь закрывается симметричная половина для
+  `code`. Воспроизведённый сценарий, который обязан начать блокировать: задача
+  `code` маппится на `TC-999`, отсутствующий в трекере, при этом другая задача
+  маппится на реальный кейс и тем закрывает Check 3 — сегодня все три проверки
+  зелёные, и задача самосертифицируется против выдуманного кейса. Это отказ
+  AC-4.2 в его исходной формулировке: «функциональность объявлена, не построена».
+- **CR-014 (P2) — убрать обещание, а не добавлять проверку.** Текст Check 2b
+  говорит «the same fail-closed cross-reference Check 1 above applies (missing
+  row, or missing/empty `Type` column, still blocks)», тогда как хелпер `Type` не
+  читает. Ревьюеры разошлись: Codex предлагал привести хелпер к правилу, Claude —
+  убрать оговорку из правила. **Решение оператора — вариант Claude:** `Type`
+  семантически не относится к вопросу «существует ли кейс», а пустой `Type` всё
+  равно блокируется fail-closed в Check 1 ниже по потоку. Убрать из текста
+  Check 2b оговорку про `Type`, оставив требование существования строки. Проверку
+  `Type` в хелпер Check 2b **не добавлять**.
+- **CR-015 (P2) — fail-closed на дублирующихся строках.**
+  `_pf_status_tracker_type_of` возвращает `Type` первой найденной строки и молча
+  игнорирует последующие. При `TC-001`, присутствующем дважды — сначала `Manual`,
+  ниже `Auto`, — незакрытый критерий проходит по оговорке для ручных кейсов, хотя
+  кейс автоматический; `sort -u` в Check 3 конфликта тоже не видит. Сделать так,
+  чтобы незакрытая строка проходила только если **все** строки каждого названного
+  кейса существуют и все имеют ровно `Manual`; дубль с расходящимся `Type`
+  блокирует.
+- **CR-016 (P2) — снять асимметрию перепарсинга.** Ветка `tests` в
+  `_pf_task_rule_ok` зовёт `_pf_status_tracker_tc_ids` внутри цикла по кейсам —
+  тот самый паттерн, который убрали из Check 1 по CR-012. Материализовать набор
+  один раз на вызов. Воспроизводимого отказа по времени нет ни здесь, ни у CR-012
+  (замеры: реальные файлы issue — 1 с, синтетический план 50×50 — 0 с на
+  незагруженной машине), поэтому это приведение к единообразию, а не оптимизация
+  под измеренную проблему.
+- **Каждый шаг каждого кейса отчитывается через `pf_pass "TC-NNN step K: …"` /
+  `pf_fail "TC-NNN step K: …"`** — единственная форма, которую распознаёт
+  сканирование TC-ID в `/pf-test` (Phase 3.2).
+- **Не ослаблять существующее.** Направленность TC-014 и TC-015 остаётся
+  независимой: прямое и обратное направления реализованы отдельными паттернами и
+  отдельными путями кода, у каждого своя самопроверка против формулировки
+  противоположного направления. Оговорка для ручных кейсов в Check 1 (CR-005) и
+  чтение Status Tracker в Check 3 (CR-006) сохраняются.
+
+**Acceptance Criteria:**
+- [x] TC-014 passes — включая новую ветку: задача `code`, маппящаяся на кейс без строки в Status Tracker, блокирует гейт
+- [x] TC-013 passes — включая fail-closed на дублирующейся строке кейса с расходящимся `Type`
+- [x] TC-015 passes — обратное направление не затронуто, самопроверка направленности зелёная
 
 ### Dependencies
 
@@ -467,7 +537,7 @@ passes» означает то же, что везде — TC полностью
 относительном порядке (в том числе параллельно, в одной волне
 `/pf-execute`).
 
-- **Все шесть `tests`-задач (1, 3, 5, 7, 9, 13) не блокируются ничем.** Они
+- **Все `tests`-задачи (1, 3, 5, 7, 9, 13, и добавленная эскалацией 15) не блокируются ничем.** Они
   не зависят от соответствующей `code`-задачи для своего создания — только
   их drift-guard-шаг ожидаемо RED до неё. Это осознанное свойство плана
   (test-first), не повод вводить искусственный `blocked_by`.
@@ -499,17 +569,6 @@ passes» означает то же, что везде — TC полностью
   файловый-конфликт довод, что и для `pf-codereview`.
 - **`skills/pf-close/SKILL.md` трогает только Task 12** — независима от
   всех остальных цепочек, может исполняться в любой волне.
-- **TC-027 (mapped inside Task 2) требует Task 4 и Task 6 уже
-  выполненными** для содержательного прогона (ledger и triage — часть
-  того, что проверяет сквозной прогон). По номерам задач в этом документе
-  (позиция раздела, а не порядок исполнения — см. Overview) Task 2 идёт
-  раньше Task 4/6; по исправленному порядку исполнения выше (`Task 4 →
-  Task 2 → Task 6 → Task 10`) Task 4 к моменту исполнения Task 2 уже
-  landed, но Task 6 — ещё нет, она исполняется после. Это означает, что
-  TC-027's Acceptance Criteria в Task 2 фактически проверяется не сразу
-  по завершении Task 2, а только после того, как Task 6 тоже landed —
-  это нормально: Acceptance Criteria задачи не обязаны закрываться в
-  момент, когда задача дошла до головы своей волны.
 
 **Фазированное внедрение не применяется.** Все 14 задач меняют прозу пяти
 skill-файлов одной issue-ветки, сходятся в один `/pf-close`, и ни один
@@ -521,12 +580,14 @@ skill-файлов одной issue-ветки, сходятся в один `/p
 развёртывания не даёт дополнительной ценности сверх уже описанного графа
 Dependencies.
 
-**Внешние зависимости:**
-- Ни одна задача не требует Codex CLI — все Manual TC (`test_plan.md`
-  Prerequisites) используют дефолтный `[claude]`-путь ревью.
-- `make update-skills` (или `/pf-update`) должен быть прогнан после всех
-  14 задач и до прогона Manual TC — как и у прошлых issue, изменяющих
-  `skills/`, тест-план читает установленные копии `~/.claude/skills/`.
+**Внешние зависимости:** ни одной. Решение владельца на стадии `/pf-qa`
+удалило все четыре Manual TC этого тест-плана (TC-009 переведён в Auto,
+TC-019/TC-020/TC-027 удалены — см. `test_plan.md`'s Known Issues KI-2), а
+вместе с ними — и обе прежние причины этого раздела: зависимость от Codex
+CLI (её не было и раньше — Manual TC использовали дефолтный `[claude]`-путь)
+и требование прогнать `make update-skills`/`/pf-update` перед живым прогоном
+(Auto-кейсы читают `skills/` этого репозитория напрямую, а не установленные
+копии в `~/.claude/skills/`).
 
 ### Complexity Estimate
 
@@ -535,10 +596,10 @@ stories (US-1 и US-2 — по одной паре каждая; US-4 и US-6 �
 каждая) плюс US-3 (пара) и US-5, которая из-за охвата трёх разных файлов
 (`pf-codereview`+`pf-check` для AC-5.1/5.2, `pf`+`pf-check` для AC-5.3,
 `pf-close` для AC-5.4/5.5) разбита на одну `tests`-задачу и три отдельные
-`code`-задачи вместо одной. Итог: 6 `tests`-задач + 8 `code`-задач.
+`code`-задачи вместо одной. Итог на момент проектирования: 6 `tests`-задач + 8 `code`-задач; после эскалации раунда 3 ревью добавилась Task 15 (`tests`), итого 7 + 8 = 15.
 
 Оценка отражает фактический охват: пять изменяемых skill-файлов, шесть
-user stories, 26 AC, 27 TC (23 Auto, требующих новой тестовой инфраструктуры
+user stories, 26 AC, 24 TC (все Auto, требующих новой тестовой инфраструктуры
 с нуля — ни одна не расширяет существующий сьют, все шесть новых файлов
 `test/*.sh` создаются впервые), плюс ~20 новых фикстур. Она не раздута
 искусственно: каждая `code`-задача правит одну связную область одного

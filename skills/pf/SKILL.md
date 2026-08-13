@@ -150,7 +150,7 @@ This table is keyed on **which documents in the issue folder are complete**, not
 | `size_tier: trivial` — documents complete (per `~/.claude/skills/pf-size-tiers/SKILL.md`) | Next step |
 |---|---|
 | `notes.md` is not complete | `/pf-brd` |
-| `notes.md` complete, `test_plan.md` not complete | `/pf-check` (before a complete `test_plan.md` exists), then `/pf-test-plan` (once check passed, per the "Note on 'check passed'" convention below) |
+| `notes.md` complete, `test_plan.md` not complete | `/pf-check` (before a complete `test_plan.md` exists), then `/pf-test-plan` (once the check-passed marker is recorded — see the check-passed convention near the end of this step) |
 | `notes.md` + `test_plan.md` both complete, `code_review.md` not complete | `/pf-check` (before executing), then `/pf-execute` (once check passed), then `/pf-codereview` (once execution done) |
 
 `/pf-spec` and `/pf-impl-plan` must never appear as a next step when `size_tier: trivial`.
@@ -227,7 +227,15 @@ Stages are complete per `~/.claude/skills/pf-size-tiers/SKILL.md`; the first inc
 | DEV_DOCS (complete or `skip`-resolved) | `/pf-qa` |
 | QA | `/pf-close` |
 
-**Note on "check passed":** A check counts as passed only when the document it was run against is **complete** per the shared definition in `~/.claude/skills/pf-size-tiers/SKILL.md` ("Stage completion") **and** the next document in sequence is complete as well. Mere existence of the next file is **not** enough: an empty or stub document (one that fails the shared definition) never counts as a passed check — it is treated as absent, and the next step is the skill that produces it.
+**Note on "check passed":** The source of truth for whether a check passed is the explicit marker line `/pf-check` writes when it finishes (see below), not the circular "next document is also complete" heuristic, which now applies only as a legacy fallback for issues predating this marker — and which, where it does apply, judges "complete" by the shared definition in `~/.claude/skills/pf-size-tiers/SKILL.md` ("Stage completion"), never by a criterion restated here. `/pf-check` writes exactly one of two mutually exclusive lines each time it finishes — but that exclusivity holds only **within a single run**, never across the file's history: `session-log.md` is append-only, and a document routinely gets checked, revised, and checked again, so the file can (and normally does) accumulate **several marker lines for the same `<TARGET>`**, in any combination of `PASSED`/`OPEN`, left over from earlier runs.
+
+`[pf-check PASSED] <TARGET> @ <UTC-ISO-8601-timestamp>` — marker: `session-log.md` — check passed for `<TARGET>`, written by `/pf-check`, read by `/pf`.
+
+`[pf-check OPEN] <TARGET> @ <UTC-ISO-8601-timestamp> — <reason>` — marker: `session-log.md` — check ran but did NOT pass for `<TARGET>` (open P0/P1 remain), written by `/pf-check`, read by `/pf` (not counted as a passed check — see `/pf`'s "Note on 'check passed'").
+
+**Take the LAST marker line for the current `<TARGET>`, by position in the file — never "is a `PASSED` line present for `<TARGET>` anywhere".** Collect every `[pf-check PASSED] <TARGET> @ ...` and `[pf-check OPEN] <TARGET> @ ...` line matching the current TARGET (match the literal bracketed tag immediately followed by TARGET, not a bare substring search for the word `PASSED` alone) and use only the one that sits furthest down the file — the most recently appended. Every earlier marker line for that same TARGET is history, not current status, and counts for nothing, no matter which tag it carries: an earlier `PASSED` line does **not** override a later `OPEN` line for the same TARGET. This is the exact sequence a normal review-then-revise cycle produces — check passes at 10:00 and appends `PASSED`, the document is then revised, check runs again at 11:00 and is skipped with an open P0, appending `OPEN` below the earlier `PASSED` — and the later `OPEN` line is what governs.
+
+If the last marker for TARGET is the `OPEN` line, the check does **not** count as passed, no matter how recently it ran or whether a `PASSED` line for TARGET exists earlier in the file: do not advance to the next pipeline stage as if it had — treat TARGET exactly as if its check had not run yet, so the workflow table's row for TARGET alone (without "+ check passed") governs, and the next step comes back around to `/pf-check`. If the last marker for TARGET is the `PASSED` line, the check counts as passed for that document — no further condition needed. If neither line is present at all for TARGET (an issue whose `session-log.md` predates this convention, or a check that genuinely has not run yet), fall back to the legacy definition: the document is **complete** per the shared definition in `~/.claude/skills/pf-size-tiers/SKILL.md` ("Stage completion") **and** the next document in sequence is complete as well. Mere existence of the next file is **not** enough under this fallback: an empty or stub document (one that fails the shared definition) never counts as a passed check — it is treated as absent, and the next step is the skill that produces it.
 
 ## Step 7: Output
 
