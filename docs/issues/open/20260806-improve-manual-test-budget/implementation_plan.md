@@ -8,6 +8,7 @@
 
 - `skills/pf-size-tiers/SKILL.md` — добавить таблицу бюджета Manual по tier, словарь `Manual reason`, требования к валидации
 - `skills/pf-test-plan/SKILL.md` — реализовать бюджетную проверку, валидацию `Manual reason`, запуск automation pass, 3-вариантный гейт
+- `skills/pf-check/SKILL.md` — расширить "Claude review path" для проверки Manual-бюджета и закрытого словаря
 - `test/lib.sh` — добавить helpers для парсинга Status Tracker, подсчёта Manual-кейсов, валидации `Manual reason`
 - `tools/manual-budget-validator.js` — новый инструмент для парсинга `test_plan.md` и валидации бюджета
 - `test/manual-budget.sh` — новый bash-хارнесс для всех 20 тестовых кейсов
@@ -260,7 +261,7 @@ Medium
 ---
 
 ### Task 9: Документировать ручные тесты гейта для `/pf-manual-test`
-**Task Type:** tests
+**Task Type:** code
 **Mapped Test Cases:** (support infrastructure, not mapped to TC — verification instructions for manual testing phase)
 
 **Files:**
@@ -291,4 +292,29 @@ Medium
 - [ ] Инструкции ясны и воспроизводимы
 - [ ] Все три варианта гейта могут быть проверены вручную
 - [ ] manual_test_checklist.md интегрируется с `/pf-manual-test`
+
+---
+
+### Task 10: Расширить `/pf-check` для проверки Manual-бюджета и закрытого словаря `Manual reason`
+**Task Type:** code
+**Mapped Test Cases:** (support infrastructure, не маппируется на TC — расширяет существующий pf-check gate)
+
+**Files:**
+- `skills/pf-check/SKILL.md` — расширить prompt "Claude review path" (раздел, где проверяется oversized-for-tier)
+
+**Implementation Notes:**
+- В раздел "Claude review path" (после проверки на oversized-для-tier для test_plan.md) добавить новую логику:
+  - Парсит `test_plan.md` (ищет Status Tracker)
+  - Считает Manual-кейсы, сравнивает с бюджетом текущего tier (из `skills/pf-size-tiers/SKILL.md`)
+  - Проверяет каждый Manual-TC на наличие `Manual reason` и его корректность (ровно 5 значений из словаря)
+  - Если Manual-count > tier-budget ИЛИ Manual reason некорректен/отсутствует → добавить P1 finding с типом oversized/invalid, не проходить проверку дальше
+  - Сообщение должно указывать: Manual-count, tier-budget, hard-cap (5), и список некорректных reasons (если есть)
+- Использовать тот же инструмент `tools/manual-budget-validator.js`, что и pf-test-plan, или вызвать функции через ту же архитектуру
+- Проверка срабатывает для любого `test_plan.md` с таблицей Status Tracker, независимо от tier
+
+**Acceptance Criteria:**
+- [ ] `/pf-check` флагирует превышение Manual-бюджета как P1 oversized finding
+- [ ] `/pf-check` флагирует некорректные/отсутствующие `Manual reason` как P1 invalid finding
+- [ ] Оба типа фактов верны: используется актуальная информация из pf-size-tiers
+- [ ] Проверка не срабатывает на test_plan.md без Status Tracker
 
