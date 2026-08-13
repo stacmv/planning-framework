@@ -58,6 +58,8 @@ If role resolution yields no `roles:`/`profile:` at all for this issue (§4's le
 >
 > If [TARGET] exceeds its tier's budget, include a **P0** finding: "`<file>` is oversized for this issue's declared tier (`<tier>`): <actual> vs <budget>. Either trim the document, or re-classify the issue to a larger tier (edit `size_tier` in `prompt.md`)."
 >
+> Additionally, if [TARGET] is `test_plan.md`: count how many rows in its Status Tracker have `Type: Manual`, and compare against the tier's Manual budget in `~/.claude/skills/pf-size-tiers/SKILL.md`'s "Manual test-case budget by tier" table (trivial 0-1, small ≤2, medium ≤3, large ≤5, hard cap 5 unconditional). If the count exceeds the tier's budget, include a **P1** finding stating the actual count, the tier's budget, and the hard cap. Separately, check every `Manual`-type row's `Remarks` column: it must begin with `Manual reason: <value>` where `<value>` is one of the 5 words in that same section's closed vocabulary (`human-judgment`, `external-system`, `interactive-agent`, `cost`, `environment`). For every `Manual` row missing this prefix, or using a value outside the vocabulary, include a **P1** finding naming the offending TC-ID and what's wrong, and listing the 5 valid values.
+>
 > Group findings by priority: P0 (blocker), P1 (important), P2 (minor).
 >
 > Read the `doc_language` field from `docs/issues/open/[ISSUE-ID]/prompt.md`'s YAML frontmatter (default: English if absent) and write your findings in that language.

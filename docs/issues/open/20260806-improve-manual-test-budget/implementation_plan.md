@@ -110,9 +110,9 @@ Medium
 - **Hard cap сообщение**: если срабатывает потолок 5, сообщение должно явно указывать "бюджет = N (tier), жёсткий потолок = 5"
 
 **Acceptance Criteria:**
-- [ ] TC-001, TC-002, TC-003 pass — бюджеты для small/medium/large соблюдаются, гейт не срабатывает
-- [ ] TC-004, TC-005 pass — потолок 5 срабатывает при 6+ Manual, сообщение содержит оба числа
-- [ ] TC-014 pass — ретроактивное применение бюджета на старой issue работает
+- [x] TC-001, TC-002, TC-003 pass — бюджеты для small/medium/large соблюдаются, гейт не срабатывает
+- [x] TC-004, TC-005 pass — потолок 5 срабатывает при 6+ Manual, сообщение содержит оба числа
+- [x] TC-014 pass — ретроактивное применение бюджета на старой issue работает
 
 ---
 
@@ -158,8 +158,8 @@ Medium
 - Sub-agent dispatch из оркестратора: `Agent({ description: "Automation pass: convert max Manual→Auto in test plan", prompt: "..." })`
 
 **Acceptance Criteria:**
-- [ ] TC-009 pass — механически проверяемые TC конвертированы в Auto с указанием конкретного harness
-- [ ] TC-010 pass — отсутствующий harness добавлен как задача в implementation_plan.md
+- [x] TC-009 pass — механически проверяемые TC конвертированы в Auto с указанием конкретного harness
+- [x] TC-010 pass — отсутствующий harness добавлен как задача в implementation_plan.md
 
 ---
 
@@ -312,8 +312,8 @@ Medium
 - Проверка срабатывает для любого `test_plan.md` с таблицей Status Tracker, независимо от tier
 
 **Acceptance Criteria:**
-- [ ] `/pf-check` флагирует превышение Manual-бюджета как P1 oversized finding
-- [ ] `/pf-check` флагирует некорректные/отсутствующие `Manual reason` как P1 invalid finding
-- [ ] Оба типа фактов верны: используется актуальная информация из pf-size-tiers
-- [ ] Проверка не срабатывает на test_plan.md без Status Tracker
+- [x] `/pf-check` флагирует превышение Manual-бюджета как P1 oversized finding
+- [x] `/pf-check` флагирует некорректные/отсутствующие `Manual reason` как P1 invalid finding
+- [x] Оба типа фактов верны: используется актуальная информация из pf-size-tiers
+- [x] Проверка не срабатывает на test_plan.md без Status Tracker
 
