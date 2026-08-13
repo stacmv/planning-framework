@@ -31,9 +31,8 @@
 - Черновой `test_plan.md` содержит достаточно Manual-кейсов, чтобы их число превышало бюджет Medium (>3) даже после возможной конвертации.
 
 **Test Data:**
-- `test/fixtures/manual-budget-tc-011/brd.md` — fixture с описанием для issue (или equivalent, созданный вручную).
-- `test/fixtures/manual-budget-tc-011/prompt.md` — fixture с `size_tier: medium`.
-- `test/fixtures/manual-budget-tc-011/test_plan.md` — черновик тест-плана с Manual-кейсами.
+- `test/fixtures/manual-budget-tc-011/docs/issues/open/manual-budget-tc-011/prompt.md` — fixture с `size_tier: medium`.
+- `test/fixtures/manual-budget-tc-011/docs/issues/open/manual-budget-tc-011/test_plan.md` — черновик тест-плана с 5 Manual-кейсами (превышение бюджета medium ≤3).
 
 **Steps:**
 
@@ -62,9 +61,8 @@
 - Черновой `test_plan.md` содержит достаточно Manual-кейсов, чтобы их число превышало текущий tier-бюджет.
 
 **Test Data:**
-- `test/fixtures/manual-budget-tc-012/brd.md` — fixture с описанием.
-- `test/fixtures/manual-budget-tc-012/prompt.md` — fixture с `size_tier: medium`.
-- `test/fixtures/manual-budget-tc-012/test_plan.md` — черновик с Manual-кейсами.
+- `test/fixtures/manual-budget-tc-012/docs/issues/open/manual-budget-tc-012/prompt.md` — fixture с `size_tier: medium`.
+- `test/fixtures/manual-budget-tc-012/docs/issues/open/manual-budget-tc-012/test_plan.md` — черновик с 5 Manual-кейсами.
 
 **Steps:**
 
@@ -94,9 +92,8 @@
 - Черновой `test_plan.md` готов к запуску `/pf-test-plan`.
 
 **Test Data:**
-- `test/fixtures/manual-budget-tc-013/brd.md` — fixture с описанием.
-- `test/fixtures/manual-budget-tc-013/prompt.md` — fixture с `size_tier: medium`.
-- `test/fixtures/manual-budget-tc-013/test_plan.md` — черновик с Manual-кейсами.
+- `test/fixtures/manual-budget-tc-013/docs/issues/open/manual-budget-tc-013/prompt.md` — fixture с `size_tier: medium`.
+- `test/fixtures/manual-budget-tc-013/docs/issues/open/manual-budget-tc-013/test_plan.md` — черновик с Manual-кейсами (превышение бюджета).
 
 **Steps:**
 

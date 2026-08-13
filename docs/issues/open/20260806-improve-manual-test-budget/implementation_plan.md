@@ -258,7 +258,7 @@ Medium
 - TC-020: не требует fixture, просто grep SKILL.md на словарь
 
 **Acceptance Criteria:**
-- [x] Все fixtures готовы и загружены в test/fixtures/manual-budget-tc-*/
+- [x] Все fixtures готовы и загружены в test/fixtures/manual-budget-tc-*/, поддерживают выполнение TC-001 через TC-020 (Mapped Test Cases живёт у Task 7 по конвенции для `tests`-тасков; см. `~/.claude/skills/pf-execute/SKILL.md` Check 2b)
 - [x] Suite успешно загружает каждый fixture с `pf_setup_case`
 - [x] Тесты находят Status Tracker в каждом fixture
 
@@ -293,9 +293,9 @@ Medium
   - Проверить, что test_plan.md содержит какие TC отложены
 
 **Acceptance Criteria:**
-- [ ] Инструкции ясны и воспроизводимы
-- [ ] Все три варианта гейта могут быть проверены вручную
-- [ ] manual_test_checklist.md интегрируется с `/pf-manual-test`
+- [x] Инструкции ясны и воспроизводимы
+- [x] Все три варианта гейта могут быть проверены вручную
+- [x] manual_test_checklist.md интегрируется с `/pf-manual-test` (формат сверен с `tools/manual-test-ui/lib/checklist.js`'s парсером — `## TC-NNN:` заголовки, `**Prerequisites:**`/`**Test Data:**`/Steps-таблица с колонкой Result — совпадает)
 
 ---
 
