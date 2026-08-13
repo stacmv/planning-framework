@@ -645,6 +645,133 @@ else
   printf 'log:\n%s\nbody:\n%s\n' "$(cat "$tc015_log" 2>/dev/null)" "$tc015_body" >&2
 fi
 
+# ─── TC-005: projects.json stays valid JSON for a path that needs escaping ────
+# (20260812-bug-flaky-manual-test-ui). On Windows the TC-015 fixture above
+# already IS the JSON-breaking case — after cygpath -w its path is native and
+# therefore full of backslashes — so no separate fixture is built: this branch
+# reuses $tc015_config and $expected_path as recorded before that file was
+# written. On POSIX (no cygpath, so backslashes never occur) a fresh fixture is
+# built here, with a double quote embedded in a path component, the character
+# that actually breaks a naive JSON serializer on this platform.
+#
+# tc005_expected_path is captured BEFORE the write, from the same value that
+# feeds the write. tc005_written_path (step 2/3 below) is read back FROM THE
+# FILE by a separate `node -e`. The two must never collapse into the same
+# variable — comparing a value to itself would stay green under any corruption
+# of the serializer, which is the exact defect this case exists to catch.
+
+if command -v cygpath >/dev/null 2>&1; then
+  tc005_config="$tc015_config"
+  tc005_expected_path="$expected_path"
+  tc005_project_name="$TC015_PROJECT"
+  tc005_workdir="$tc015_root"
+  tc005_setup_ok=1
+  [ -f "$tc005_config" ] || tc005_setup_ok=0
+else
+  TC005_ISSUE="20260101-improve-manual-test-ui-fixture"
+  TC005_PROJECT='pf-fixture-quote-project'
+
+  tc005_setup_ok=1
+  tc005_root="$(pf_mktemp_d)" || exit 1
+  tc005_workdir="$tc005_root"
+  tc005_repo="$tc005_root/pf-fixture-\"-project"
+  mkdir "$tc005_repo" || tc005_setup_ok=0
+
+  tc005_issue_dir="$tc005_repo/docs/issues/open/$TC005_ISSUE"
+  mkdir -p "$tc005_issue_dir" || tc005_setup_ok=0
+  printf '# Issue\n\n**Type:** improve\n**Size Tier:** small\n' >"$tc005_issue_dir/prompt.md" || tc005_setup_ok=0
+  printf '# Manual Test Checklist\n\n**Feature Name:** fixture\n' >"$tc005_issue_dir/manual_test_checklist.md" || tc005_setup_ok=0
+
+  git -C "$tc005_repo" init -q || tc005_setup_ok=0
+  git -C "$tc005_repo" symbolic-ref HEAD refs/heads/develop || tc005_setup_ok=0
+  pf_git_init "$tc005_repo"
+
+  tc005_config="$tc005_root/projects.json"
+  tc005_expected_path="$tc005_repo"
+  tc005_project_name="$TC005_PROJECT"
+
+  # Same serializer TC-015/TC-004 use above: values through process.argv, the
+  # path never interpolated into the -e script text.
+  node -e '
+    const fs = require("node:fs");
+    const [, name, path, cfgPath] = process.argv;
+    fs.writeFileSync(
+      cfgPath,
+      JSON.stringify({ projects: [{ name, path, defaultBranch: "develop" }] })
+    );
+  ' "$TC005_PROJECT" "$tc005_repo" "$tc005_config" || tc005_setup_ok=0
+
+  [ -f "$tc005_config" ] || tc005_setup_ok=0
+fi
+
+if [ "$tc005_setup_ok" -eq 1 ]; then
+  pf_pass "TC-005 step 1: fixture with a JSON-breaking path was created"
+else
+  pf_fail "TC-005 step 1: fixture setup failed before projects.json could be written"
+fi
+
+tc005_parse_err="$tc005_workdir/tc005-parse-err.log"
+if tc005_written_path="$(node -e '
+  const fs = require("node:fs");
+  const [, cfgPath] = process.argv;
+  const data = JSON.parse(fs.readFileSync(cfgPath, "utf8"));
+  process.stdout.write(data.projects[0].path);
+' "$tc005_config" 2>"$tc005_parse_err")"; then
+  pf_pass "TC-005 step 2: projects.json is valid JSON for a path requiring escaping"
+else
+  pf_fail "TC-005 step 2: projects.json failed to parse for a path requiring escaping"
+  cat "$tc005_parse_err" >&2 2>/dev/null
+fi
+
+# written_path came from the file (above); expected_path was fixed before the
+# write (in the branch above). Comparing THESE two — not written_path against
+# itself — is the point of this step.
+if [ "${tc005_written_path-}" = "$tc005_expected_path" ]; then
+  pf_pass "TC-005 step 3: parsed path is byte-identical to the expected path"
+else
+  pf_fail "TC-005 step 3: parsed path differs from the expected path"
+  pf_note "TC-005: expected_path = $tc005_expected_path"
+  pf_note "TC-005: written_path  = ${tc005_written_path-}"
+fi
+
+tc005_port="$(free_port)"
+tc005_log="$tc005_workdir/tc005-server.log"
+
+PLANNING_TEST_UI_CONFIG="$tc005_config" \
+  PLANNING_TEST_UI_MEMORY_ROOT="$tc005_workdir/memory" \
+  node "$UI_DIR/server.js" --port "$tc005_port" >"$tc005_log" 2>&1 &
+tc005_pid=$!
+
+tc005_up=0
+tc005_waited=0
+while [ "$tc005_waited" -lt 100 ]; do
+  if grep -q "http://localhost:$tc005_port" "$tc005_log" 2>/dev/null; then
+    tc005_up=1
+    break
+  fi
+  kill -0 "$tc005_pid" 2>/dev/null || break
+  sleep 0.1
+  tc005_waited=$((tc005_waited + 1))
+done
+
+tc005_body=""
+if [ "$tc005_up" -eq 1 ]; then
+  tc005_body="$(curl -sS --max-time 10 "http://127.0.0.1:$tc005_port/api/projects" 2>&1)"
+fi
+
+# Always terminated here, whether or not it ever came up: a fixture process
+# left running is exactly what S-4/S-5 forbid.
+kill "$tc005_pid" 2>/dev/null
+wait "$tc005_pid" 2>/dev/null
+
+if [ "$tc005_up" -eq 1 ] &&
+  printf '%s' "$tc005_body" | grep -qF -- "\"name\":\"$tc005_project_name\""; then
+  pf_pass "TC-005 step 4: server lists the project from the escaped path"
+else
+  pf_fail "TC-005 step 4: server did not list the project from the escaped path"
+  printf 'log:\n%s\nbody:\n%s\n' "$(cat "$tc005_log" 2>/dev/null)" "$tc005_body" >&2
+fi
+
 assert_repo_untouched
 
 pf_summary
