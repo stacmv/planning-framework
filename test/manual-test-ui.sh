@@ -1,6 +1,15 @@
 #!/usr/bin/env bash
 # test/manual-test-ui.sh — the Manual Test UI suite: TC-001, TC-015, TC-016.
 #
+# 20260812-bug-flaky-manual-test-ui (TC-004): the TC-015 step-4 fixture wrote
+# its Windows temp path into projects.json with a bare printf, which a native
+# Windows node process then resolved against the wrong drive (Git Bash gives
+# POSIX paths in argv, but never converts path text living inside a file it
+# writes). Step 4 below is therefore now split into two pf_pass/pf_fail
+# checkpoints labelled "TC-004 step 1" / "TC-004 step 2" — server start and
+# project listing are now told apart — while staying physically inside the
+# TC-015 section, since the fixture setup is shared.
+#
 # TC-016 comes first and is load-bearing for the whole automated half of this
 # issue. /pf-test runs exactly ONE runner — `make test` — and until now that
 # target's node half globbed `tools/onboarding-tui/test/*.test.js` alone. The
@@ -106,7 +115,7 @@ fi
 # expands it itself, so an empty directory is node's error and not a bash one.
 
 ui_rc=0
-ui_out="$(cd "$REPO_ROOT" && node --test "$UI_GLOB" 2>&1)" || ui_rc=$?
+ui_out="$(cd "$REPO_ROOT" && node --test --test-reporter=tap "$UI_GLOB" 2>&1)" || ui_rc=$?
 
 if [ "$ui_rc" -eq 0 ] &&
   printf '%s\n' "$ui_out" | grep -qF -- 'checklist-ru.test.js' &&
@@ -115,6 +124,194 @@ if [ "$ui_rc" -eq 0 ] &&
 else
   pf_fail "step 4: the manual-test-ui node suites did not run clean (exit $ui_rc)"
   printf '%s\n' "$ui_out" | tail -20 >&2
+fi
+
+# ══════════════════════════════════════════════════════════════════════════════
+# 20260812-bug-flaky-manual-test-ui — TC-001/TC-002: Cause 1 was `EPERM` on
+# `fs.symlinkSync` inside `buildFixture()` taking down all nine TC-011
+# subchecks instead of just the symlink-dependent one. TC-001 proves the
+# other eight still pass; TC-002 proves the symlink subcheck itself is never
+# silently swallowed (skipped-with-reason, executed, or a reported `missing`
+# — never absent without a trace).
+#
+# Captured separately into $rp_out, deliberately NOT merged into $ui_out:
+# $ui_out globs the whole tools/manual-test-ui/test/ directory, so "output is
+# non-empty" stays true even if read-paths.test.js itself never ran — that
+# vacuousness reason does not go away just because both captures are TAP now.
+#
+# NOTE for the next reader: there is a second, unrelated "=== TC-001" section
+# further down this file (the pf-test-plan/pf-test skill-text checks, from a
+# different issue). Its labels are bare "step N: …" with no "TC-001 " prefix,
+# so there is no literal collision with the "TC-001 step N: …" labels below.
+# Left untouched on purpose.
+# ══════════════════════════════════════════════════════════════════════════════
+
+rp_out="$(cd "$REPO_ROOT" && node --test --test-reporter=tap tools/manual-test-ui/test/read-paths.test.js 2>&1)"
+
+# subcheck_state <output> <name> — echoes exactly one of: pass | failed | skip | missing
+# for the named node --test subtest, decided by TAP line shape alone:
+#   "not ok N - <name>"          -> failed
+#   "ok N - <name> # SKIP …"     -> skip
+#   "ok N - <name>" (no # SKIP)  -> pass
+#   neither line found           -> missing
+# Anchored at line start (^[[:space:]]*(not )?ok [0-9]+ - <name>) so a bare
+# grep -F match against a "not ok" line can never be mistaken for a pass.
+subcheck_state() {
+  local out="$1" name="$2" ok_line notok_line
+  notok_line="$(printf '%s\n' "$out" | grep -E -- "^[[:space:]]*not ok [0-9]+ - ${name}")"
+  if [ -n "$notok_line" ]; then
+    printf 'failed'
+    return
+  fi
+  ok_line="$(printf '%s\n' "$out" | grep -E -- "^[[:space:]]*ok [0-9]+ - ${name}")"
+  if [ -z "$ok_line" ]; then
+    printf 'missing'
+    return
+  fi
+  if printf '%s\n' "$ok_line" | grep -q -- '# SKIP'; then
+    printf 'skip'
+  else
+    printf 'pass'
+  fi
+}
+
+printf '\n=== TC-001: the eight non-symlink subchecks of TC-011 pass when symlinkSync is unavailable\n'
+
+if [ -n "$rp_out" ]; then
+  pf_pass "TC-001 step 1: read-paths.test.js run captured, no immediate whole-TC-011 crash"
+else
+  pf_fail "TC-001 step 1: read-paths.test.js run produced no capturable output"
+fi
+
+tc001_name_positive="positive control: a document of the project is readable"
+tc001_name_step1="step 1: traversal out of the project is refused, however it is spelled"
+tc001_name_step3a="step 3a: a sibling directory sharing the project's prefix is refused"
+tc001_name_step3b="step 3b: a sibling of public/ is refused by the static route"
+tc001_name_step4="step 4: the memory prefix is readable — the one allowed extension"
+tc001_name_step5="step 5: normalisation happens before the prefix comparison"
+tc001_name_step6="step 6: session transcripts are unreachable, by name and by listing"
+tc001_name_browser="browser modules are served from an allowlist, never from the whole lib/"
+
+tc001_state_positive="$(subcheck_state "$rp_out" "$tc001_name_positive")"
+tc001_state_step1="$(subcheck_state "$rp_out" "$tc001_name_step1")"
+tc001_state_step3a="$(subcheck_state "$rp_out" "$tc001_name_step3a")"
+tc001_state_step3b="$(subcheck_state "$rp_out" "$tc001_name_step3b")"
+tc001_state_step4="$(subcheck_state "$rp_out" "$tc001_name_step4")"
+tc001_state_step5="$(subcheck_state "$rp_out" "$tc001_name_step5")"
+tc001_state_step6="$(subcheck_state "$rp_out" "$tc001_name_step6")"
+tc001_state_browser="$(subcheck_state "$rp_out" "$tc001_name_browser")"
+
+tc001_found=0
+[ "$tc001_state_positive" != "missing" ] && tc001_found=$((tc001_found + 1))
+[ "$tc001_state_step1" != "missing" ] && tc001_found=$((tc001_found + 1))
+[ "$tc001_state_step3a" != "missing" ] && tc001_found=$((tc001_found + 1))
+[ "$tc001_state_step3b" != "missing" ] && tc001_found=$((tc001_found + 1))
+[ "$tc001_state_step4" != "missing" ] && tc001_found=$((tc001_found + 1))
+[ "$tc001_state_step5" != "missing" ] && tc001_found=$((tc001_found + 1))
+[ "$tc001_state_step6" != "missing" ] && tc001_found=$((tc001_found + 1))
+[ "$tc001_state_browser" != "missing" ] && tc001_found=$((tc001_found + 1))
+
+if [ "$tc001_found" -eq 8 ]; then
+  pf_pass "TC-001 step 2: eight non-symlink subchecks found in captured output"
+else
+  pf_fail "TC-001 step 2: fewer than eight non-symlink subchecks found in captured output"
+fi
+
+if [ "$tc001_state_positive" = "pass" ]; then
+  pf_pass "TC-001 step 3a: positive control passed despite EPERM"
+else
+  pf_fail "TC-001 step 3a: positive control did not pass"
+fi
+
+if [ "$tc001_state_step1" = "pass" ]; then
+  pf_pass "TC-001 step 3b: traversal-refusal (step 1) subcheck passed despite EPERM"
+else
+  pf_fail "TC-001 step 3b: traversal-refusal (step 1) subcheck did not pass"
+fi
+
+if [ "$tc001_state_step3a" = "pass" ]; then
+  pf_pass "TC-001 step 3c: sibling-prefix (step 3a) subcheck passed despite EPERM"
+else
+  pf_fail "TC-001 step 3c: sibling-prefix (step 3a) subcheck did not pass"
+fi
+
+if [ "$tc001_state_step3b" = "pass" ]; then
+  pf_pass "TC-001 step 3d: public-sibling (step 3b) subcheck passed despite EPERM"
+else
+  pf_fail "TC-001 step 3d: public-sibling (step 3b) subcheck did not pass"
+fi
+
+if [ "$tc001_state_step4" = "pass" ]; then
+  pf_pass "TC-001 step 3e: memory-prefix (step 4) subcheck passed despite EPERM"
+else
+  pf_fail "TC-001 step 3e: memory-prefix (step 4) subcheck did not pass"
+fi
+
+if [ "$tc001_state_step5" = "pass" ]; then
+  pf_pass "TC-001 step 3f: prefix-normalisation (step 5) subcheck passed despite EPERM"
+else
+  pf_fail "TC-001 step 3f: prefix-normalisation (step 5) subcheck did not pass"
+fi
+
+if [ "$tc001_state_step6" = "pass" ]; then
+  pf_pass "TC-001 step 3g: transcript-isolation (step 6) subcheck passed despite EPERM"
+else
+  pf_fail "TC-001 step 3g: transcript-isolation (step 6) subcheck did not pass"
+fi
+
+if [ "$tc001_state_browser" = "pass" ]; then
+  pf_pass "TC-001 step 3h: browser-module allowlist subcheck passed despite EPERM"
+else
+  pf_fail "TC-001 step 3h: browser-module allowlist subcheck did not pass"
+fi
+
+printf '\n=== TC-002: symlink subcheck (step 2) is skipped-with-reason, executed, or missing — never silently swallowed\n'
+
+tc002_name_step2="step 2: a symlink pointing out of the project is refused"
+tc002_state_step2="$(subcheck_state "$rp_out" "$tc002_name_step2")"
+
+if [ "$tc002_state_step2" != "missing" ]; then
+  pf_pass "TC-002 step 1: step 2 subcheck is present in output (skip or executed)"
+else
+  pf_fail "TC-002 step 1: step 2 subcheck is missing from output"
+fi
+
+# Applicable only when skip (test_plan.md TC-002 step 2): neither pass nor
+# fail is printed for the executed or missing branches.
+if [ "$tc002_state_step2" = "skip" ]; then
+  if printf '%s\n' "$rp_out" | grep -qiE -- 'EPERM|Developer Mode|symlink'; then
+    pf_pass "TC-002 step 2: symlink unavailable — step 2 skipped with a stated reason"
+  else
+    pf_fail "TC-002 step 2: step 2 skipped silently, no reason stated"
+  fi
+fi
+
+# Applicable only when executed, i.e. pass or failed (test_plan.md TC-002
+# step 3): neither pass nor fail is printed for the skip or missing branches.
+if [ "$tc002_state_step2" = "pass" ] || [ "$tc002_state_step2" = "failed" ]; then
+  if [ "$tc002_state_step2" = "pass" ]; then
+    pf_pass "TC-002 step 3: symlink available — step 2 executed and passed"
+  else
+    pf_fail "TC-002 step 3: symlink available but step 2 did not run or failed"
+  fi
+fi
+
+# Always applicable (test_plan.md TC-002 step 4), including when step 2 is
+# "missing" — a missing step 2 must not also hide a skip elsewhere.
+tc002_other_skipped=0
+[ "$tc001_state_positive" = "skip" ] && tc002_other_skipped=1
+[ "$tc001_state_step1" = "skip" ] && tc002_other_skipped=1
+[ "$tc001_state_step3a" = "skip" ] && tc002_other_skipped=1
+[ "$tc001_state_step3b" = "skip" ] && tc002_other_skipped=1
+[ "$tc001_state_step4" = "skip" ] && tc002_other_skipped=1
+[ "$tc001_state_step5" = "skip" ] && tc002_other_skipped=1
+[ "$tc001_state_step6" = "skip" ] && tc002_other_skipped=1
+[ "$tc001_state_browser" = "skip" ] && tc002_other_skipped=1
+
+if [ "$tc002_other_skipped" -eq 0 ]; then
+  pf_pass "TC-002 step 4: skip is confined to step 2 only"
+else
+  pf_fail "TC-002 step 4: a subcheck other than step 2 was also skipped"
 fi
 
 # ─── Step 5: the onboarding-tui branch is untouched ───────────────────────────
@@ -327,6 +524,11 @@ fi
 # The fixture repository carries a checklist so that the answer proves the
 # server walked git (issueCount counts issues whose checklist exists), not
 # merely echoed the configuration back.
+#
+# The two pf_pass/pf_fail checkpoints below this fixture setup are labelled
+# "TC-004 step 1" / "TC-004 step 2", not "TC-015 step 4" — a deliberate switch
+# of TC-ID (20260812-bug-flaky-manual-test-ui). The fixture setup above stays
+# shared with the rest of the TC-015 section; only the two checkpoints moved.
 
 TC015_ISSUE="20260101-improve-manual-test-ui-fixture"
 TC015_PROJECT="pf-fixture-project"
@@ -346,8 +548,50 @@ git -C "$tc015_repo" symbolic-ref HEAD refs/heads/develop
 pf_git_init "$tc015_repo"
 
 tc015_config="$tc015_root/projects.json"
-printf '{"projects":[{"name":"%s","path":"%s","defaultBranch":"develop"}]}\n' \
-  "$TC015_PROJECT" "$tc015_repo" >"$tc015_config"
+
+# Path conversion (TC-004): $tc015_repo is a POSIX path from pf_mktemp_d.
+# Git Bash rewrites POSIX paths that appear as argv into native Windows paths
+# for the child process it execs, but it never touches path text that lives
+# inside a file's *content* — and node reads projects.json's content, not
+# argv. Written as-is, a native Windows node resolves the leading slash
+# against whatever the current drive happens to be, not against the repo's
+# real location. cygpath -w is the conversion that closes that gap; on a
+# platform without it (Linux/macOS) the POSIX path is already native.
+if command -v cygpath >/dev/null 2>&1; then
+  repo_path="$(cygpath -w "$tc015_repo")"
+else
+  repo_path="$tc015_repo"
+fi
+
+# The one value that never round-trips through a file: the next task compares
+# against this, not against $tc015_repo or $repo_path re-derived later.
+expected_path="$repo_path"
+
+# Serialized via node, not printf: repo_path may contain backslashes (Windows)
+# that need JSON escaping, and printf has no notion of that. Values are
+# passed through process.argv rather than interpolated into the -e script text
+# — interpolating a backslash-laden Windows path into shell-quoted JS source
+# is exactly the kind of thing that breaks before JSON.stringify ever runs.
+node -e '
+  const fs = require("node:fs");
+  const [, name, path, cfgPath] = process.argv;
+  fs.writeFileSync(
+    cfgPath,
+    JSON.stringify({ projects: [{ name, path, defaultBranch: "develop" }] })
+  );
+' "$TC015_PROJECT" "$repo_path" "$tc015_config"
+
+# Read back the same way, to prove what actually landed in the file (not what
+# the shell thinks it wrote).
+written_path="$(node -e '
+  const fs = require("node:fs");
+  const [, cfgPath] = process.argv;
+  const data = JSON.parse(fs.readFileSync(cfgPath, "utf8"));
+  process.stdout.write(data.projects[0].path);
+' "$tc015_config")"
+
+pf_note "TC-015: tc015_repo (raw, from pf_mktemp_d) = $tc015_repo"
+pf_note "TC-015: projects.json path field = $written_path"
 
 tc015_port="$(free_port)"
 tc015_log="$tc015_root/server.log"
@@ -374,6 +618,12 @@ while [ "$tc015_waited" -lt 100 ]; do
   tc015_waited=$((tc015_waited + 1))
 done
 
+if [ "$tc015_up" -eq 1 ]; then
+  pf_pass "TC-004 step 1: server started"
+else
+  pf_fail "TC-004 step 1: server did not start"
+fi
+
 tc015_body=""
 if [ "$tc015_up" -eq 1 ]; then
   tc015_body="$(curl -sS --max-time 10 "http://127.0.0.1:$tc015_port/api/projects" 2>&1)"
@@ -382,13 +632,143 @@ fi
 kill "$tc015_pid" 2>/dev/null
 wait "$tc015_pid" 2>/dev/null
 
+# Printed unconditionally, even when step 1 failed and $tc015_body is empty:
+# an Auto-TC label that is silently skipped leaves TC-004 step 2 unmapped in
+# /pf-test.
 if [ "$tc015_up" -eq 1 ] &&
   printf '%s' "$tc015_body" | grep -qF -- "\"name\":\"$TC015_PROJECT\"" &&
   printf '%s' "$tc015_body" | grep -qF -- '"issueCount":1'; then
-  pf_pass "step 4: the server starts with zero installs and lists the configured projects"
+  pf_pass "TC-004 step 2: server listed the fixture project"
 else
-  pf_fail "step 4: the server did not start or did not list the configured project"
+  pf_fail "TC-004 step 2: server did not list the fixture project"
   printf 'log:\n%s\nbody:\n%s\n' "$(cat "$tc015_log" 2>/dev/null)" "$tc015_body" >&2
+fi
+
+# ─── TC-005: projects.json stays valid JSON for a path that needs escaping ────
+# (20260812-bug-flaky-manual-test-ui). On Windows the TC-015 fixture above
+# already IS the JSON-breaking case — after cygpath -w its path is native and
+# therefore full of backslashes — so no separate fixture is built: this branch
+# reuses $tc015_config and $expected_path as recorded before that file was
+# written. On POSIX (no cygpath, so backslashes never occur) a fresh fixture is
+# built here, with a double quote embedded in a path component, the character
+# that actually breaks a naive JSON serializer on this platform.
+#
+# tc005_expected_path is captured BEFORE the write, from the same value that
+# feeds the write. tc005_written_path (step 2/3 below) is read back FROM THE
+# FILE by a separate `node -e`. The two must never collapse into the same
+# variable — comparing a value to itself would stay green under any corruption
+# of the serializer, which is the exact defect this case exists to catch.
+
+if command -v cygpath >/dev/null 2>&1; then
+  tc005_config="$tc015_config"
+  tc005_expected_path="$expected_path"
+  tc005_project_name="$TC015_PROJECT"
+  tc005_workdir="$tc015_root"
+  tc005_setup_ok=1
+  [ -f "$tc005_config" ] || tc005_setup_ok=0
+else
+  TC005_ISSUE="20260101-improve-manual-test-ui-fixture"
+  TC005_PROJECT='pf-fixture-quote-project'
+
+  tc005_setup_ok=1
+  tc005_root="$(pf_mktemp_d)" || exit 1
+  tc005_workdir="$tc005_root"
+  tc005_repo="$tc005_root/pf-fixture-\"-project"
+  mkdir "$tc005_repo" || tc005_setup_ok=0
+
+  tc005_issue_dir="$tc005_repo/docs/issues/open/$TC005_ISSUE"
+  mkdir -p "$tc005_issue_dir" || tc005_setup_ok=0
+  printf '# Issue\n\n**Type:** improve\n**Size Tier:** small\n' >"$tc005_issue_dir/prompt.md" || tc005_setup_ok=0
+  printf '# Manual Test Checklist\n\n**Feature Name:** fixture\n' >"$tc005_issue_dir/manual_test_checklist.md" || tc005_setup_ok=0
+
+  git -C "$tc005_repo" init -q || tc005_setup_ok=0
+  git -C "$tc005_repo" symbolic-ref HEAD refs/heads/develop || tc005_setup_ok=0
+  pf_git_init "$tc005_repo"
+
+  tc005_config="$tc005_root/projects.json"
+  tc005_expected_path="$tc005_repo"
+  tc005_project_name="$TC005_PROJECT"
+
+  # Same serializer TC-015/TC-004 use above: values through process.argv, the
+  # path never interpolated into the -e script text.
+  node -e '
+    const fs = require("node:fs");
+    const [, name, path, cfgPath] = process.argv;
+    fs.writeFileSync(
+      cfgPath,
+      JSON.stringify({ projects: [{ name, path, defaultBranch: "develop" }] })
+    );
+  ' "$TC005_PROJECT" "$tc005_repo" "$tc005_config" || tc005_setup_ok=0
+
+  [ -f "$tc005_config" ] || tc005_setup_ok=0
+fi
+
+if [ "$tc005_setup_ok" -eq 1 ]; then
+  pf_pass "TC-005 step 1: fixture with a JSON-breaking path was created"
+else
+  pf_fail "TC-005 step 1: fixture setup failed before projects.json could be written"
+fi
+
+tc005_parse_err="$tc005_workdir/tc005-parse-err.log"
+if tc005_written_path="$(node -e '
+  const fs = require("node:fs");
+  const [, cfgPath] = process.argv;
+  const data = JSON.parse(fs.readFileSync(cfgPath, "utf8"));
+  process.stdout.write(data.projects[0].path);
+' "$tc005_config" 2>"$tc005_parse_err")"; then
+  pf_pass "TC-005 step 2: projects.json is valid JSON for a path requiring escaping"
+else
+  pf_fail "TC-005 step 2: projects.json failed to parse for a path requiring escaping"
+  cat "$tc005_parse_err" >&2 2>/dev/null
+fi
+
+# written_path came from the file (above); expected_path was fixed before the
+# write (in the branch above). Comparing THESE two — not written_path against
+# itself — is the point of this step.
+if [ "${tc005_written_path-}" = "$tc005_expected_path" ]; then
+  pf_pass "TC-005 step 3: parsed path is byte-identical to the expected path"
+else
+  pf_fail "TC-005 step 3: parsed path differs from the expected path"
+  pf_note "TC-005: expected_path = $tc005_expected_path"
+  pf_note "TC-005: written_path  = ${tc005_written_path-}"
+fi
+
+tc005_port="$(free_port)"
+tc005_log="$tc005_workdir/tc005-server.log"
+
+PLANNING_TEST_UI_CONFIG="$tc005_config" \
+  PLANNING_TEST_UI_MEMORY_ROOT="$tc005_workdir/memory" \
+  node "$UI_DIR/server.js" --port "$tc005_port" >"$tc005_log" 2>&1 &
+tc005_pid=$!
+
+tc005_up=0
+tc005_waited=0
+while [ "$tc005_waited" -lt 100 ]; do
+  if grep -q "http://localhost:$tc005_port" "$tc005_log" 2>/dev/null; then
+    tc005_up=1
+    break
+  fi
+  kill -0 "$tc005_pid" 2>/dev/null || break
+  sleep 0.1
+  tc005_waited=$((tc005_waited + 1))
+done
+
+tc005_body=""
+if [ "$tc005_up" -eq 1 ]; then
+  tc005_body="$(curl -sS --max-time 10 "http://127.0.0.1:$tc005_port/api/projects" 2>&1)"
+fi
+
+# Always terminated here, whether or not it ever came up: a fixture process
+# left running is exactly what S-4/S-5 forbid.
+kill "$tc005_pid" 2>/dev/null
+wait "$tc005_pid" 2>/dev/null
+
+if [ "$tc005_up" -eq 1 ] &&
+  printf '%s' "$tc005_body" | grep -qF -- "\"name\":\"$tc005_project_name\""; then
+  pf_pass "TC-005 step 4: server lists the project from the escaped path"
+else
+  pf_fail "TC-005 step 4: server did not list the project from the escaped path"
+  printf 'log:\n%s\nbody:\n%s\n' "$(cat "$tc005_log" 2>/dev/null)" "$tc005_body" >&2
 fi
 
 assert_repo_untouched
