@@ -115,7 +115,7 @@ fi
 # expands it itself, so an empty directory is node's error and not a bash one.
 
 ui_rc=0
-ui_out="$(cd "$REPO_ROOT" && node --test "$UI_GLOB" 2>&1)" || ui_rc=$?
+ui_out="$(cd "$REPO_ROOT" && node --test --test-reporter=tap "$UI_GLOB" 2>&1)" || ui_rc=$?
 
 if [ "$ui_rc" -eq 0 ] &&
   printf '%s\n' "$ui_out" | grep -qF -- 'checklist-ru.test.js' &&
@@ -124,6 +124,195 @@ if [ "$ui_rc" -eq 0 ] &&
 else
   pf_fail "step 4: the manual-test-ui node suites did not run clean (exit $ui_rc)"
   printf '%s\n' "$ui_out" | tail -20 >&2
+fi
+
+# ══════════════════════════════════════════════════════════════════════════════
+# 20260812-bug-flaky-manual-test-ui — TC-001/TC-002: Cause 1 was `EPERM` on
+# `fs.symlinkSync` inside `buildFixture()` taking down all nine TC-011
+# subchecks instead of just the symlink-dependent one. TC-001 proves the
+# other eight still pass; TC-002 proves the symlink subcheck itself is never
+# silently swallowed (skipped-with-reason, executed, or a reported `missing`
+# — never absent without a trace).
+#
+# Captured separately into $rp_out, deliberately NOT merged into $ui_out:
+# $ui_out globs the whole tools/manual-test-ui/test/ directory, so "output is
+# non-empty" stays true even if read-paths.test.js itself never ran — that
+# vacuousness reason does not go away just because both captures are TAP now.
+#
+# NOTE for the next reader: there is a second, unrelated "=== TC-001" section
+# further down this file (the pf-test-plan/pf-test skill-text checks, from a
+# different issue). Its labels are bare "step N: …" with no "TC-001 " prefix,
+# so there is no literal collision with the "TC-001 step N: …" labels below.
+# Left untouched on purpose.
+# ══════════════════════════════════════════════════════════════════════════════
+
+rp_rc=0
+rp_out="$(cd "$REPO_ROOT" && node --test --test-reporter=tap tools/manual-test-ui/test/read-paths.test.js 2>&1)" || rp_rc=$?
+
+# subcheck_state <output> <name> — echoes exactly one of: pass | failed | skip | missing
+# for the named node --test subtest, decided by TAP line shape alone:
+#   "not ok N - <name>"          -> failed
+#   "ok N - <name> # SKIP …"     -> skip
+#   "ok N - <name>" (no # SKIP)  -> pass
+#   neither line found           -> missing
+# Anchored at line start (^[[:space:]]*(not )?ok [0-9]+ - <name>) so a bare
+# grep -F match against a "not ok" line can never be mistaken for a pass.
+subcheck_state() {
+  local out="$1" name="$2" ok_line notok_line
+  notok_line="$(printf '%s\n' "$out" | grep -E -- "^[[:space:]]*not ok [0-9]+ - ${name}")"
+  if [ -n "$notok_line" ]; then
+    printf 'failed'
+    return
+  fi
+  ok_line="$(printf '%s\n' "$out" | grep -E -- "^[[:space:]]*ok [0-9]+ - ${name}")"
+  if [ -z "$ok_line" ]; then
+    printf 'missing'
+    return
+  fi
+  if printf '%s\n' "$ok_line" | grep -q -- '# SKIP'; then
+    printf 'skip'
+  else
+    printf 'pass'
+  fi
+}
+
+printf '\n=== TC-001: the eight non-symlink subchecks of TC-011 pass when symlinkSync is unavailable\n'
+
+if [ -n "$rp_out" ]; then
+  pf_pass "TC-001 step 1: read-paths.test.js run captured, no immediate whole-TC-011 crash"
+else
+  pf_fail "TC-001 step 1: read-paths.test.js run produced no capturable output"
+fi
+
+tc001_name_positive="positive control: a document of the project is readable"
+tc001_name_step1="step 1: traversal out of the project is refused, however it is spelled"
+tc001_name_step3a="step 3a: a sibling directory sharing the project's prefix is refused"
+tc001_name_step3b="step 3b: a sibling of public/ is refused by the static route"
+tc001_name_step4="step 4: the memory prefix is readable — the one allowed extension"
+tc001_name_step5="step 5: normalisation happens before the prefix comparison"
+tc001_name_step6="step 6: session transcripts are unreachable, by name and by listing"
+tc001_name_browser="browser modules are served from an allowlist, never from the whole lib/"
+
+tc001_state_positive="$(subcheck_state "$rp_out" "$tc001_name_positive")"
+tc001_state_step1="$(subcheck_state "$rp_out" "$tc001_name_step1")"
+tc001_state_step3a="$(subcheck_state "$rp_out" "$tc001_name_step3a")"
+tc001_state_step3b="$(subcheck_state "$rp_out" "$tc001_name_step3b")"
+tc001_state_step4="$(subcheck_state "$rp_out" "$tc001_name_step4")"
+tc001_state_step5="$(subcheck_state "$rp_out" "$tc001_name_step5")"
+tc001_state_step6="$(subcheck_state "$rp_out" "$tc001_name_step6")"
+tc001_state_browser="$(subcheck_state "$rp_out" "$tc001_name_browser")"
+
+tc001_found=0
+[ "$tc001_state_positive" != "missing" ] && tc001_found=$((tc001_found + 1))
+[ "$tc001_state_step1" != "missing" ] && tc001_found=$((tc001_found + 1))
+[ "$tc001_state_step3a" != "missing" ] && tc001_found=$((tc001_found + 1))
+[ "$tc001_state_step3b" != "missing" ] && tc001_found=$((tc001_found + 1))
+[ "$tc001_state_step4" != "missing" ] && tc001_found=$((tc001_found + 1))
+[ "$tc001_state_step5" != "missing" ] && tc001_found=$((tc001_found + 1))
+[ "$tc001_state_step6" != "missing" ] && tc001_found=$((tc001_found + 1))
+[ "$tc001_state_browser" != "missing" ] && tc001_found=$((tc001_found + 1))
+
+if [ "$tc001_found" -eq 8 ]; then
+  pf_pass "TC-001 step 2: eight non-symlink subchecks found in captured output"
+else
+  pf_fail "TC-001 step 2: fewer than eight non-symlink subchecks found in captured output"
+fi
+
+if [ "$tc001_state_positive" = "pass" ]; then
+  pf_pass "TC-001 step 3a: positive control passed despite EPERM"
+else
+  pf_fail "TC-001 step 3a: positive control passed despite EPERM"
+fi
+
+if [ "$tc001_state_step1" = "pass" ]; then
+  pf_pass "TC-001 step 3b: traversal-refusal (step 1) subcheck passed despite EPERM"
+else
+  pf_fail "TC-001 step 3b: traversal-refusal (step 1) subcheck passed despite EPERM"
+fi
+
+if [ "$tc001_state_step3a" = "pass" ]; then
+  pf_pass "TC-001 step 3c: sibling-prefix (step 3a) subcheck passed despite EPERM"
+else
+  pf_fail "TC-001 step 3c: sibling-prefix (step 3a) subcheck passed despite EPERM"
+fi
+
+if [ "$tc001_state_step3b" = "pass" ]; then
+  pf_pass "TC-001 step 3d: public-sibling (step 3b) subcheck passed despite EPERM"
+else
+  pf_fail "TC-001 step 3d: public-sibling (step 3b) subcheck passed despite EPERM"
+fi
+
+if [ "$tc001_state_step4" = "pass" ]; then
+  pf_pass "TC-001 step 3e: memory-prefix (step 4) subcheck passed despite EPERM"
+else
+  pf_fail "TC-001 step 3e: memory-prefix (step 4) subcheck passed despite EPERM"
+fi
+
+if [ "$tc001_state_step5" = "pass" ]; then
+  pf_pass "TC-001 step 3f: prefix-normalisation (step 5) subcheck passed despite EPERM"
+else
+  pf_fail "TC-001 step 3f: prefix-normalisation (step 5) subcheck passed despite EPERM"
+fi
+
+if [ "$tc001_state_step6" = "pass" ]; then
+  pf_pass "TC-001 step 3g: transcript-isolation (step 6) subcheck passed despite EPERM"
+else
+  pf_fail "TC-001 step 3g: transcript-isolation (step 6) subcheck passed despite EPERM"
+fi
+
+if [ "$tc001_state_browser" = "pass" ]; then
+  pf_pass "TC-001 step 3h: browser-module allowlist subcheck passed despite EPERM"
+else
+  pf_fail "TC-001 step 3h: browser-module allowlist subcheck passed despite EPERM"
+fi
+
+printf '\n=== TC-002: symlink subcheck (step 2) is skipped-with-reason, executed, or missing — never silently swallowed\n'
+
+tc002_name_step2="step 2: a symlink pointing out of the project is refused"
+tc002_state_step2="$(subcheck_state "$rp_out" "$tc002_name_step2")"
+
+if [ "$tc002_state_step2" != "missing" ]; then
+  pf_pass "TC-002 step 1: step 2 subcheck is present in output (skip or executed)"
+else
+  pf_fail "TC-002 step 1: step 2 subcheck is missing from output"
+fi
+
+# Applicable only when skip (test_plan.md TC-002 step 2): neither pass nor
+# fail is printed for the executed or missing branches.
+if [ "$tc002_state_step2" = "skip" ]; then
+  if printf '%s\n' "$rp_out" | grep -qiE -- 'EPERM|Developer Mode|symlink'; then
+    pf_pass "TC-002 step 2: symlink unavailable — step 2 skipped with a stated reason"
+  else
+    pf_fail "TC-002 step 2: step 2 skipped silently, no reason stated"
+  fi
+fi
+
+# Applicable only when executed, i.e. pass or failed (test_plan.md TC-002
+# step 3): neither pass nor fail is printed for the skip or missing branches.
+if [ "$tc002_state_step2" = "pass" ] || [ "$tc002_state_step2" = "failed" ]; then
+  if [ "$tc002_state_step2" = "pass" ]; then
+    pf_pass "TC-002 step 3: symlink available — step 2 executed and passed"
+  else
+    pf_fail "TC-002 step 3: symlink available but step 2 did not run or failed"
+  fi
+fi
+
+# Always applicable (test_plan.md TC-002 step 4), including when step 2 is
+# "missing" — a missing step 2 must not also hide a skip elsewhere.
+tc002_other_skipped=0
+[ "$tc001_state_positive" = "skip" ] && tc002_other_skipped=1
+[ "$tc001_state_step1" = "skip" ] && tc002_other_skipped=1
+[ "$tc001_state_step3a" = "skip" ] && tc002_other_skipped=1
+[ "$tc001_state_step3b" = "skip" ] && tc002_other_skipped=1
+[ "$tc001_state_step4" = "skip" ] && tc002_other_skipped=1
+[ "$tc001_state_step5" = "skip" ] && tc002_other_skipped=1
+[ "$tc001_state_step6" = "skip" ] && tc002_other_skipped=1
+[ "$tc001_state_browser" = "skip" ] && tc002_other_skipped=1
+
+if [ "$tc002_other_skipped" -eq 0 ]; then
+  pf_pass "TC-002 step 4: skip is confined to step 2 only"
+else
+  pf_fail "TC-002 step 4: a subcheck other than step 2 was also skipped"
 fi
 
 # ─── Step 5: the onboarding-tui branch is untouched ───────────────────────────
