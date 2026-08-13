@@ -166,8 +166,9 @@ profiles:
     default:   { write: claude, review: [codex] }
     code:      { write: codex, review: [claude] }
     tests:     { write: codex, review: [claude], run: claude }
-    user_docs: { write: codex, review: [claude] }
 ```
+
+**Deliberately no point-specific `user_docs`/`dev_docs` entry in any shipped profile.** A point-specific entry for either of these two keys wins at level 2 — *before* the tier-default `skip` at level 3 (see "Why level 3 must come before level 4" below) — so it would force that stage on every tier, including `trivial`/`small`, defeating the tier-budget philosophy `pf-size-tiers` sets out for exactly those tiers. An earlier revision of `codex-implements` did carry `user_docs: { write: codex, review: [claude] }` for this reason (Codex writes the code, so the profile wanted Codex to write the user docs too) — removed once this consequence was recognized. A project that genuinely wants a profile to force `user_docs`/`dev_docs` on every tier can still do so: add the point-specific entry to a **custom** profile in its own `role-profiles.yml`, with the tier trade-off understood, rather than have it baked into a shipped default.
 
 `default` applies to every stage key the profile does not point-override.
 Resolving *within* one profile, for stage `<key>`: if the profile has a

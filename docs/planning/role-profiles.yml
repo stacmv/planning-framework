@@ -9,4 +9,3 @@ profiles:
     default:   { write: claude, review: [codex] }
     code:      { write: codex, review: [claude] }
     tests:     { write: codex, review: [claude], run: claude }
-    user_docs: { write: codex, review: [claude] }

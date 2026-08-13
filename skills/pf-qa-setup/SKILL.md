@@ -29,6 +29,8 @@ Rules:
 
 Wait for user input before proceeding if either question is needed.
 
+**Also detect a version-tracking convention, independently of the project type above** — this project's *own* released version, never to be confused with any framework-install marker (e.g. `.pf-version`, which records which Planning Framework version this project *consumes*, not what this project itself ships). Look for a `CHANGELOG.md` at the project root **and** one of: `package.json`'s `version` field, `pyproject.toml`'s `[project] version`, `Cargo.toml`'s `version`, `composer.json`'s `version`, `manifest.json`+`versions.json` (Obsidian plugin convention), or any shell variable matching `[A-Z_]+VERSION="?\d+\.\d+\.\d+"?` in a script at the project root (covers a project that version-stamps itself the way this very framework's own `scripts/converge-to-v3.sh` does with `PF_VERSION`). If both a CHANGELOG and a version marker are found, record the version-marker file's path for Phase 4's "Version Bump" section. If either is missing, there is no version-tracking convention to enforce — Phase 4 omits that section entirely rather than inventing one.
+
 ---
 
 ## Core Rule: Every Checklist Item Must Resolve to a Single Boolean Check
@@ -181,6 +183,17 @@ grep -c '| \[ \] *|' docs/issues/open/<ISSUE-ID>/test_plan.md
 git diff develop...HEAD | grep -iE "^\+.*(api[_-]?key|secret|password|token)\s*=\s*['\"]"
 ```
 
+### Version Bump
+
+Only include this section if Phase 1 detected a version-tracking convention (a `CHANGELOG.md` plus a version marker file). If not detected, omit this section entirely — same "no aspirational items" rule as the Project-Specific Checks section below.
+
+- [ ] **[AI check] Version bumped or CHANGELOG updated if this change is release-worthy** — read `git diff develop...HEAD` — does it change this project's own shipped behavior (not internal tooling, tests, or docs-only)? If yes, does `<version marker file>` show a version bump, or does `CHANGELOG.md`'s `## [Unreleased]`-equivalent section contain an entry describing this change (whichever this project's own convention uses — a per-change bump, or an accumulating Unreleased section moved to a version heading at explicit release time)? (Yes/No — pass automatically if the change is internal-only/docs-only/test-only)
+
+**Commands:**
+```bash
+git diff develop...HEAD -- <version marker file> CHANGELOG.md
+```
+
 ---
 
 ## Feature Issues (feat, improve)
@@ -264,7 +277,7 @@ Only include this section if CI/CD or pre-commit automation actually exists in t
 **Last Updated:** <today's date YYYY-MM-DD>
 ```
 
-Replace every `<...>` placeholder with the actual commands/paths from Phase 2 (and `<ISSUE-ID>`/`<parent-branch>` with the values `/pf-qa` resolves at run time — leave these two as literal placeholders in the saved file, since they're filled in per-run, not per-project-setup). If a command category does not apply (e.g. no build step in a Python CLI tool, no coverage tool, no integration suite), omit that entire item/line rather than leaving a placeholder — per the Core Rule above, never leave a vague or unrunnable item in the file.
+Replace every `<...>` placeholder with the actual commands/paths from Phase 2 (and `<ISSUE-ID>`/`<parent-branch>` with the values `/pf-qa` resolves at run time — leave these two as literal placeholders in the saved file, since they're filled in per-run, not per-project-setup). `<version marker file>` is filled in from the version-tracking convention detected alongside Phase 1 (e.g. `package.json`, `pyproject.toml`); if none was detected, omit the entire "Version Bump" section rather than leaving the placeholder unfilled. If a command category does not apply (e.g. no build step in a Python CLI tool, no coverage tool, no integration suite), omit that entire item/line rather than leaving a placeholder — per the Core Rule above, never leave a vague or unrunnable item in the file.
 
 ---
 
