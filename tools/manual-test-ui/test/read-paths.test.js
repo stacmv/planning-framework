@@ -68,10 +68,6 @@ function buildFixture() {
     "parent/project-x/secret.md": `${NEIGHBOUR_MARKER}\n`,
     "parent/secret-outside.md": `${OUTSIDE_MARKER}\n`,
   });
-  // A symlink that lives inside the project but points out of it: literal
-  // path comparison would accept it, realpath comparison must not.
-  fs.symlinkSync(path.join(parent, "secret-outside.md"), path.join(projectDir, "outside.md"));
-
   const memRoot = makeMemoryRoot({ root: path.join(tmp, "claude-home") });
   const mem = memRoot.addProject({
     projectPath: projectDir,
@@ -145,7 +141,28 @@ test("TC-011: reads are confined to the project and one memory prefix", async (t
     assert.strictEqual(empty.status, 400, empty.text);
   });
 
-  await t.test("step 2: a symlink pointing out of the project is refused", async () => {
+  await t.test("step 2: a symlink pointing out of the project is refused", async (t2) => {
+    // A symlink that lives inside the project but points out of it: literal
+    // path comparison would accept it, realpath comparison must not. Created
+    // here, not in buildFixture(), because on Windows without Developer Mode
+    // fs.symlinkSync throws EPERM — and if that throw happened during
+    // fixture construction, it would take down all nine subtests instead of
+    // just this one.
+    try {
+      fs.symlinkSync(path.join(fx.parent, "secret-outside.md"), path.join(fx.projectDir, "outside.md"));
+    } catch (err) {
+      if (err.code === "EPERM" || err.code === "EACCES") {
+        console.error(
+          `Skipping symlink escape check: fs.symlinkSync failed with ${err.code}. ` +
+            "On Windows, creating symlinks requires Developer Mode (or an elevated process); " +
+            "enable Developer Mode to run this symlink-based subtest."
+        );
+        t2.skip(`fs.symlinkSync not permitted (${err.code}) — enable Developer Mode on Windows to run this check`);
+        return;
+      }
+      throw err;
+    }
+
     const res = await doc("outside.md");
     assertRefused(res, OUTSIDE_MARKER);
     // The literal path is inside the project; only realpath tells the truth.

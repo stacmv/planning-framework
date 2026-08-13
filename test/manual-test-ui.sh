@@ -1,6 +1,15 @@
 #!/usr/bin/env bash
 # test/manual-test-ui.sh — the Manual Test UI suite: TC-001, TC-015, TC-016.
 #
+# 20260812-bug-flaky-manual-test-ui (TC-004): the TC-015 step-4 fixture wrote
+# its Windows temp path into projects.json with a bare printf, which a native
+# Windows node process then resolved against the wrong drive (Git Bash gives
+# POSIX paths in argv, but never converts path text living inside a file it
+# writes). Step 4 below is therefore now split into two pf_pass/pf_fail
+# checkpoints labelled "TC-004 step 1" / "TC-004 step 2" — server start and
+# project listing are now told apart — while staying physically inside the
+# TC-015 section, since the fixture setup is shared.
+#
 # TC-016 comes first and is load-bearing for the whole automated half of this
 # issue. /pf-test runs exactly ONE runner — `make test` — and until now that
 # target's node half globbed `tools/onboarding-tui/test/*.test.js` alone. The
@@ -327,6 +336,11 @@ fi
 # The fixture repository carries a checklist so that the answer proves the
 # server walked git (issueCount counts issues whose checklist exists), not
 # merely echoed the configuration back.
+#
+# The two pf_pass/pf_fail checkpoints below this fixture setup are labelled
+# "TC-004 step 1" / "TC-004 step 2", not "TC-015 step 4" — a deliberate switch
+# of TC-ID (20260812-bug-flaky-manual-test-ui). The fixture setup above stays
+# shared with the rest of the TC-015 section; only the two checkpoints moved.
 
 TC015_ISSUE="20260101-improve-manual-test-ui-fixture"
 TC015_PROJECT="pf-fixture-project"
@@ -346,8 +360,50 @@ git -C "$tc015_repo" symbolic-ref HEAD refs/heads/develop
 pf_git_init "$tc015_repo"
 
 tc015_config="$tc015_root/projects.json"
-printf '{"projects":[{"name":"%s","path":"%s","defaultBranch":"develop"}]}\n' \
-  "$TC015_PROJECT" "$tc015_repo" >"$tc015_config"
+
+# Path conversion (TC-004): $tc015_repo is a POSIX path from pf_mktemp_d.
+# Git Bash rewrites POSIX paths that appear as argv into native Windows paths
+# for the child process it execs, but it never touches path text that lives
+# inside a file's *content* — and node reads projects.json's content, not
+# argv. Written as-is, a native Windows node resolves the leading slash
+# against whatever the current drive happens to be, not against the repo's
+# real location. cygpath -w is the conversion that closes that gap; on a
+# platform without it (Linux/macOS) the POSIX path is already native.
+if command -v cygpath >/dev/null 2>&1; then
+  repo_path="$(cygpath -w "$tc015_repo")"
+else
+  repo_path="$tc015_repo"
+fi
+
+# The one value that never round-trips through a file: the next task compares
+# against this, not against $tc015_repo or $repo_path re-derived later.
+expected_path="$repo_path"
+
+# Serialized via node, not printf: repo_path may contain backslashes (Windows)
+# that need JSON escaping, and printf has no notion of that. Values are
+# passed through process.argv rather than interpolated into the -e script text
+# — interpolating a backslash-laden Windows path into shell-quoted JS source
+# is exactly the kind of thing that breaks before JSON.stringify ever runs.
+node -e '
+  const fs = require("node:fs");
+  const [, name, path, cfgPath] = process.argv;
+  fs.writeFileSync(
+    cfgPath,
+    JSON.stringify({ projects: [{ name, path, defaultBranch: "develop" }] })
+  );
+' "$TC015_PROJECT" "$repo_path" "$tc015_config"
+
+# Read back the same way, to prove what actually landed in the file (not what
+# the shell thinks it wrote).
+written_path="$(node -e '
+  const fs = require("node:fs");
+  const [, cfgPath] = process.argv;
+  const data = JSON.parse(fs.readFileSync(cfgPath, "utf8"));
+  process.stdout.write(data.projects[0].path);
+' "$tc015_config")"
+
+pf_note "TC-015: tc015_repo (raw, from pf_mktemp_d) = $tc015_repo"
+pf_note "TC-015: projects.json path field = $written_path"
 
 tc015_port="$(free_port)"
 tc015_log="$tc015_root/server.log"
@@ -374,6 +430,12 @@ while [ "$tc015_waited" -lt 100 ]; do
   tc015_waited=$((tc015_waited + 1))
 done
 
+if [ "$tc015_up" -eq 1 ]; then
+  pf_pass "TC-004 step 1: server started"
+else
+  pf_fail "TC-004 step 1: server did not start"
+fi
+
 tc015_body=""
 if [ "$tc015_up" -eq 1 ]; then
   tc015_body="$(curl -sS --max-time 10 "http://127.0.0.1:$tc015_port/api/projects" 2>&1)"
@@ -382,12 +444,15 @@ fi
 kill "$tc015_pid" 2>/dev/null
 wait "$tc015_pid" 2>/dev/null
 
+# Printed unconditionally, even when step 1 failed and $tc015_body is empty:
+# an Auto-TC label that is silently skipped leaves TC-004 step 2 unmapped in
+# /pf-test.
 if [ "$tc015_up" -eq 1 ] &&
   printf '%s' "$tc015_body" | grep -qF -- "\"name\":\"$TC015_PROJECT\"" &&
   printf '%s' "$tc015_body" | grep -qF -- '"issueCount":1'; then
-  pf_pass "step 4: the server starts with zero installs and lists the configured projects"
+  pf_pass "TC-004 step 2: server listed the fixture project"
 else
-  pf_fail "step 4: the server did not start or did not list the configured project"
+  pf_fail "TC-004 step 2: server did not list the fixture project"
   printf 'log:\n%s\nbody:\n%s\n' "$(cat "$tc015_log" 2>/dev/null)" "$tc015_body" >&2
 fi
 
