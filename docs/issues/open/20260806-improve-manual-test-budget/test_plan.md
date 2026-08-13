@@ -546,11 +546,36 @@
 | 3 | Проверить, что валидатор использует это определение | Логика проверки лежит на этом наборе |
 
 **Test Data:**
-- Исходный код validator-а (предположительно в `skills/pf-test-plan/lib.js` или аналоге)
+- `skills/pf-size-tiers/SKILL.md` (каноническое определение словаря)
+- `test/lib.sh` (`pf_get_manual_reason_vocab`)
 
 **Expected Outcome:** Словарь содержит ровно 5 значений; никаких неожиданных расширений.
 
 **Priority:** Low
+
+---
+
+### TC-021: `/pf-check` инструктирован проверять Manual-бюджет и словарь для `test_plan.md`
+
+**Description:** Проверяет, что `skills/pf-check/SKILL.md`'s "Claude review path" промпт содержит инструкцию проверять Manual-бюджет по tier и закрытый словарь `Manual reason`, когда TARGET — `test_plan.md`. Добавлен по итогам `/pf-check` ревью самого `implementation_plan.md` (Task 10), после того как этот test_plan.md уже был зафиксирован — статическая проверка формулировки промпта, не проверка живого запуска ревью (которая требует LLM-суждения и не поддаётся детерминированному bash-тесту).
+
+**Preconditions:**
+- `skills/pf-check/SKILL.md` существует и содержит секцию "Claude review path".
+
+**Steps:**
+
+| Step | Action | Expected Result |
+|------|--------|-----------------|
+| 1 | `grep` секцию "Claude review path" в `skills/pf-check/SKILL.md` | Секция найдена |
+| 2 | Проверить наличие упоминания "Manual test-case budget by tier" или эквивалентной по смыслу инструкции | Найдено |
+| 3 | Проверить наличие упоминания `Manual reason` и словаря из 5 значений | Найдено |
+
+**Test Data:**
+- `skills/pf-check/SKILL.md`
+
+**Expected Outcome:** Промпт "Claude review path" содержит обе проверки (бюджет + словарь) как P1 findings для `test_plan.md`.
+
+**Priority:** Medium
 
 ---
 
@@ -578,6 +603,7 @@
 | TC-018 | Automation pass снижает Manual-счётчик до бюджета | Auto | Medium | [ ] | Harness: count-manual-after-automation, budget-match |
 | TC-019 | Несколько automation pass (идемпотентность) | Auto | Low | [ ] | Harness: multiple-automation-pass-idempotence |
 | TC-020 | Словарь ровно 5 значений | Auto | Low | [ ] | Harness: vocabulary-size-check |
+| TC-021 | `/pf-check` инструктирован проверять Manual-бюджет и словарь | Auto | Medium | [ ] | Harness: grep-skill-instruction-text |
 
 ---
 
@@ -585,7 +611,7 @@
 
 | Issue | Description | TC Affected | Steps to Reproduce | Severity |
 |-------|-------------|-------------|-------------------|----------|
-| Auto test harnesses not yet implemented | Auto test cases (TC-001 through TC-020) reference harness functions and fixture files in their Remarks that do not exist in the repo yet (e.g. `count-manual-in-status-tracker`, `docs/issues/open/test-fixture-tc-NNN/`). This is expected at the test-plan stage — building missing harnesses is a task for `implementation_plan.md` during the implementation phase, not a prerequisite of this test plan itself. | TC-001, TC-002, TC-003, TC-004, TC-005, TC-006, TC-007, TC-008, TC-009, TC-010, TC-014, TC-015, TC-016, TC-017, TC-018, TC-019, TC-020 | Review Status Tracker Remarks column for Auto tests; verify harness function names and fixture paths. | Low (expected; not a defect) |
+| Auto test harnesses not yet implemented | Auto test cases (TC-001 through TC-021) reference harness functions and fixture files in their Remarks that do not exist in the repo yet (e.g. `count-manual-in-status-tracker`, `docs/issues/open/test-fixture-tc-NNN/`). This is expected at the test-plan stage — building missing harnesses is a task for `implementation_plan.md` during the implementation phase, not a prerequisite of this test plan itself. | TC-001, TC-002, TC-003, TC-004, TC-005, TC-006, TC-007, TC-008, TC-009, TC-010, TC-014, TC-015, TC-016, TC-017, TC-018, TC-019, TC-020, TC-021 | Review Status Tracker Remarks column for Auto tests; verify harness function names and fixture paths. | Low (expected; not a defect) |
 
 ---
 

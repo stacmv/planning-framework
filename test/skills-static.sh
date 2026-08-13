@@ -694,4 +694,50 @@ else
   fi
 fi
 
+# ══════════════════════════════════════════════════════════════════════════════
+printf '\n=== TC-021: /pf-check instructs on Manual budget and reason vocabulary\n'
+# ══════════════════════════════════════════════════════════════════════════════
+#
+# When checking test_plan.md, /pf-check must verify the Manual test-case budget
+# and the closed vocabulary for Manual reason values. This is a static assertion
+# that the Claude review path in pf-check/SKILL.md contains the necessary
+# instructions, matching the feature spec and test plan requirements.
+
+CHECK="$SKILLS/pf-check/SKILL.md"
+
+# Step 1: the "Claude review path" section exists
+if grep -qE '^### Claude review path' "$CHECK"; then
+  pf_pass "TC-021 step 1: pf-check contains the Claude review path section"
+else
+  pf_fail "TC-021 step 1: pf-check has no Claude review path section"
+fi
+
+# Step 2: the section mentions Manual budget checking for test_plan.md
+if grep -qiE 'Manual.*budget|budget.*Manual' "$CHECK" &&
+   grep -qF 'Manual test-case budget by tier' "$CHECK"; then
+  pf_pass "TC-021 step 2: Claude review path mentions Manual test-case budget by tier"
+else
+  pf_fail "TC-021 step 2: Claude review path does not mention Manual budget checking"
+fi
+
+# Step 3: the section mentions Manual reason validation and vocabulary
+if grep -qE 'Manual reason.*Remarks|Remarks.*Manual reason' "$CHECK" &&
+   grep -qF 'human-judgment' "$CHECK" &&
+   grep -qF 'external-system' "$CHECK" &&
+   grep -qF 'interactive-agent' "$CHECK" &&
+   grep -qF 'cost' "$CHECK" &&
+   grep -qF 'environment' "$CHECK"; then
+  pf_pass "TC-021 step 3: Claude review path names the 5-word vocabulary (human-judgment, external-system, interactive-agent, cost, environment)"
+else
+  pf_fail "TC-021 step 3: Claude review path does not document the closed vocabulary"
+fi
+
+# Step 4: both checks are documented for test_plan.md specifically
+# shellcheck disable=SC2016  # backticks are markdown in a grep pattern, not command substitution
+if grep -A 50 'if \[TARGET\] is `test_plan.md`' "$CHECK" | grep -qiE 'Manual.*budget'; then
+  pf_pass "TC-021 step 4: Manual budget check is scoped to test_plan.md"
+else
+  pf_fail "TC-021 step 4: Manual budget check scope is unclear or missing"
+fi
+
 pf_summary

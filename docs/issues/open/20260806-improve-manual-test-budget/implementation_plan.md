@@ -118,7 +118,7 @@ Medium
 
 ### Task 4: Добавить test helpers в test/lib.sh для валидации и подсчёта
 **Task Type:** code
-**Mapped Test Cases:** (support infrastructure, не маппируется на TC)
+**Mapped Test Cases:** TC-001, TC-006, TC-020 (helpers эти TC и проверяют напрямую; см. `~/.claude/skills/pf-execute/SKILL.md` Check 2 — каждый `code`-task обязан именовать хотя бы один реальный TC)
 
 **Реализуется одним проходом вместе с Task 2 (см. DEVIATION там) — не отдельный вызов Node, чистый bash.**
 
@@ -135,7 +135,7 @@ Medium
   - `pf_validate_test_plan_structure <test_plan_file>` — проверяет, что Status Tracker существует и парсим
 
 **Acceptance Criteria:**
-- [ ] Все helpers работают корректно и используются suite
+- [x] Все helpers работают корректно и используются suite
 
 ---
 
@@ -194,27 +194,32 @@ Medium
 
 ### Task 7: Создать bash test suite test/manual-budget.sh
 **Task Type:** tests
-**Mapped Test Cases:** TC-015, TC-016, TC-017, TC-018, TC-019
+**Mapped Test Cases:** TC-001, TC-002, TC-003, TC-004, TC-005, TC-006, TC-007, TC-008, TC-009, TC-010, TC-014, TC-015, TC-016, TC-017, TC-018, TC-019, TC-020
+
+**SCOPE EXPANDED during execution (deviation):** исходный план мапил на этот таск только TC-015..019 — остальные Auto TC (001-010, 014, 020) были названы в Mapped Test Cases других тасков (что удовлетворяет Check 2), но реального bash-теста для них никто не писал. Это разрыв: 12 из 17 объявленных Auto TC не имели бы кода теста вообще. Исправлено здесь — этот таск покрывает ВСЕ Auto TC, кроме TC-021 (статическая grep-проверка текста `pf-check/SKILL.md`, добавляется отдельно в `test/skills-static.sh`, не сюда — другой файл, другой паттерн проверки).
 
 **Files:**
-- `test/manual-budget.sh` — новый файл
+- `test/manual-budget.sh` — новый файл, покрывает TC-001..010, TC-014..020 (17 Auto TC)
+- `test/skills-static.sh` — добавить одну проверку для TC-021 (grep на упоминание "Manual test-case budget by tier" и `Manual reason` в секции "Claude review path" `skills/pf-check/SKILL.md`) — этот файл уже существует и уже содержит именно такие статические grep-проверки текста skill-файлов, см. его текущее содержимое для стиля
+
+**Important — what "Auto" means here:** большинство этих TC (кроме TC-001..008, TC-020, которые прямо тестируют bash-helpers из Task 4 через `pf_setup_case`-фикстуры) описывают ПОВЕДЕНИЕ `/pf-test-plan`'s Step 4b/4c/4d (budget check / automation pass / gate) — реальный прогон этого шага требует LLM-суждения (сам automation pass — это диспатч суб-агента) и НЕ детерминирован для bash. Поэтому TC-009/010/014/016-019 тестируются иначе: против ЗАФИКСИРОВАННЫХ fixture test_plan.md, представляющих состояние "до" и "после" automation pass/гейта (созданы в Task 8), проверяются мехонические свойства — например, TC-016 ("успешная конвертация сохраняет логику") сравнивает, что суммарное число TC между "до" и "после" фикстурами не изменилось, изменился только `Type`/`Remarks`; TC-017/018/019 проверяют идемпотентность и корректность подсчёта через `pf_count_manual_in_tracker`/`pf_check_manual_budget` на разных фикстурах. Не пытаться реально диспатчить LLM sub-agent из bash-теста.
 
 **Implementation Notes:**
 - Bash test suite, следует conventions из test/lib.sh (S-1 … S-5)
 - Для каждого TC:
   - Вывести заголовок: `printf '\n=== TC-NNN: [описание]\n'`
-  - `pf_setup_case manual-budget-tc-NNN >/dev/null` — подготовить fixture
-  - Выполнить нужные проверки (парсинг, подсчёт, валидация и т.п.)
-  - Использовать helpers из test/lib.sh: `pf_count_manual_in_tracker`, `pf_validate_manual_reasons`, `pf_check_manual_budget` и т.п.
+  - `pf_setup_case manual-budget-tc-NNN >/dev/null` — подготовить fixture (см. Task 8)
+  - Выполнить нужные проверки, используя helpers из test/lib.sh: `pf_count_manual_in_tracker`, `pf_validate_manual_reasons`, `pf_get_manual_reason_vocab`, `pf_get_budget_for_tier`, `pf_check_manual_budget`, `pf_validate_test_plan_structure`
   - Вывести результаты: `pf_pass "сообщение"` или `pf_fail "сообщение"`
 - TC-011, TC-012, TC-013 (Manual gate tests) не включены в bash suite — это ручные проверки логики AskUserQuestion
 - Итоговый вывод: `pf_summary` (автоматический подсчёт pass/fail)
 - Стандартные переменные и трапы: `TMP_WORK`, `TMP_HOME`, очистка при EXIT
 
 **Acceptance Criteria:**
-- [ ] TC-015, TC-016, TC-017, TC-018, TC-019 pass — edge cases и validation coverage
-- [ ] Suite запускается из Makefile (`make test`)
-- [ ] Финальный summary показывает 5 auto-tests passed
+- [x] TC-001..010, TC-014..020 pass — все 17 Auto TC покрыты реальными assertions
+- [x] TC-021 pass — grep-проверка добавлена в test/skills-static.sh
+- [x] Suite запускается из Makefile (`make test`)
+- [x] Финальный summary показывает 17 auto-tests passed в manual-budget.sh
 
 ---
 
@@ -253,15 +258,15 @@ Medium
 - TC-020: не требует fixture, просто grep SKILL.md на словарь
 
 **Acceptance Criteria:**
-- [ ] Все fixtures готовы и загружены в test/fixtures/manual-budget-tc-*/
-- [ ] Suite успешно загружает каждый fixture с `pf_setup_case`
-- [ ] Тесты находят Status Tracker в каждом fixture
+- [x] Все fixtures готовы и загружены в test/fixtures/manual-budget-tc-*/
+- [x] Suite успешно загружает каждый fixture с `pf_setup_case`
+- [x] Тесты находят Status Tracker в каждом fixture
 
 ---
 
 ### Task 9: Документировать ручные тесты гейта для `/pf-manual-test`
 **Task Type:** code
-**Mapped Test Cases:** (support infrastructure, not mapped to TC — verification instructions for manual testing phase)
+**Mapped Test Cases:** TC-011, TC-012, TC-013 (эти три Manual TC верифицируются через этот чеклист — прямая связь)
 
 **Files:**
 - `docs/issues/open/20260806-improve-manual-test-budget/manual_test_checklist.md` — инструкции для ручной проверки TC-011, TC-012, TC-013
@@ -296,7 +301,7 @@ Medium
 
 ### Task 10: Расширить `/pf-check` для проверки Manual-бюджета и закрытого словаря `Manual reason`
 **Task Type:** code
-**Mapped Test Cases:** (support infrastructure, не маппируется на TC — расширяет существующий pf-check gate)
+**Mapped Test Cases:** TC-021 (новый TC, добавлен в test_plan.md во время execution — см. заметку ниже)
 
 **Files:**
 - `skills/pf-check/SKILL.md` — расширить prompt "Claude review path" (раздел, где проверяется oversized-for-tier)
@@ -308,6 +313,7 @@ Medium
   - Проверяет каждый Manual-TC на наличие `Manual reason` и его корректность (ровно 5 значений из словаря)
   - Если Manual-count > tier-budget ИЛИ Manual reason некорректен/отсутствует → добавить P1 finding с типом oversized/invalid, не проходить проверку дальше
   - Сообщение должно указывать: Manual-count, tier-budget, hard-cap (5), и список некорректных reasons (если есть)
+- **Note on TC-021:** `test_plan.md` не содержал TC под это расширение — Task 10 появилась только после `/pf-check` на уже зафиксированном `implementation_plan.md`, когда `test_plan.md` уже прошёл собственный `/pf-check`. Добавлен `TC-021` (Auto, статическая grep-проверка формулировки в `skills/pf-check/SKILL.md` — не живой прогон ревью, т.к. это LLM-суждение, недетерминированное для bash-теста) напрямую в `test_plan.md` во время execution, чтобы `~/.claude/skills/pf-execute/SKILL.md`'s Check 2 (каждый `code`-task называет реальный TC) не блокировался фиктивной или отсутствующей связью.
 - **DEVIATION (см. Task 2):** нет отдельного инструмента для вызова — "Claude review path" уже является текстовой инструкцией для LLM-ревьюера (не исполняемый скрипт), поэтому проверка формулируется как ещё один пункт того же промпта: ревьюер сам механически считает `Manual`-строки в Status Tracker и сверяет `Remarks` каждой на префикс `Manual reason: <value>` из словаря (см. `pf-size-tiers/SKILL.md`), точно так же, как он уже это делает для oversized-for-tier проверки строк/кейсов чуть выше в этом же промпте
 - Проверка срабатывает для любого `test_plan.md` с таблицей Status Tracker, независимо от tier
 
