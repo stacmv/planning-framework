@@ -307,8 +307,8 @@
 | 4 | Проверить, что тест-план не завершается с ошибкой | Процесс продолжает работу после гейта |
 
 **Test Data:**
-- `docs/issues/open/test-fixture-tc-011/brd.md` (превышение после automation pass)
-- `docs/issues/open/test-fixture-tc-011/prompt.md`
+- `test/fixtures/manual-budget-tc-011/docs/issues/open/manual-budget-tc-011/prompt.md`
+- `test/fixtures/manual-budget-tc-011/docs/issues/open/manual-budget-tc-011/test_plan.md`
 
 **Expected Outcome:** Решение «Разбить issue» записано; тест-план завершён с информацией о разбиении.
 
@@ -335,8 +335,8 @@
 | 5 | Убедиться, что бюджет пересчитан на новый tier | Manual-кейсы теперь в бюджете large (≤5) |
 
 **Test Data:**
-- `docs/issues/open/test-fixture-tc-012/brd.md` (превышение, требует подъёма)
-- `docs/issues/open/test-fixture-tc-012/prompt.md`
+- `test/fixtures/manual-budget-tc-012/docs/issues/open/manual-budget-tc-012/prompt.md`
+- `test/fixtures/manual-budget-tc-012/docs/issues/open/manual-budget-tc-012/test_plan.md`
 
 **Expected Outcome:** Tier поднят; обоснование записано в тест-план; превышение разрешено.
 
@@ -362,8 +362,8 @@
 | 4 | Убедиться, что Status Tracker отражает решение | Отложенные кейсы помечены как deferred (или аналогично) |
 
 **Test Data:**
-- `docs/issues/open/test-fixture-tc-013/brd.md` (превышение на 1 кейс)
-- `docs/issues/open/test-fixture-tc-013/prompt.md`
+- `test/fixtures/manual-budget-tc-013/docs/issues/open/manual-budget-tc-013/prompt.md`
+- `test/fixtures/manual-budget-tc-013/docs/issues/open/manual-budget-tc-013/test_plan.md`
 
 **Expected Outcome:** Решение зафиксировано; примечание о отложенных кейсах добавлено в тест-план.
 
@@ -583,27 +583,27 @@
 
 | TC | Test Case | Type | Priority | Status | Remarks |
 |----|-----------|------|----------|--------|---------|
-| TC-001 | Бюджет Medium tier (≤3 Manual) соблюдается | Auto | Critical | [ ] | Harness: count-manual-in-status-tracker |
-| TC-002 | Бюджет Small tier (≤2 Manual) соблюдается | Auto | Critical | [ ] | Harness: count-manual-in-status-tracker |
-| TC-003 | Бюджет Large tier (≤5 Manual) соблюдается | Auto | Critical | [ ] | Harness: count-manual-in-status-tracker |
-| TC-004 | Hard cap 5 Manual при Large tier (6+ Manual rejected) | Auto | Critical | [ ] | Harness: gate-trigger-at-6-manual, budget-calculation |
-| TC-005 | Hard cap 5 Manual при Trivial tier | Auto | High | [ ] | Harness: hard-cap-enforcement |
-| TC-006 | Словарь `Manual reason` — принимаются 5 корректных | Auto | Critical | [ ] | Harness: validate-manual-reason-vocab |
-| TC-007 | `Manual reason` с недопустимым значением отклоняется | Auto | Critical | [ ] | Harness: validate-manual-reason-vocab, reject-invalid |
-| TC-008 | Manual-кейс без `Manual reason` отклоняется | Auto | Critical | [ ] | Harness: validate-manual-reason-required |
-| TC-009 | Automation pass — успешная конвертация Manual→Auto | Auto | Critical | [ ] | Harness: automation-pass, cli-output-check |
-| TC-010 | Automation pass с отсутствующим харнессом | Auto | High | [ ] | Harness: automation-pass, missing-harness-detection, impl-plan-task-create |
+| TC-001 | Бюджет Medium tier (≤3 Manual) соблюдается | Auto | Critical | ✓ | Harness: count-manual-in-status-tracker |
+| TC-002 | Бюджет Small tier (≤2 Manual) соблюдается | Auto | Critical | ✓ | Harness: count-manual-in-status-tracker |
+| TC-003 | Бюджет Large tier (≤5 Manual) соблюдается | Auto | Critical | ✓ | Harness: count-manual-in-status-tracker |
+| TC-004 | Hard cap 5 Manual при Large tier (6+ Manual rejected) | Auto | Critical | ✓ | Harness: gate-trigger-at-6-manual, budget-calculation |
+| TC-005 | Hard cap 5 Manual при Trivial tier | Auto | High | ✓ | Harness: hard-cap-enforcement |
+| TC-006 | Словарь `Manual reason` — принимаются 5 корректных | Auto | Critical | ✓ | Harness: validate-manual-reason-vocab |
+| TC-007 | `Manual reason` с недопустимым значением отклоняется | Auto | Critical | ✓ | Harness: validate-manual-reason-vocab, reject-invalid |
+| TC-008 | Manual-кейс без `Manual reason` отклоняется | Auto | Critical | ✓ | Harness: validate-manual-reason-required |
+| TC-009 | Automation pass — успешная конвертация Manual→Auto | Auto | Critical | ✓ | Harness: automation-pass, cli-output-check |
+| TC-010 | Automation pass с отсутствующим харнессом | Auto | High | ✓ | Harness: automation-pass, missing-harness-detection, impl-plan-task-create |
 | TC-011 | Гейт — вариант «Разбить issue» | Manual | High | [ ] | Manual test; requires human verification of AskUserQuestion handling and decision recording in test_plan.md |
 | TC-012 | Гейт — вариант «Поднять tier» | Manual | High | [ ] | Manual test; requires human verification of tier-change logic and justification recording |
 | TC-013 | Гейт — вариант «Отложить избыток» | Manual | High | [ ] | Manual test; requires human inspection of deferred-case logic and prose accuracy in test_plan.md |
-| TC-014 | Ретроактивная применимость на старой issue | Auto | High | [ ] | Harness: retroactive-budget-enforcement; uses existing old issue |
-| TC-015 | Manual reason валидация vs. механическое покрытие | Auto | Medium | [ ] | Harness: validate-reason-vs-harness-coverage |
-| TC-016 | Успешная конвертация сохраняет логику | Auto | Medium | [ ] | Harness: compare-case-logic-before-after |
-| TC-017 | Automation pass на issue в бюджете (no-op) | Auto | Medium | [ ] | Harness: automation-pass-idempotence |
-| TC-018 | Automation pass снижает Manual-счётчик до бюджета | Auto | Medium | [ ] | Harness: count-manual-after-automation, budget-match |
-| TC-019 | Несколько automation pass (идемпотентность) | Auto | Low | [ ] | Harness: multiple-automation-pass-idempotence |
-| TC-020 | Словарь ровно 5 значений | Auto | Low | [ ] | Harness: vocabulary-size-check |
-| TC-021 | `/pf-check` инструктирован проверять Manual-бюджет и словарь | Auto | Medium | [ ] | Harness: grep-skill-instruction-text |
+| TC-014 | Ретроактивная применимость на старой issue | Auto | High | ✓ | Harness: retroactive-budget-enforcement; uses existing old issue |
+| TC-015 | Manual reason валидация vs. механическое покрытие | Auto | Medium | ✓ | Harness: validate-reason-vs-harness-coverage |
+| TC-016 | Успешная конвертация сохраняет логику | Auto | Medium | ✓ | Harness: compare-case-logic-before-after |
+| TC-017 | Automation pass на issue в бюджете (no-op) | Auto | Medium | ✓ | Harness: automation-pass-idempotence |
+| TC-018 | Automation pass снижает Manual-счётчик до бюджета | Auto | Medium | ✓ | Harness: count-manual-after-automation, budget-match |
+| TC-019 | Несколько automation pass (идемпотентность) | Auto | Low | ✓ | Harness: multiple-automation-pass-idempotence |
+| TC-020 | Словарь ровно 5 значений | Auto | Low | ✓ | Harness: vocabulary-size-check |
+| TC-021 | `/pf-check` инструктирован проверять Manual-бюджет и словарь | Auto | Medium | ✓ | Harness: grep-skill-instruction-text |
 
 ---
 

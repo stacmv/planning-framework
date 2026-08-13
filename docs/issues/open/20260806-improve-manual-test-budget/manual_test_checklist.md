@@ -29,6 +29,7 @@
 - Команда `/pf` доступна (проверить: `which pf` или просто запустить `/pf` в сессии Claude Code).
 - Тестовый issue создан в `docs/issues/open/` на основе fixture'а для TC-011 (путь: `test/fixtures/manual-budget-tc-011/` или создан вручную с `size_tier: medium` в `prompt.md` и 5 Manual-кейсами в черновике `test_plan.md` таких, что automation pass не решит проблему полностью).
 - Черновой `test_plan.md` содержит достаточно Manual-кейсов, чтобы их число превышало бюджет Medium (>3) даже после возможной конвертации.
+- Подготовленные данные: `/tmp/pf-test-data/20260806-improve-manual-test-budget/TC-011` (запустите `node docs/issues/open/20260806-improve-manual-test-budget/test-data/setup.mjs TC-011`, если каталога ещё нет)
 
 **Test Data:**
 - `test/fixtures/manual-budget-tc-011/docs/issues/open/manual-budget-tc-011/prompt.md` — fixture с `size_tier: medium`.
@@ -59,6 +60,7 @@
 - Команда `/pf` доступна.
 - Тестовый issue создан на основе fixture'а для TC-012 (путь: `test/fixtures/manual-budget-tc-012/`) или вручную с `size_tier: medium` в `prompt.md` и Manual-кейсами, которые даже после automation pass превышают бюджет Medium (например, 5 Manual-кейсов).
 - Черновой `test_plan.md` содержит достаточно Manual-кейсов, чтобы их число превышало текущий tier-бюджет.
+- Подготовленные данные: `/tmp/pf-test-data/20260806-improve-manual-test-budget/TC-012` (запустите `node docs/issues/open/20260806-improve-manual-test-budget/test-data/setup.mjs TC-012`, если каталога ещё нет)
 
 **Test Data:**
 - `test/fixtures/manual-budget-tc-012/docs/issues/open/manual-budget-tc-012/prompt.md` — fixture с `size_tier: medium`.
@@ -90,6 +92,7 @@
 - Команда `/pf` доступна.
 - Тестовый issue создан на основе fixture'а для TC-013 (путь: `test/fixtures/manual-budget-tc-013/`) или вручную с `size_tier: medium` в `prompt.md` и Manual-кейсами, превышающими бюджет (например, 4 Manual-кейса при бюджете 3).
 - Черновой `test_plan.md` готов к запуску `/pf-test-plan`.
+- Подготовленные данные: `/tmp/pf-test-data/20260806-improve-manual-test-budget/TC-013` (запустите `node docs/issues/open/20260806-improve-manual-test-budget/test-data/setup.mjs TC-013`, если каталога ещё нет)
 
 **Test Data:**
 - `test/fixtures/manual-budget-tc-013/docs/issues/open/manual-budget-tc-013/prompt.md` — fixture с `size_tier: medium`.

@@ -194,10 +194,32 @@ printf '\n=== TC-010: Automation pass с отсутствующим харнес
 # ══════════════════════════════════════════════════════════════════════════════
 
 case_dir="$(pf_setup_case manual-budget-tc-010)" || exit 1
-if [ ! -f "$case_dir/docs/issues/open/manual-budget-tc-010/test_plan.md" ]; then
+tp="$case_dir/docs/issues/open/manual-budget-tc-010/test_plan.md"
+if [ ! -f "$tp" ]; then
   pf_fail "TC-010: fixture has no test_plan.md"
 else
-  pf_note "TC-010: automation pass with missing harness — fixture should document expected behavior"
+  # Fixture models Manual rows whose reason is 'cost' but whose Remarks also
+  # document a missing harness by name (the automation-pass output an
+  # implementation of Step 4c should produce when it can't convert a case).
+  # Assert: (a) the reasons still validate despite the extra "(missing)" text
+  # after the reason word (real-world exercise of the extraction logic), and
+  # (b) at least one row's Remarks documents a missing harness by name.
+  if pf_validate_manual_reasons "$tp" 2>/dev/null; then
+    pf_pass "TC-010: Manual reasons still validate correctly with trailing '(missing)' harness text"
+  else
+    pf_fail "TC-010: Manual reason validation broke on Remarks carrying missing-harness text"
+  fi
+
+  # Captured to a variable first, not piped live into `grep -q` — under this
+  # file's `pipefail` (test/lib.sh), a live multi-line producer piped into a
+  # `grep -q` that exits early on its first match gets SIGPIPE, and pipefail
+  # then reports the pipeline as failed even though grep itself matched.
+  tracker_rows="$(pf_status_tracker_rows_full "$tp")"
+  if printf '%s' "$tracker_rows" | grep -qiE 'missing'; then
+    pf_pass "TC-010: at least one row documents a missing harness by name in Remarks"
+  else
+    pf_fail "TC-010: no row's Remarks documents a missing harness"
+  fi
 fi
 
 # ══════════════════════════════════════════════════════════════════════════════
