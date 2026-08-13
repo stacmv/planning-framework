@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# test/pf-codereview-triage.sh — TC-010, TC-011, TC-012
+# test/pf-codereview-triage.sh — TC-009, TC-010, TC-011, TC-012
 # (20260806-improve-codereview-convergence, implementation_plan.md Task 5).
 #
 # Task 5 is infrastructure-only: it writes the harness (helpers + drift-guards)
@@ -12,7 +12,16 @@
 # a helper that errors out) is done explicitly in each guard's message below,
 # per test_plan.md's Overview point 3 and this task's Implementation Notes.
 #
-# Expected state on THIS branch, before Task 6 runs:
+# TC-009 was added later, after this issue's own /pf-qa stage: the test plan
+# originally reserved TC-009/TC-019/TC-020/TC-027 as live-run Manual TCs.
+# The owner decided at /pf-qa to drop all four; TC-009 is the one converted
+# to a static drift-guard here (the other three were removed outright,
+# leaving no unique coverage gap — see test_plan.md's Known Issues, KI-2).
+#
+# Expected state on THIS branch (Task 6 already landed):
+#   TC-009            — GREEN (baseline — Phase 2.5 already documents both
+#                        the AC-3.1 failure-scenario requirement and the
+#                        AC-3.2 single-blocking-axis prohibition)
 #   TC-010            — RED  (pure static audit, no fixtures; reclassification
 #                        step does not exist in SKILL.md yet)
 #   TC-011            — GREEN (baseline/regression guard — Phase 3's existing
@@ -21,6 +30,11 @@
 #                        and Task 6)
 #   TC-012 (helper)   — GREEN (pure bash, no dependency on SKILL.md text)
 #   TC-012 (drift-guard) — RED (follow-up-issue path for P1 doesn't exist yet)
+#
+# NOTE: the "RED" states listed above (TC-010, TC-012's drift-guard) describe
+# this branch's history at Task 5 time, before Task 6 landed. Task 6 has
+# since landed on this branch, so TC-010 and TC-012 are expected GREEN too
+# when this suite is actually run today — see the real run's output.
 #
 # Read-only: this suite never writes into $REPO_ROOT, never touches $HOME,
 # never runs the convergence script, and issues no git commands. It only
@@ -108,6 +122,108 @@ pf_cr_section_range() {
     printf '%s:%s' "$start_line" "$((start_line + end_line - 1))"
   fi
 }
+
+# ══════════════════════════════════════════════════════════════════════════════
+printf '=== TC-009: Phase 2.5 requires a failure scenario for P0/P1 and forbids a second blocking signal\n'
+# ══════════════════════════════════════════════════════════════════════════════
+# Static audit of skills/pf-codereview/SKILL.md's "## Phase 2.5" section
+# (test_plan.md TC-009, revised to Auto per an owner decision at /pf-qa —
+# the four live-run Manual TCs this issue originally planned were dropped;
+# TC-009 is the one converted to a static drift-guard instead of removed
+# outright, because it is the only TC covering AC-3.1/AC-3.2 at all).
+#
+# Anchor-narrowing is load-bearing here, not decorative: "severity",
+# "blocking" and "priority" are common words that occur throughout
+# SKILL.md outside Phase 2.5 (Phase 3's ledger fields, Phase 4's gate).
+# A bare unscoped grep for these words would pass on any of those
+# unrelated occurrences even if Phase 2.5 itself were gutted — so every
+# check below is scoped to the Phase 2.5 block located by its own
+# heading, not to the file as a whole.
+
+if [ ! -f "$SKILL" ]; then
+  pf_fail "TC-009 step 1: skills/pf-codereview/SKILL.md does not exist (test infrastructure defect, not a rule failure)"
+  pf_fail "TC-009 step 2: cannot check failure-scenario requirement — SKILL.md missing (test infrastructure defect)"
+  pf_fail "TC-009 step 3: cannot check second-signal prohibition — SKILL.md missing (test infrastructure defect)"
+else
+  p25_range="$(pf_cr_section_range '^## Phase 2\.5:' '^## Phase [0-9]' "$SKILL")"
+  if [ -z "$p25_range" ]; then
+    pf_fail "TC-009 step 1: could not locate a '## Phase 2.5: ...' heading in SKILL.md (test infrastructure defect — heading not found/renamed, not a rule failure — rule not documented in SKILL.md)"
+    pf_fail "TC-009 step 2: cannot check failure-scenario requirement — Phase 2.5 section not located"
+    pf_fail "TC-009 step 3: cannot check second-signal prohibition — Phase 2.5 section not located"
+  else
+    pf_pass "TC-009 step 1: located '## Phase 2.5' section in SKILL.md ($p25_range)"
+
+    p25_start="${p25_range%%:*}"
+    p25_end="${p25_range##*:}"
+    if [ "$p25_end" = '$' ]; then
+      p25_block="$(tail -n "+$p25_start" "$SKILL")"
+    else
+      p25_block="$(sed -n "${p25_start},${p25_end}p" "$SKILL")"
+    fi
+    # Flatten to one line so a rule phrased across a line break (or split
+    # across two adjacent sentences) is still caught by a single regex.
+    p25_blob="$(printf '%s' "$p25_block" | tr '\n' ' ')"
+
+    # ─── Step 2 (AC-3.1): failure-scenario requirement, two signals ─────────
+    # (a) the requirement is stated for P0/P1 findings specifically, using
+    #     the words "failure scenario"; (b) the requirement actually spells
+    #     out the input/state -> bad-outcome chain, not just the phrase
+    #     "failure scenario" in isolation.
+    fs_named=0
+    fs_chain=0
+    printf '%s' "$p25_blob" | grep -qiE '(P0[ /]*(or|,)?[ ]*P1|P0/P1)[^.]{0,200}(concrete )?failure scenario|(concrete )?failure scenario[^.]{0,200}(P0[ /]*(or|,)?[ ]*P1|P0/P1)' &&
+      fs_named=1
+    printf '%s' "$p25_blob" | grep -qiE '(input|state)[^.]{0,140}(wrong output|crash|regression|violation)' &&
+      fs_chain=1
+
+    if [ "$fs_named" -eq 1 ] && [ "$fs_chain" -eq 1 ]; then
+      pf_pass "TC-009 step 2: Phase 2.5 requires a P0/P1 finding to name a concrete failure scenario (input/state -> wrong output/crash/regression/violation), scoped inside the Phase 2.5 block"
+    else
+      missing=()
+      [ "$fs_named" -eq 0 ] && missing+=("no 'P0/P1 ... failure scenario' requirement found inside Phase 2.5")
+      [ "$fs_chain" -eq 0 ] && missing+=("no input/state -> bad-outcome chain (wrong output/crash/regression/violation) found inside Phase 2.5")
+      pf_fail "TC-009 step 2: failure-scenario requirement (AC-3.1) not documented inside Phase 2.5 — rule not documented in SKILL.md (${missing[*]})"
+    fi
+
+    # ─── Step 3 (AC-3.2): no second, parallel blocking signal ───────────────
+    # (a) an explicit PROHIBITION on a second/parallel signal next to
+    #     Priority — not just the bare words "second"/"parallel"/"blocking"
+    #     co-occurring, which a permissive rewrite ("it MAY add a second,
+    #     parallel blocking field") would also satisfy; a negation cue
+    #     (does not/never/forbidden/...) must sit close to "second" for this
+    #     to count as a prohibition rather than a grant. (b) an explicit
+    #     statement that Priority alone / the one Priority value is what the
+    #     gate reads — the two together are what keep this from being
+    #     satisfied by a prohibition sentence with no positive single-axis
+    #     statement nearby, or vice versa.
+    no_second_flag=0
+    single_axis=0
+    printf '%s' "$p25_blob" | grep -qiE '(does not|never|forbidden|prohibited|must not|disallow|cannot)[^.]{0,30}\bsecond[, ]*[^.]{0,20}parallel[^.]{0,120}blocking' &&
+      no_second_flag=1
+    printf '%s' "$p25_blob" | grep -qiE 'priority alone|one priority value|single axis' &&
+      single_axis=1
+
+    if [ "$no_second_flag" -eq 1 ] && [ "$single_axis" -eq 1 ]; then
+      pf_pass "TC-009 step 3: Phase 2.5 forbids a second, parallel blocking signal next to Priority and states Priority is read alone by the gate, scoped inside the Phase 2.5 block"
+    else
+      missing=()
+      [ "$no_second_flag" -eq 0 ] && missing+=("no explicit prohibition of a second/parallel blocking field found inside Phase 2.5")
+      [ "$single_axis" -eq 0 ] && missing+=("no statement that Priority alone / the one Priority value drives the gate found inside Phase 2.5")
+      pf_fail "TC-009 step 3: single-blocking-axis prohibition (AC-3.2) not documented inside Phase 2.5 — rule not documented in SKILL.md (${missing[*]})"
+    fi
+
+    # ─── Step 4: both signals must have been found TOGETHER, inside this
+    # same narrowed Phase 2.5 range — not one inside Phase 2.5 and the
+    # other found by accident elsewhere in the file (steps 2-3 above are
+    # already scoped to $p25_blob, so this step confirms the conjunction
+    # explicitly rather than re-deriving it).
+    if [ "$fs_named" -eq 1 ] && [ "$fs_chain" -eq 1 ] && [ "$no_second_flag" -eq 1 ] && [ "$single_axis" -eq 1 ]; then
+      pf_pass "TC-009 step 4: both AC-3.1 and AC-3.2 signals are documented together inside the same Phase 2.5 block (baseline — matches SKILL.md today)"
+    else
+      pf_fail "TC-009 step 4: AC-3.1 and/or AC-3.2 signal missing from Phase 2.5 — see steps 2-3 for which one"
+    fi
+  fi
+fi
 
 # ══════════════════════════════════════════════════════════════════════════════
 printf '=== TC-011: Open P0 never yields PASS, independent of round number (regression guard)\n'
