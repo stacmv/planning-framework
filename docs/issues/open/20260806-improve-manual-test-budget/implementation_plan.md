@@ -60,35 +60,33 @@ Medium
 - Явно отметить граничный случай: словарь содержит ровно 5 значений, никаких иных
 
 **Acceptance Criteria:**
-- [ ] TC-020 pass — словарь ровно 5 значений в SKILL.md
+- [x] TC-020 pass — словарь ровно 5 значений в SKILL.md
 
 ---
 
-### Task 2: Создать Manual Budget Validator инструмент
+### Task 2: Manual Budget — парсинг и валидация (bash, не Node)
 **Task Type:** code
 **Mapped Test Cases:** TC-006, TC-007, TC-008
 
+**DEVIATION FROM ORIGINAL PLAN (recorded during /pf-execute):** исходный план предполагал новый `tools/manual-budget-validator.js`. Обнаружено, что в репозитории уже есть рабочий, протестированный bash-парсер Status Tracker по имени колонки — `_pf_status_tracker_rows`/`_pf_status_tracker_type_of` в `test/pf-execute-completeness.sh`. Дублировать эту логику в Node — лишняя поверхность и расхождение с конвенциями репо (vanilla bash test harness, ноль внешних зависимостей). Task 2 объединена с Task 4: обе решаются добавлением чистых bash-функций в `test/lib.sh`, переиспользующих существующий паттерн парсинга. Новый `.js`-файл не создаётся.
+
+**Конвенция Manual reason (решение, зафиксированное здесь, т.к. ни brd.md, ни test_plan.md не специфицируют механику):** для строк со статусом `Manual` колонка `Remarks` Status Tracker обязана начинаться с `Manual reason: <value>` (значение — одно из 5 слов словаря), опционально с произвольным текстом после. Это переиспользует существующую колонку (без изменения структуры таблицы) и уже согласуется с тем, как Auto-строки в `Remarks` этого же test_plan.md несут `Harness: ...`.
+
 **Files:**
-- `tools/manual-budget-validator.js` — новый файл
+- `test/lib.sh` — новые публичные функции (см. Task 4 ниже — этот таск и Task 4 реализуются одним проходом по одному файлу)
 
 **Implementation Notes:**
-- Экспортирует функции:
-  - `parseTestPlan(filePath)` — парсит test_plan.md, вытаскивает Status Tracker
-  - `countManualCases(tracker)` — считает строки со статусом `Manual`
-  - `validateManualReasons(tracker)` — проверяет каждый Manual на наличие и корректность `Manual reason`
-  - `checkBudget(manualCount, tier)` — возвращает {exceeded: bool, budget: number, hardCap: number}
-  - `getValidReasons()` — возвращает массив [5 значений]
-- Парсинг Status Tracker по регекс-паттерну строк таблицы (вытаскивает TC, Type, Remarks с Manual reason)
+- Опираться на существующий паттерн `_pf_status_tracker_rows`/`_pf_trim` (`test/pf-execute-completeness.sh`) — либо промоутировать их в `test/lib.sh` как публичные (без `_` префикса) и переиспользовать в обоих файлах, либо продублировать минимальный эквивалент в `test/lib.sh`, если промоушен рискует затронуть уже стабильный `pf-execute-completeness.sh`. Решение — на усмотрение исполнителя, с пометкой в summary.
 - Валидация:
-  - `Manual reason` обязателен для каждого Manual-TC
-  - Значение должно быть из словаря (case-sensitive)
-  - Возвращает список ошибок или пустой массив
-- Обработка ошибок: если Status Tracker не найден или парс сломан, выбросить с понятным сообщением
+  - `Manual reason` обязателен для каждой `Manual`-строки
+  - Значение должно быть из словаря (case-sensitive), ровно 5 значений: `human-judgment`, `external-system`, `interactive-agent`, `cost`, `environment`
+  - Возвращает список ошибок или пустой результат (exit code)
+- Обработка ошибок: отсутствующий Status Tracker — понятное сообщение, не падение с трассировкой
 
 **Acceptance Criteria:**
-- [ ] TC-006 pass — 5 корректных значений принимаются, недопустимое отклоняется
-- [ ] TC-007 pass — некорректное значение отклоняется с списком допустимых
-- [ ] TC-008 pass — отсутствующее `Manual reason` отклоняется
+- [x] TC-006 pass — 5 корректных значений принимаются, недопустимое отклоняется
+- [x] TC-007 pass — некорректное значение отклоняется с списком допустимых
+- [x] TC-008 pass — отсутствующее `Manual reason` отклоняется
 
 ---
 
@@ -122,18 +120,19 @@ Medium
 **Task Type:** code
 **Mapped Test Cases:** (support infrastructure, не маппируется на TC)
 
+**Реализуется одним проходом вместе с Task 2 (см. DEVIATION там) — не отдельный вызов Node, чистый bash.**
+
 **Files:**
 - `test/lib.sh` — добавить новые функции в раздел Public API
 
 **Implementation Notes:**
-- Новые helpers (все оборачивают вызовы tools/manual-budget-validator.js):
-  - `pf_count_manual_in_tracker <test_plan_file>` — возвращает число Manual-TC в Status Tracker
-  - `pf_validate_manual_reasons <test_plan_file>` — возвращает 0 (OK) или 1 (ошибки), выводит ошибки в stderr
-  - `pf_get_manual_reason_vocab` — возвращает 5 корректных значений, одно на строку
-  - `pf_check_manual_budget <manual_count> <size_tier>` — возвращает 0 если в бюджете, 1 если превышение
-  - `pf_get_budget_for_tier <size_tier>` — возвращает числовой бюджет (не учитывает потолок)
+- Новые helpers, чистый bash, переиспользуют паттерн `_pf_status_tracker_rows`/`_pf_trim` из `test/pf-execute-completeness.sh` (см. Task 2 DEVIATION):
+  - `pf_count_manual_in_tracker <test_plan_file>` — возвращает число `Manual`-строк в Status Tracker
+  - `pf_validate_manual_reasons <test_plan_file>` — возвращает 0 (OK) или 1 (ошибки), выводит ошибки в stderr; проверяет, что `Remarks` каждой `Manual`-строки начинается с `Manual reason: <value>`, value ∈ словарь
+  - `pf_get_manual_reason_vocab` — печатает 5 корректных значений, одно на строку
+  - `pf_check_manual_budget <manual_count> <size_tier>` — возвращает 0 если в бюджете, 1 если превышение (бюджет: trivial 0-1, small ≤2, medium ≤3, large ≤5, hard cap 5 при любом tier)
+  - `pf_get_budget_for_tier <size_tier>` — возвращает числовой бюджет (без учёта потолка)
   - `pf_validate_test_plan_structure <test_plan_file>` — проверяет, что Status Tracker существует и парсим
-- Все функции вызывают node с инструментом validator: `node -e 'const v = require(process.argv[1]); ...' tools/manual-budget-validator.js`
 
 **Acceptance Criteria:**
 - [ ] Все helpers работают корректно и используются suite
@@ -309,7 +308,7 @@ Medium
   - Проверяет каждый Manual-TC на наличие `Manual reason` и его корректность (ровно 5 значений из словаря)
   - Если Manual-count > tier-budget ИЛИ Manual reason некорректен/отсутствует → добавить P1 finding с типом oversized/invalid, не проходить проверку дальше
   - Сообщение должно указывать: Manual-count, tier-budget, hard-cap (5), и список некорректных reasons (если есть)
-- Использовать тот же инструмент `tools/manual-budget-validator.js`, что и pf-test-plan, или вызвать функции через ту же архитектуру
+- **DEVIATION (см. Task 2):** нет отдельного инструмента для вызова — "Claude review path" уже является текстовой инструкцией для LLM-ревьюера (не исполняемый скрипт), поэтому проверка формулируется как ещё один пункт того же промпта: ревьюер сам механически считает `Manual`-строки в Status Tracker и сверяет `Remarks` каждой на префикс `Manual reason: <value>` из словаря (см. `pf-size-tiers/SKILL.md`), точно так же, как он уже это делает для oversized-for-tier проверки строк/кейсов чуть выше в этом же промпте
 - Проверка срабатывает для любого `test_plan.md` с таблицей Status Tracker, независимо от tier
 
 **Acceptance Criteria:**

@@ -57,6 +57,14 @@
 #   assert_repo_untouched
 #   snapshot_tree <dir>
 #   pf_pass / pf_fail / pf_assert / pf_note / pf_summary
+#   pf_trim <string>                            — whitespace trim via pure bash
+#   pf_status_tracker_rows_full <test_plan>     — TC<TAB>Type<TAB>Remarks per row
+#   pf_count_manual_in_tracker <test_plan>      — count rows with Type=Manual
+#   pf_validate_manual_reasons <test_plan>      — validate Remarks for Manual rows
+#   pf_get_manual_reason_vocab                  — 5 valid Manual reason values
+#   pf_get_budget_for_tier <size_tier>          — numeric budget for tier
+#   pf_check_manual_budget <count> <tier>       — check if count within budget
+#   pf_validate_test_plan_structure <test_plan> — check for parseable Status Tracker
 
 set -uo pipefail
 
@@ -337,6 +345,184 @@ assert_repo_untouched() {
     pf_fail "S-5: framework working tree CHANGED during this suite"
     diff <(printf '%s\n' "$PF_REPO_STATUS_BEFORE") <(printf '%s\n' "$now") >&2 || true
   fi
+}
+
+# ─── Status Tracker helpers ───────────────────────────────────────────────────
+
+# pf_trim <string> — whitespace trim via pure parameter expansion (no subprocess).
+# Modeled on _pf_trim from pf-execute-completeness.sh, made public for general use.
+pf_trim() {
+  local s="$1"
+  s="${s#"${s%%[![:space:]]*}"}"
+  s="${s%"${s##*[![:space:]]}"}"
+  printf '%s' "$s"
+}
+
+# pf_status_tracker_heading_line <test_plan.md>
+#
+# Prints the line number of the FIRST "## Status Tracker" heading, or
+# nothing if the file has none at all. Private helper for pf_status_tracker_rows_full.
+_pf_lib_status_tracker_heading_line() {
+  grep -n -E '^##[[:space:]]+Status Tracker' "$1" 2>/dev/null | head -1 | cut -d: -f1
+}
+
+# pf_status_tracker_rows_full <test_plan.md>
+#
+# Prints one "TC-ID<TAB>Type<TAB>Remarks" triplet per data row of the FIRST
+# "## Status Tracker" table in test_plan.md. Column position (which cell is
+# "TC", which is "Type", which is "Remarks") is read from the table's own
+# header row, not hardcoded to a fixed index. Prints nothing if the file has no
+# "## Status Tracker" heading at all.
+pf_status_tracker_rows_full() {
+  local test_plan="$1"
+  local start line tc_col=1 type_col=0 remarks_col=0 have_header=0
+  local -a cells
+
+  start="$(_pf_lib_status_tracker_heading_line "$test_plan")"
+  [ -z "$start" ] && return 0
+
+  while IFS= read -r line; do
+    [[ "$line" =~ ^##[[:space:]] ]] && break
+    [[ "$line" != \|* ]] && continue
+    # Skip the header/data separator row ("| --- | --- | ...").
+    [[ "$line" =~ ^\|[-:\|\ ]+\|?$ ]] && continue
+
+    IFS='|' read -r -a cells <<<"$line"
+    local i
+    for i in "${!cells[@]}"; do
+      cells[i]="$(pf_trim "${cells[$i]}")"
+    done
+
+    if [ "$have_header" -eq 0 ]; then
+      for i in "${!cells[@]}"; do
+        case "${cells[$i]}" in
+          TC) tc_col="$i" ;;
+          Type) type_col="$i" ;;
+          Remarks) remarks_col="$i" ;;
+        esac
+      done
+      have_header=1
+      continue
+    fi
+
+    if [[ "${cells[$tc_col]:-}" =~ ^TC-[0-9]+$ ]]; then
+      printf '%s\t%s\t%s\n' "${cells[$tc_col]}" "${cells[$type_col]:-}" "${cells[$remarks_col]:-}"
+    fi
+  done < <(tail -n "+$((start + 1))" "$test_plan")
+}
+
+# pf_count_manual_in_tracker <test_plan_file>
+#
+# Prints the number of rows in the file's "## Status Tracker" table whose
+# Type column is exactly "Manual". Returns 0 always (counting is never an error).
+pf_count_manual_in_tracker() {
+  local test_plan="$1"
+  pf_status_tracker_rows_full "$test_plan" | awk -F'\t' '$2 == "Manual" {count++} END {print count+0}'
+}
+
+# pf_validate_manual_reasons <test_plan_file>
+#
+# For every "Manual"-type row in the Status Tracker, checks that its Remarks
+# column begins with "Manual reason: <value>" where <value> is one of the 5
+# valid words (see pf_get_manual_reason_vocab). Prints one error line per
+# violation to stderr (naming the offending TC-ID and what's wrong) and returns
+# exit code 1 if any violation found, 0 if all Manual rows are valid (including
+# the case of zero Manual rows, which is trivially valid).
+pf_validate_manual_reasons() {
+  local test_plan="$1"
+  local tc type remarks line
+  local found_error=0
+  local -A valid_vocab
+
+  # Build the vocabulary set
+  while IFS= read -r word; do
+    valid_vocab["$word"]=1
+  done < <(pf_get_manual_reason_vocab)
+
+  while IFS=$'\t' read -r tc type remarks; do
+    [ -z "$tc" ] && continue
+    if [ "$type" = "Manual" ]; then
+      # Check if Remarks starts with "Manual reason: "
+      if [[ ! "$remarks" =~ ^Manual\ reason:\ (.*)$ ]]; then
+        printf 'TC %s: missing "Manual reason:" prefix in Remarks column\n' "$tc" >&2
+        found_error=1
+      else
+        # Extract the value after "Manual reason: "
+        local reason_val="${BASH_REMATCH[1]}"
+        # Get the first word (before any space, punctuation, etc.)
+        reason_val="${reason_val%%[^a-z-]*}"
+        if [ -z "${valid_vocab[$reason_val]:-}" ]; then
+          printf 'TC %s: invalid reason value "%s" (must be one of: %s)\n' "$tc" "$reason_val" "$(pf_get_manual_reason_vocab | tr '\n' ' ' | sed 's/ $//')" >&2
+          found_error=1
+        fi
+      fi
+    fi
+  done < <(pf_status_tracker_rows_full "$test_plan")
+
+  [ "$found_error" -eq 0 ]
+}
+
+# pf_get_manual_reason_vocab
+#
+# Prints the 5 valid Manual reason values, one per line, in canonical order:
+# human-judgment, external-system, interactive-agent, cost, environment.
+pf_get_manual_reason_vocab() {
+  printf 'human-judgment\nexternal-system\ninteractive-agent\ncost\nenvironment\n'
+}
+
+# pf_get_budget_for_tier <size_tier>
+#
+# Prints the numeric Manual budget for a tier: trivial→1, small→2, medium→3,
+# large→5. Returns 0 on success, 1 if the tier is unknown (with no output).
+pf_get_budget_for_tier() {
+  local tier="$1"
+  case "$tier" in
+    trivial) printf '1'; return 0 ;;
+    small) printf '2'; return 0 ;;
+    medium) printf '3'; return 0 ;;
+    large) printf '5'; return 0 ;;
+    *) return 1 ;;
+  esac
+}
+
+# pf_check_manual_budget <manual_count> <size_tier>
+#
+# Returns 0 if <manual_count> is within that tier's budget (from
+# pf_get_budget_for_tier) AND within the unconditional hard cap of 5.
+# Returns 1 otherwise.
+pf_check_manual_budget() {
+  local count="$1" tier="$2"
+  local budget
+
+  budget="$(pf_get_budget_for_tier "$tier")" || return 1
+  [ "$count" -le "$budget" ] && [ "$count" -le 5 ]
+}
+
+# pf_validate_test_plan_structure <test_plan_file>
+#
+# Returns 0 if the file has a "## Status Tracker" heading with a parseable
+# table (at least one data row). Returns 1 with a message to stderr if
+# validation fails.
+pf_validate_test_plan_structure() {
+  local test_plan="$1"
+
+  if [ ! -f "$test_plan" ]; then
+    printf 'File not found: %s\n' "$test_plan" >&2
+    return 1
+  fi
+
+  if ! grep -q -E '^##[[:space:]]+Status Tracker' "$test_plan" 2>/dev/null; then
+    printf 'No "## Status Tracker" heading found in %s\n' "$test_plan" >&2
+    return 1
+  fi
+
+  # Check that the table has at least one data row
+  if [ -z "$(pf_status_tracker_rows_full "$test_plan")" ]; then
+    printf 'Status Tracker table in %s has no data rows\n' "$test_plan" >&2
+    return 1
+  fi
+
+  return 0
 }
 
 # ─── detectState() bridge ─────────────────────────────────────────────────────

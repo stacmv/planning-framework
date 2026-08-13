@@ -141,6 +141,31 @@ definition, here; references, everywhere else.
 | medium  | 3 separate docs, today's existing shape (no explicit cap besides the existing >1500-line specs.md split rule) | 10-20 test cases (today's default) |
 | large   | Same as medium, plus: specs.md >1500 lines splits into 3 parts (existing rule); implementation_plan.md may include a phased-rollout section | 20+ test cases allowed |
 
+## Manual test-case budget by tier
+
+`test_plan.md`'s Status Tracker limits how many `Manual`-type rows an issue may carry, by `size_tier`:
+
+| Tier    | Manual budget | Hard cap |
+|---------|----------------|----------|
+| trivial | 0-1            | 5        |
+| small   | ≤2             | 5        |
+| medium  | ≤3             | 5        |
+| large   | ≤5             | 5        |
+
+The hard cap of 5 applies unconditionally — `large` tier does not let the budget grow past it.
+
+### `Manual reason` — closed vocabulary
+
+Every `Manual`-type row's `Remarks` column must begin with `Manual reason: <value>` (optionally followed by free text), where `<value>` is exactly one of these five — no others:
+
+- `human-judgment` — visual/UX/aesthetic judgment
+- `external-system` — a paid API, a real device, a third-party account
+- `interactive-agent` — a live LLM session as the thing under test (the subject and the measuring instrument must be different systems — a case where the model reads the expected outcome and reports on its own success does not qualify, whatever reason it claims)
+- `cost` — automation is technically possible but not worth it; must include an effort estimate in the reason text
+- `environment` — the needed environment is unavailable in CI
+
+A `Manual` row with no `Manual reason:` prefix in `Remarks`, or with a value outside this list, is invalid and must be rejected during test-plan generation.
+
 ## Section-inclusion matrix
 
 | Section                                  | trivial | small | medium | large |
