@@ -21,3 +21,15 @@ fallback) вернуло 0 P0 и 4 P1, поэтому гейт разрешён 
 @ 2026-08-13T14:15:22Z
 
 [pf-check PASSED] test_plan.md @ 2026-08-13T14:15:22Z
+
+[autopilot default] pf-check implementation_plan.md — Claude review
+(off-branch fallback) вернуло 0 P0 и 2 P1, поэтому гейт разрешён как "Fix
+now" без вопроса к человеку. Правки: Task 9 (manual_test_checklist.md —
+документация, не автотест) перемаркирован tests → code, т.к. Task Type:
+docs запрещён и заблокировал бы весь /pf-execute; добавлена Task 10 —
+расширение "Claude review path" в pf-check/SKILL.md проверкой Manual-
+бюджета и словаря `Manual reason` по tier, иначе ручная правка test_plan.md
+в обход этого бюджета проходила бы pf-check незамеченной.
+@ 2026-08-13T14:29:29Z
+
+[pf-check PASSED] implementation_plan.md @ 2026-08-13T14:29:29Z
