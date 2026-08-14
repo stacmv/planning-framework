@@ -16,6 +16,10 @@ function run(target, args = []) {
   return spawnSync(process.execPath, [cli, "converge", "--target", target, "--agents", "codex", "--yes", ...args], { encoding: "utf8" });
 }
 
+function uninstall(target, args = []) {
+  return spawnSync(process.execPath, [cli, "uninstall", "--target", target, "--agents", "codex", "--yes", ...args], { encoding: "utf8" });
+}
+
 function git(target, args) {
   return spawnSync("git", ["-C", target, ...args], { encoding: "utf8" });
 }
@@ -47,6 +51,25 @@ test("fresh Codex convergence installs every discovered skill and AGENTS adapter
     assert.equal(second.status, 0, second.stderr || second.stdout);
     assert.match(second.stdout, /Detected state: v4/);
     assert.equal(fs.readFileSync(path.join(target, "AGENTS.md"), "utf8").match(/pf4:begin/g).length, 1);
+  } finally {
+    fs.rmSync(target, { recursive: true, force: true });
+  }
+});
+
+test("Codex uninstall removes PF integration but preserves planning data", () => {
+  const target = fs.mkdtempSync(path.join(os.tmpdir(), "pf-v4-uninstall-"));
+  try {
+    fs.writeFileSync(path.join(target, "README.md"), "consumer\n");
+    assert.equal(run(target).status, 0);
+    fs.writeFileSync(path.join(target, "AGENTS.md"), `# Local instructions\n\n${fs.readFileSync(path.join(target, "AGENTS.md"), "utf8")}`);
+    const result = uninstall(target);
+    assert.equal(result.status, 0, result.stderr || result.stdout);
+    assert.equal(fs.existsSync(path.join(target, ".agents")), false);
+    assert.equal(fs.existsSync(path.join(target, ".pf-version")), false);
+    assert.equal(fs.readFileSync(path.join(target, "AGENTS.md"), "utf8"), "# Local instructions\n");
+    assert.equal(fs.existsSync(path.join(target, "PLANNING.md")), true);
+    assert.equal(fs.existsSync(path.join(target, "docs", "planning")), true);
+    assert.match(result.stdout, /kept PLANNING\.md, docs\/planning\/, and docs\/issues\//);
   } finally {
     fs.rmSync(target, { recursive: true, force: true });
   }

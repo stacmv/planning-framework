@@ -112,6 +112,18 @@ irm https://raw.githubusercontent.com/stacmv/planning-framework/develop-v4.0/scr
 
 For Codex, PF writes all 21 skills to `.agents/skills/` and adds its bounded section to `AGENTS.md`. Start a new Codex session in the project and run `/pf`. Re-run the same command to update PF4.
 
+### Uninstall PF4
+
+This removes the Codex integration while preserving your planning documents and issues:
+
+```powershell
+node scripts/pf-cli.mjs uninstall --target . --agents codex --yes
+```
+
+Use `--agents claude` to remove only Claude's global skills, or `--agents both` to remove both integrations.
+
+The equivalent wrapper is `node scripts/uninstall.mjs --target . --agents codex --yes`.
+
 > The v4 installer pulls from the `develop-v4.0` branch. To install into a custom location instead, use the manual steps below, or explore the framework interactively with `make tui`.
 
 ### Manual Install / Upgrade — one command for every case

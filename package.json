@@ -8,6 +8,6 @@
   },
   "scripts": {
     "test": "node --test tools/onboarding-tui/test/*.test.js test/pf-cli.test.mjs",
-    "check": "node --check scripts/pf-cli.mjs && node --check scripts/install.mjs"
+    "check": "node --check scripts/pf-cli.mjs && node --check scripts/install.mjs && node --check scripts/uninstall.mjs"
   }
 }

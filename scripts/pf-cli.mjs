@@ -115,6 +115,13 @@ function parseArgs(argv) {
 
 function usage(command = "converge") {
   if (command === "update-skills") return `Usage: node scripts/pf-cli.mjs update-skills [--source <dir>] [--target <dir>] [--agents auto|both|claude|codex]`;
+  if (command === "uninstall") return `Usage: node scripts/pf-cli.mjs uninstall [--target <dir>] [--agents codex|claude|both] [--yes]
+
+Removes PF4 agent integrations while preserving planning documents and issues.
+
+  --target <dir>   Project whose Codex integration will be removed (default: current directory)
+  --agents <mode>  codex (default), claude, or both
+  --yes            Skip confirmation`;
   if (command === "issue-status") return `Usage: node scripts/pf-cli.mjs issue-status <issue-id> [--target <dir>]`;
   return `Usage: node scripts/pf-cli.mjs converge [options]
 
@@ -292,6 +299,53 @@ function installShim() {
   return file;
 }
 
+function pfSkillNames() {
+  return fs.readdirSync(SKILLS_SRC, { withFileTypes: true })
+    .filter((entry) => entry.isDirectory() && isFile(path.join(SKILLS_SRC, entry.name, "SKILL.md")))
+    .map((entry) => entry.name);
+}
+
+function removeInstalledSkills(destinationRoot, report) {
+  for (const name of pfSkillNames()) {
+    const destination = path.join(destinationRoot, name);
+    if (!isDir(destination)) continue;
+    removePath(destination);
+    report.push(name);
+  }
+  if (isDir(destinationRoot) && fs.readdirSync(destinationRoot).length === 0) fs.rmdirSync(destinationRoot);
+}
+
+function removeAgentsSection(target, warnings) {
+  const file = path.join(target, "AGENTS.md");
+  if (!isFile(file)) return false;
+  const current = fs.readFileSync(file, "utf8");
+  const begin = current.indexOf(PF4_BEGIN);
+  const end = current.indexOf(PF4_END);
+  if (begin < 0 && end < 0) return false;
+  if (begin < 0 || end < begin) {
+    warnings.push("AGENTS.md has unbalanced PF4 markers; its PF section was left untouched");
+    return false;
+  }
+  const remaining = `${current.slice(0, begin)}${current.slice(end + PF4_END.length)}`.replace(/^\s+|\s+$/g, "");
+  if (remaining) fs.writeFileSync(file, `${remaining}\n`);
+  else fs.unlinkSync(file);
+  return true;
+}
+
+function removeShim(report) {
+  const bin = path.join(os.homedir(), ".claude", "bin");
+  const shim = path.join(bin, process.platform === "win32" ? "pf.js" : "pf");
+  if (isFile(shim) && /onboarding-tui[\\/]cli\.js/.test(fs.readFileSync(shim, "utf8"))) {
+    fs.unlinkSync(shim);
+    report.push(relative(os.homedir(), shim));
+  }
+  const cmd = path.join(bin, "pf.cmd");
+  if (isFile(cmd) && /pf\.js/.test(fs.readFileSync(cmd, "utf8"))) {
+    fs.unlinkSync(cmd);
+    report.push(relative(os.homedir(), cmd));
+  }
+}
+
 function checkWorktree(target, force, warnings, gitOk) {
   if (!gitOk) return;
   const lines = (git(target, ["status", "--porcelain=v1"]).stdout || "").split(/\r?\n/).filter(Boolean).filter((line) => !line.startsWith("??"));
@@ -307,6 +361,12 @@ function stageFootprint(target, gitOk) {
   if (!gitOk) return;
   const paths = [".pf-version", "PLANNING.md", "CLAUDE.md", "AGENTS.md", ".agents", "docs/issues", "docs/planning", "planning"]
     .filter((p) => exists(path.join(target, p)) || gitTracked(target, p));
+  if (paths.length) git(target, ["add", "-A", "--", ...paths]);
+}
+
+function stageUninstallFootprint(target, gitOk) {
+  if (!gitOk) return;
+  const paths = [".pf-version", "AGENTS.md", ".agents"].filter((p) => exists(path.join(target, p)) || gitTracked(target, p));
   if (paths.length) git(target, ["add", "-A", "--", ...paths]);
 }
 
@@ -481,6 +541,45 @@ function updateSkills(options) {
   say(`Updated ${report.length} skill(s) for ${agents}.`); return 0;
 }
 
+async function uninstall(options) {
+  const target = path.resolve(options.target);
+  const agents = options.agents === "auto" ? "codex" : options.agents;
+  if (!["claude", "codex", "both"].includes(agents)) fail(`invalid --agents '${agents}' - valid values: codex, claude, both`);
+  if (!options.yes && !(await askConfirmation())) {
+    say("Uninstall cancelled. Nothing was changed.");
+    return 4;
+  }
+  const warnings = [];
+  const report = { codex: [], claude: [], shim: [], agentsSection: false, marker: false };
+  const gitOk = gitAvailable(target);
+  if (agents === "codex" || agents === "both") {
+    const skillsRoot = path.join(target, ".agents", "skills");
+    removeInstalledSkills(skillsRoot, report.codex);
+    const agentsRoot = path.join(target, ".agents");
+    if (isDir(agentsRoot) && fs.readdirSync(agentsRoot).length === 0) fs.rmdirSync(agentsRoot);
+    report.agentsSection = removeAgentsSection(target, warnings);
+    const marker = path.join(target, ".pf-version");
+    if (isFile(marker) && /^4\.\d+(?:\.\d+)?\s*$/.test(fs.readFileSync(marker, "utf8"))) {
+      fs.unlinkSync(marker);
+      report.marker = true;
+    } else if (isFile(marker)) warnings.push(".pf-version is not a PF4 marker; it was left untouched");
+    stageUninstallFootprint(target, gitOk);
+  }
+  if (agents === "claude" || agents === "both") {
+    removeInstalledSkills(path.join(os.homedir(), ".claude", "skills"), report.claude);
+    removeShim(report.shim);
+  }
+  say("PF4 uninstall complete.");
+  if (report.codex.length) say(`  removed Codex skills: ${report.codex.length}`);
+  if (report.agentsSection) say("  removed AGENTS.md PF4 section");
+  if (report.marker) say("  removed .pf-version");
+  if (report.claude.length) say(`  removed Claude skills: ${report.claude.length}`);
+  if (report.shim.length) say(`  removed Claude shim: ${report.shim.join(", ")}`);
+  if (warnings.length) warnings.forEach((warning) => say(`  warning: ${warning}`));
+  say("  kept PLANNING.md, docs/planning/, and docs/issues/");
+  return 0;
+}
+
 function issueStatus(options) {
   const id = options.positionals?.[0]; if (!id) fail("Issue ID required.\n" + usage("issue-status"), 1);
   const target = path.resolve(options.target); const branch = `issue/${id}`; const issuePath = path.join(target, "docs", "issues", "open", id); say("Issue status\n------------"); if (!isDir(issuePath)) say(`Issue not found locally: ${relative(target, issuePath)}`);
@@ -496,7 +595,7 @@ async function main() {
   const command = raw[0] && !raw[0].startsWith("-") ? raw.shift() : "converge";
   const options = parseArgs(raw);
   if (options.help) { say(usage(command)); return; }
-  try { const code = command === "converge" ? await converge(options) : command === "update-skills" ? updateSkills(options) : command === "issue-status" ? issueStatus(options) : fail(`unknown command: ${command}`); process.exitCode = code; }
+  try { const code = command === "converge" ? await converge(options) : command === "update-skills" ? updateSkills(options) : command === "uninstall" ? await uninstall(options) : command === "issue-status" ? issueStatus(options) : fail(`unknown command: ${command}`); process.exitCode = code; }
   catch (error) { if (error.code) process.exitCode = error.code; else if (process.exitCode === undefined || process.exitCode === 0) process.exitCode = 1; }
 }
 
