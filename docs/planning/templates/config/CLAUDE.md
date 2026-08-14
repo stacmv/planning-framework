@@ -1,9 +1,9 @@
 ## Planning Framework
 
 **Project:** [Project Name]
-**Framework Version:** 3.0
+**Framework Version:** 4.0
 
-This project uses **Planning Framework v3.0**. All development work is tracked as issues under
+This project uses **Planning Framework v4.0**. All development work is tracked as issues under
 `docs/issues/`, and every issue moves through a fixed pipeline of planning documents before any
 code is written.
 

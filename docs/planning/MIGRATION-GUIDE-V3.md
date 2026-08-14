@@ -14,7 +14,7 @@ make converge TARGET=/path/to/your-project
 or, from inside the project itself:
 
 ```bash
-/path/to/planning-framework/scripts/converge-to-v3.sh
+/path/to/planning-framework/scripts/converge-to-v4.mjs
 ```
 
 That is the whole migration. `converge` is the **single entry point** of the framework: the four former per-version setup and migration scripts have been removed, and there is nothing else to run. Installing is not a separate operation — it is simply what converge does when it finds nothing to migrate.
@@ -100,7 +100,7 @@ in the project root. Notes:
 ## Look before you leap: `--dry-run`
 
 ```bash
-scripts/converge-to-v3.sh --target /path/to/project --dry-run
+scripts/converge-to-v4.mjs --target /path/to/project --dry-run
 ```
 
 Prints the detected state and the complete plan — every file that would move, every path that would be deleted, every skill that would be installed — and **changes nothing**. Exit code 0. Run it first on any project you care about.

@@ -7,13 +7,13 @@
 # all skills. Re-running the same command updates the existing install in place
 # (idempotent, no prompts). Requires `git` and `node` on PATH; refuses otherwise.
 #
-# PowerShell-native equivalent of scripts/install.sh (TC-016).
+# PowerShell-native installer for the Node.js runtime (TC-016).
 
-# Fail fast on cmdlet errors (mirrors `set -e` in the bash installer).
+# Fail fast on cmdlet errors.
 $ErrorActionPreference = 'Stop'
 
 $RepoUrl    = 'https://github.com/stacmv/planning-framework.git'
-$RepoBranch = 'main'
+$RepoBranch = 'develop-v4.0'
 $InstallDir  = Join-Path $HOME '.claude\planning-framework'
 $SkillsDir   = Join-Path $HOME '.claude\skills'
 $BinDir      = Join-Path $HOME '.claude\bin'
@@ -65,9 +65,9 @@ if (Test-Path (Join-Path $InstallDir '.git')) {
 Write-Host ''
 
 # ─── 3. Install skills to ~/.claude/skills/ (dynamic discovery) ───────────────
-# Mirrors scripts/update-skills.sh: every directory under skills\ that contains
+# Mirrors `node scripts/pf-cli.mjs update-skills`: every directory under skills\ that contains
 # a SKILL.md is copied. No hardcoded skill list — full skill parity with the
-# Linux/macOS installer (install.sh).
+# Linux/macOS installer (install.mjs).
 
 Write-Host "Installing skills to: $SkillsDir"
 Get-ChildItem -Path (Join-Path $InstallDir 'skills') -Directory | ForEach-Object {

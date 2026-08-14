@@ -1,0 +1,13 @@
+{
+  "name": "planning-framework",
+  "version": "4.0.0",
+  "private": true,
+  "description": "Dependency-free Planning Framework CLI and skills",
+  "engines": {
+    "node": ">=18"
+  },
+  "scripts": {
+    "test": "node --test tools/onboarding-tui/test/*.test.js test/pf-cli.test.mjs",
+    "check": "node --check scripts/pf-cli.mjs && node --check scripts/install.mjs"
+  }
+}

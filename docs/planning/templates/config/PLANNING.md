@@ -1,10 +1,10 @@
-# Planning Framework v3.0 — [Project Name]
+# Planning Framework v4.0 — [Project Name]
 
-> **Claude Code users:** run `/pf` to see the active issue, its current stage, and the next step.
+> **Claude Code users:** run `/pf`. **Codex users:** use the local `pf` skill from `.agents/skills`.
 
 Planning Framework is an issue-based workflow for tracking development work across AI agent
-sessions. It works with Claude Code, Gemini CLI and Qwen Code; the `/pf-*` skills listed below are
-the Claude Code front end for it.
+sessions. It works with Claude Code and Codex; the same `/pf-*` skill set is installed globally for
+Claude and locally in `.agents/skills` for Codex.
 
 ---
 
@@ -215,6 +215,6 @@ open/YYYYMMDD-type-slug/   →   closed/YYYYMMDD-type-slug/
 
 ---
 
-**Framework Version:** 3.0
+**Framework Version:** 4.0
 
 The machine-readable version marker of this installation is `.pf-version` in the repository root.

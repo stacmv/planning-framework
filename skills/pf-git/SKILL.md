@@ -1,7 +1,7 @@
 ---
 name: pf-git
 description: Reference data — the commit & push procedure every pf-* stage runs when it finishes. Not normally invoked directly.
-version: 3.0.0
+version: 4.0.0
 ---
 
 This skill is reference data for other Planning Framework skills. It is not meant
@@ -14,7 +14,7 @@ Every `pf-*` skill that produces or changes an artifact **references** this
 section at the end of its stage; no skill restates the procedure in its own
 words. (Seven independent copies of a rule are exactly how the completion gates
 drifted apart before `pf-size-tiers` centralized them — see
-`~/.claude/skills/pf-size-tiers/SKILL.md`.)
+`<PF_SKILL_ROOT>/pf-size-tiers/SKILL.md`.)
 
 **The rule:** a stage is not finished when its file is written — it is finished
 when that file is **committed and pushed**. Run this procedure as the last action
@@ -52,7 +52,7 @@ For `size_tier: trivial`, `notes.md` stands in for `brd.md` / `specs.md` /
 `implementation_plan.md` — stage it under whichever stage produced it.
 
 **Why every row carries the automigration qualifier.** The `reviewers:` →
-`roles:` automigration (`~/.claude/skills/pf-roles/SKILL.md` §5) edits
+`roles:` automigration (`<PF_SKILL_ROOT>/pf-roles/SKILL.md` §5) edits
 `prompt.md` but never commits that edit itself — by design, so it doesn't
 create a commit of its own just for the migration. Whichever `pf-*` stage
 runs next for that issue after automigration fired is the one responsible

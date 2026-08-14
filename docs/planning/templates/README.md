@@ -1,4 +1,4 @@
-# Planning Framework v3.0 Templates
+# Planning Framework v4.0 Templates
 
 This folder is a **framework artifact**: it is mirrored into your project from the Planning
 Framework repository, so anything you add or edit here is removed again on the next run. Treat it as
@@ -162,7 +162,7 @@ Document custom files in `PLANNING.md`.
 ## Template Maintenance
 
 Templates are maintained in the Planning Framework repository and are versioned with the framework
-(v3.0, v3.1, …). Breaking changes get a major bump. To pull the current set into your project, run
+(v4.0, v3.1, …). Breaking changes get a major bump. To pull the current set into your project, run
 the framework's convergence script (`make converge`); to refresh the installed skills, run
 `/pf-update`.
 
@@ -190,4 +190,4 @@ framework at all, v1, v2, a half-migrated tree, or an incomplete v3. See
 
 ---
 
-**Framework Version:** 3.0
+**Framework Version:** 4.0

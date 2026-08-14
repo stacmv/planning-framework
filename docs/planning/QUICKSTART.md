@@ -1,4 +1,4 @@
-# Planning Framework v3.0 - Quick Start
+# Planning Framework v4.0 - Quick Start
 
 **Get started in 5 minutes**
 **Version:** 3.0.0
@@ -8,7 +8,7 @@
 
 ## What is Planning Framework?
 
-Planning Framework v3.0 helps AI agents work on your project across multiple sessions without losing context. v3.0 adds a skills layer for Claude Code that enforces a document pipeline before any implementation starts.
+Planning Framework v4.0 helps AI agents work on your project across multiple sessions without losing context. The skills layer is available globally in Claude Code and locally in `.agents/skills` for Codex.
 
 **Key idea:** Each task gets its own **issue folder** with a pipeline of documents (BRD → spec → test plan → implementation plan → progress). Global files stay small. No merge conflicts.
 
@@ -42,7 +42,7 @@ make converge TARGET=/path/to/your-project
 
 ```bash
 git add .
-git commit -m "Setup Planning Framework v3.0"
+git commit -m "Setup Planning Framework v4.0"
 ```
 
 ### Step 3: Create First Issue (2 min)
@@ -273,7 +273,7 @@ cat docs/issues/open/[issue-id]/session-log.md
 tail -20 docs/planning/session-log.md
 
 # Update skills in this project from framework source
-./scripts/update-skills.sh
+node scripts/pf-cli.mjs update-skills
 ```
 
 ---
@@ -411,7 +411,7 @@ Session logs track which agent did what:
 When the framework publishes skill updates, pull them into your project:
 
 ```bash
-./scripts/update-skills.sh
+node scripts/pf-cli.mjs update-skills
 ```
 
 This copies the latest skill files from the framework source into your project's `skills/` directory. Commit the result to propagate the update to your team.
@@ -486,7 +486,7 @@ cat docs/issues/open/[issue-id]/implementation-plan.md
 ### Learn More
 
 - **[FRAMEWORK.md](FRAMEWORK.md)** - Complete guide (all features, best practices, FAQ)
-- **[MIGRATION-GUIDE-V3.md](MIGRATION-GUIDE-V3.md)** - Converging any project on v3.0
+- **[MIGRATION-GUIDE-V3.md](MIGRATION-GUIDE-V3.md)** - Converging any project on v4.0
 - **[templates/README.md](templates/README.md)** - Template documentation
 
 ### Get Help
@@ -508,8 +508,8 @@ Love Planning Framework? Share it:
 
 ```
 CONVERGE:    make converge TARGET=<path>   (install / migrate / top up — one command)
-PREVIEW:     ./scripts/converge-to-v3.sh --target <path> --dry-run
-UPDATE:      ./scripts/update-skills.sh
+PREVIEW:     node scripts/converge-to-v4.mjs --target <path> --dry-run
+UPDATE:      node scripts/pf-cli.mjs update-skills
 
 SESSION:     /pf → shows status and next step (Claude Code)
 PIPELINE:    /pf-brd → /pf-spec → /pf-test-plan → /pf-impl-plan → /pf-execute → /pf-codereview → /pf-test → /pf-qa → /pf-close
@@ -531,7 +531,7 @@ GLOBAL:      implementation-plan.md (roadmap, stays small!)
 
 ---
 
-**You're ready to use Planning Framework v3.0!**
+**You're ready to use Planning Framework v4.0!**
 
 Create your first issue and start building. 🚀
 

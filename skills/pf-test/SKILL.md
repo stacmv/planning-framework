@@ -1,12 +1,12 @@
 ---
 name: pf-test
 description: Run tests for the active issue, update Status Tracker, and generate manual_test_checklist.md for external testers
-version: 3.0.0
+version: 4.0.0
 ---
 
 Determine the active issue from `docs/issues/open/`. Read `docs/issues/open/[ACTIVE-ISSUE-ID]/test_plan.md` — if it does not exist, stop: "test_plan.md is required. Run /pf-test-plan first."
 
-Then check `docs/issues/open/[ACTIVE-ISSUE-ID]/code_review.md`: it must exist and its `verdict:` field must read literally `PASS` **or** start with `SKIPPED` (the latter written by `/pf-codereview` when `roles.code.review: skip` is confirmed — see `~/.claude/skills/pf-roles/SKILL.md` §1's "`code.review: skip`" section; it is not a failure, and this prerequisite must not block on it). This is a mechanical check — read the file and compare the field's literal value, no judgment call. If the file is missing, or exists with `verdict: FAIL` (or any value other than `PASS`/`SKIPPED...`), stop: "code_review.md (PASS) is required. Run /pf-codereview first." (translate per `doc_language` in `prompt.md`'s YAML frontmatter if it is set to something other than English).
+Then check `docs/issues/open/[ACTIVE-ISSUE-ID]/code_review.md`: it must exist and its `verdict:` field must read literally `PASS` **or** start with `SKIPPED` (the latter written by `/pf-codereview` when `roles.code.review: skip` is confirmed — see `<PF_SKILL_ROOT>/pf-roles/SKILL.md` §1's "`code.review: skip`" section; it is not a failure, and this prerequisite must not block on it). This is a mechanical check — read the file and compare the field's literal value, no judgment call. If the file is missing, or exists with `verdict: FAIL` (or any value other than `PASS`/`SKIPPED...`), stop: "code_review.md (PASS) is required. Run /pf-codereview first." (translate per `doc_language` in `prompt.md`'s YAML frontmatter if it is set to something other than English).
 
 ---
 
@@ -196,7 +196,7 @@ For each Manual TC-ID collected in 5.1, find its full test case section in `test
 Before writing the checklist, generate this issue's own data directory `docs/issues/<status>/[ISSUE-ID]/test-data/`, holding the `fixtures/` every Manual TC declared plus a `setup.mjs` that unpacks them — `<status>` is the directory the issue currently lives in (`open` while it is being worked on). Its two parts:
 
 - `test-data/fixtures/<entry>` — one real file per entry declared under **Test Data**, laid out under `fixtures/` with exactly the relative path the test plan named, and with content that actually satisfies the case's steps. An entry several cases share is written once, under a common subdirectory (e.g. `fixtures/prelude/`).
-- `test-data/setup.mjs` — copied verbatim from `~/.claude/skills/pf-test/templates/setup.mjs`. Replace only the block between the `BEGIN GENERATED CONFIG` and `END GENERATED CONFIG` markers: `ISSUE_ID` = this issue's ID, `PRELUDE` = the entries shared by several cases, `CASES` = every Manual TC-ID mapped to the entries it declared. Nothing outside that block is edited, and no dependency is added — the template is standard-library-only on purpose, so a tester can run `node setup.mjs` by hand.
+- `test-data/setup.mjs` — copied verbatim from `<PF_SKILL_ROOT>/pf-test/templates/setup.mjs`. Replace only the block between the `BEGIN GENERATED CONFIG` and `END GENERATED CONFIG` markers: `ISSUE_ID` = this issue's ID, `PRELUDE` = the entries shared by several cases, `CASES` = every Manual TC-ID mapped to the entries it declared. Nothing outside that block is edited, and no dependency is added — the template is standard-library-only on purpose, so a tester can run `node setup.mjs` by hand.
 
 If no Manual TC declares any file (every one of them reads `none` / `не требуются`), create nothing: an issue that needs no data gets no `test-data/` directory at all.
 
@@ -285,9 +285,9 @@ If there were no Auto-type TCs, replace the auto tests sentence with: "No automa
 
 ## Phase 7: Commit & Push
 
-As the last action of this skill, run the shared commit & push procedure in `~/.claude/skills/pf-git/SKILL.md` ("Stage commit & push") for the files this run changed — the updated Status Tracker in `test_plan.md` and `manual_test_checklist.md`. Do not restate the procedure here: it defines what to stage, the commit message, the push guard, and the one-line report, which you append to the Phase 6 summary.
+As the last action of this skill, run the shared commit & push procedure in `<PF_SKILL_ROOT>/pf-git/SKILL.md` ("Stage commit & push") for the files this run changed — the updated Status Tracker in `test_plan.md` and `manual_test_checklist.md`. Do not restate the procedure here: it defines what to stage, the commit message, the push guard, and the one-line report, which you append to the Phase 6 summary.
 
-The `test-data/` directory generated in 5.2.1 — its `fixtures/` and its `setup.mjs` — is committed and pushed by this same run, through that same `~/.claude/skills/pf-git/SKILL.md` ("Stage commit & push") procedure: the stage that creates an artifact is the stage that commits it. Leave it uncommitted and the working tree stays modified after the stage reports success, which fails the pre-close quality gate and leaves a tester with a checklist whose data cannot be prepared.
+The `test-data/` directory generated in 5.2.1 — its `fixtures/` and its `setup.mjs` — is committed and pushed by this same run, through that same `<PF_SKILL_ROOT>/pf-git/SKILL.md` ("Stage commit & push") procedure: the stage that creates an artifact is the stage that commits it. Leave it uncommitted and the working tree stays modified after the stage reports success, which fails the pre-close quality gate and leaves a tester with a checklist whose data cannot be prepared.
 
 This matters more here than anywhere else in the pipeline: `manual_test_checklist.md` exists to be handed to an **external tester**, who cannot receive it if it never leaves this machine.
 

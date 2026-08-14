@@ -1,7 +1,7 @@
 ---
 name: pf-size-tiers
 description: Reference data — size-tier definitions and document budgets, read by other pf-* skills. Not normally invoked directly.
-version: 3.0.0
+version: 4.0.0
 ---
 
 This skill is reference data for other Planning Framework skills. It is not meant
@@ -75,7 +75,7 @@ and may resolve to `skip` at any tier via an explicit
 `roles.user_docs`/`roles.dev_docs: skip` or a profile's point-specific
 entry. A stage resolved to `skip` counts as **complete** for routing
 purposes without a document ever existing on disk — see
-`~/.claude/skills/pf/SKILL.md` Step 5/Step 6 for how that is applied and
+`<PF_SKILL_ROOT>/pf/SKILL.md` Step 5/Step 6 for how that is applied and
 displayed.
 
 CODE_REVIEW applies uniformly across every tier, including `trivial` — code

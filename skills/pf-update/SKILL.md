@@ -38,7 +38,7 @@ All 21 skills:
 
 Look for the planning-framework repo in common locations by running:
 ```
-find ~/dev ~/projects ~/code /home -maxdepth 3 -name "update-skills.sh" -path "*/planning-framework/*" 2>/dev/null | head -5
+find ~/dev ~/projects ~/code /home -maxdepth 3 -name "pf-cli.mjs" -path "*/planning-framework/*" 2>/dev/null | head -5
 ```
 
 If found, use that path. If not found, ask the user: "Where is the planning-framework repo on your machine?"
@@ -47,7 +47,7 @@ If found, use that path. If not found, ask the user: "Where is the planning-fram
 
 Run the update script:
 ```
-bash <path-to-planning-framework>/scripts/update-skills.sh
+node <path-to-planning-framework>/scripts/pf-cli.mjs update-skills
 ```
 
 Show the output to the user ([new], [updated], [unchanged] per skill).
@@ -56,12 +56,12 @@ Show the output to the user ([new], [updated], [unchanged] per skill).
 
 Updating the skills without touching `.pf-version` lets the marker drift silently: the project claims one framework version while running another. So, after the update:
 
-1. Read the framework version from the framework repo — `PF_VERSION` in `scripts/converge-to-v4.sh`.
+1. Read the framework version from the framework repo — `PF_VERSION` in `scripts/pf-cli.mjs converge`.
 2. Read the current project's `.pf-version` (the file at the repo root of the project `/pf-update` was invoked in).
 3. Compare:
    - **Match** — say so in one line and move on. Nothing to do.
    - **Mismatch or `.pf-version` missing entirely** — do **not** rewrite the file yourself: the marker is written by convergence, together with the layout and documents it stands for. Print a recommendation instead, naming both versions:
-     "This project's `.pf-version` says `<project-version>`, the framework is `<framework-version>`. Run convergence to bring the project up to date: `make converge` in the project, or `bash <path-to-planning-framework>/scripts/converge-to-v4.sh --target <project-path>`."
+     "This project's `.pf-version` says `<project-version>`, the framework is `<framework-version>`. Run convergence to bring the project up to date: `make converge` in the project, or `node <path-to-planning-framework>/scripts/pf-cli.mjs converge --target <project-path>`."
      (If `.pf-version` is absent, say "This project has no `.pf-version` marker" and give the same recommendation.)
 
 ## Step 4: Report

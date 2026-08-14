@@ -70,7 +70,7 @@ One command handles every case — a fresh project, an older (v1/v2) one, or an
 incomplete v3/v4 one. Run it from the project directory:
 
 ```bash
-bash ~/dev/planning-framework/scripts/converge-to-v4.sh
+node ~/dev/planning-framework/scripts/pf-cli.mjs converge
 ```
 
 Or, from the framework repository: `make converge TARGET=/path/to/project`
@@ -79,7 +79,7 @@ Or, from the framework repository: `make converge TARGET=/path/to/project`
 
 Run `/pf-update` inside Claude Code, or:
 ```bash
-bash ~/dev/planning-framework/scripts/update-skills.sh
+node ~/dev/planning-framework/scripts/pf-cli.mjs update-skills
 ```
 
 ---

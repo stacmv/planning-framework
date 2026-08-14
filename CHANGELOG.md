@@ -9,6 +9,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [4.0.0] - 2026-08-14
+
+### Added
+- Node.js CLI for convergence, installation, skill updates, and issue status without a Bash runtime.
+- Codex adapter installation into `.agents/skills` with a bounded `AGENTS.md` runtime section.
+- Cross-platform integration tests covering fresh and v2 consumer projects.
+
+### Changed
+- Claude and Codex skill installation now discovers every directory containing `SKILL.md`.
+- The onboarding TUI and Makefile use the same Node.js CLI.
+
 ### Added
 - `/pf-autopilot` skill — drives the active issue to `/pf-close` autonomously: creates a self-resume schedule (CronCreate) before starting work, retries a sub-agent once after a connection drop, proceeds with recommended defaults only after 3 unanswered `AskUserQuestion` attempts (logging each as `[autopilot default]` in the issue session-log), and removes the schedule on closure
 - `pf-git` reference skill — the single definition of the commit & push procedure that closes every pipeline stage: scoped staging per stage, Conventional Commit messages carrying the issue ID, and the same push guard `/pf-close` Phase 8.5 uses (never `main`/`master`, never `--force`/`--no-verify`, a failed push is reported rather than fatal). Not invoked directly

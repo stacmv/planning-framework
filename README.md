@@ -3,7 +3,7 @@
 > **Issue-based workflow for AI-assisted development across sessions and branches**
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
-[![Version](https://img.shields.io/badge/version-3.0.0-blue.svg)](docs/planning/FRAMEWORK.md)
+[![Version](https://img.shields.io/badge/version-4.0.0-blue.svg)](docs/planning/FRAMEWORK.md)
 
 ---
 
@@ -20,7 +20,7 @@
 **Pipeline Enforcement** - Skills refuse to run if prerequisites are missing, keeping documents consistent
 **`/pf-check`** - Verifies consistency across all pipeline documents at any point
 **One entry point** - `make converge` installs, migrates or tops up a project from *any* starting state
-**`scripts/update-skills.sh`** - Propagate skill updates to all consumer projects from one place
+**`scripts/pf-cli.mjs update-skills`** - Propagate skill updates to Claude or Codex installations
 
 ## Skills
 
@@ -92,7 +92,7 @@ The fastest way to get the framework — clones it, installs the global `pf` com
 
 **Linux / macOS** (requires `git` and `node` on your `PATH`):
 ```sh
-curl -fsSL https://raw.githubusercontent.com/stacmv/planning-framework/main/scripts/install.sh | sh
+curl -fsSL https://raw.githubusercontent.com/stacmv/planning-framework/develop-v4.0/scripts/install.mjs | node
 ```
 
 **Windows** (PowerShell, requires `git` and `node` on your `PATH`):
@@ -102,7 +102,7 @@ irm https://raw.githubusercontent.com/stacmv/planning-framework/main/scripts/ins
 
 Re-running the same command later updates an existing install in place (no prompts).
 
-> The installer pulls from the `main` (release) branch; `develop` is the active-development trunk. To install into a custom location instead, use the manual steps below, or explore the framework interactively with `make tui`.
+> The v4 installer pulls from the `develop-v4.0` branch. To install into a custom location instead, use the manual steps below, or explore the framework interactively with `make tui`.
 
 ### Manual Install / Upgrade — one command for every case
 
@@ -126,7 +126,7 @@ cd /path/to/your-project && git status && git add . && git commit -m "Planning F
 Not sure what it would do? Add `--dry-run`:
 
 ```bash
-./scripts/converge-to-v4.sh --target /path/to/your-project --dry-run
+node scripts/pf-cli.mjs converge --target /path/to/your-project --dry-run --agents both
 ```
 
 **See [QUICKSTART.md](docs/planning/QUICKSTART.md) for the complete 5-minute guide and [MIGRATION-GUIDE-V3.md](docs/planning/MIGRATION-GUIDE-V3.md) for upgrades.**
@@ -252,7 +252,7 @@ Session logs track which agent did what:
 
 **One-command installer** (Linux/macOS/Windows — clones the framework, installs `pf` + skills):
 ```bash
-curl -fsSL https://raw.githubusercontent.com/stacmv/planning-framework/main/scripts/install.sh | sh   # Linux/macOS
+curl -fsSL https://raw.githubusercontent.com/stacmv/planning-framework/develop-v4.0/scripts/install.mjs | node   # Linux/macOS
 irm https://raw.githubusercontent.com/stacmv/planning-framework/main/scripts/install.ps1 | iex        # Windows
 ```
 
@@ -261,7 +261,7 @@ irm https://raw.githubusercontent.com/stacmv/planning-framework/main/scripts/ins
 make converge                       # Converge the current directory on v4
 make converge TARGET=<path>         # ...or a specific project
 make converge TARGET=<path> AGENTS=both                  # Install Claude and Codex adapters
-./scripts/converge-to-v4.sh --dry-run --target <path>    # Show the plan, change nothing
+node scripts/pf-cli.mjs converge --dry-run --target <path> --agents both    # Show the plan, change nothing
 ```
 
 Installs the framework + selected agent adapters, migrates v1/v2 layouts, and tops up an incomplete v3/v4 install. Same script for all of it.
@@ -273,14 +273,14 @@ make tui                            # Onboarding/update wizard (also available a
 
 **Skills maintenance:**
 ```bash
-./scripts/update-skills.sh          # Propagate skill updates to consumer projects
+node scripts/pf-cli.mjs update-skills --agents claude          # Update Claude's global skills
+node scripts/pf-cli.mjs update-skills --agents codex --target <path>  # Update a Codex project
 ```
 
-All scripts:
+The Node CLI:
 - Interactive prompts
-- Colorized output
-- Error handling
-- Comprehensive help
+- Cross-platform file and git operations without Bash
+- Error handling and comprehensive help
 
 ---
 
@@ -417,11 +417,16 @@ MIT License - Use freely in any project. See [LICENSE](LICENSE) for details.
 
 ## Version History
 
+- **v4.0.0** (2026-08-14) - Codex-ready Node.js runtime
+  - Node.js CLI replaces Bash runtime dependencies
+  - All discovered skills install into `.agents/skills` for Codex
+  - Claude and Codex adapters can be installed independently or together
+
 - **v3.0.0** (2026-06-24) - Skills-Based Workflow
   - 7 Claude Code skills (`/pf`, `/pf-brd`, `/pf-spec`, `/pf-check`, `/pf-test-plan`, `/pf-impl-plan`, `/pf-execute`)
   - BRD → spec → test plan → implementation plan pipeline
   - Pipeline enforcement (prerequisites checked by skills)
-  - `scripts/setup-planning-v3.sh` and `scripts/update-skills.sh`
+  - `scripts/pf-cli.mjs update-skills`
   - See [CHANGELOG.md](CHANGELOG.md) for details
 
 - **v2.0.0** (2026-01-28) - Issue-Based Workflow

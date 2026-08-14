@@ -1,7 +1,7 @@
 ---
 name: pf-roles
 description: Reference data — the write/review actor-resolution matrix (roles:/profile: schema, agents.yml/role-profiles.yml, the fallback order, reviewers: automigration, sequential review mode, write-invocation form for delegated actors). Not normally invoked directly.
-version: 3.0.0
+version: 4.0.0
 ---
 
 This skill is reference data for other Planning Framework skills. It is not meant
@@ -16,12 +16,12 @@ second write-capable actor (Codex) and a `sequential` review mode touches every
 one of those stages identically — resolving *who writes* and *who reviews* a
 given pipeline stage, and *how* a non-Claude actor is actually invoked. Centralizing
 that here means one fix mends all consumers, the same principle that already
-protects the commit procedure (`~/.claude/skills/pf-git/SKILL.md`) and the
-stage-completion criterion (`~/.claude/skills/pf-size-tiers/SKILL.md`) from
+protects the commit procedure (`<PF_SKILL_ROOT>/pf-git/SKILL.md`) and the
+stage-completion criterion (`<PF_SKILL_ROOT>/pf-size-tiers/SKILL.md`) from
 independent drift.
 
 **Referenced by** (do not restate any of the material below — reference this file
-by name instead): `~/.claude/skills/pf/SKILL.md`, `pf-brd`, `pf-spec`,
+by name instead): `<PF_SKILL_ROOT>/pf/SKILL.md`, `pf-brd`, `pf-spec`,
 `pf-test-plan`, `pf-impl-plan`, `pf-check`, `pf-codereview`, `pf-execute`,
 `pf-user-docs`, `pf-dev-docs`, `pf-qa`.
 
@@ -70,7 +70,7 @@ Fields of a stage's role record:
   `codex-implements` default profile (§3) so the schema doesn't need to change
   again once a consumer reads it, but no `pf-*` skill resolves or acts on it
   in this issue (the same reserved-field pattern as `implementation_plan.md`'s
-  `Task Type: docs`, see `~/.claude/skills/pf-impl-plan/SKILL.md`). Wiring an
+  `Task Type: docs`, see `<PF_SKILL_ROOT>/pf-impl-plan/SKILL.md`). Wiring an
   actual consumer for it is out of scope here.
 - **`skip`** — the whole stage is skipped. Only valid for `user_docs`/`dev_docs`.
   `code: skip` (skipping authorship of `code` itself) is invalid — the resolver
@@ -96,8 +96,8 @@ code: { write: claude, review: skip, confirmed: 2026-08-06 }
 If `/pf-codereview` reaches this role and no `confirmed:` marker is present yet
 (e.g. `skip` was hand-edited in, bypassing `/pf`), `pf-codereview` asks the same
 question itself and writes the same marker before proceeding (mechanics belong to
-`~/.claude/skills/pf-codereview/SKILL.md`, not restated here). `qa_report.md`
-also carries a dedicated risk line when this is set (`~/.claude/skills/pf-qa/SKILL.md`).
+`<PF_SKILL_ROOT>/pf-codereview/SKILL.md`, not restated here). `qa_report.md`
+also carries a dedicated risk line when this is set (`<PF_SKILL_ROOT>/pf-qa/SKILL.md`).
 
 ---
 
@@ -286,9 +286,9 @@ for each key: actor in the old reviewers:
   consumers of `reviewers:` use `brd`, `specs`, `test_plan`,
   `implementation_plan`, `code` (the planning-pipeline keys), plus two keys used
   outside that pipeline: `analysis` (bug-type issues — see
-  `~/.claude/skills/pf/SKILL.md`'s bug-workflow reviewer-assignment guard) and
+  `<PF_SKILL_ROOT>/pf/SKILL.md`'s bug-workflow reviewer-assignment guard) and
   `notes` (trivial-tier issues, any type — see
-  `~/.claude/skills/pf-brd/SKILL.md`'s reviewer-assignment guard). All seven are
+  `<PF_SKILL_ROOT>/pf-brd/SKILL.md`'s reviewer-assignment guard). All seven are
   migrated the same way, under the same key name they already have in
   `roles:`. This list documents what's known today for clarity — the rule
   itself does not check key names against it; it migrates exactly what is
@@ -299,7 +299,7 @@ for each key: actor in the old reviewers:
   drift).
 - The automigration mutates `prompt.md`, so it is committed as part of
   whichever `pf-*` stage runs next for that issue, not as its own commit — see
-  `~/.claude/skills/pf-git/SKILL.md`'s staging table.
+  `<PF_SKILL_ROOT>/pf-git/SKILL.md`'s staging table.
 - **Where this runs:** as part of `/pf`'s Step 2 (scanning `docs/issues/open/`),
   scoped to the **selected** issue only — the sole issue folder if only one is
   open, or the one Step 3's picker resolves once the user answers which issue
@@ -308,7 +308,7 @@ for each key: actor in the old reviewers:
   its own first `/pf`/`pf-check`/`pf-codereview` touch instead — whichever of
   those it happens to hit next, whenever it is next actually worked on. This
   keeps every `prompt.md` automigration edit owned by the same `pf-*` stage
-  invocation that commits it (`~/.claude/skills/pf-git/SKILL.md`'s staging
+  invocation that commits it (`<PF_SKILL_ROOT>/pf-git/SKILL.md`'s staging
   table only ever qualifies the edit for the issue the next stage actually
   operates on); migrating every open issue in one `/pf` pass would leave every
   non-selected issue's edit unstaged and unowned, tripping `pf-qa`'s
@@ -388,7 +388,7 @@ way `pf-check`'s "Codex invocation chain" already calls it for **review**.
 **This availability check is the write-side counterpart to `pf-check`'s
 "Codex invocation chain" (review side).** Before issuing the `task ...
 --write` call above, the calling skill checks Codex availability the same
-way that chain does — see `~/.claude/skills/pf-check/SKILL.md`, steps 1-2:
+way that chain does — see `<PF_SKILL_ROOT>/pf-check/SKILL.md`, steps 1-2:
 plugin present (its `codex:setup`/`codex:rescue` skills appear in this
 session's available-skills listing) → run the `codex:setup` skill if the CLI
 itself isn't confirmed ready → proceed once `codex:setup` reports the CLI is
@@ -464,14 +464,14 @@ is enough.
 **Write vs. review stay separate.** Codex's **review** invocation form
 (`codex-companion.mjs review --wait --scope ...`) is a different operation with
 its own canonical definition, already marked canonical in
-`~/.claude/skills/pf-check/SKILL.md`'s "Codex invocation chain" and already
-referenced from `~/.claude/skills/pf-codereview/SKILL.md`. This file does not
+`<PF_SKILL_ROOT>/pf-check/SKILL.md`'s "Codex invocation chain" and already
+referenced from `<PF_SKILL_ROOT>/pf-codereview/SKILL.md`. This file does not
 copy or redefine that section — only references it by name. Do not merge the
 two; they use different subcommands (`review` vs. `task`) and different flags.
 
 ### Synchronous vs. asynchronous write invocation
 
-A synchronous `task ... --write` call risks hitting the Bash tool's timeout (2
+A synchronous `task ... --write` call risks hitting the runtime command tool's timeout (2
 minutes by default in this environment, up to 10 minutes if explicitly raised)
 on a large generation. Choose based on expected output size:
 

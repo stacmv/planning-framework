@@ -120,7 +120,7 @@ test('TC-036 step 5: actions.js exports runConverge and nothing named after the 
   assert.strictEqual(actions.runMigrateV2ToV3, undefined, 'runMigrateV2ToV3 must be gone');
 
   const src = fs.readFileSync(path.join(TUI_ROOT, 'lib', 'actions.js'), 'utf8');
-  assert.match(src, /converge-to-v4\.sh/, 'runConverge must delegate to converge-to-v4.sh');
+  assert.match(src, /pf-cli\.mjs/, 'runConverge must delegate to the Node CLI');
   // The P2-7 compromise comment described a prompt-for-target quirk of the
   // script that is being deleted; it must not outlive it.
   assert.ok(!src.includes('P2-7'), 'the P2-7 compromise comment must be deleted');

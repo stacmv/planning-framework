@@ -1,18 +1,18 @@
 ---
 name: pf-test-plan
 description: Generate a comprehensive test plan for the active issue based on BRD/specs or analysis
-version: 3.0.0
+version: 4.0.0
 ---
 
-Before checking any other prerequisite, read `prompt.md`'s frontmatter. If it has no `size_tier` field, ask the user via `AskUserQuestion` — same 4 tier options and descriptions as in `~/.claude/skills/pf-size-tiers/SKILL.md`, recommending medium ("matches today's default behavior") — then write the answer into `prompt.md`'s frontmatter before proceeding with the rest of this skill.
+Before checking any other prerequisite, read `prompt.md`'s frontmatter. If it has no `size_tier` field, ask the user via `AskUserQuestion` — same 4 tier options and descriptions as in `<PF_SKILL_ROOT>/pf-size-tiers/SKILL.md`, recommending medium ("matches today's default behavior") — then write the answer into `prompt.md`'s frontmatter before proceeding with the rest of this skill.
 
-Determine the active issue from `docs/issues/open/`. Read `size_tier` from `prompt.md`'s frontmatter (default: medium if absent). Check prerequisites — "exists" below always means **complete** per the shared definition of "stage complete" in `~/.claude/skills/pf-size-tiers/SKILL.md` ("Stage completion"); a stub does not satisfy a prerequisite:
+Determine the active issue from `docs/issues/open/`. Read `size_tier` from `prompt.md`'s frontmatter (default: medium if absent). Check prerequisites — "exists" below always means **complete** per the shared definition of "stage complete" in `<PF_SKILL_ROOT>/pf-size-tiers/SKILL.md` ("Stage completion"); a stub does not satisfy a prerequisite:
 - **If `size_tier: trivial`:** `notes.md` must be complete. If not, stop: "Notes document is required. Run /pf-brd first."
 - **If `size_tier` is small/medium/large (or absent):**
   - For feat/improve issues: `brd.md` must be complete. If not, stop: "BRD is required. Run /pf-brd first."
   - For bug issues: `analysis.md` must be complete. If not, stop: "Write analysis.md (root cause analysis) before creating the test plan."
 
-**Output gate — `test_plan.md` already present (regenerate / keep / cancel).** If `test_plan.md` already exists, do **not** stop outright — this is the gate that used to trap the owner of a migrated issue behind a stub it would not let them replace. Judge the existing file against the same shared definition in `~/.claude/skills/pf-size-tiers/SKILL.md`, then ask the user via `AskUserQuestion`, stating whether it is complete or an incomplete stub:
+**Output gate — `test_plan.md` already present (regenerate / keep / cancel).** If `test_plan.md` already exists, do **not** stop outright — this is the gate that used to trap the owner of a migrated issue behind a stub it would not let them replace. Judge the existing file against the same shared definition in `<PF_SKILL_ROOT>/pf-size-tiers/SKILL.md`, then ask the user via `AskUserQuestion`, stating whether it is complete or an incomplete stub:
 - **regenerate** — produce a fresh test plan via whichever actor `write` resolves to (see the role resolution below) and overwrite the existing file (recommend this when it is not complete — e.g. a migration stub whose whole body is the stub marker);
 - **keep** — leave it untouched and stop, reporting that the TEST_PLAN stage is already complete (recommend this when it is complete);
 - **cancel** — stop and change nothing.
@@ -30,10 +30,10 @@ Use a lightweight **mechanical count only** (e.g. `wc -l` on the file) to perfor
 
 If the predecessor is oversized for its tier, stop before producing `test_plan.md`, with a message naming the offending file, the tier, and the actual line count vs. the budget, e.g.: "`specs.md` is oversized for this issue's declared tier (`small`): 412 lines vs ~300 budget. Run /pf-check to review, then either trim the document or re-classify the issue's size_tier in prompt.md."
 
-**Resolve role** for the `test_plan` key per `~/.claude/skills/pf-roles/SKILL.md` (§4's fallback order), before deciding how to produce the document.
+**Resolve role** for the `test_plan` key per `<PF_SKILL_ROOT>/pf-roles/SKILL.md` (§4's fallback order), before deciding how to produce the document.
 
 - If `write == claude` — unchanged: **do not read these documents or draft the plan yourself** (beyond the mechanical count above). Dispatch a single sub-agent (Agent tool, default/general-purpose type — no need for a fork) to do the reading, drafting, and writing — this sub-agent-dispatch mechanism is unchanged at every tier, including trivial: a sub-agent is still dispatched for trivial-tier test plans, only the source document and target counts differ. Give it the issue ID, `size_tier`, which source document(s) to read, and the full structure below (Steps 1-5).
-- If `write != claude` (in this issue, only `codex`) — this skill has no `AskUserQuestion` clarifying loop of its own to run (the test plan is derived mechanically from the predecessor documents, the same way the sub-agent path already does it). Instead of dispatching a Claude sub-agent, delegate the write to the resolved actor's write-invocator per `~/.claude/skills/pf-roles/SKILL.md` §7, targeting `docs/issues/open/[ACTIVE-ISSUE-ID]/test_plan.md` with a single prompt carrying the same instructions the sub-agent would otherwise receive: the issue ID, `size_tier`, which source document(s) to read (by path — the actor reads them itself, the same "do not inline document content" boundary the mechanical-count guard above already observes), `doc_language`, and the full structure below (Steps 1-5). A from-scratch pipeline document is §7's asynchronous case.
+- If `write != claude` (in this issue, only `codex`) — this skill has no `AskUserQuestion` clarifying loop of its own to run (the test plan is derived mechanically from the predecessor documents, the same way the sub-agent path already does it). Instead of dispatching a Claude sub-agent, delegate the write to the resolved actor's write-invocator per `<PF_SKILL_ROOT>/pf-roles/SKILL.md` §7, targeting `docs/issues/open/[ACTIVE-ISSUE-ID]/test_plan.md` with a single prompt carrying the same instructions the sub-agent would otherwise receive: the issue ID, `size_tier`, which source document(s) to read (by path — the actor reads them itself, the same "do not inline document content" boundary the mechanical-count guard above already observes), `doc_language`, and the full structure below (Steps 1-5). A from-scratch pipeline document is §7's asynchronous case.
 
 The source document(s) to read/pass, and the target test-case count, by tier:
 
@@ -132,4 +132,4 @@ Once the sub-agent (or, when `write != claude`, the delegated actor) returns, re
 
 ## Close the stage: commit & push
 
-After relaying the summary, run the shared commit & push procedure in `~/.claude/skills/pf-git/SKILL.md` ("Stage commit & push") as the last action of this skill. The orchestrator does this, never the sub-agent. Do not restate the procedure here: it defines what to stage, the commit message (including the TC counts), the push guard, and the one-line report. A stage is not finished until its document is committed and pushed.
+After relaying the summary, run the shared commit & push procedure in `<PF_SKILL_ROOT>/pf-git/SKILL.md` ("Stage commit & push") as the last action of this skill. The orchestrator does this, never the sub-agent. Do not restate the procedure here: it defines what to stage, the commit message (including the TC counts), the push guard, and the one-line report. A stage is not finished until its document is committed and pushed.

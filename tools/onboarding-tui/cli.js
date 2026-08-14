@@ -9,7 +9,7 @@
  *   - lib/menu.js      -> render a state-branched menu, collect a choice
  *   - lib/tutorial.js  -> the "what is Planning Framework?" walkthrough
  *   - lib/actions.js   -> delegate convergence / update-skills to the
- *                         repository's shell scripts via child_process.spawn
+ *                         repository's Node CLI via child_process.spawn
  *
  * Install and migration are a single action: `converge`. It is offered from
  * the `none`, `v2-or-older`, `v3` and `v4` states alike (an incomplete project

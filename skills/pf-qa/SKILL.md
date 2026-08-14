@@ -1,19 +1,19 @@
 ---
 name: pf-qa
 description: Run QA checks from .qa-workflow.md, confirm manual items, and produce qa_report.md with PASS/FAIL verdict
-version: 3.0.0
+version: 4.0.0
 ---
 
 Determine the active issue from `docs/issues/open/`. Check prerequisites, in order:
 
-1. **The TESTING stage must have run.** How that is evidenced depends on whether the issue has any `Manual` test cases at all — check `docs/issues/open/ISSUE-ID/test_plan.md`'s Status Tracker for rows whose `Type` is `Manual` (resolve the `Type` column by header name, not by position — see `~/.claude/skills/pf-close/SKILL.md`'s Phase 4.5 for why the two column orders in this repo make position unreliable):
+1. **The TESTING stage must have run.** How that is evidenced depends on whether the issue has any `Manual` test cases at all — check `docs/issues/open/ISSUE-ID/test_plan.md`'s Status Tracker for rows whose `Type` is `Manual` (resolve the `Type` column by header name, not by position — see `<PF_SKILL_ROOT>/pf-close/SKILL.md`'s Phase 4.5 for why the two column orders in this repo make position unreliable):
 
    - **The issue has at least one `Manual` row** — `manual_test_checklist.md` must exist inside the issue folder. If it does not, stop: "Testing stage is not complete. Run /pf-test first."
    - **The issue has no `Manual` rows at all** — `/pf-test` writes no checklist in that case by design (its Phase 5.1: "If there are no Manual rows, skip to Phase 6"), so its absence is the expected outcome, not a missing stage. Do **not** stop. Instead require the evidence that TESTING actually ran: every `Auto` row in the Status Tracker carries a Status of `✓` or `✗` rather than `[ ]`. If any `Auto` row is still `[ ]`, stop with: "Testing stage is not complete — N Auto TC(s) still unprocessed in test_plan.md. Run /pf-test first." (name them).
    - **No Status Tracker table at all** — stop and surface that, rather than reading it as "no Manual rows". A missing table is a malformed test plan, not an Auto-only issue.
 
    **Why this is not simply "require the file".** An `Auto`-only issue never produces a checklist, so an unconditional file check deadlocks it: `/pf-test` correctly declines to write the file, and `/pf-qa` then refuses to run because the file is absent, with no action available that satisfies both. Measured on `20260806-improve-codereview-convergence`, whose four `Manual` cases were dropped at QA time: the issue became `Auto`-only and had to keep a placeholder `manual_test_checklist.md` purely to get past this check — a file written to satisfy a gate rather than to be read by anyone.
-2. For each of `user_docs`, `dev_docs`: resolve the role for that key per `~/.claude/skills/pf-roles/SKILL.md` (§4's fallback order), reading `docs/issues/open/ISSUE-ID/prompt.md`'s frontmatter (`roles:`/`profile:`). If the resolved role is `skip` (explicit, via a profile's point-specific entry, or via the tier-default fallback for `size_tier: trivial`/`small`), this key's file requirement does not apply — move on to the next key. Otherwise `docs/issues/open/ISSUE-ID/user_docs.md` (respectively `dev_docs.md`) must exist and be non-empty. If it is missing or empty, stop with the same pattern as the check above: "User docs stage is not complete. Run /pf-user-docs first." (respectively "Dev docs stage is not complete. Run /pf-dev-docs first.").
+2. For each of `user_docs`, `dev_docs`: resolve the role for that key per `<PF_SKILL_ROOT>/pf-roles/SKILL.md` (§4's fallback order), reading `docs/issues/open/ISSUE-ID/prompt.md`'s frontmatter (`roles:`/`profile:`). If the resolved role is `skip` (explicit, via a profile's point-specific entry, or via the tier-default fallback for `size_tier: trivial`/`small`), this key's file requirement does not apply — move on to the next key. Otherwise `docs/issues/open/ISSUE-ID/user_docs.md` (respectively `dev_docs.md`) must exist and be non-empty. If it is missing or empty, stop with the same pattern as the check above: "User docs stage is not complete. Run /pf-user-docs first." (respectively "Dev docs stage is not complete. Run /pf-dev-docs first.").
 
 **Documentation language:** read the `doc_language` field from `docs/issues/open/ISSUE-ID/prompt.md`'s YAML frontmatter (default: English if absent). Write prose in `qa_report.md` (blocker descriptions, notes) in that language, but keep the report's structural labels and the `**PASS**`/`**FAIL**` verdict markers in English exactly as specified below, since `/pf-close` parses them literally.
 
@@ -49,7 +49,7 @@ Scan `.qa-workflow.md` for runnable commands:
 
 Run each discovered command (plus any built-in fallback commands from Phase 0):
 
-1. Run each command via Bash, capturing both exit code and stdout/stderr output.
+1. Run each command via the runtime command tool, capturing both exit code and stdout/stderr output.
 2. Record the result for each command. **Which signal decides depends on what the command is asserting, and the two shapes are not interchangeable:**
 
    - **Positive check** — the command does work and succeeds by exiting 0 (`shellcheck …`, `make test`, `git merge-base --is-ancestor …`). Exit code 0 → **PASS**, non-zero → **FAIL**.
@@ -90,9 +90,9 @@ Wait for the user's response before proceeding to Phase 3.5.
 
 ## Phase 3.5: Resolve the code-review risk line
 
-Resolve the role for the `code` key per `~/.claude/skills/pf-roles/SKILL.md` (§4's fallback order), reading `docs/issues/open/ISSUE-ID/prompt.md`'s frontmatter. If `roles.code.review == skip`:
+Resolve the role for the `code` key per `<PF_SKILL_ROOT>/pf-roles/SKILL.md` (§4's fallback order), reading `docs/issues/open/ISSUE-ID/prompt.md`'s frontmatter. If `roles.code.review == skip`:
 
-- Read the `confirmed:` marker recorded next to `roles.code.review: skip` in `prompt.md`'s frontmatter (written by `/pf` or `pf-codereview` — see `~/.claude/skills/pf-roles/SKILL.md`'s "`code.review: skip`" section).
+- Read the `confirmed:` marker recorded next to `roles.code.review: skip` in `prompt.md`'s frontmatter (written by `/pf` or `pf-codereview` — see `<PF_SKILL_ROOT>/pf-roles/SKILL.md`'s "`code.review: skip`" section).
 - This unconditionally produces one risk line for Phase 4's report, verbatim except for the date:
   ```
   ⚠ Risk: code review was skipped for this issue (roles.code.review: skip, confirmed <date>). No independent review of the implementation exists.
@@ -167,7 +167,7 @@ After writing `qa_report.md`, report to the user:
 
 ## Phase 6: Commit & Push
 
-As the last action of this skill — **after** the verdict is written and reported, on a PASS and on a FAIL alike — run the shared commit & push procedure in `~/.claude/skills/pf-git/SKILL.md` ("Stage commit & push") for `qa_report.md`. Do not restate the procedure here: it defines what to stage, the commit message (which carries the verdict), the push guard, and the one-line report you append to Phase 5's output.
+As the last action of this skill — **after** the verdict is written and reported, on a PASS and on a FAIL alike — run the shared commit & push procedure in `<PF_SKILL_ROOT>/pf-git/SKILL.md` ("Stage commit & push") for `qa_report.md`. Do not restate the procedure here: it defines what to stage, the commit message (which carries the verdict), the push guard, and the one-line report you append to Phase 5's output.
 
 **Order matters.** This phase runs after Phase 3's git-status check, never before it: committing earlier would let this skill's own artifact — or worse, an unrelated dirty worktree — satisfy the very check that exists to catch it. That is also why the shared procedure stages `qa_report.md` by path instead of `git add -A`.
 

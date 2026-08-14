@@ -1,7 +1,7 @@
 ---
 name: pf-manual-test
 description: Launch the local Manual Test UI for filling in manual_test_checklist.md interactively, across this and other configured projects
-version: 3.0.0
+version: 4.0.0
 ---
 
 This skill launches **Manual Test UI** — a small local web tool for reading an

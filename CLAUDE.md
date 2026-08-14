@@ -1,8 +1,8 @@
-# Planning Framework v3.0 - Claude Code Integration
+# Planning Framework v4.0 - Claude Code Integration
 
-**⚠️ Important: This project uses Planning Framework v3.0**
+**⚠️ Important: This project uses Planning Framework v4.0**
 
-Planning Framework v3.0 uses **`PLANNING.md`** for all AI agents (Claude, Gemini, Qwen).
+Planning Framework v4.0 uses **`PLANNING.md`** for all AI agents (Claude, Gemini, Qwen).
 
 👉 **Read `PLANNING.md` for complete framework instructions.**
 
@@ -10,7 +10,7 @@ Planning Framework v3.0 uses **`PLANNING.md`** for all AI agents (Claude, Gemini
 
 ## Quick Migration Note
 
-**v2.0 → v3.0 Changes:**
+**v2.0 → v4.0 Changes:**
 - Skills-based workflow via `/pf` and related commands
 - BRD → spec → test plan → implementation plan pipeline
 - `skills/` directory with 21 Claude Code skills
@@ -22,7 +22,7 @@ See **[MIGRATION-GUIDE-V3.md](docs/planning/MIGRATION-GUIDE-V3.md)**.
 
 ---
 
-## What's New in v3.0
+## What's New in v4.0
 
 **Skills-Based Workflow:**
 - Run `/pf` to see active issue status and next step
@@ -40,7 +40,7 @@ See **[MIGRATION-GUIDE-V3.md](docs/planning/MIGRATION-GUIDE-V3.md)**.
 
 ---
 
-## Session Start (v3.0)
+## Session Start (v4.0)
 
 **Run `/pf` to see active issue status and next step.**
 
@@ -67,7 +67,7 @@ CREATE → ANALYZE → PLAN → IMPLEMENT → QA → CLOSE
 
 ---
 
-## Session End (v3.0)
+## Session End (v4.0)
 
 **If working on issue:**
 - [ ] Update issue `session-log.md`
@@ -92,13 +92,13 @@ CREATE → ANALYZE → PLAN → IMPLEMENT → QA → CLOSE
 - **[PLANNING.md](PLANNING.md)** - **START HERE** - Complete framework config
 - **[FRAMEWORK.md](docs/planning/FRAMEWORK.md)** - Full documentation
 - **[QUICKSTART.md](docs/planning/QUICKSTART.md)** - 5-minute guide
-- **[MIGRATION-GUIDE-V3.md](docs/planning/MIGRATION-GUIDE-V3.md)** - upgrade any project to v3.0 with `converge`
+- **[MIGRATION-GUIDE-V3.md](docs/planning/MIGRATION-GUIDE-V3.md)** - upgrade any project to v4.0 with `converge`
 
 ---
 
 ## For Projects Using v2.0
 
-This file kept for backwards compatibility. New v3.0 projects use `PLANNING.md`.
+This file kept for backwards compatibility. New v4.0 projects use `PLANNING.md`.
 
 **To upgrade your v2.0 project:**
 ```bash
@@ -111,7 +111,7 @@ a half-migrated one and an incomplete v3 one alike. See
 
 ---
 
-**Framework Version:** 3.0.0
+**Framework Version:** 4.0.0
 **Last Updated:** 2026-06-24
 
 **👉 Read `PLANNING.md` for complete instructions.**

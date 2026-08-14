@@ -1,4 +1,4 @@
-# Planning Framework v3.0 - Complete Guide
+# Planning Framework v4.0 - Complete Guide
 
 **Version:** 3.0.0
 **Last Updated:** 2026-06-24
@@ -25,7 +25,7 @@
 
 ## Overview
 
-Planning Framework v3.0 is an **issue-based workflow system** designed for AI-assisted development across multiple sessions and branches, with a skills layer for Claude Code that enforces a structured document pipeline.
+Planning Framework v4.0 is an **issue-based workflow system** designed for AI-assisted development across multiple sessions and branches, with a shared skills layer for Claude Code and Codex that enforces a structured document pipeline.
 
 ### The Problem
 
@@ -38,7 +38,7 @@ When working with AI agents across multiple sessions:
 
 ### The Solution
 
-Planning Framework v3.0 solves these problems through:
+Planning Framework v4.0 solves these problems through:
 
 **Issue-Based Workflow:**
 - Each task gets its own issue folder
@@ -90,7 +90,7 @@ make converge TARGET=/path/to/your-project
 
 # 3. Commit the framework
 cd /path/to/your-project
-git add . && git commit -m "Setup Planning Framework v3.0"
+git add . && git commit -m "Setup Planning Framework v4.0"
 
 # 4. Start working!
 # Run /pf-qa-setup to create .qa-workflow.md, then ask your AI agent for your
@@ -100,7 +100,7 @@ git add . && git commit -m "Setup Planning Framework v3.0"
 Preview without changing anything:
 
 ```bash
-./scripts/converge-to-v3.sh --target /path/to/your-project --dry-run
+node scripts/converge-to-v4.mjs --target /path/to/your-project --dry-run
 ```
 
 There is no separate setup or migration script — `converge` is the single entry point. For what it does to existing issues, the backup and the flags, see [MIGRATION-GUIDE-V3.md](MIGRATION-GUIDE-V3.md).
@@ -404,7 +404,7 @@ git commit -m "Close issue 20240127-feat-add-auth: Added JWT authentication"
 To propagate skill updates to all consumer projects registered with the framework:
 
 ```bash
-./scripts/update-skills.sh
+node scripts/pf-cli.mjs update-skills
 ```
 
 ---
@@ -631,18 +631,18 @@ See complete FAQ in full documentation.
 
 **Documentation:**
 - [QUICKSTART.md](QUICKSTART.md) - 5-minute getting started
-- [MIGRATION-GUIDE-V3.md](MIGRATION-GUIDE-V3.md) - Converge any project on v3.0
+- [MIGRATION-GUIDE-V3.md](MIGRATION-GUIDE-V3.md) - Converge any project on v4.0
 - [templates/README.md](templates/README.md) - Template usage
 - [v1.0-archive/MIGRATION-GUIDE-v1-to-v2.md](v1.0-archive/MIGRATION-GUIDE-v1-to-v2.md) - Historical v1.0 → v2.0 guide (do not execute)
 
 **Scripts:**
-- `scripts/converge-to-v3.sh` - The single entry point: install, migrate or top up
-- `scripts/update-skills.sh` - Propagate skill updates to consumer projects
-- `scripts/issue-status.sh` - Issue status across remote branches
+- `scripts/converge-to-v4.mjs` - The single entry point: install, migrate or top up
+- `scripts/pf-cli.mjs update-skills` - Propagate skill updates to consumer projects
+- `scripts/issue-status.mjs` - Issue status across remote branches
 
 ---
 
-**Framework Version:** 3.0.0
+**Framework Version:** 4.0.0
 **Last Updated:** 2026-06-24
 
-Happy coding with Planning Framework v3.0! 🚀
+Happy coding with Planning Framework v4.0! 🚀

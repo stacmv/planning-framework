@@ -1,7 +1,7 @@
 ---
 name: pf-qa-setup
 description: Create or update .qa-workflow.md for the current project with appropriate QA commands and checklists
-version: 3.0.0
+version: 4.0.0
 ---
 
 Determine the project root (the directory containing `CLAUDE.md` or the current working directory). All file detection and writing happen there.
@@ -29,7 +29,7 @@ Rules:
 
 Wait for user input before proceeding if either question is needed.
 
-**Also detect a version-tracking convention, independently of the project type above** — this project's *own* released version, never to be confused with any framework-install marker (e.g. `.pf-version`, which records which Planning Framework version this project *consumes*, not what this project itself ships). Look for a `CHANGELOG.md` at the project root **and** one of: `package.json`'s `version` field, `pyproject.toml`'s `[project] version`, `Cargo.toml`'s `version`, `composer.json`'s `version`, `manifest.json`+`versions.json` (Obsidian plugin convention), or any shell variable matching `[A-Z_]+VERSION="?\d+\.\d+\.\d+"?` in a script at the project root (covers a project that version-stamps itself the way this very framework's own `scripts/converge-to-v3.sh` does with `PF_VERSION`). If both a CHANGELOG and a version marker are found, record the version-marker file's path for Phase 4's "Version Bump" section. If either is missing, there is no version-tracking convention to enforce — Phase 4 omits that section entirely rather than inventing one.
+**Also detect a version-tracking convention, independently of the project type above** — this project's *own* released version, never to be confused with any framework-install marker (e.g. `.pf-version`, which records which Planning Framework version this project *consumes*, not what this project itself ships). Look for a `CHANGELOG.md` at the project root **and** one of: `package.json`'s `version` field, `pyproject.toml`'s `[project] version`, `Cargo.toml`'s `version`, `composer.json`'s `version`, `manifest.json`+`versions.json` (Obsidian plugin convention), or any shell variable matching `[A-Z_]+VERSION="?\d+\.\d+\.\d+"?` in a script at the project root (covers a project that version-stamps itself the way this very framework's own `scripts/pf-cli.mjs` does with `PF_VERSION`). If both a CHANGELOG and a version marker are found, record the version-marker file's path for Phase 4's "Version Bump" section. If either is missing, there is no version-tracking convention to enforce — Phase 4 omits that section entirely rather than inventing one.
 
 ---
 
