@@ -640,4 +640,58 @@ else
   pf_fail "step 5: pf-autopilot never passes the autopilot argument — pf-check cannot know"
 fi
 
+
+# ════════════════════════════════════════════════
+printf '\n=== TC-062: pf-qa judges by what a check asserts, not by its exit code alone\n'
+# ════════════════════════════════════════════════
+#
+# Two defects found while /pf-qa ran against
+# 20260806-improve-codereview-convergence. Both had the same shape: a rule that
+# is right for the common case and inverts on a legitimate one.
+#
+#  1. The TESTING prerequisite required manual_test_checklist.md
+#     unconditionally. /pf-test writes no checklist when an issue has no Manual
+#     rows (its Phase 5.1 says so outright), so an Auto-only issue deadlocked:
+#     the file cannot exist and its absence is refused. That issue ended up
+#     keeping a placeholder checklist written purely to satisfy the gate.
+#
+#  2. Phase 2 recorded "exit 0 -> PASS, non-zero -> FAIL" for every command.
+#     .qa-workflow.md's own checks are mostly NEGATIVE — they pass by matching
+#     nothing, and grep exits 1 exactly then. Applied literally the rule turned
+#     six clean checks into six blockers on a spotless diff.
+#
+# Both guards are scoped to their own section of the file: "exit", "PASS" and
+# "FAIL" are everywhere in this skill, so an unscoped grep would pass on a
+# gutted rule.
+
+QA_SKILL="$SKILLS/pf-qa/SKILL.md"
+
+if [ ! -f "$QA_SKILL" ]; then
+  pf_fail "TC-062 step 1: skills/pf-qa/SKILL.md not found (test infrastructure defect, not a rule failure)"
+  pf_fail "TC-062 step 2: cannot check the negative-check rule — skills/pf-qa/SKILL.md missing (infrastructure)"
+else
+  # ─── step 1: the TESTING prerequisite branches on Manual-row presence ───────
+  prereq="$(sed -n '/^Determine the active issue/,/^## Phase 0/p' "$QA_SKILL")"
+  if [ -z "$prereq" ]; then
+    pf_fail "TC-062 step 1: could not locate the prerequisite block (infrastructure — file shape changed)"
+  elif printf '%s\n' "$prereq" | grep -qiE 'no .?Manual.? rows|Auto-only|issue has no Manual' &&
+    printf '%s\n' "$prereq" | grep -qiE 'do \*\*not\*\* stop|does not stop|not a missing stage'; then
+    pf_pass "TC-062 step 1: the TESTING prerequisite branches on whether the issue has Manual rows, instead of demanding manual_test_checklist.md unconditionally"
+  else
+    pf_fail "TC-062 step 1: the TESTING prerequisite still demands manual_test_checklist.md unconditionally — an Auto-only issue cannot satisfy it (rule not documented in SKILL.md)"
+  fi
+
+  # ─── step 2: Phase 2 separates positive from negative checks ───────────────
+  ph2="$(sed -n '/^## Phase 2: Run Automated Checks/,/^## Phase 3/p' "$QA_SKILL")"
+  if [ -z "$ph2" ]; then
+    pf_fail "TC-062 step 2: could not locate Phase 2 (infrastructure — heading changed)"
+  elif printf '%s\n' "$ph2" | grep -qiE 'negative check' &&
+    printf '%s\n' "$ph2" | grep -qiE 'no output.{0,40}PASS|nothing.{0,40}PASS' &&
+    printf '%s\n' "$ph2" | grep -qiE 'exit code is not the signal|not the signal'; then
+    pf_pass "TC-062 step 2: Phase 2 distinguishes a negative check (passes by matching nothing) from a positive one, and says the exit code is not the signal there"
+  else
+    pf_fail "TC-062 step 2: Phase 2 still decides every check by exit code alone — negative checks in .qa-workflow.md would be reported as blockers on a clean diff (rule not documented in SKILL.md)"
+  fi
+fi
+
 pf_summary

@@ -1,0 +1,12 @@
+profiles:
+  solo-claude:
+    # backward-compat default: Claude does everything
+    default: { write: claude, review: [claude] }
+  claude-writes-codex-reviews:
+    default: { write: claude, review: [codex] }
+    code:    { write: claude, review: [codex] }
+  codex-implements:
+    default:   { write: claude, review: [codex] }
+    code:      { write: codex, review: [claude] }
+    tests:     { write: codex, review: [claude], run: claude }
+    user_docs: { write: codex, review: [claude] }

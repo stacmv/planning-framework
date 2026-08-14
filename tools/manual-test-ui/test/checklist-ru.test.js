@@ -58,3 +58,32 @@ assert.strictEqual(sum.totalSteps, 3, `totalSteps: expected 3, got ${sum.totalSt
 assert.strictEqual(sum.passedSteps, 1, `passedSteps: expected 1, got ${sum.passedSteps}`);
 
 console.log("OK: checklist-ru.test.js — 2 TCs, RU+EN parsed, " + sum.totalSteps + " steps");
+
+// Regression: a non-`## TC-NNN` section sitting between two TC blocks (e.g.
+// "## Общая подготовка") must not vanish silently from the parse. Finding 3b
+// (follow-up after /pf-check).
+const LOST_SECTION_FIXTURE = `## TC-001: Первый кейс
+
+**Notes:**
+
+## Общая подготовка
+
+Маркер: SECTION-MARKER-3b7f2c
+
+## TC-002: Второй кейс
+
+**Notes:**
+`;
+
+const lostSectionParsed = parseChecklist(LOST_SECTION_FIXTURE);
+assert.strictEqual(
+  lostSectionParsed.tcs.length,
+  2,
+  `LOST_SECTION_FIXTURE: expected 2 TCs, got ${lostSectionParsed.tcs.length}`
+);
+assert.ok(
+  JSON.stringify(lostSectionParsed).includes("SECTION-MARKER-3b7f2c"),
+  "маркер секции «Общая подготовка» потерян при разборе"
+);
+
+console.log("OK: checklist-ru.test.js — non-TC section between TC blocks is not lost");

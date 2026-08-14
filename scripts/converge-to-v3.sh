@@ -926,7 +926,7 @@ t4_claude_md() {
 
 t5_global_docs() {
   local f src
-  for f in session-log.md decisions.md implementation-plan.md; do
+  for f in session-log.md decisions.md implementation-plan.md test-plan.md; do
     src="$TEMPLATES_SRC/global/$f"
     if [ -f "$TARGET/docs/planning/$f" ]; then
       continue # user document — never overwritten

@@ -60,10 +60,23 @@ every prerequisite gate.
 
 | Pipeline | Stage order |
 |---|---|
-| `size_tier: trivial` (all issue types) | CREATE (`prompt.md`) → BRD/SPEC/IMPL_PLAN collapsed into NOTES (`notes.md`) → TEST_PLAN (`test_plan.md`) → CODE_REVIEW (`code_review.md`) → TESTING (`manual_test_checklist.md`) → QA (`qa_report.md`) |
-| feat (small/medium/large) | CREATE → BRD (`brd.md`) → SPEC (`specs.md`) → TEST_PLAN → IMPL_PLAN (`implementation_plan.md`) → CODE_REVIEW (`code_review.md`) → TESTING → QA |
-| improve (small/medium/large) | CREATE → BRD → TEST_PLAN → IMPL_PLAN → CODE_REVIEW (`code_review.md`) → TESTING → QA |
-| bug (small/medium/large) | CREATE → ANALYSIS (`analysis.md`) → TEST_PLAN → IMPL_PLAN → CODE_REVIEW (`code_review.md`) → TESTING → QA |
+| `size_tier: trivial` (all issue types) | CREATE (`prompt.md`) → BRD/SPEC/IMPL_PLAN collapsed into NOTES (`notes.md`) → TEST_PLAN (`test_plan.md`) → CODE_REVIEW (`code_review.md`) → TESTING (`manual_test_checklist.md`) → USER_DOCS (`user_docs.md`) → DEV_DOCS (`dev_docs.md`) → QA (`qa_report.md`) |
+| feat (small/medium/large) | CREATE → BRD (`brd.md`) → SPEC (`specs.md`) → TEST_PLAN → IMPL_PLAN (`implementation_plan.md`) → CODE_REVIEW (`code_review.md`) → TESTING → USER_DOCS (`user_docs.md`) → DEV_DOCS (`dev_docs.md`) → QA |
+| improve (small/medium/large) | CREATE → BRD → TEST_PLAN → IMPL_PLAN → CODE_REVIEW (`code_review.md`) → TESTING → USER_DOCS (`user_docs.md`) → DEV_DOCS (`dev_docs.md`) → QA |
+| bug (small/medium/large) | CREATE → ANALYSIS (`analysis.md`) → TEST_PLAN → IMPL_PLAN → CODE_REVIEW (`code_review.md`) → TESTING → USER_DOCS (`user_docs.md`) → DEV_DOCS (`dev_docs.md`) → QA |
+
+**USER_DOCS and DEV_DOCS are formally-skippable stages**, present in every
+pipeline above — including `size_tier: trivial` — between TESTING and QA.
+They are never simply absent from the stage order; whether either actually
+requires a document on a given issue is decided by role resolution
+(`pf-roles` §4, level 3), not by the pipeline table. Both
+resolve to `skip` by default at `trivial`/`small` tier (fallback level 3),
+and may resolve to `skip` at any tier via an explicit
+`roles.user_docs`/`roles.dev_docs: skip` or a profile's point-specific
+entry. A stage resolved to `skip` counts as **complete** for routing
+purposes without a document ever existing on disk — see
+`~/.claude/skills/pf/SKILL.md` Step 5/Step 6 for how that is applied and
+displayed.
 
 CODE_REVIEW applies uniformly across every tier, including `trivial` — code
 review does not scale down with document tier; findings are findings, not
@@ -80,7 +93,19 @@ incomplete stage is TEST_PLAN, so its next step is `/pf-test-plan`, never
 - The criterion applies to **every** document of an issue, not to `test_plan.md`
   alone: `prompt.md`, `notes.md`, `brd.md`, `specs.md`, `analysis.md`,
   `test_plan.md`, `implementation_plan.md`, `code_review.md`,
-  `manual_test_checklist.md`, `qa_report.md`.
+  `manual_test_checklist.md`, `user_docs.md`, `dev_docs.md`, `qa_report.md`.
+- `user_docs.md`/`dev_docs.md` are the one exception to conjunct 1 above:
+  when role resolution (`pf-roles` §4, level 3) yields
+  `skip` for `roles.user_docs`/`roles.dev_docs`, that stage counts as
+  complete even though no file exists on disk — the exception is narrow and
+  applies to these two keys only. Every other document in the list above
+  still requires physical presence on disk to count as complete. The `skip`
+  determination itself is subject to the same mechanical-check rule as
+  everything else in this section: it is made by reading the issue's
+  `prompt.md` frontmatter fresh from disk at judgment time, never from a
+  resolution remembered earlier in the session — a stale "it resolved to
+  skip when I last checked" is exactly the kind of memory-based answer this
+  section exists to rule out.
 - It applies to issues under `docs/issues/open/` — those are the only ones the
   pipeline routes. Issues under `docs/issues/closed/` are archive: the pointer
   `brd.md` that convergence leaves in a closed legacy issue (it links to the

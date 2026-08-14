@@ -32,6 +32,19 @@
 #       pf_repo_copy → $TMP_REPO (with .git, so `git diff develop...HEAD` and
 #       commits work there). Use assert_repo_untouched to prove it.
 #
+#       KNOWN GAP — assert_repo_untouched only audits INSIDE $REPO_ROOT. It runs
+#       `git -C "$REPO_ROOT" status --porcelain`, so a write that lands *outside*
+#       the repository is invisible to it and the suite still reports S-5 green.
+#       This is not hypothetical: during 20260806-feat-product-test-plan a helper
+#       returned an empty path that reached `git -C ""` / `cp`, and probe files
+#       were created at the Git-Bash filesystem root (/docs, /scripts, /skills)
+#       while every suite stayed green. The rule that actually prevents it is a
+#       convention, not this assertion: ANY helper returning a path must be
+#       checked non-empty by its caller BEFORE that path is used in a command
+#       that writes — see pf_ptp_area_setup in test/pf-product-test-plan.sh and
+#       its call site for the required shape. Closing the gap mechanically
+#       (auditing a whitelist of out-of-repo paths) is not implemented.
+#
 # Public API:
 #   pf_run_converge [args…]                     — normal non-interactive run
 #   pf_run_converge_interactive <payload> [args…] — no --yes; "" = closed stdin

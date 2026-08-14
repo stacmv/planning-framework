@@ -10,7 +10,7 @@ Update the installed Planning Framework skills to the latest version.
 
 The update script **discovers skills by globbing `skills/*/SKILL.md` in the framework repo** — it never reads the list below, and a new skill is picked up without editing this file. The list is documentation only; keep it in sync, but the script is the source of truth.
 
-All 18 skills:
+All 21 skills:
 
 - `pf` — orchestrator: shows active issue status and next step
 - `pf-help` — framework overview and quick-start
@@ -30,6 +30,9 @@ All 18 skills:
 - `pf-update` — this skill (self-updates)
 - `pf-size-tiers` — reference data: tier definitions and document budgets (not directly invoked)
 - `pf-git` — reference data: the commit & push procedure run at the end of every stage (not directly invoked)
+- `pf-roles` — reference data: the write/review actor-resolution matrix (not directly invoked)
+- `pf-user-docs` — write user-facing documentation (README/CHANGELOG/user guide) for the active issue
+- `pf-dev-docs` — write developer-facing documentation (architecture/ADRs/runbook) for the active issue
 
 ## Step 1: Find the framework source
 
