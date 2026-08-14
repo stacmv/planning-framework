@@ -13,7 +13,7 @@
 - **Runtime-relative reviewers** — issue frontmatter can use `self`, `peer`, `both`, `claude`, or `codex`.
 - **Codex project adapter** — converge installs repo-local skills into `.agents/skills/` and writes a bounded PF section in `AGENTS.md`.
 
-## What's New in v3.0
+## Core Workflow
 
 **Skills-Based Workflow** - Run `/pf` to see active issue status and your next step — no manual file reads to orient
 **BRD Pipeline** - feat/improve issues follow BRD → spec → test plan → implementation plan before any code
@@ -75,7 +75,7 @@ When working with AI agents across multiple sessions:
 
 ## The Solution
 
-Planning Framework v2.0 uses an **issue-based workflow**:
+Planning Framework v4.0 uses an **issue-based workflow**:
 - ✅ Each task in its own issue folder
 - ✅ Complete context (prompt, analysis, plan, progress)
 - ✅ Global files stay minimal (roadmap only)
@@ -86,26 +86,31 @@ Planning Framework v2.0 uses an **issue-based workflow**:
 
 ## Quick Start (5 Minutes)
 
-### One-Command Install
+### Install PF4
 
-The fastest way to get the framework — clones it, installs the global `pf` command and all skills:
+Run the installer from the root of the project you want to manage. It checks whether `claude` and `codex` are available on `PATH`:
 
-**Linux / macOS** (requires `git` and `node` on your `PATH`):
-```sh
-curl -fsSL https://raw.githubusercontent.com/stacmv/planning-framework/develop-v4.0/scripts/install.mjs | node
-```
+- one available CLI: installs PF for it;
+- both available CLIs: asks whether to install for Claude, Codex, or both;
+- neither available: stops with an actionable error.
 
-For a Codex project, install the local adapter directly:
-```sh
-curl -fsSL https://raw.githubusercontent.com/stacmv/planning-framework/develop-v4.0/scripts/install.mjs | node -- --agents codex --target /path/to/your-project
-```
-
-**Windows** (PowerShell, requires `git` and `node` on your `PATH`):
+**Windows (PowerShell):**
 ```powershell
-irm https://raw.githubusercontent.com/stacmv/planning-framework/main/scripts/install.ps1 | iex
+irm https://raw.githubusercontent.com/stacmv/planning-framework/develop-v4.0/scripts/install.mjs | node -- --target .
 ```
 
-Re-running the same command later updates an existing install in place (no prompts).
+**Linux / macOS:**
+```sh
+curl -fsSL https://raw.githubusercontent.com/stacmv/planning-framework/develop-v4.0/scripts/install.mjs | node -- --target .
+```
+
+When both CLIs are found, the installer asks which integration to configure. You can also choose explicitly:
+
+```powershell
+irm https://raw.githubusercontent.com/stacmv/planning-framework/develop-v4.0/scripts/install.mjs | node -- --agents codex --target .
+```
+
+For Codex, PF writes all 21 skills to `.agents/skills/` and adds its bounded section to `AGENTS.md`. Start a new Codex session in the project and run `/pf`. Re-run the same command to update PF4.
 
 > The v4 installer pulls from the `develop-v4.0` branch. To install into a custom location instead, use the manual steps below, or explore the framework interactively with `make tui`.
 
@@ -125,7 +130,7 @@ node scripts/pf-cli.mjs converge --target /path/to/your-project --agents codex -
 cd /path/to/your-project && git status && git add . && git commit -m "Planning Framework v4.0"
 
 # 4. Set up QA gates and create the first issue
-# In Claude Code: /pf-qa-setup, then "Create an issue to [add feature]"
+# In Codex: /pf-qa-setup, then "Create an issue to [add feature]"
 ```
 
 Not sure what it would do? Add `--dry-run`:
@@ -257,8 +262,8 @@ Session logs track which agent did what:
 
 **One-command installer** (Linux/macOS/Windows — clones the framework, installs `pf` + skills):
 ```bash
-curl -fsSL https://raw.githubusercontent.com/stacmv/planning-framework/develop-v4.0/scripts/install.mjs | node   # Linux/macOS
-irm https://raw.githubusercontent.com/stacmv/planning-framework/main/scripts/install.ps1 | iex        # Windows
+curl -fsSL https://raw.githubusercontent.com/stacmv/planning-framework/develop-v4.0/scripts/install.mjs | node -- --target .  # Linux/macOS
+irm https://raw.githubusercontent.com/stacmv/planning-framework/develop-v4.0/scripts/install.mjs | node -- --target .           # Windows PowerShell
 ```
 
 **Install / migrate / top up — one script:**

@@ -8,6 +8,7 @@ import test from "node:test";
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const cli = path.join(root, "scripts", "pf-cli.mjs");
+const installer = path.join(root, "scripts", "install.mjs");
 const skills = fs.readdirSync(path.join(root, "skills"), { withFileTypes: true })
   .filter((entry) => entry.isDirectory() && fs.existsSync(path.join(root, "skills", entry.name, "SKILL.md")));
 
@@ -18,6 +19,13 @@ function run(target, args = []) {
 function git(target, args) {
   return spawnSync("git", ["-C", target, ...args], { encoding: "utf8" });
 }
+
+test("installer documents automatic Claude/Codex selection", () => {
+  const result = spawnSync(process.execPath, [installer, "--help"], { encoding: "utf8" });
+  assert.equal(result.status, 0, result.stderr || result.stdout);
+  assert.match(result.stdout, /--agents auto\|codex\|claude\|both/);
+  assert.match(result.stdout, /auto-detect Claude Code and Codex/);
+});
 
 test("fresh Codex convergence installs every discovered skill and AGENTS adapter", () => {
   const target = fs.mkdtempSync(path.join(os.tmpdir(), "pf-v4-fresh-"));
