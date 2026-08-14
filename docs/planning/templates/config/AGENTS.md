@@ -12,6 +12,11 @@ the local PF skills from `.agents/skills`.
 - If `reviewers.<artifact>` is `self`, review with the current runtime agent.
 - If it is `peer`, review with the other installed supported agent.
 - If it is `both`, run both reviews and aggregate findings without arbitration.
+- In Codex, `<PF_SKILL_ROOT>` is `.agents/skills`; use `request_user_input` (or ask in the
+  current conversation) for `AskUserQuestion`, and use the current Codex session for any
+  `Agent`/`codex-companion` delegation. Do not call a Claude plugin path from Codex.
+- If Codex task tools such as `TaskCreate`, `TaskGet`, or `TaskUpdate` are unavailable, keep
+  the task ledger in the implementation plan and update it only after rereading the files.
 - When Codex is runtime and Claude is selected as reviewer, call Claude through
   `claude -p` with a review-only prompt.
 <!-- pf4:end -->

@@ -48,11 +48,11 @@ your project by the `/pf-qa-setup` skill.
 ## How to Use These Templates
 
 You normally do not use them by hand. The framework's convergence script brings any project — with
-no Planning Framework, or an older one, or a partial v3 — to the current v3 layout, and copies these
+no Planning Framework, or an older one, or a partial v3/v4 — to the current v4 layout, and copies these
 templates as part of it:
 
 ```bash
-make converge
+node scripts/pf-cli.mjs converge --agents codex --yes
 ```
 
 The `[Project Name]` placeholder in `config/PLANNING.md` and `config/CLAUDE.md` is substituted with
@@ -163,15 +163,15 @@ Document custom files in `PLANNING.md`.
 
 Templates are maintained in the Planning Framework repository and are versioned with the framework
 (v4.0, v3.1, …). Breaking changes get a major bump. To pull the current set into your project, run
-the framework's convergence script (`make converge`); to refresh the installed skills, run
+the framework's convergence script (`node scripts/pf-cli.mjs converge`); to refresh the installed skills, run
 `/pf-update`.
 
 ---
 
 ## Migrating an Older Project
 
-`make converge` is idempotent and brings a project to the v3 layout from **any** starting point — no
-framework at all, v1, v2, a half-migrated tree, or an incomplete v3. See
+`node scripts/pf-cli.mjs converge` is idempotent and brings a project to the v4 layout from **any** starting point — no
+framework at all, v1, v2, a half-migrated tree, or an incomplete v3/v4. See
 `docs/planning/MIGRATION-GUIDE-V3.md`.
 
 ---

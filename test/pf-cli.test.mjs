@@ -27,12 +27,17 @@ test("fresh Codex convergence installs every discovered skill and AGENTS adapter
     assert.equal(result.status, 0, result.stderr || result.stdout);
     assert.equal(fs.readFileSync(path.join(target, ".pf-version"), "utf8").trim(), "4.0.0");
     assert.match(fs.readFileSync(path.join(target, "PLANNING.md"), "utf8"), /Framework Version:\*\* 4\.0/);
-    assert.match(fs.readFileSync(path.join(target, "AGENTS.md"), "utf8"), /pf4:begin/);
+    const agents = fs.readFileSync(path.join(target, "AGENTS.md"), "utf8");
+    assert.match(agents, /pf4:begin/);
+    assert.match(agents, /request_user_input/);
+    assert.match(agents, /current Codex session/);
+    assert.match(fs.readFileSync(path.join(target, "PLANNING.md"), "utf8"), /<PF_SKILL_ROOT>/);
     const installed = fs.readdirSync(path.join(target, ".agents", "skills"), { withFileTypes: true })
       .filter((entry) => entry.isDirectory() && fs.existsSync(path.join(target, ".agents", "skills", entry.name, "SKILL.md")));
     assert.equal(installed.length, skills.length);
     const second = run(target);
     assert.equal(second.status, 0, second.stderr || second.stdout);
+    assert.match(second.stdout, /Detected state: v4/);
     assert.equal(fs.readFileSync(path.join(target, "AGENTS.md"), "utf8").match(/pf4:begin/g).length, 1);
   } finally {
     fs.rmSync(target, { recursive: true, force: true });

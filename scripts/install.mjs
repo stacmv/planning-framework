@@ -10,6 +10,22 @@ const repoUrl = process.env.PF_REPO_URL || "https://github.com/stacmv/planning-f
 const branch = process.env.PF_REPO_BRANCH || "develop-v4.0";
 const installDir = path.join(os.homedir(), ".claude", "planning-framework");
 
+function option(name, fallback) {
+  const prefix = `${name}=`;
+  const inline = process.argv.find((arg) => arg.startsWith(prefix));
+  if (inline) return inline.slice(prefix.length);
+  const index = process.argv.indexOf(name);
+  return index >= 0 ? process.argv[index + 1] : fallback;
+}
+
+const agents = option("--agents", process.env.PF_AGENTS || "claude");
+const target = path.resolve(option("--target", process.env.PF_TARGET || process.cwd()));
+if (process.argv.includes("--help") || process.argv.includes("-h")) {
+  console.log("Usage: curl -fsSL <installer-url> | node -- [--agents claude|codex|both] [--target <project>]");
+  process.exit(0);
+}
+if (!["claude", "codex", "both"].includes(agents)) throw new Error(`Invalid --agents value: ${agents}`);
+
 function run(args) {
   const result = spawnSync("git", args, { stdio: "inherit" });
   if (result.status !== 0) throw new Error(`git ${args.join(" ")} failed with exit code ${result.status}`);
@@ -29,7 +45,11 @@ if (fs.existsSync(path.join(installDir, ".git"))) {
 }
 
 const cli = path.join(installDir, "scripts", "pf-cli.mjs");
-const result = spawnSync(process.execPath, [cli, "update-skills", "--agents", "claude", "--source", installDir], { stdio: "inherit" });
+const command = agents === "claude" ? "update-skills" : "converge";
+const args = [cli, command, "--agents", agents, "--source", installDir];
+if (command === "converge") args.push("--target", target, "--yes");
+const result = spawnSync(process.execPath, args, { stdio: "inherit" });
 if (result.status !== 0) process.exit(result.status ?? 1);
 console.log(`Installed Planning Framework at ${installDir}`);
-console.log(`Run: ${path.join(os.homedir(), ".claude", "bin", process.platform === "win32" ? "pf.js" : "pf")}`);
+if (agents === "claude") console.log(`Run: ${path.join(os.homedir(), ".claude", "bin", process.platform === "win32" ? "pf.js" : "pf")}`);
+else console.log(`Codex skills: ${path.join(target, ".agents", "skills")}`);

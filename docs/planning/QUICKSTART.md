@@ -1,8 +1,8 @@
 # Planning Framework v4.0 - Quick Start
 
 **Get started in 5 minutes**
-**Version:** 3.0.0
-**Last Updated:** 2026-06-24
+**Version:** 4.0.0
+**Last Updated:** 2026-08-14
 
 ---
 
@@ -23,20 +23,20 @@ Planning Framework v4.0 helps AI agents work on your project across multiple ses
 ```bash
 git clone https://github.com/[your-org]/planning-framework /tmp/planning-fw
 cd /tmp/planning-fw
-make converge TARGET=/path/to/your-project
+node scripts/pf-cli.mjs converge --target /path/to/your-project --agents codex --yes
 ```
 
-`converge` is the single entry point: the same command installs into a fresh project, upgrades a v1 or v2 one, finishes a half-migrated one, and tops up an incomplete v3 one. It is idempotent — re-run it any time. Add `--dry-run` to see the plan without changing anything.
+`converge` is the single entry point: the same Node.js command installs into a fresh project, upgrades a v1 or v2 one, finishes a half-migrated one, and tops up an incomplete v3/v4 one. It is idempotent — re-run it any time. Add `--dry-run` to see the plan without changing anything.
 
 **Created:**
 - `PLANNING.md` - Framework instructions
 - `.pf-version` - Framework version stamp
 - `CLAUDE.md` - With a `<!-- pf:begin -->` / `<!-- pf:end -->` framework section
-- 21 skills in `~/.claude/skills/` (`/pf`, `/pf-help`, `/pf-brd`, `/pf-spec`, `/pf-check`, `/pf-test-plan`, `/pf-impl-plan`, `/pf-execute`, `/pf-codereview`, `/pf-test`, `/pf-manual-test`, `/pf-qa`, `/pf-qa-setup`, `/pf-close`, `/pf-autopilot`, `/pf-update`, `/pf-size-tiers`, `/pf-git`, `/pf-roles`, `/pf-user-docs`, `/pf-dev-docs`) and the `pf` shim in `~/.claude/bin/`
+- 21 skills in `.agents/skills/` for Codex, or `~/.claude/skills/` for Claude Code (`/pf`, `/pf-help`, `/pf-brd`, `/pf-spec`, `/pf-check`, `/pf-test-plan`, `/pf-impl-plan`, `/pf-execute`, `/pf-codereview`, `/pf-test`, `/pf-manual-test`, `/pf-qa`, `/pf-qa-setup`, `/pf-close`, `/pf-autopilot`, `/pf-update`, `/pf-size-tiers`, `/pf-git`, `/pf-roles`, `/pf-user-docs`, `/pf-dev-docs`)
 - `docs/issues/open/` and `/closed/` - Issue folders
 - `docs/planning/` - Global planning files + templates
 
-**Not created:** `.qa-workflow.md`. QA gates are project-specific, so there is no template — run `/pf-qa-setup` in Claude Code and it writes one fitted to your project.
+**Not created:** `.qa-workflow.md`. QA gates are project-specific, so there is no template — run `/pf-qa-setup` in Claude Code or Codex and it writes one fitted to your project.
 
 ### Step 2: Commit (30 sec)
 
@@ -74,7 +74,7 @@ Agent follows workflow automatically:
 
 ## Core Workflow
 
-### 5-Minute Workflow (Claude Code with Skills)
+### 5-Minute Workflow (Claude Code or Codex with Skills)
 
 ```
 /pf                  ← See active issue and next step
@@ -116,7 +116,7 @@ CREATE → ANALYZE → TEST_PLAN → IMPL_PLAN → /pf-execute → /pf-coderevie
 your-project/
 ├── PLANNING.md                      # Read this first!
 ├── .qa-workflow.md                  # QA requirements
-├── skills/                          # Claude Code skills (/pf, /pf-brd, etc.)
+├── .agents/skills/                  # Codex skills (/pf, /pf-brd, etc.)
 │
 ├── docs/
 │   ├── issues/
@@ -139,7 +139,7 @@ your-project/
 
 ### What Agents Do
 
-**Session Start (Claude Code):**
+**Session Start (Claude Code or Codex):**
 - Run `/pf` — reads active issue, shows stage and next step
 
 **Session Start (other agents):**
@@ -421,17 +421,17 @@ This copies the latest skill files from the framework source into your project's
 ## Migrating from v1 or v2
 
 ```bash
-make converge TARGET=/path/to/your-project
+node scripts/pf-cli.mjs converge --target /path/to/your-project --agents codex --yes
 ```
 
 The same command as a fresh install — there is no separate migration script. It:
-1. Detects the starting state (none / v1 / v2 / half-migrated / incomplete v3)
+1. Detects the starting state (none / v1 / v2 / half-migrated / incomplete v3/v4)
 2. Backs up `planning/` to `planning-backup-<timestamp>/` before touching anything
 3. Moves your issues and global documents from `planning/` into `docs/`
 4. Renames `implementation-plan.md` → `implementation_plan.md` inside issue folders
 5. Deletes v1/v2 framework artifacts **by whitelist** (never `rm -rf planning/`)
-6. Tops up to the v3 target state: `.pf-version`, `PLANNING.md`, the `CLAUDE.md` section, templates, all 15 skills, the `pf` shim
-7. Prints a report — including, per issue, which v3 documents are still missing
+6. Tops up to the v4 target state: `.pf-version`, `PLANNING.md`, agent adapters, templates, and all 21 skills
+7. Prints a report — including, per issue, which v4 documents are still missing
 
 Run it with `--dry-run` first to see the plan.
 
@@ -507,7 +507,7 @@ Love Planning Framework? Share it:
 ## Quick Reference Card
 
 ```
-CONVERGE:    make converge TARGET=<path>   (install / migrate / top up — one command)
+CONVERGE:    node scripts/pf-cli.mjs converge --target <path> --agents codex --yes
 PREVIEW:     node scripts/converge-to-v4.mjs --target <path> --dry-run
 UPDATE:      node scripts/pf-cli.mjs update-skills
 
@@ -537,5 +537,5 @@ Create your first issue and start building. 🚀
 
 ---
 
-**Version:** 3.0.0
-**Last Updated:** 2026-06-24
+**Version:** 4.0.0
+**Last Updated:** 2026-08-14

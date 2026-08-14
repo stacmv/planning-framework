@@ -165,6 +165,9 @@ function detectState(target) {
   const hasV3 = isDir(path.join(target, "docs", "issues"));
   if (hasV2 && hasV3) return "mixed";
   if (hasV2) return "v2";
+  const marker = isFile(path.join(target, ".pf-version")) ? fs.readFileSync(path.join(target, ".pf-version"), "utf8").trim() : "";
+  if (/^4\.\d+(?:\.\d+)?$/.test(marker)) return "v4";
+  if (/^3\.\d+(?:\.\d+)?$/.test(marker)) return "v3";
   if (hasV3) return "v3";
   if (isDir(path.join(target, "docs", "planning"))) return "v1";
   return "no-pf";
@@ -256,7 +259,7 @@ function writeClaude(target, projectName, skipClaude, warnings) {
 
 function writeAgents(target) {
   const file = path.join(target, "AGENTS.md");
-  const section = `${PF4_BEGIN}\n# Planning Framework v4\n\nThis repository uses Planning Framework v4. Read \`PLANNING.md\` first, then use the local PF skills from \`.agents/skills\`.\n\n## Runtime rules\n\n- Codex may be the runtime/master agent for the PF workflow.\n- The runtime/master agent owns file edits and workflow state.\n- Reviewer agents are read-only and return findings to the runtime agent.\n- \`self\` means the current runtime, \`peer\` means the other installed agent, and \`both\` runs both reviews.\n- Codex uses its current session and available tools; no Bash helper is required.\n${PF4_END}`;
+  const section = `${PF4_BEGIN}\n# Planning Framework v4\n\nThis repository uses Planning Framework v4. Read \`PLANNING.md\` first, then use the local PF skills from \`.agents/skills\`.\n\n## Runtime rules\n\n- Codex may be the runtime/master agent for the PF workflow.\n- The runtime/master agent owns file edits and workflow state.\n- Reviewer agents are read-only and return findings to the runtime agent.\n- \`self\` means the current runtime, \`peer\` means the other installed agent, and \`both\` runs both reviews.\n- Codex uses its current session and available tools; no Bash helper is required.\n- In Codex, use request_user_input (or the current conversation) for questions, and use the current Codex session for any Agent/codex-companion delegation.\n- If TaskCreate, TaskGet, or TaskUpdate are unavailable, keep the task ledger in the implementation plan and update it only after rereading files.\n${PF4_END}`;
   const current = isFile(file) ? fs.readFileSync(file, "utf8") : "";
   const begin = current.indexOf(PF4_BEGIN);
   const end = current.indexOf(PF4_END);

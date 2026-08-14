@@ -73,7 +73,7 @@ incomplete v3/v4 one. Run it from the project directory:
 node ~/dev/planning-framework/scripts/pf-cli.mjs converge
 ```
 
-Or, from the framework repository: `make converge TARGET=/path/to/project`
+Or, from the framework repository: `node scripts/pf-cli.mjs converge --target /path/to/project --agents codex --yes`
 
 ## Updating skills
 

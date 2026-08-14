@@ -160,7 +160,7 @@ open/YYYYMMDD-type-slug/   →   closed/YYYYMMDD-type-slug/
 
 - One issue per session
 - One branch per issue
-- **Commit and push every completed unit of issue work** — per `~/.claude/skills/pf-git/SKILL.md` ("Stage commit & push"). The `pf-*` skills do this at the end of each stage; the rule applies equally to work done by hand, without a skill. Work that has not left this machine does not exist for the next session, the other machine, or `/pf`'s remote sync.
+- **Commit and push every completed unit of issue work** — per `<PF_SKILL_ROOT>/pf-git/SKILL.md` ("Stage commit & push"). `<PF_SKILL_ROOT>` is `~/.claude/skills` in Claude Code and `.agents/skills` in Codex.
 - Update `session-log.md` after every session
 - Check off tasks in `implementation_plan.md` as completed
 - Never close without QA passing and user confirmation

@@ -68,6 +68,16 @@ If role resolution yields no `roles:`/`profile:` at all for this issue (§4's le
 
 **This section is canonical.** It is the single place that defines how this framework talks to Codex and how Codex's findings get folded into pf's P0/P1/P2 priorities. `<PF_SKILL_ROOT>/pf-codereview/SKILL.md` uses this exact same chain and mapping for code review — it references this section by name rather than restating or redefining it. Do not duplicate this chain elsewhere; change it here only.
 
+**Codex runtime adapter (checked first).** When this skill is loaded from
+`.agents/skills` in a Codex session, the current Codex session is the Codex
+reviewer. Read TARGET and its predecessors, perform the review directly, and
+return the structured findings or the documented unstructured findings block.
+Do not check for `codex:setup`, call `Skill`, call `CLAUDE_PLUGIN_ROOT`, or run
+`codex-companion.mjs`; those are Claude-runtime integration paths. If a Codex
+sub-agent is available, it may be used, but it is not required. The current
+session remains the fallback and must never report "Codex unavailable" merely
+because a plugin is absent.
+
 Run this chain whenever the resolved reviewer for TARGET is an actor whose `agents.yml` entry has `invoke: codex-companion` (in this framework, `codex` — alone or as one side of a two-actor `by` list). The brief given to Codex is the same TARGET + predecessor list + tier-budget check + "group by P0/P1/P2" brief as the Claude review path above, adapted to whichever invocation form below actually ends up running.
 
 **Off-branch TARGET — no issue branch yet (AC-5.2).** Before step 1, check whether the issue branch `issue/[ISSUE-ID]` exists. If the issue branch does not exist — TARGET was authored on `develop` before it was created, exactly what happened during this very issue's own review of `brd.md` and `test_plan.md` — do not run this diff-based chain at all: a diff against a nonexistent branch reads as empty, and empty must never be read as clean here. Instead, switch to reviewing TARGET by its path directly (the Claude review path above already works this way — content on disk, no diff), running as `claude` for this artifact the same way chain step 5 below falls back when Codex is genuinely unavailable. No issue branch exists yet: state that reason in the report, not a silent empty-diff clean.

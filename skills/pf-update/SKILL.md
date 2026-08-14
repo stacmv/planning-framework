@@ -61,7 +61,7 @@ Updating the skills without touching `.pf-version` lets the marker drift silentl
 3. Compare:
    - **Match** — say so in one line and move on. Nothing to do.
    - **Mismatch or `.pf-version` missing entirely** — do **not** rewrite the file yourself: the marker is written by convergence, together with the layout and documents it stands for. Print a recommendation instead, naming both versions:
-     "This project's `.pf-version` says `<project-version>`, the framework is `<framework-version>`. Run convergence to bring the project up to date: `make converge` in the project, or `node <path-to-planning-framework>/scripts/pf-cli.mjs converge --target <project-path>`."
+     "This project's `.pf-version` says `<project-version>`, the framework is `<framework-version>`. Run convergence to bring the project up to date: `node <path-to-planning-framework>/scripts/pf-cli.mjs converge --target <project-path> --agents codex --yes`."
      (If `.pf-version` is absent, say "This project has no `.pf-version` marker" and give the same recommendation.)
 
 ## Step 4: Report

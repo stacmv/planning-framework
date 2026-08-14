@@ -2,7 +2,7 @@
 
 **⚠️ Important: This project uses Planning Framework v4.0**
 
-Planning Framework v4.0 uses **`PLANNING.md`** for all AI agents (Claude, Gemini, Qwen).
+Planning Framework v4.0 uses **`PLANNING.md`** for all AI agents (Claude Code, Codex, Gemini, Qwen).
 
 👉 **Read `PLANNING.md` for complete framework instructions.**
 
@@ -13,11 +13,11 @@ Planning Framework v4.0 uses **`PLANNING.md`** for all AI agents (Claude, Gemini
 **v2.0 → v4.0 Changes:**
 - Skills-based workflow via `/pf` and related commands
 - BRD → spec → test plan → implementation plan pipeline
-- `skills/` directory with 21 Claude Code skills
-- Single entry point: `make converge` (installs, migrates or tops up — from any starting state)
+- `skills/` directory with 21 PF skills for Claude Code and Codex
+- Single Node.js entry point: `node scripts/pf-cli.mjs converge` (installs, migrates or tops up — from any starting state)
 - See `PLANNING.md` for new workflow
 
-**For v2.0 projects:** Run `make converge TARGET=/path/to/project`.
+**For v2.0 projects:** Run `node scripts/pf-cli.mjs converge --target /path/to/project --agents codex --yes`.
 See **[MIGRATION-GUIDE-V3.md](docs/planning/MIGRATION-GUIDE-V3.md)**.
 
 ---
@@ -33,7 +33,7 @@ See **[MIGRATION-GUIDE-V3.md](docs/planning/MIGRATION-GUIDE-V3.md)**.
 **Key Files:**
 - `PLANNING.md` - Framework instructions (**READ THIS**)
 - `.qa-workflow.md` - QA requirements
-- `skills/` - 21 Claude Code skills (`/pf`, `/pf-help`, `/pf-brd`, `/pf-spec`, `/pf-check`, `/pf-test-plan`, `/pf-impl-plan`, `/pf-execute`, `/pf-codereview`, `/pf-test`, `/pf-manual-test`, `/pf-qa`, `/pf-qa-setup`, `/pf-close`, `/pf-autopilot`, `/pf-update`, `/pf-size-tiers`, `/pf-git`, `/pf-roles`, `/pf-user-docs`, `/pf-dev-docs`)
+- `skills/` - 21 PF skills for Claude Code and Codex (`/pf`, `/pf-help`, `/pf-brd`, `/pf-spec`, `/pf-check`, `/pf-test-plan`, `/pf-impl-plan`, `/pf-execute`, `/pf-codereview`, `/pf-test`, `/pf-manual-test`, `/pf-qa`, `/pf-qa-setup`, `/pf-close`, `/pf-autopilot`, `/pf-update`, `/pf-size-tiers`, `/pf-git`, `/pf-roles`, `/pf-user-docs`, `/pf-dev-docs`)
 - `docs/planning/implementation-plan.md` - Roadmap
 - `docs/planning/session-log.md` - Timeline
 - `docs/planning/decisions.md` - Architectural decisions
@@ -102,11 +102,11 @@ This file kept for backwards compatibility. New v4.0 projects use `PLANNING.md`.
 
 **To upgrade your v2.0 project:**
 ```bash
-make converge TARGET=/path/to/your-project
+node scripts/pf-cli.mjs converge --target /path/to/your-project --agents codex --yes
 ```
 
 `converge` is the only install/upgrade path — it handles a fresh project, v1, v2,
-a half-migrated one and an incomplete v3 one alike. See
+a half-migrated one and an incomplete v3/v4 one alike. See
 [MIGRATION-GUIDE-V3.md](docs/planning/MIGRATION-GUIDE-V3.md).
 
 ---

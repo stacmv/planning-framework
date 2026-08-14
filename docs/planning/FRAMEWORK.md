@@ -1,7 +1,7 @@
 # Planning Framework v4.0 - Complete Guide
 
-**Version:** 3.0.0
-**Last Updated:** 2026-06-24
+**Version:** 4.0.0
+**Last Updated:** 2026-08-14
 
 ---
 
@@ -46,14 +46,15 @@ Planning Framework v4.0 solves these problems through:
 - Global files stay minimal (roadmap only)
 - No merge conflicts (issue folders are branch-specific)
 
-**Skills-Based Workflow (Claude Code):**
+**Skills-Based Workflow (Claude Code and Codex):**
 - `/pf` shows active issue status and next step at session start
 - BRD → spec → test plan → implementation plan pipeline for feat/improve issues
 - Skills enforce prerequisites — each stage requires the prior one to exist
 - `/pf-check` verifies cross-document consistency at any point
 
 **Multi-Agent Support:**
-- Single `PLANNING.md` config works for Claude/Gemini/Qwen
+- Single `PLANNING.md` config works for Claude Code and Codex
+- Claude skills install globally; Codex skills install locally in `.agents/skills`
 - Agent names tracked in session logs
 - Consistent workflow across all agents
 
@@ -69,7 +70,7 @@ Planning Framework v4.0 solves these problems through:
 ✅ **Better Context** - Agent reads only relevant issue
 ✅ **Natural Archival** - Closed issues out of sight
 ✅ **Structured Pipeline** - Requirements before code
-✅ **Multi-Agent** - Works with Claude Code, Gemini CLI, Qwen Code
+✅ **Multi-Agent** - Works with Claude Code, Codex, Gemini CLI and Qwen Code
 
 ---
 
@@ -84,9 +85,9 @@ Planning Framework v4.0 solves these problems through:
 git clone https://github.com/[your-org]/planning-framework
 cd planning-framework
 
-# 2. Converge the project on v3 (installs framework + skills + the `pf` shim,
+# 2. Converge the project on v4 (installs framework + selected skills,
 #    migrates v1/v2 layouts, tops up whatever is missing — idempotent)
-make converge TARGET=/path/to/your-project
+node scripts/pf-cli.mjs converge --target /path/to/your-project --agents codex --yes
 
 # 3. Commit the framework
 cd /path/to/your-project
@@ -373,7 +374,7 @@ git commit -m "Close issue 20240127-feat-add-auth: Added JWT authentication"
 
 ## Skills
 
-21 Claude Code skills live in the `skills/` directory — one directory per skill, each holding a `SKILL.md`. They are installed into `~/.claude/skills/` by `converge-to-v3.sh` and refreshed by `update-skills.sh`.
+21 PF skills live in the `skills/` directory — one directory per skill, each holding a `SKILL.md`. They are installed into `~/.claude/skills/` for Claude Code or into `.agents/skills/` for Codex by `scripts/pf-cli.mjs`.
 
 | Skill | Command | What it does |
 |-------|---------|-------------|
@@ -474,7 +475,7 @@ project/
 ~/.claude/
 ├── bin/
 │   └── pf                               # Global shim → the onboarding TUI
-└── skills/                              # 17 skills — one directory per skill
+└── skills/                              # 21 skills — one directory per skill
     ├── pf/SKILL.md                      # /pf — status + next step
     ├── pf-help/SKILL.md                 # /pf-help — overview + quick start
     ├── pf-brd/SKILL.md                  # /pf-brd — create BRD
@@ -502,9 +503,10 @@ project/
 ```
 planning-framework/
 └── scripts/
-    ├── converge-to-v3.sh                # The single entry point: install / migrate / top up
-    ├── update-skills.sh                 # Propagate skill updates
-    └── issue-status.sh                  # Issue status across remote branches
+    ├── pf-cli.mjs                       # Dependency-free Node.js CLI
+    ├── converge-to-v4.mjs               # Converge wrapper
+    ├── update-skills.mjs                # Skill update wrapper
+    └── issue-status.mjs                 # Issue status wrapper
 ```
 
 ---
@@ -516,6 +518,8 @@ planning-framework/
 **Session Start Checklist:**
 
 **For Claude Code:** Run `/pf` — it reads active issue context and shows the current pipeline stage and next step automatically.
+
+**For Codex:** Read `PLANNING.md`, then use the local `pf` skill from `.agents/skills`. The current Codex session owns edits, reviews and commands; runtime-specific Claude plugin paths are not required.
 
 **For other agents:**
 

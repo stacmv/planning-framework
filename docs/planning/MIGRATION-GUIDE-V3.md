@@ -1,14 +1,14 @@
-# Migration Guide: → v3.0 (converge)
+# Migration Guide: v3 → v4.0 (converge)
 
-**Version:** 3.0.0
-**Applies to:** every project, whatever it starts from — no framework, v1.x, v2.0, a half-finished migration, or an incomplete v3 install.
+**Version:** 4.0.0
+**Applies to:** every project, whatever it starts from — no framework, v1.x, v2.0, a half-finished migration, or an incomplete v3/v4 install.
 
 ---
 
 ## One command
 
 ```bash
-make converge TARGET=/path/to/your-project
+node scripts/pf-cli.mjs converge --target /path/to/your-project --agents codex --yes
 ```
 
 or, from inside the project itself:
@@ -25,21 +25,21 @@ Prefer a menu? `make tui` (or the global `pf` command) walks you through the sam
 
 ## What "converged" means
 
-Converge does not ask *"which version are you on?"* It compares your project against the v3 **target state** and fills in whatever is missing:
+Converge does not ask *"which version are you on?"* It compares your project against the v4 **target state** and fills in whatever is missing:
 
 | # | Target |
 |---|--------|
 | T1 | `docs/issues/{open,closed}/` and `docs/planning/` exist |
 | T2 | `.pf-version` carries the framework version |
-| T3 | `PLANNING.md` is stamped **Framework Version:** 3.0 |
+| T3 | `PLANNING.md` is stamped **Framework Version:** 4.0 |
 | T4 | `CLAUDE.md` holds exactly one `<!-- pf:begin -->` / `<!-- pf:end -->` section |
 | T5 | `docs/planning/{implementation-plan,session-log,decisions}.md` exist |
 | T6 | `docs/planning/templates/` **mirrors** the framework's templates |
-| T7 | all 17 skills are installed in `~/.claude/skills/` |
+| T7 | all 21 skills are installed in the selected Claude or Codex location |
 | T8 | the `pf` shim exists at `~/.claude/bin/pf` |
 | T9 | no v1/v2 artifacts are left behind (whitelist only — see below) |
 | T10 | no hyphenated `implementation-plan.md` survives inside an issue |
-| T11 | the project detects as `v3` |
+| T11 | the project detects as `v4` |
 
 Re-running converge on an already-converged project is a no-op — not because the script special-cases it, but because there is nothing left to top up. It is **idempotent**: run it as often as you like.
 
@@ -54,10 +54,10 @@ Converge detects the starting state, prints it, and runs only the phases that st
 | State | What it is | What converge does |
 |-------|-----------|--------------------|
 | **no-pf** | No framework artifacts at all | Clean install: creates the layout, installs skills and the `pf` shim |
-| **v1** | v1.x layout: `docs/planning/` without `docs/issues/` | Tops up to the v3 layout. An old unmarked `# Planning Framework Integration` section in `CLAUDE.md` is **not** deleted (your text may follow it) — converge adds the `pf:begin/end` section and warns you to remove the old banner by hand |
+| **v1** | v1.x layout: `docs/planning/` without `docs/issues/` | Tops up to the v4 layout. An old unmarked `# Planning Framework Integration` section in `CLAUDE.md` is **not** deleted (your text may follow it) — converge adds the `pf:begin/end` section and warns you to remove the old banner by hand |
 | **v2** | A real v2 install: `planning/issues/`, `planning/{implementation-plan,session-log,decisions}.md`, `planning/templates/`, v2-stamped `PLANNING.md` | Backup → transfer → normalise → delete v2 artifacts → top up |
 | **mixed** | Half-migrated: `planning/issues/` and `docs/issues/` coexist | Same as v2, per file: whatever already landed in `docs/` is kept, the rest is carried over |
-| **v3 (incomplete)** | The v3 fingerprint is there, but `.pf-version`, `PLANNING.md`, the `CLAUDE.md` section or some skills are missing | Tops up only what is missing. **This state is why "already v3" is not an exit condition** |
+| **v3/v4 (incomplete)** | The v3/v4 fingerprint is there, but `.pf-version`, `PLANNING.md`, an agent section or some skills are missing | Tops up only what is missing. **This state is why "already v3" is not an exit condition** |
 
 ---
 
@@ -65,12 +65,12 @@ Converge detects the starting state, prints it, and runs only the phases that st
 
 **Open issues** are migrated in place and stay open:
 
-- `implementation-plan.md` → `implementation_plan.md` (the v3 name; T10).
+- `implementation-plan.md` → `implementation_plan.md` (the v4 name; T10).
 - `doc_language: Russian|English` is written into `prompt.md` front matter, decided by counting Cyrillic vs Latin letters in `prompt.md` + `analysis.md` (a tie is English). Force it with `--doc-language Russian|English`.
 - **No stub documents are minted.** A migrated issue simply has documents it does not have yet; the final report lists them per issue ("still owes: `test_plan.md`"), and `/pf` routes you to the first incomplete stage. Earlier versions wrote `TODO: Run /pf-…` placeholders and then refused to regenerate over them — that dead end is gone.
 - `size_tier` is deliberately **not** guessed. `/pf` asks you once.
 
-**Closed issues** are never rewritten. They only get a `brd.md` **pointer** — a few lines linking to the legacy `prompt.md` / `analysis.md` / `definition-of-done.md` that are already in the folder — so the v3 pipeline can read the archive without anyone editing it. A closed issue that already has a `brd.md` (or a trivial-tier `notes.md`) is left completely alone.
+**Closed issues** are never rewritten. They only get a `brd.md` **pointer** — a few lines linking to the legacy `prompt.md` / `analysis.md` / `definition-of-done.md` that are already in the folder — so the v4 pipeline can read the archive without anyone editing it. A closed issue that already has a `brd.md` (or a trivial-tier `notes.md`) is left completely alone.
 
 If the same issue ID exists in both `open/` and `closed/`, the transfer follows the destination that already exists — an issue is never resurrected into `open/`, and open work is never buried in `closed/`.
 
@@ -126,7 +126,7 @@ A dirty worktree is a **gate**, not a nuisance: converge moves and deletes files
 
 There is no `.qa-workflow.md` template, and converge never creates one. QA gates are project-specific — a generic checklist is worse than none, because it passes without checking anything.
 
-After converging, run this in Claude Code:
+After converging, run this in Claude Code or Codex:
 
 ```
 /pf-qa-setup
@@ -141,7 +141,7 @@ It writes a `.qa-workflow.md` fitted to the project (its real lint, test and bui
 1. Review the diff: `git status` / `git diff`.
 2. Commit the migration.
 3. Run `/pf-qa-setup` if you have no `.qa-workflow.md`.
-4. Run `/pf` in Claude Code — it names your active issue, its stage, and the next step.
+4. Run `/pf` in Claude Code or Codex — it names your active issue, its stage, and the next step.
 5. Delete `planning-backup-*/` once you are satisfied.
 
 ---
@@ -149,5 +149,5 @@ It writes a `.qa-workflow.md` fitted to the project (its real lint, test and bui
 ## See also
 
 - [QUICKSTART.md](QUICKSTART.md) — 5-minute getting started
-- [FRAMEWORK.md](FRAMEWORK.md) — complete v3.0 guide
+- [FRAMEWORK.md](FRAMEWORK.md) — complete v4.0 guide
 - [v1.0-archive/MIGRATION-GUIDE-v1-to-v2.md](v1.0-archive/MIGRATION-GUIDE-v1-to-v2.md) — the historical v1.0 → v2.0 guide (do not execute it; its scripts are gone)

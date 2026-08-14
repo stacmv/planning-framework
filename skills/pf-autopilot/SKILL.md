@@ -8,6 +8,16 @@ description: Drive one Planning Framework issue to /pf-close autonomously, survi
 
 Goal: the user launches this once — the issue then rides to closure on its own, surviving session limits ("You've hit your session limit") and connection drops ("API Error: Connection closed mid-response"), with no manual "continue" prompts.
 
+## Runtime adapter
+
+In Codex, use `request_user_input` when available (otherwise ask in the current
+conversation), and use the current Codex session for the work loop. `CronList`,
+`CronCreate`, and `CronDelete` are optional schedule integrations: if they are
+unavailable, report that no safety-net schedule was created, continue the current
+run, and record the resume command `/pf-autopilot continue <ISSUE-ID>` in the
+issue's `session-log.md`. Never claim that a schedule exists when the runtime did
+not create one.
+
 ## Step 0. Context — which issue is being driven
 
 Autopilot takes an optional issue ID: `/pf-autopilot [ISSUE-ID]`, and `/pf-autopilot continue <ISSUE-ID>` on a scheduled resume. **The ID, once resolved, is pinned for the whole run** — every later step targets that issue and no other.
@@ -24,14 +34,14 @@ Autopilot takes an optional issue ID: `/pf-autopilot [ISSUE-ID]`, and `/pf-autop
 
 ## Step 1. Safety-net schedule (before starting work, not after)
 
-1. Check via `CronList` whether a task named `pf-autopilot-<project-name>` already exists. **One autopilot per project, never two** — two autonomous sessions in one repository race each other for the working tree, the branch and the commits.
+1. If the runtime exposes `CronList`, check whether a task named `pf-autopilot-<project-name>` already exists. **One autopilot per project, never two** — two autonomous sessions in one repository race each other for the working tree, the branch and the commits. If the runtime does not expose schedule tools, apply the Runtime adapter above and continue without a schedule.
    - If a task exists **for the pinned issue** (its prompt names the same ID), this is a resume: keep it, do not recreate it.
    - If a task exists **for a different issue**, stop and say which issue is already being driven, offering the two ways out: let it finish, or `CronDelete pf-autopilot-<project>` and relaunch on this one. Do not silently retarget the existing schedule.
-2. If no task exists, create it via `CronCreate`:
+2. If no task exists and the runtime exposes `CronCreate`, create it:
    - name: `pf-autopilot-<project-name>` (the project, not the issue — that is what keeps the "one per project" rule enforceable);
    - interval: every 2 hours (or the interval the user named);
    - task prompt: `cd <absolute project path>; /pf-autopilot continue <ISSUE-ID>` — the resumed session re-enters this skill with the issue pinned, and Step 0 re-derives the actual current stage for **that** issue. The ID is not optional here: a resume that has to guess is the failure this argument exists to prevent.
-3. Tell the user in one line: which issue is pinned, what was scheduled, at what interval, and how to remove it manually (`CronDelete pf-autopilot-<project>`).
+3. Tell the user in one line which issue is pinned and either what was scheduled and how to remove it manually (`CronDelete pf-autopilot-<project>`), or that scheduling is unavailable and the resume command was recorded in `session-log.md`.
 
 The schedule is created **before** substantive work: its whole point is to survive an interruption that happens in the middle.
 
@@ -49,7 +59,7 @@ Repeat until the issue is closed:
 
 When `/pf-close` has successfully closed the **pinned** issue:
 
-1. Delete the schedule: `CronDelete pf-autopilot-<project>`. This step is mandatory — orphaned cron tasks wake sessions for nothing. Delete it even when other issues remain open: the schedule was pinned to the issue just closed, and autopilot never rolls on to a neighbouring issue by itself.
+1. If this run created a schedule, delete it with `CronDelete pf-autopilot-<project>`. This step is mandatory for a created schedule — orphaned cron tasks wake sessions for nothing. If scheduling was unavailable, report that there was no schedule to delete.
 2. Final report: the pinned issue ID, which stages were completed, which defaults were assumed on timeout, link to the closed issue.
 
 ## Limits

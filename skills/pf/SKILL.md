@@ -7,8 +7,9 @@ version: 4.0.0
 You are the Planning Framework v4.0 orchestrator. When invoked as `/pf`, perform the following steps exactly.
 
 `<PF_SKILL_ROOT>` means `~/.claude/skills` in Claude Code and `.agents/skills` in Codex. In Codex,
-use the current session and available tools for questions, file edits, reviews, and commands; do not
-expect a Bash-specific helper or a Claude-only tool name to exist.
+use `request_user_input` (or ask in the current conversation) for questions and the current session
+for file edits, reviews, and commands; optional sub-agents may be used when available. Do not call a
+Claude plugin path or require a Bash-specific helper.
 
 ## Step 1: Read installed version
 

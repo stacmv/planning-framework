@@ -25,6 +25,17 @@ by name instead): `<PF_SKILL_ROOT>/pf/SKILL.md`, `pf-brd`, `pf-spec`,
 `pf-test-plan`, `pf-impl-plan`, `pf-check`, `pf-codereview`, `pf-execute`,
 `pf-user-docs`, `pf-dev-docs`, `pf-qa`.
 
+## Runtime adapter conventions
+
+When the skills are loaded from `.agents/skills`, Codex is the runtime/master
+agent. In that mode, interpret `AskUserQuestion` as the Codex question tool
+(`request_user_input` when available, otherwise a question in the current
+conversation), interpret `Agent tool` as an optional Codex sub-agent, and
+interpret `Bash`/shell examples as commands to run with the runtime command
+tool. The current Codex session is the fallback for every write, review, and
+delegation step. Never require a Claude plugin path or `codex-companion.mjs`
+for the local Codex adapter.
+
 ---
 
 ## 1. `roles:` / `profile:` in `prompt.md`
@@ -367,63 +378,41 @@ snapshot.
 inline `analysis.md`/`notes.md` writing, and §6 above) references this section
 by name instead of restating the invocation form.
 
-For an actor with `invoke: codex-companion`, a **write** operation means:
+For an actor with `invoke: codex-companion`, the behavior depends on the
+runtime that loaded the skills:
 
-```
-node "${CLAUDE_PLUGIN_ROOT}/scripts/codex-companion.mjs" task "<prompt>" --write
-```
+- **Codex runtime** (the project has `.agents/skills` and Codex is the current
+  session): the current Codex session is the actor. Read the prompt and target
+  context, edit the target files directly, reread them, and return the short
+  completion summary. Do not call `CLAUDE_PLUGIN_ROOT`, `codex-companion.mjs`,
+  `Agent`, or a shell-specific wrapper. A Codex sub-agent may be used when the
+  runtime exposes one, but it is optional; the current session is the fallback.
+- **Claude runtime**: use the installed Codex plugin's companion script when it
+  is available:
+  ```
+  node "${CLAUDE_PLUGIN_ROOT}/scripts/codex-companion.mjs" task "<prompt>" --write
+  ```
+  If that plugin path is unavailable, stop with an actionable error rather than
+  silently changing the configured author to Claude.
 
-Same script, same `task ... --write` form that
-`codex-cli-runtime/SKILL.md` (the `codex` plugin) documents for
-`codex:codex-rescue` — but called directly via `Bash` from the consumer skill
-itself, **not** through `codex:codex-rescue`. That subagent is a pure forwarder
-for user-initiated rescue requests; it is not meant to be invoked
-programmatically from another skill. The consumer skill builds `<prompt>`
-itself (document content, task description, file path, context — shape depends
-on the caller, see each consumer's own section) and calls the script the same
-way `pf-check`'s "Codex invocation chain" already calls it for **review**.
+The consumer skill builds `<prompt>` itself (document content, task description,
+file path, and context). For Codex runtime, the prompt is an instruction to the
+current session; for Claude runtime, it is passed to the companion process.
 
 ### Availability check before writing
 
-**This availability check is the write-side counterpart to `pf-check`'s
-"Codex invocation chain" (review side).** Before issuing the `task ...
---write` call above, the calling skill checks Codex availability the same
-way that chain does — see `<PF_SKILL_ROOT>/pf-check/SKILL.md`, steps 1-2:
-plugin present (its `codex:setup`/`codex:rescue` skills appear in this
-session's available-skills listing) → run the `codex:setup` skill if the CLI
-itself isn't confirmed ready → proceed once `codex:setup` reports the CLI is
-installed and authenticated. If the plugin isn't installed at all, offer to
-install it via the same four commands `pf-check`'s chain step 3 documents —
-reference that step rather than repeating the command list here. Do not
-restate or fork this check; every consumer of this section reuses it as-is.
-
-**Where it diverges from the review-side chain: the final fallback.**
-`pf-check`'s chain step 5 lets Codex-unavailable silently fall back to Claude
-reviewing instead — acceptable there because findings are findings regardless
-of which engine produced them. Write delegation cannot do the same: if a
-stage's resolved `write` actor is `codex` and Codex is genuinely unavailable
-after the steps above (plugin install declined, or the CLI is not
-installed/not authenticated even after `codex:setup` offered to fix it),
-silently substituting Claude as author would silently violate the user's
-configured authorship — there is no raw-CLI write fallback equivalent to
-review's `codex exec` (write needs the plugin's `codex-companion.mjs`
-script; there is no unstructured raw-CLI write path). So the correct
-behavior here is a **stop, with a clear,
-actionable error** — never a silent fallback to Claude, and never an
-unhandled crash from a missing script path. The calling skill must surface
-something equivalent to:
+In Codex, availability is established by the current session and the local
+`.agents/skills` tree. Proceed directly and do not attempt Claude plugin setup.
+In Claude, check the Codex plugin/CLI before issuing the companion command. If
+the configured Codex writer is unavailable there, stop with:
 
 ```
-Configured write actor 'codex' is unavailable (Codex CLI not
-installed/authenticated). Either complete Codex setup, or change this
-stage's `write` to `claude` in `prompt.md`.
+Configured write actor 'codex' is unavailable. Either complete Codex setup, or
+change this stage's `write` to `claude` in `prompt.md`.
 ```
 
-— and then stop that skill's current operation there: no document or code
-gets written by a substitute actor. This applies identically to every
-consumer of this section (`pf-brd`, `pf-spec`, `pf-test-plan`, `pf-impl-plan`,
-`pf-execute`, `pf-user-docs`, `pf-dev-docs`) — each inherits this check by
-referencing this section rather than implementing its own copy.
+This rule applies identically to `pf-brd`, `pf-spec`, `pf-test-plan`,
+`pf-impl-plan`, `pf-execute`, `pf-user-docs`, and `pf-dev-docs`.
 
 ### Prompt shape for a from-scratch pipeline document
 
@@ -461,19 +450,17 @@ additions; this list is the shared shape they all build from, so a consumer
 does not need to restate it — a plain reference to "`pf-roles/SKILL.md` §7"
 is enough.
 
-**Write vs. review stay separate.** Codex's **review** invocation form
-(`codex-companion.mjs review --wait --scope ...`) is a different operation with
-its own canonical definition, already marked canonical in
-`<PF_SKILL_ROOT>/pf-check/SKILL.md`'s "Codex invocation chain" and already
-referenced from `<PF_SKILL_ROOT>/pf-codereview/SKILL.md`. This file does not
-copy or redefine that section — only references it by name. Do not merge the
-two; they use different subcommands (`review` vs. `task`) and different flags.
+**Write vs. review stay separate.** The review and write prompts remain
+different operations, but in Codex runtime both are performed by the current
+Codex session. The `codex-companion.mjs review`/`task` commands are only the
+Claude-runtime plugin implementation described by the adapter above.
 
 ### Synchronous vs. asynchronous write invocation
 
-A synchronous `task ... --write` call risks hitting the runtime command tool's timeout (2
-minutes by default in this environment, up to 10 minutes if explicitly raised)
-on a large generation. Choose based on expected output size:
+A synchronous external write call can risk a command-tool timeout on a large
+generation. In Codex runtime, prefer direct current-session work and reread the
+files after each logical unit. In Claude runtime choose the external invocation
+based on expected output size:
 
 - **Small/targeted edit** — fixing an existing file (§6's fix-forward step), a
   simple one-or-two-file implementation task — use the **synchronous** call as
@@ -484,12 +471,7 @@ on a large generation. Choose based on expected output size:
   ```
   node "${CLAUDE_PLUGIN_ROOT}/scripts/codex-companion.mjs" task "<prompt>" --write --background
   ```
-  then poll for completion via the script's existing `status`/`result`
-  subcommands (the same subcommands `codex-cli-runtime/SKILL.md` already lists
-  as existing on `codex-companion.mjs`, even though it forbids calling them
-  from inside `codex:codex-rescue` — here the consumer skill calls them
-  directly, the same `Bash` path, not through `codex:codex-rescue`). Do not
-  reinvent this polling mechanism — it already exists in the script.
+  then poll for completion via that script's `status`/`result` subcommands.
 
 This is a size-of-output judgment call, not a hard byte threshold: if the
 expected generation is a full pipeline document from nothing, or an

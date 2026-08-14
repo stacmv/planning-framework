@@ -19,7 +19,7 @@
 **BRD Pipeline** - feat/improve issues follow BRD → spec → test plan → implementation plan before any code
 **Pipeline Enforcement** - Skills refuse to run if prerequisites are missing, keeping documents consistent
 **`/pf-check`** - Verifies consistency across all pipeline documents at any point
-**One entry point** - `make converge` installs, migrates or tops up a project from *any* starting state
+**One entry point** - `node scripts/pf-cli.mjs converge` installs, migrates or tops up a project from *any* starting state
 **`scripts/pf-cli.mjs update-skills`** - Propagate skill updates to Claude or Codex installations
 
 ## Skills
@@ -51,7 +51,7 @@
 | `/pf-dev-docs` | Write developer-facing documentation (architecture, ADRs, runbook) for the active issue |
 
 ### Upgrading from v2.0?
-Run `make converge TARGET=/path/to/your-project`. See **[MIGRATION-GUIDE-V3.md](docs/planning/MIGRATION-GUIDE-V3.md)** for what it does to your issues, the backup, and `--dry-run`.
+Run `node scripts/pf-cli.mjs converge --target /path/to/your-project --agents codex --yes`. See **[MIGRATION-GUIDE-V3.md](docs/planning/MIGRATION-GUIDE-V3.md)** for what it does to your issues, the backup, and `--dry-run`.
 
 ---
 
@@ -95,6 +95,11 @@ The fastest way to get the framework — clones it, installs the global `pf` com
 curl -fsSL https://raw.githubusercontent.com/stacmv/planning-framework/develop-v4.0/scripts/install.mjs | node
 ```
 
+For a Codex project, install the local adapter directly:
+```sh
+curl -fsSL https://raw.githubusercontent.com/stacmv/planning-framework/develop-v4.0/scripts/install.mjs | node -- --agents codex --target /path/to/your-project
+```
+
 **Windows** (PowerShell, requires `git` and `node` on your `PATH`):
 ```powershell
 irm https://raw.githubusercontent.com/stacmv/planning-framework/main/scripts/install.ps1 | iex
@@ -112,7 +117,7 @@ git clone https://github.com/[your-org]/planning-framework
 cd planning-framework
 
 # 2. Converge your project on v4
-make converge TARGET=/path/to/your-project
+node scripts/pf-cli.mjs converge --target /path/to/your-project --agents codex --yes
 # Works whatever the project starts from: no framework, v1, v2,
 # half-migrated, or an incomplete v3 install. Idempotent.
 
@@ -258,9 +263,9 @@ irm https://raw.githubusercontent.com/stacmv/planning-framework/main/scripts/ins
 
 **Install / migrate / top up — one script:**
 ```bash
-make converge                       # Converge the current directory on v4
-make converge TARGET=<path>         # ...or a specific project
-make converge TARGET=<path> AGENTS=both                  # Install Claude and Codex adapters
+node scripts/pf-cli.mjs converge --agents codex --yes                  # Converge the current directory
+node scripts/pf-cli.mjs converge --target <path> --agents codex --yes   # ...or a specific project
+node scripts/pf-cli.mjs converge --target <path> --agents both --yes    # Install Claude and Codex adapters
 node scripts/pf-cli.mjs converge --dry-run --target <path> --agents both    # Show the plan, change nothing
 ```
 

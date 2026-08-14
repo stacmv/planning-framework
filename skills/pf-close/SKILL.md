@@ -197,13 +197,19 @@ Proceed to Phase 6.
 
 This phase produces `docs/issues/closed/ISSUE-ID/usage_report.md`, a best-effort record of which LLMs worked the issue and roughly how many tokens / dollars that took. Treat every number here as approximate — never invent a figure that isn't backed by real data.
 
+**Codex runtime adapter.** A Codex session has no Claude Code transcript to scan.
+Do not treat the absence of `~/.claude/projects/...` as an error and do not invoke
+the Claude-only `claude-api` skill. Use `usage.md` for any manually recorded Codex
+session data; when it is absent, report that Codex usage was not recorded rather
+than estimating it.
+
 1. **Find the issue's start time.** Run:
    ```
    git log --reverse --format=%aI -- docs/issues/open/ISSUE-ID | head -1
    ```
    This is START-TS — the issue lived under `docs/issues/open/ISSUE-ID` throughout its history (Phase 5's move to `closed/` is still uncommitted at this point, and the archive commit is not made until Phase 8, so the `closed/` path does not yet exist in git history). If it returns nothing, skip auto-computation (step 2) and go straight to step 3 with a note that the window could not be determined.
 
-2. **Auto-compute Claude usage from local transcripts.**
+2. **Auto-compute Claude usage from local transcripts when running in Claude Code.**
    - Transcript directory: `~/.claude/projects/<cwd-with-slashes-replaced-by-dashes>/` (e.g. `pwd` of `/home/stac/dev/planning-framework` → `-home-stac-dev-planning-framework`). If this directory doesn't exist, skip to step 3.
    - For every `*.jsonl` file in that directory, read each line as JSON, keep entries where `.type == "assistant"` and `.timestamp >= START-TS`, dedupe by `.message.id` (a single API response can appear more than once in the log), then group by `.message.model` and sum `.message.usage.input_tokens`, `.cache_creation_input_tokens`, `.cache_read_input_tokens`, and `.output_tokens`.
    - A small inline `jq` (or Node.js) script run via the runtime command tool is the right tool for this — don't try to do the aggregation by eye.
