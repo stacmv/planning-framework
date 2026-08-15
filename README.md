@@ -96,6 +96,29 @@ irm https://raw.githubusercontent.com/stacmv/planning-framework/main/scripts/ins
 
 Re-running the same command later updates an existing install in place (no prompts).
 
+### Uninstall PF3
+
+The uninstaller removes PF3's global skills, `pf` command, and its managed
+framework clone. It preserves unrelated Claude Code configuration and skills.
+
+**Linux / macOS**:
+```sh
+curl -fsSL https://raw.githubusercontent.com/stacmv/planning-framework/main/scripts/uninstall.sh | sh
+```
+
+**Windows** (PowerShell):
+```powershell
+irm https://raw.githubusercontent.com/stacmv/planning-framework/main/scripts/uninstall.ps1 | iex
+```
+
+Use `--yes` to skip the confirmation when running a checked-out script, for
+example: `sh scripts/uninstall.sh --yes` or `./scripts/uninstall.ps1 -Yes`.
+
+> PF3 and PF4 Claude Code skills use the same global `~/.claude/skills` names.
+> To switch their Claude installation, uninstall the current version before
+> installing the other. PF4's Codex skills are project-local and can coexist
+> with a PF3 Claude installation.
+
 > The installer pulls from the `main` (release) branch; `develop` is the active-development trunk. To install into a custom location instead, use the manual steps below, or explore the framework interactively with `make tui`.
 
 ### Manual Install / Upgrade — one command for every case

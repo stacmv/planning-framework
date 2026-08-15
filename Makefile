@@ -1,6 +1,6 @@
 PORT ?=
 
-.PHONY: help test test-migration test-ui update-skills issue-status converge tui
+.PHONY: help test test-migration test-ui install uninstall update-skills issue-status converge tui
 
 help:
 	@echo "Planning Framework - Commands"
@@ -9,6 +9,9 @@ help:
 	@echo "  make test-migration               Run the v2 -> v3 migration suite on demand (slow)"
 	@echo "  make test-ui                      Launch the Manual Test UI (see tools/manual-test-ui/README.md)"
 	@echo "  make test-ui PORT=4400            Launch it on a specific port"
+	@echo "  make install                       Install PF3 globally for Claude Code"
+	@echo "  make uninstall                     Remove the PF3 global install (asks first)"
+	@echo "  make uninstall YES=1               Remove PF3 non-interactively"
 	@echo "  make update-skills                Propagate skills/ to ~/.claude/skills/ for all consumer projects"
 	@echo "  make update-skills SOURCE=path    Propagate from a different source directory"
 	@echo "  make issue-status                 Check status of issues from remote branches"
@@ -85,6 +88,12 @@ test-ui:
 		exit 1; \
 	fi
 	node tools/manual-test-ui/server.js $(if $(PORT),--port $(PORT),)
+
+install:
+	sh scripts/install.sh
+
+uninstall:
+	sh scripts/uninstall.sh $(if $(YES),--yes,)
 
 update-skills:
 	bash scripts/update-skills.sh $(if $(SOURCE),--source $(SOURCE),)

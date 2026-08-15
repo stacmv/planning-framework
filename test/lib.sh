@@ -227,6 +227,21 @@ _pf_converge_exec() {
   HOME="$TMP_HOME" bash "${root}/scripts/converge-to-v3.sh" "$@"
 }
 
+# pf_run_uninstall [--yes]
+#
+# Runs the PF3 global uninstaller with the same isolated HOME discipline as
+# convergence tests. Keeping this assignment here prevents a suite from ever
+# pointing an installer-maintenance test at the developer's real account.
+pf_run_uninstall() {
+  local root="${1:-$REPO_ROOT}"
+  shift || true
+  if [ -z "${TMP_HOME:-}" ] || [ ! -d "${TMP_HOME:-/nonexistent}" ]; then
+    printf 'FATAL (S-1): TMP_HOME is not a temp dir — refusing to run with the real home dir.\n' >&2
+    return 2
+  fi
+  HOME="$TMP_HOME" sh "${root}/scripts/uninstall.sh" "$@"
+}
+
 _pf_has_target() {
   local a
   for a in "$@"; do
