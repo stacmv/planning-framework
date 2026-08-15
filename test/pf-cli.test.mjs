@@ -36,7 +36,7 @@ test("installer documents automatic Claude/Codex selection", () => {
   assert.match(result.stdout, /auto-detect Claude Code and Codex/);
 });
 
-test("fresh Codex convergence installs every discovered skill and AGENTS adapter", () => {
+test("fresh Codex convergence creates planning data without a project-local adapter", () => {
   const target = fs.mkdtempSync(path.join(os.tmpdir(), "pf-v4-fresh-"));
   try {
     fs.writeFileSync(path.join(target, "README.md"), "consumer\n");
@@ -44,38 +44,33 @@ test("fresh Codex convergence installs every discovered skill and AGENTS adapter
     assert.equal(result.status, 0, result.stderr || result.stdout);
     assert.equal(fs.readFileSync(path.join(target, ".pf-version"), "utf8").trim(), "4.0.0");
     assert.match(fs.readFileSync(path.join(target, "PLANNING.md"), "utf8"), /Framework Version:\*\* 4\.0/);
-    const agents = fs.readFileSync(path.join(target, "AGENTS.md"), "utf8");
-    assert.match(agents, /pf4:begin/);
-    assert.match(agents, /request_user_input/);
-    assert.match(agents, /current Codex session/);
+    assert.equal(fs.existsSync(path.join(target, "AGENTS.md")), false);
     assert.match(fs.readFileSync(path.join(target, "PLANNING.md"), "utf8"), /<PF_SKILL_ROOT>/);
-    const installed = fs.readdirSync(path.join(target, ".agents", "skills"), { withFileTypes: true })
-      .filter((entry) => entry.isDirectory() && fs.existsSync(path.join(target, ".agents", "skills", entry.name, "SKILL.md")));
-    assert.equal(installed.length, skills.length);
+    assert.equal(fs.existsSync(path.join(target, ".agents")), false);
     const second = run(target);
     assert.equal(second.status, 0, second.stderr || second.stdout);
     assert.match(second.stdout, /Detected state: v4/);
-    assert.equal(fs.readFileSync(path.join(target, "AGENTS.md"), "utf8").match(/pf4:begin/g).length, 1);
   } finally {
     fs.rmSync(target, { recursive: true, force: true });
   }
 });
 
-test("Codex uninstall removes PF integration but preserves planning data", () => {
+test("Codex lifecycle installs and removes global skills without touching a project", () => {
+  const home = fs.mkdtempSync(path.join(os.tmpdir(), "pf-v4-codex-home-"));
   const target = fs.mkdtempSync(path.join(os.tmpdir(), "pf-v4-uninstall-"));
   try {
     fs.writeFileSync(path.join(target, "README.md"), "consumer\n");
-    assert.equal(run(target).status, 0);
-    fs.writeFileSync(path.join(target, "AGENTS.md"), `# Local instructions\n\n${fs.readFileSync(path.join(target, "AGENTS.md"), "utf8")}`);
-    const result = uninstall(target);
+    const env = { ...process.env, HOME: home, USERPROFILE: home, CODEX_HOME: path.join(home, ".codex") };
+    const activated = spawnSync(process.execPath, [cli, "activate", "--agents", "codex"], { encoding: "utf8", env });
+    assert.equal(activated.status, 0, activated.stderr || activated.stdout);
+    const skillsRoot = path.join(home, ".codex", "skills");
+    assert.equal(fs.readdirSync(skillsRoot).length, skills.length);
+    const result = spawnSync(process.execPath, [cli, "uninstall", "--agents", "codex", "--yes"], { encoding: "utf8", env });
     assert.equal(result.status, 0, result.stderr || result.stdout);
-    assert.equal(fs.existsSync(path.join(target, ".agents")), false);
-    assert.equal(fs.existsSync(path.join(target, ".pf-version")), false);
-    assert.equal(fs.readFileSync(path.join(target, "AGENTS.md"), "utf8"), "# Local instructions\n");
-    assert.equal(fs.existsSync(path.join(target, "PLANNING.md")), true);
-    assert.equal(fs.existsSync(path.join(target, "docs", "planning")), true);
+    assert.equal(fs.existsSync(skillsRoot), false);
     assert.match(result.stdout, /kept PLANNING\.md, docs\/planning\/, and docs\/issues\//);
   } finally {
+    fs.rmSync(home, { recursive: true, force: true });
     fs.rmSync(target, { recursive: true, force: true });
   }
 });
@@ -104,18 +99,18 @@ test("activate and deactivate provide a safe Claude lifecycle", () => {
   }
 });
 
-test("deactivate removes the Codex adapter and keeps planning data", () => {
+test("deactivate removes global Codex skills", () => {
+  const home = fs.mkdtempSync(path.join(os.tmpdir(), "pf-v4-deactivate-home-"));
   const target = fs.mkdtempSync(path.join(os.tmpdir(), "pf-v4-deactivate-"));
   try {
-    fs.writeFileSync(path.join(target, "README.md"), "consumer\n");
-    const activated = lifecycle("activate", target, ["--agents", "codex", "--yes"]);
+    const env = { ...process.env, HOME: home, USERPROFILE: home, CODEX_HOME: path.join(home, ".codex") };
+    const activated = spawnSync(process.execPath, [cli, "activate", "--agents", "codex"], { encoding: "utf8", env });
     assert.equal(activated.status, 0, activated.stderr || activated.stdout);
-    const deactivated = lifecycle("deactivate", target, ["--agents", "codex", "--yes"]);
+    const deactivated = spawnSync(process.execPath, [cli, "deactivate", "--agents", "codex", "--yes"], { encoding: "utf8", env });
     assert.equal(deactivated.status, 0, deactivated.stderr || deactivated.stdout);
-    assert.equal(fs.existsSync(path.join(target, ".agents")), false);
-    assert.equal(fs.existsSync(path.join(target, "PLANNING.md")), true);
-    assert.equal(fs.existsSync(path.join(target, "docs", "planning")), true);
+    assert.equal(fs.existsSync(path.join(home, ".codex", "skills")), false);
   } finally {
+    fs.rmSync(home, { recursive: true, force: true });
     fs.rmSync(target, { recursive: true, force: true });
   }
 });
@@ -154,7 +149,7 @@ test("v2 convergence transfers documents, normalizes plan names and removes only
   }
 });
 
-test("Codex convergence stages the generated adapter in a git consumer project", () => {
+test("Codex convergence stages only planning files in a git consumer project", () => {
   const target = fs.mkdtempSync(path.join(os.tmpdir(), "pf-v4-git-"));
   try {
     fs.writeFileSync(path.join(target, "README.md"), "consumer\n");
@@ -166,8 +161,6 @@ test("Codex convergence stages the generated adapter in a git consumer project",
     const result = run(target);
     assert.equal(result.status, 0, result.stderr || result.stdout);
     const status = git(target, ["status", "--porcelain=v1"]).stdout;
-    assert.match(status, /A  \.agents\/skills\//);
-    assert.match(status, /A  AGENTS\.md/);
     assert.match(status, /A  \.pf-version/);
   } finally {
     fs.rmSync(target, { recursive: true, force: true });

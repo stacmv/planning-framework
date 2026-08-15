@@ -101,11 +101,10 @@ if (fs.existsSync(path.join(installDir, ".git"))) {
 }
 
 const cli = path.join(installDir, "scripts", "pf-cli.mjs");
-const command = agents === "claude" ? "update-skills" : "converge";
+const command = "activate";
 const args = [cli, command, "--agents", agents, "--source", installDir];
-if (command === "converge") args.push("--target", target, "--yes");
 const result = spawnSync(process.execPath, args, { stdio: "inherit" });
 if (result.status !== 0) process.exit(result.status ?? 1);
 console.log(`Installed Planning Framework at ${installDir}`);
-if (agents === "claude") console.log(`Run: ${path.join(os.homedir(), ".claude", "bin", process.platform === "win32" ? "pf.js" : "pf")}`);
-else console.log(`Codex skills: ${path.join(target, ".agents", "skills")}`);
+console.log(`Run: ${path.join(os.homedir(), ".claude", "bin", process.platform === "win32" ? "pf.js" : "pf")}`);
+if (agents === "codex" || agents === "both") console.log(`Codex skills: ${path.join(process.env.CODEX_HOME || path.join(os.homedir(), ".codex"), "skills")}`);

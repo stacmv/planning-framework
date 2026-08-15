@@ -114,38 +114,34 @@ For Codex, PF writes all 21 skills to `.agents/skills/` and adds its bounded sec
 
 ### Lifecycle Commands
 
-After cloning PF4, use the short lifecycle commands instead of reconstructing
-Node invocations:
+The installer creates one global `pf` command for Claude and Codex. Agent
+skills are global: Claude uses `~/.claude/skills`; Codex uses
+`$CODEX_HOME/skills` (normally `~/.codex/skills`). No project path is needed
+to activate, update, deactivate, or remove an agent:
 
 ```sh
-make install AGENTS=codex TARGET=/path/to/project       # download/update PF4 and activate Codex
-make activate AGENTS=claude                             # activate Claude globally
-make activate AGENTS=codex TARGET=/path/to/project YES=1
-make deactivate AGENTS=codex TARGET=/path/to/project YES=1
-make uninstall AGENTS=both TARGET=/path/to/project YES=1
-make uninstall AGENTS=both TARGET=/path/to/project YES=1 REMOVE_CORE=1
+pf activate --agents codex
+pf activate --agents claude
+pf update-skills --agents both
+pf deactivate --agents codex --yes
+pf uninstall --agents both --yes --remove-core
 ```
 
-`activate` enables only the selected adapter. `deactivate` removes only that
-adapter and keeps PF4 plus the project's planning documents. `uninstall` does
-the same and, with `REMOVE_CORE=1`, also removes the verified
-`~/.planning-framework` runtime cache.
-
-For an activated Claude installation, the global `pf` command accepts the
-same lifecycle subcommands, for example:
+`deactivate` removes only global PF skills. `uninstall --remove-core` also
+removes the verified `~/.planning-framework` runtime cache. Planning documents
+always belong to a project and are managed separately from its root:
 
 ```sh
-pf activate --agents claude
-pf deactivate --agents claude --yes
-pf uninstall --agents both --target /path/to/project --yes --remove-core
+cd /path/to/project
+pf converge --agents codex --yes
 ```
 
 ### Remove PF4
 
-This removes the Codex integration while preserving your planning documents and issues:
+This removes global Codex skills while preserving your planning documents and issues:
 
 ```powershell
-node scripts/pf-cli.mjs uninstall --target . --agents codex --yes
+pf uninstall --agents codex --yes
 ```
 
 Use `--agents claude` to remove only Claude's global skills, or `--agents both` to remove both integrations. Add `--remove-core` only when PF4 is no longer needed on the machine; it leaves planning documents and issues intact.

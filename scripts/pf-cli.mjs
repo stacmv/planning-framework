@@ -115,21 +115,19 @@ function parseArgs(argv) {
 }
 
 function usage(command = "converge") {
-  if (command === "activate") return `Usage: pf activate [--target <dir>] [--agents auto|both|claude|codex] [--yes]
+  if (command === "activate") return `Usage: pf activate [--agents auto|both|claude|codex]
 
 Enables PF4 for the selected agent. Claude installs global skills and the pf
-command. Codex (and both) safely converges the target project before installing
-its project-local adapter.`;
-  if (command === "deactivate") return `Usage: pf deactivate [--target <dir>] [--agents auto|both|claude|codex] [--yes]
+command. Codex installs global skills into $CODEX_HOME/skills.`;
+  if (command === "deactivate") return `Usage: pf deactivate [--agents auto|both|claude|codex] [--yes]
 
 Removes only the selected PF4 agent adapter. Planning documents and the PF4
 runtime cache are kept.`;
-  if (command === "update-skills") return `Usage: node scripts/pf-cli.mjs update-skills [--source <dir>] [--target <dir>] [--agents auto|both|claude|codex]`;
-  if (command === "uninstall") return `Usage: node scripts/pf-cli.mjs uninstall [--target <dir>] [--agents codex|claude|both] [--yes]
+  if (command === "update-skills") return `Usage: node scripts/pf-cli.mjs update-skills [--source <dir>] [--agents auto|both|claude|codex]`;
+  if (command === "uninstall") return `Usage: node scripts/pf-cli.mjs uninstall [--agents codex|claude|both] [--yes]
 
 Removes PF4 agent integrations while preserving planning documents and issues.
 
-  --target <dir>   Project whose Codex integration will be removed (default: current directory)
   --agents <mode>  codex (default), claude, or both
   --yes            Skip confirmation
   --remove-core    Also remove the verified ~/.planning-framework runtime cache`;
@@ -310,6 +308,14 @@ function installShim() {
   return file;
 }
 
+function codexHome() {
+  return path.resolve(process.env.CODEX_HOME || path.join(os.homedir(), ".codex"));
+}
+
+function codexSkillsDir() {
+  return path.join(codexHome(), "skills");
+}
+
 function pfSkillNames() {
   return fs.readdirSync(SKILLS_SRC, { withFileTypes: true })
     .filter((entry) => entry.isDirectory() && isFile(path.join(SKILLS_SRC, entry.name, "SKILL.md")))
@@ -436,11 +442,6 @@ function topUp(target, projectName, skipClaude, agents, warnings, report) {
     say(`  installed ${report.skills.length} skill(s) -> ${path.join(os.homedir(), ".claude", "skills")}`);
     say(`  installed pf shim -> ${installShim()}`);
   }
-  if (agents === "codex" || agents === "both") {
-    installSkills(SKILLS_SRC, path.join(target, ".agents", "skills"), report.codexSkills);
-    say(`  installed ${report.codexSkills.length} skill(s) -> .agents/skills`);
-    writeAgents(target);
-  }
 }
 
 function printReport(target, state, options, warnings, errors, report, backup, incomplete) {
@@ -550,19 +551,15 @@ function addClosedPointer(dir) {
 function updateSkills(options) {
   const source = path.resolve(options.source || ROOT); const agents = resolveAgents(options.agents); const report = [];
   if (agents === "claude" || agents === "both") installSkills(path.join(source, "skills"), path.join(os.homedir(), ".claude", "skills"), report);
-  if (agents === "codex" || agents === "both") { if (!options.target) fail("--target is required for --agents codex"); installSkills(path.join(source, "skills"), path.join(path.resolve(options.target), ".agents", "skills"), report); writeAgents(path.resolve(options.target)); }
-  if (agents !== "codex") installShim();
+  if (agents === "codex" || agents === "both") installSkills(path.join(source, "skills"), codexSkillsDir(), report);
+  installShim();
   say(`Updated ${report.length} skill(s) for ${agents}.`); return 0;
 }
 
 async function activate(options) {
   const agents = resolveAgents(options.agents);
-  if (agents === "claude") {
-    say("Activating PF4 for Claude...");
-    return updateSkills({ ...options, agents: "claude", source: options.source || ROOT });
-  }
   say(`Activating PF4 for ${agents}...`);
-  return converge({ ...options, agents });
+  return updateSkills({ ...options, agents, source: options.source || ROOT });
 }
 
 function managedCoreDir() {
@@ -584,7 +581,6 @@ function removeManagedCore(warnings) {
 }
 
 async function uninstall(options) {
-  const target = path.resolve(options.target);
   const agents = options.agents === "auto" ? "codex" : options.agents;
   if (!["claude", "codex", "both"].includes(agents)) fail(`invalid --agents '${agents}' - valid values: codex, claude, both`);
   if (!options.yes && !(await askConfirmation())) {
@@ -592,20 +588,9 @@ async function uninstall(options) {
     return 4;
   }
   const warnings = [];
-  const report = { codex: [], claude: [], shim: [], agentsSection: false, marker: false, core: false };
-  const gitOk = gitAvailable(target);
+  const report = { codex: [], claude: [], shim: [], core: false };
   if (agents === "codex" || agents === "both") {
-    const skillsRoot = path.join(target, ".agents", "skills");
-    removeInstalledSkills(skillsRoot, report.codex);
-    const agentsRoot = path.join(target, ".agents");
-    if (isDir(agentsRoot) && fs.readdirSync(agentsRoot).length === 0) fs.rmdirSync(agentsRoot);
-    report.agentsSection = removeAgentsSection(target, warnings);
-    const marker = path.join(target, ".pf-version");
-    if (isFile(marker) && /^4\.\d+(?:\.\d+)?\s*$/.test(fs.readFileSync(marker, "utf8"))) {
-      fs.unlinkSync(marker);
-      report.marker = true;
-    } else if (isFile(marker)) warnings.push(".pf-version is not a PF4 marker; it was left untouched");
-    stageUninstallFootprint(target, gitOk);
+    removeInstalledSkills(codexSkillsDir(), report.codex);
   }
   if (agents === "claude" || agents === "both") {
     removeInstalledSkills(path.join(os.homedir(), ".claude", "skills"), report.claude);
@@ -614,8 +599,6 @@ async function uninstall(options) {
   if (options.removeCore) report.core = removeManagedCore(warnings);
   say("PF4 uninstall complete.");
   if (report.codex.length) say(`  removed Codex skills: ${report.codex.length}`);
-  if (report.agentsSection) say("  removed AGENTS.md PF4 section");
-  if (report.marker) say("  removed .pf-version");
   if (report.claude.length) say(`  removed Claude skills: ${report.claude.length}`);
   if (report.shim.length) say(`  removed Claude shim: ${report.shim.join(", ")}`);
   if (report.core) say(`  removed PF4 runtime cache: ${managedCoreDir()}`);
