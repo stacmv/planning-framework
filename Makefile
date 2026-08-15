@@ -1,17 +1,21 @@
 PORT ?=
 AGENTS ?= auto
-UNINSTALL_AGENTS ?= codex
+TARGET ?= .
 
-.PHONY: help test test-ui update-skills uninstall issue-status converge tui
+.PHONY: help test test-ui install activate deactivate uninstall update-skills issue-status converge tui
 
 help:
 	@echo "Planning Framework - Commands"
 	@echo ""
 	@echo "  make test                         Run the Node.js test suite"
 	@echo "  make test-ui PORT=4400            Launch the Manual Test UI"
-	@echo "  make update-skills                Install skills for Claude"
-	@echo "  make update-skills AGENTS=codex TARGET=path  Install skills for Codex"
-	@echo "  make uninstall TARGET=path        Remove PF4 Codex integration"
+	@echo "  make install AGENTS=codex TARGET=path  Download/update PF4 and activate Codex"
+	@echo "  make activate AGENTS=claude       Activate Claude from this PF4 checkout"
+	@echo "  make activate AGENTS=codex TARGET=path  Activate Codex for a project"
+	@echo "  make deactivate AGENTS=codex TARGET=path  Remove an adapter; keep PF and planning docs"
+	@echo "  make uninstall AGENTS=both TARGET=path YES=1  Remove adapters without prompts"
+	@echo "  make uninstall AGENTS=both TARGET=path YES=1 REMOVE_CORE=1  Also remove the PF4 runtime cache"
+	@echo "  make update-skills AGENTS=codex TARGET=path  Update already active skills"
 	@echo "  make issue-status ID=...          Check status of an issue branch"
 	@echo "  make converge                     Install, migrate or top up to v4"
 	@echo "  make converge TARGET=<path>       Converge a specific project"
@@ -24,17 +28,26 @@ test:
 test-ui:
 	node tools/manual-test-ui/server.js $(if $(PORT),--port $(PORT),)
 
+install:
+	node scripts/install.mjs --agents $(AGENTS) --target $(TARGET)
+
+activate:
+	node scripts/pf-cli.mjs activate --agents $(AGENTS) --target $(TARGET) $(if $(YES),--yes,)
+
+deactivate:
+	node scripts/pf-cli.mjs deactivate --agents $(AGENTS) --target $(TARGET) $(if $(YES),--yes,)
+
 update-skills:
-	node scripts/pf-cli.mjs update-skills $(if $(SOURCE),--source $(SOURCE),) $(if $(TARGET),--target $(TARGET),) --agents $(AGENTS)
+	node scripts/pf-cli.mjs update-skills $(if $(SOURCE),--source $(SOURCE),) --target $(TARGET) --agents $(AGENTS)
 
 uninstall:
-	node scripts/pf-cli.mjs uninstall $(if $(TARGET),--target $(TARGET),) --agents $(UNINSTALL_AGENTS) $(if $(YES),--yes,)
+	node scripts/pf-cli.mjs uninstall --target $(TARGET) --agents $(AGENTS) $(if $(YES),--yes,) $(if $(REMOVE_CORE),--remove-core,)
 
 issue-status:
 	node scripts/pf-cli.mjs issue-status $(ID) $(if $(TARGET),--target $(TARGET),)
 
 converge:
-	node scripts/pf-cli.mjs converge $(if $(TARGET),--target $(TARGET),) --agents $(AGENTS) $(if $(YES),--yes,)
+	node scripts/pf-cli.mjs converge --target $(TARGET) --agents $(AGENTS) $(if $(YES),--yes,)
 
 tui:
-	node tools/onboarding-tui/cli.js $(if $(TARGET),--target $(TARGET),)
+	node tools/onboarding-tui/cli.js --target $(TARGET)

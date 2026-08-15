@@ -85,7 +85,7 @@ function renderTemplate(file, projectName) {
 }
 
 function parseArgs(argv) {
-  const options = { target: process.cwd(), agents: "auto", yes: false, dryRun: false, force: false, source: null, failAfter: null };
+  const options = { target: process.cwd(), agents: "auto", yes: false, dryRun: false, force: false, source: null, failAfter: null, removeCore: false };
   const positionals = [];
   for (let i = 0; i < argv.length; i += 1) {
     const arg = argv[i];
@@ -99,6 +99,7 @@ function parseArgs(argv) {
     else if (arg === "--source" || arg.startsWith("--source=")) options.source = value("--source");
     else if (arg === "--doc-language" || arg.startsWith("--doc-language=")) options.docLanguage = value("--doc-language");
     else if (arg === "--yes" || arg === "-y") options.yes = true;
+    else if (arg === "--remove-core") options.removeCore = true;
     else if (arg === "--dry-run") options.dryRun = true;
     else if (arg === "--force") options.force = true;
     else if (arg.startsWith("--fail-after=")) {
@@ -114,6 +115,15 @@ function parseArgs(argv) {
 }
 
 function usage(command = "converge") {
+  if (command === "activate") return `Usage: pf activate [--target <dir>] [--agents auto|both|claude|codex] [--yes]
+
+Enables PF4 for the selected agent. Claude installs global skills and the pf
+command. Codex (and both) safely converges the target project before installing
+its project-local adapter.`;
+  if (command === "deactivate") return `Usage: pf deactivate [--target <dir>] [--agents auto|both|claude|codex] [--yes]
+
+Removes only the selected PF4 agent adapter. Planning documents and the PF4
+runtime cache are kept.`;
   if (command === "update-skills") return `Usage: node scripts/pf-cli.mjs update-skills [--source <dir>] [--target <dir>] [--agents auto|both|claude|codex]`;
   if (command === "uninstall") return `Usage: node scripts/pf-cli.mjs uninstall [--target <dir>] [--agents codex|claude|both] [--yes]
 
@@ -121,7 +131,8 @@ Removes PF4 agent integrations while preserving planning documents and issues.
 
   --target <dir>   Project whose Codex integration will be removed (default: current directory)
   --agents <mode>  codex (default), claude, or both
-  --yes            Skip confirmation`;
+  --yes            Skip confirmation
+  --remove-core    Also remove the verified ~/.planning-framework runtime cache`;
   if (command === "issue-status") return `Usage: node scripts/pf-cli.mjs issue-status <issue-id> [--target <dir>]`;
   return `Usage: node scripts/pf-cli.mjs converge [options]
 
@@ -291,8 +302,8 @@ function installSkills(sourceRoot, destinationRoot, report) {
 function installShim() {
   const bin = path.join(os.homedir(), ".claude", "bin");
   fs.mkdirSync(bin, { recursive: true });
-  const cli = path.join(ROOT, "tools", "onboarding-tui", "cli.js");
-  const shim = `#!/usr/bin/env node\nrequire(${JSON.stringify(cli)});\n`;
+  const launcher = path.join(ROOT, "scripts", "pf.mjs");
+  const shim = `#!/usr/bin/env node\nconst { spawnSync } = require("node:child_process");\nconst result = spawnSync(process.execPath, [${JSON.stringify(launcher)}, ...process.argv.slice(2)], { stdio: "inherit" });\nprocess.exit(result.status ?? 1);\n`;
   const file = path.join(bin, process.platform === "win32" ? "pf.js" : "pf");
   fs.writeFileSync(file, shim, { mode: 0o755 });
   if (process.platform === "win32") fs.writeFileSync(path.join(bin, "pf.cmd"), `@node "${file}" %*\r\n`);
@@ -335,9 +346,12 @@ function removeAgentsSection(target, warnings) {
 function removeShim(report) {
   const bin = path.join(os.homedir(), ".claude", "bin");
   const shim = path.join(bin, process.platform === "win32" ? "pf.js" : "pf");
-  if (isFile(shim) && /onboarding-tui[\\/]cli\.js/.test(fs.readFileSync(shim, "utf8"))) {
-    fs.unlinkSync(shim);
-    report.push(relative(os.homedir(), shim));
+  if (isFile(shim)) {
+    const content = fs.readFileSync(shim, "utf8");
+    if (/onboarding-tui[\\/]cli\.js/.test(content) || (content.includes("spawnSync(process.execPath") && content.includes("pf.mjs"))) {
+      fs.unlinkSync(shim);
+      report.push(relative(os.homedir(), shim));
+    }
   }
   const cmd = path.join(bin, "pf.cmd");
   if (isFile(cmd) && /pf\.js/.test(fs.readFileSync(cmd, "utf8"))) {
@@ -541,6 +555,34 @@ function updateSkills(options) {
   say(`Updated ${report.length} skill(s) for ${agents}.`); return 0;
 }
 
+async function activate(options) {
+  const agents = resolveAgents(options.agents);
+  if (agents === "claude") {
+    say("Activating PF4 for Claude...");
+    return updateSkills({ ...options, agents: "claude", source: options.source || ROOT });
+  }
+  say(`Activating PF4 for ${agents}...`);
+  return converge({ ...options, agents });
+}
+
+function managedCoreDir() {
+  return path.join(os.homedir(), ".planning-framework");
+}
+
+function removeManagedCore(warnings) {
+  const core = managedCoreDir();
+  const config = path.join(core, ".git", "config");
+  const officialOrigin = "https://github.com/stacmv/planning-framework.git";
+  if (!isFile(config) || !fs.readFileSync(config, "utf8").includes(officialOrigin)) {
+    warnings.push(`preserved ${core}: it is not a verified PF4 runtime cache`);
+    return false;
+  }
+  const cwd = path.resolve(process.cwd());
+  if (cwd === core || cwd.startsWith(`${core}${path.sep}`)) process.chdir(os.homedir());
+  removePath(core);
+  return true;
+}
+
 async function uninstall(options) {
   const target = path.resolve(options.target);
   const agents = options.agents === "auto" ? "codex" : options.agents;
@@ -550,7 +592,7 @@ async function uninstall(options) {
     return 4;
   }
   const warnings = [];
-  const report = { codex: [], claude: [], shim: [], agentsSection: false, marker: false };
+  const report = { codex: [], claude: [], shim: [], agentsSection: false, marker: false, core: false };
   const gitOk = gitAvailable(target);
   if (agents === "codex" || agents === "both") {
     const skillsRoot = path.join(target, ".agents", "skills");
@@ -569,15 +611,23 @@ async function uninstall(options) {
     removeInstalledSkills(path.join(os.homedir(), ".claude", "skills"), report.claude);
     removeShim(report.shim);
   }
+  if (options.removeCore) report.core = removeManagedCore(warnings);
   say("PF4 uninstall complete.");
   if (report.codex.length) say(`  removed Codex skills: ${report.codex.length}`);
   if (report.agentsSection) say("  removed AGENTS.md PF4 section");
   if (report.marker) say("  removed .pf-version");
   if (report.claude.length) say(`  removed Claude skills: ${report.claude.length}`);
   if (report.shim.length) say(`  removed Claude shim: ${report.shim.join(", ")}`);
+  if (report.core) say(`  removed PF4 runtime cache: ${managedCoreDir()}`);
   if (warnings.length) warnings.forEach((warning) => say(`  warning: ${warning}`));
   say("  kept PLANNING.md, docs/planning/, and docs/issues/");
   return 0;
+}
+
+async function deactivate(options) {
+  const agents = resolveAgents(options.agents);
+  say(`Deactivating PF4 for ${agents}...`);
+  return uninstall({ ...options, agents, removeCore: false });
 }
 
 function issueStatus(options) {
@@ -595,7 +645,7 @@ async function main() {
   const command = raw[0] && !raw[0].startsWith("-") ? raw.shift() : "converge";
   const options = parseArgs(raw);
   if (options.help) { say(usage(command)); return; }
-  try { const code = command === "converge" ? await converge(options) : command === "update-skills" ? updateSkills(options) : command === "uninstall" ? await uninstall(options) : command === "issue-status" ? issueStatus(options) : fail(`unknown command: ${command}`); process.exitCode = code; }
+  try { const code = command === "converge" ? await converge(options) : command === "activate" ? await activate(options) : command === "deactivate" ? await deactivate(options) : command === "update-skills" ? updateSkills(options) : command === "uninstall" ? await uninstall(options) : command === "issue-status" ? issueStatus(options) : fail(`unknown command: ${command}`); process.exitCode = code; }
   catch (error) { if (error.code) process.exitCode = error.code; else if (process.exitCode === undefined || process.exitCode === 0) process.exitCode = 1; }
 }
 

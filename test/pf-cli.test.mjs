@@ -20,6 +20,11 @@ function uninstall(target, args = []) {
   return spawnSync(process.execPath, [cli, "uninstall", "--target", target, "--agents", "codex", "--yes", ...args], { encoding: "utf8" });
 }
 
+function lifecycle(command, target, args = [], home) {
+  const env = home ? { ...process.env, HOME: home, USERPROFILE: home } : process.env;
+  return spawnSync(process.execPath, [cli, command, "--target", target, ...args], { encoding: "utf8", env });
+}
+
 function git(target, args) {
   return spawnSync("git", ["-C", target, ...args], { encoding: "utf8" });
 }
@@ -71,6 +76,63 @@ test("Codex uninstall removes PF integration but preserves planning data", () =>
     assert.equal(fs.existsSync(path.join(target, "docs", "planning")), true);
     assert.match(result.stdout, /kept PLANNING\.md, docs\/planning\/, and docs\/issues\//);
   } finally {
+    fs.rmSync(target, { recursive: true, force: true });
+  }
+});
+
+test("activate and deactivate provide a safe Claude lifecycle", () => {
+  const home = fs.mkdtempSync(path.join(os.tmpdir(), "pf-v4-claude-home-"));
+  const target = fs.mkdtempSync(path.join(os.tmpdir(), "pf-v4-claude-target-"));
+  try {
+    const activated = lifecycle("activate", target, ["--agents", "claude", "--yes"], home);
+    assert.equal(activated.status, 0, activated.stderr || activated.stdout);
+    const skillsRoot = path.join(home, ".claude", "skills");
+    assert.equal(fs.readdirSync(skillsRoot).filter((name) => fs.existsSync(path.join(skillsRoot, name, "SKILL.md"))).length, skills.length);
+    const shim = path.join(home, ".claude", "bin", process.platform === "win32" ? "pf.js" : "pf");
+    assert.equal(fs.existsSync(shim), true);
+    assert.match(fs.readFileSync(shim, "utf8"), /pf\.mjs/);
+
+    const deactivated = spawnSync(process.execPath, [shim, "deactivate", "--target", target, "--agents", "claude", "--yes"], {
+      encoding: "utf8", env: { ...process.env, HOME: home, USERPROFILE: home }
+    });
+    assert.equal(deactivated.status, 0, deactivated.stderr || deactivated.stdout);
+    assert.equal(fs.existsSync(skillsRoot), false);
+    assert.equal(fs.existsSync(shim), false);
+  } finally {
+    fs.rmSync(home, { recursive: true, force: true });
+    fs.rmSync(target, { recursive: true, force: true });
+  }
+});
+
+test("deactivate removes the Codex adapter and keeps planning data", () => {
+  const target = fs.mkdtempSync(path.join(os.tmpdir(), "pf-v4-deactivate-"));
+  try {
+    fs.writeFileSync(path.join(target, "README.md"), "consumer\n");
+    const activated = lifecycle("activate", target, ["--agents", "codex", "--yes"]);
+    assert.equal(activated.status, 0, activated.stderr || activated.stdout);
+    const deactivated = lifecycle("deactivate", target, ["--agents", "codex", "--yes"]);
+    assert.equal(deactivated.status, 0, deactivated.stderr || deactivated.stdout);
+    assert.equal(fs.existsSync(path.join(target, ".agents")), false);
+    assert.equal(fs.existsSync(path.join(target, "PLANNING.md")), true);
+    assert.equal(fs.existsSync(path.join(target, "docs", "planning")), true);
+  } finally {
+    fs.rmSync(target, { recursive: true, force: true });
+  }
+});
+
+test("uninstall --remove-core only deletes a verified PF4 runtime cache", () => {
+  const home = fs.mkdtempSync(path.join(os.tmpdir(), "pf-v4-core-home-"));
+  const target = fs.mkdtempSync(path.join(os.tmpdir(), "pf-v4-core-target-"));
+  const core = path.join(home, ".planning-framework");
+  try {
+    fs.mkdirSync(path.join(core, ".git"), { recursive: true });
+    fs.writeFileSync(path.join(core, ".git", "config"), '[remote "origin"]\n\turl = https://github.com/stacmv/planning-framework.git\n');
+    const result = lifecycle("uninstall", target, ["--agents", "claude", "--yes", "--remove-core"], home);
+    assert.equal(result.status, 0, result.stderr || result.stdout);
+    assert.equal(fs.existsSync(core), false);
+    assert.match(result.stdout, /removed PF4 runtime cache/);
+  } finally {
+    fs.rmSync(home, { recursive: true, force: true });
     fs.rmSync(target, { recursive: true, force: true });
   }
 });

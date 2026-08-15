@@ -112,7 +112,35 @@ irm https://raw.githubusercontent.com/stacmv/planning-framework/develop-v4.0/scr
 
 For Codex, PF writes all 21 skills to `.agents/skills/` and adds its bounded section to `AGENTS.md`. Start a new Codex session in the project and run `/pf`. Re-run the same command to update PF4.
 
-### Uninstall PF4
+### Lifecycle Commands
+
+After cloning PF4, use the short lifecycle commands instead of reconstructing
+Node invocations:
+
+```sh
+make install AGENTS=codex TARGET=/path/to/project       # download/update PF4 and activate Codex
+make activate AGENTS=claude                             # activate Claude globally
+make activate AGENTS=codex TARGET=/path/to/project YES=1
+make deactivate AGENTS=codex TARGET=/path/to/project YES=1
+make uninstall AGENTS=both TARGET=/path/to/project YES=1
+make uninstall AGENTS=both TARGET=/path/to/project YES=1 REMOVE_CORE=1
+```
+
+`activate` enables only the selected adapter. `deactivate` removes only that
+adapter and keeps PF4 plus the project's planning documents. `uninstall` does
+the same and, with `REMOVE_CORE=1`, also removes the verified
+`~/.planning-framework` runtime cache.
+
+For an activated Claude installation, the global `pf` command accepts the
+same lifecycle subcommands, for example:
+
+```sh
+pf activate --agents claude
+pf deactivate --agents claude --yes
+pf uninstall --agents both --target /path/to/project --yes --remove-core
+```
+
+### Remove PF4
 
 This removes the Codex integration while preserving your planning documents and issues:
 
@@ -120,7 +148,7 @@ This removes the Codex integration while preserving your planning documents and 
 node scripts/pf-cli.mjs uninstall --target . --agents codex --yes
 ```
 
-Use `--agents claude` to remove only Claude's global skills, or `--agents both` to remove both integrations.
+Use `--agents claude` to remove only Claude's global skills, or `--agents both` to remove both integrations. Add `--remove-core` only when PF4 is no longer needed on the machine; it leaves planning documents and issues intact.
 
 The equivalent wrapper is `node scripts/uninstall.mjs --target . --agents codex --yes`.
 
