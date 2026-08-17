@@ -913,7 +913,15 @@ function renderPrepareResult(result, res) {
 // `prepareActionState()`'s verdict (server.js) — this function renders that
 // verdict, it never re-derives it, so the button can never offer what the
 // route would refuse.
-function buildPrepareActionNode(item, runtime) {
+//
+// `tcId`, when given, scopes this to a single case (server.js's
+// `tc.prepare`, one entry per test case — same verdict shape, same
+// `/prepare` endpoint, distinguished only by the `tcId` field in the POST
+// body). Pre-redesign `app.js` (line 933) had a per-case button alongside
+// the whole-issue one; the redesign initially restored only the latter —
+// this parameter is what closes that gap. Omit it for the whole-issue
+// action, exactly as before.
+function buildPrepareActionNode(item, runtime, tcId) {
   // Not offered at all (e.g. a closed issue, or a checklist that declares no
   // data needed) — no body, matching the pre-redesign app.js's `openAction`
   // (`if (!item.offered) return;`, nothing appended past the shared header).
@@ -923,7 +931,8 @@ function buildPrepareActionNode(item, runtime) {
 
   const wrap = h("div", "stack");
   const actions = h("div", "action-row");
-  const btn = h("button", "btn", "Prepare test data for the whole issue");
+  const label = tcId ? `Prepare test data for ${tcId}` : "Prepare test data for the whole issue";
+  const btn = h("button", tcId ? "btn subtle" : "btn", label);
   btn.type = "button";
   btn.disabled = !item.enabled;
   actions.appendChild(btn);
@@ -935,11 +944,14 @@ function buildPrepareActionNode(item, runtime) {
 
   btn.addEventListener("click", async () => {
     const confirmFn = runtime.confirmImpl || defaultConfirm;
-    const ok = confirmFn(
-      `Prepare test data for every case of ${runtime.issueId} in ${runtime.project}?\n\n` +
+    const confirmMessage = tcId
+      ? `Prepare test data for ${tcId} of ${runtime.issueId} in ${runtime.project}?\n\n` +
+        `This runs the issue's own setup script and rebuilds this case's working copy from ` +
+        `scratch, outside the repository. Anything already in that working copy is replaced.`
+      : `Prepare test data for every case of ${runtime.issueId} in ${runtime.project}?\n\n` +
         `This runs the issue's own setup script and rebuilds its working copy from scratch, ` +
-        `outside the repository. Anything already in that working copy is replaced.`
-    );
+        `outside the repository. Anything already in that working copy is replaced.`;
+    const ok = confirmFn(confirmMessage);
     if (!ok) return;
 
     const originalLabel = btn.textContent;
@@ -960,7 +972,8 @@ function buildPrepareActionNode(item, runtime) {
     // `buildChecklistWriteHandlers`, `buildHumanTasksHandlers`) is careful
     // never to do.
     try {
-      const res = await postJsonRaw(item.endpoint, { confirm: true }, runtime.fetchImpl);
+      const body = tcId ? { confirm: true, tcId } : { confirm: true };
+      const res = await postJsonRaw(item.endpoint, body, runtime.fetchImpl);
       renderPrepareResult(result, res);
     } catch (err) {
       result.innerHTML = "";
@@ -1212,6 +1225,14 @@ function renderChecklistBody(container, parsedChecklist, runtime) {
     const infoWrap = h("div", "tc-info-wrap");
     infoWrap.innerHTML = renderTcPanelHtml(tc);
     tcWrap.appendChild(infoWrap);
+
+    // Per-case prepare button (CR-006 follow-up) — server.js already sends
+    // `tc.prepare`, the same verdict shape as the whole-issue action, one
+    // per test case; this is the client side finally reading it.
+    if (tc.prepare) {
+      const prepareNode = buildPrepareActionNode(tc.prepare, runtime, tc.id);
+      if (prepareNode) tcWrap.appendChild(prepareNode);
+    }
 
     const stepsTable = buildStepsTableNode(tc, handlers);
     if (stepsTable) tcWrap.appendChild(stepsTable);

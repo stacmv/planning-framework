@@ -853,6 +853,15 @@ Criteria этого раздела)
 **Acceptance Criteria:**
 - [x] TC-031 passes (шаг 4 — checkout по подтверждению снова доступен из UI)
 
+**Addendum (найдено при `/pf-user-docs`, не в исходном скоупе TC-031):** старый
+`app.js` (строка 933) рендерил кнопку `Prepare test data for ${tc.id}` для
+каждого TC отдельно, в дополнение к кнопке на уровне всей issue — эта задача
+восстановила только последнюю. Серверный `tc.prepare` уже существовал
+(`server.js`, идентичная форма `parsed.prepare`), клиент его просто не читал.
+Дописано: `buildPrepareActionNode` принимает опциональный `tcId`,
+`renderChecklistBody` вызывает его на каждый TC. 4 новых теста в
+`workspace-ui.test.js`.
+
 ---
 
 ### Dependencies section

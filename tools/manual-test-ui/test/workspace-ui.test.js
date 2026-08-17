@@ -1983,3 +1983,144 @@ test("defaultConfirm: declines when no real window.confirm is reachable (safe de
 
   assert.strictEqual(postCalls.length, 0, "with no confirm mechanism reachable, the default must decline, not proceed");
 });
+
+// ---------------------------------------------------------------------------
+// Per-case prepare button (CR-006 follow-up) — pre-redesign app.js (line 933)
+// rendered a "Prepare test data for ${tc.id}" button per case, in addition
+// to the whole-issue one above; the redesign initially restored only the
+// whole-issue action. server.js already sends `tc.prepare` (same verdict
+// shape as the whole-issue `prepare`, one per test case) — these tests cover
+// the client actually rendering and wiring it.
+// ---------------------------------------------------------------------------
+
+function checklistWithTcPrepare(prepareOverrides = {}) {
+  return {
+    meta: { "Feature Name": "Fixture" },
+    tcs: [
+      {
+        id: "TC-001",
+        name: "First case",
+        headingLineIndex: 0,
+        prerequisites: [],
+        requiredData: ["fixture.txt"],
+        dataStatus: "declared",
+        steps: [],
+        notesLineIndex: 20,
+        notesText: "",
+        parseWarnings: [],
+        prepare: {
+          offered: true,
+          enabled: true,
+          endpoint: `/api/projects/proj-a/issues/${ISSUE_A}/prepare`,
+          message: "The declared test data of TC-001 can be prepared.",
+          ...prepareOverrides,
+        },
+      },
+    ],
+    looseSections: [],
+  };
+}
+
+test("checklist tab: renders a per-case \"Prepare test data for TC-001\" button from tc.prepare, distinct from the whole-issue action", async () => {
+  installFakeDocument();
+  const container = new FakeElement("div");
+  const contents = testerContentsWithExtras(ISSUE_A);
+  const { fetchImpl } = countingFetch(
+    extrasRoutes(ISSUE_A, contents, {
+      [`/api/projects/proj-a/issues/${ISSUE_A}/checklist`]: checklistWithTcPrepare(),
+    })
+  );
+
+  const mod = await loadModule();
+  const handle = mod.mount(container, { project: "proj-a", issueId: ISSUE_A, initialRole: "tester", fetchImpl });
+  await handle.ready;
+  handle.selectTab("manual_test_checklist");
+  await flush();
+  await flush();
+
+  const buttons = container.findAll((n) => n.className === "btn subtle" && n.textContent === "Prepare test data for TC-001");
+  assert.strictEqual(buttons.length, 1, "expected exactly one per-case prepare button for TC-001");
+  assert.strictEqual(buttons[0].disabled, false);
+});
+
+test("checklist tab: clicking the per-case prepare button POSTs {confirm:true, tcId:\"TC-001\"} to the prepare endpoint", async () => {
+  installFakeDocument();
+  const container = new FakeElement("div");
+  const contents = testerContentsWithExtras(ISSUE_A);
+  const prepareEndpoint = `/api/projects/proj-a/issues/${ISSUE_A}/prepare`;
+  const { fetchImpl, postCalls } = countingFetch(
+    extrasRoutes(ISSUE_A, contents, {
+      [`/api/projects/proj-a/issues/${ISSUE_A}/checklist`]: checklistWithTcPrepare({ endpoint: prepareEndpoint }),
+    }),
+    {
+      onPost: async () => ({
+        ok: true,
+        status: 200,
+        json: async () => ({
+          ok: true,
+          ran: true,
+          tcId: "TC-001",
+          exitCode: 0,
+          signal: null,
+          timedOut: false,
+          durationMs: 80,
+          scriptPath: "/fixture/test-data/setup.mjs",
+          stdout: "prepared TC-001\n",
+          stderr: "",
+          prepared: [{ tcId: "TC-001", workdir: "/tmp/pf-test-data/TC-001" }],
+          message: "Prepared TC-001.",
+        }),
+      }),
+    }
+  );
+
+  const mod = await loadModule();
+  const handle = mod.mount(container, {
+    project: "proj-a",
+    issueId: ISSUE_A,
+    initialRole: "tester",
+    fetchImpl,
+    confirmImpl: () => true,
+  });
+  await handle.ready;
+  handle.selectTab("manual_test_checklist");
+  await flush();
+  await flush();
+
+  const btn = container.findAll((n) => n.className === "btn subtle" && n.textContent === "Prepare test data for TC-001")[0];
+  assert.ok(btn && !btn.disabled);
+  btn.dispatchClick();
+  await flush();
+  await flush();
+
+  assert.strictEqual(postCalls.length, 1);
+  assert.strictEqual(postCalls[0].url, prepareEndpoint);
+  assert.deepStrictEqual(postCalls[0].body, { confirm: true, tcId: "TC-001" });
+});
+
+test("checklist tab: a case whose prepare is not offered renders no per-case prepare button", async () => {
+  installFakeDocument();
+  const container = new FakeElement("div");
+  const contents = testerContentsWithExtras(ISSUE_A);
+  const { fetchImpl } = countingFetch(
+    extrasRoutes(ISSUE_A, contents, {
+      [`/api/projects/proj-a/issues/${ISSUE_A}/checklist`]: checklistWithTcPrepare({
+        offered: false,
+        enabled: false,
+        message: "TC-001 states that it needs no prepared test data, so there is nothing to prepare for it.",
+      }),
+    })
+  );
+
+  const mod = await loadModule();
+  const handle = mod.mount(container, { project: "proj-a", issueId: ISSUE_A, initialRole: "tester", fetchImpl });
+  await handle.ready;
+  handle.selectTab("manual_test_checklist");
+  await flush();
+  await flush();
+
+  assert.strictEqual(
+    container.findAll((n) => n.className === "btn subtle" && n.textContent.includes("Prepare test data for TC-001")).length,
+    0
+  );
+});
