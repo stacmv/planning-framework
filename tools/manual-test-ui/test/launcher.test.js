@@ -296,3 +296,82 @@ test("source: app.js's SCREENS table maps \"launcher\" to public/launcher.js, an
   assert.ok(/launcher:\s*\(\)\s*=>\s*import\(["']\.\/launcher\.js["']\)/.test(APP_SOURCE), "SCREENS.launcher must import ./launcher.js");
   assert.ok(LAUNCHER_SOURCE.includes("export function mount("), "launcher.js must export mount() for app.js to call");
 });
+
+// ---------------------------------------------------------------------------
+// CR-005 fix (implementation_plan.md Task 33) — an inbox click's `where`
+// (public/inbox.js's manualTestItemView/humanTaskItemView) must reach
+// workspace.js's mount() as more than just `hash`. Covered end-to-end here:
+// real inbox.js view builders -> app.js's inboxTargetHash -> app.js's
+// parseRoute, never a hand-written hash string standing in for either side.
+// `test/inbox-ui.test.js` (Task 15) already covers `where`'s own shape; this
+// only exercises the consuming side, per this task's own scope note.
+// ---------------------------------------------------------------------------
+
+const INBOX_PATH = path.join(TOOL_DIR, "public", "inbox.js");
+async function loadInbox() {
+  return import(pathToFileURL(INBOX_PATH).href);
+}
+
+test("CR-005: a manual-TC inbox click's where (roleId/doc/ptcId) survives app.js's hash round trip into workspace.js's initial* options", async () => {
+  const app = await loadApp();
+  const inbox = await loadInbox();
+
+  const where = inbox.manualTestItemView({
+    project: "proj-a",
+    issueId: "20260101-feat-a",
+    ptcId: "TC-01",
+    area: "auth",
+    testCase: "Login with valid credentials",
+    priority: "High",
+    origin: "manual_test_checklist.md",
+  }).where;
+
+  const hash = app.inboxTargetHash(where);
+  assert.strictEqual(
+    hash,
+    "#/p/proj-a/i/20260101-feat-a?role=tester&tab=manual_test_checklist.md&ptcId=TC-01"
+  );
+
+  const route = app.parseRoute(hash);
+  assert.strictEqual(route.screen, "workspace");
+  assert.strictEqual(route.project, "proj-a");
+  assert.strictEqual(route.issueId, "20260101-feat-a");
+  assert.strictEqual(route.initialRole, "tester");
+  // `parseRoute` forwards the raw query value verbatim — the ".md" ->
+  // tab-id normalization is workspace.js's own `tabIdFor` rule, applied on
+  // arrival (see workspace.js's mount()/loadRoleContents comments), not
+  // duplicated in app.js.
+  assert.strictEqual(route.initialTab, "manual_test_checklist.md");
+  assert.strictEqual(route.initialPtcId, "TC-01");
+});
+
+test("CR-005: a human-task inbox click's where (tab: \"human-tasks\") survives the same round trip, with no roleId/ptcId set", async () => {
+  const app = await loadApp();
+  const inbox = await loadInbox();
+
+  const where = inbox.humanTaskItemView({
+    project: "proj-a",
+    issueId: "20260101-feat-a",
+    stageKey: "code",
+    operation: "write",
+    mode: "blocking",
+    artifactPath: null,
+    instruction: "Implement the feature",
+    status: "queued",
+  }).where;
+
+  const hash = app.inboxTargetHash(where);
+  assert.strictEqual(hash, "#/p/proj-a/i/20260101-feat-a?tab=human-tasks");
+
+  const route = app.parseRoute(hash);
+  assert.strictEqual(route.screen, "workspace");
+  assert.strictEqual(route.initialRole, null);
+  assert.strictEqual(route.initialTab, "human-tasks");
+  assert.strictEqual(route.initialPtcId, null);
+});
+
+test("CR-005: inboxTargetHash passes a plain string target through unchanged (the pre-existing <a href> / string-navigate path)", async () => {
+  const app = await loadApp();
+  assert.strictEqual(app.inboxTargetHash("#/p/proj-a/i/20260101-feat-a"), "#/p/proj-a/i/20260101-feat-a");
+  assert.strictEqual(app.inboxTargetHash(null), null);
+});

@@ -49,25 +49,48 @@ const SCREENS = {
  * @param {string} hash — e.g. `location.hash`, may be `""`/`"#"`/`"#/"`/etc.
  * @returns {{screen: "launcher"|"inbox"|"workspace", project: string|null, issueId: string|null}}
  */
+// Query portion of the hash (e.g. `#/p/foo/i/bar?role=tester&tab=manual_test_checklist&ptcId=TC-01`)
+// carries an inbox click's initial-landing state (CR-005 fix, this issue's
+// Task 33): `role`/`tab`/`ptcId`. This is NOT a
+// second route — the path portion (`/p/foo/i/bar`) alone still fully
+// determines `{screen, project, issueId}`, exactly as before. The query is
+// only ever read once, at `workspace.js`'s `mount()` time, to seed its
+// initial role/tab/scroll target; every *subsequent* tab/role/issue switch
+// inside that screen stays local component state and never touches
+// `location.hash` again (the rule Tasks 15/24 established) — this file
+// still never writes a query string of its own, `inbox.js` does, once, for
+// the initial navigation only.
+const NULL_ROUTE_EXTRAS = { initialRole: null, initialTab: null, initialPtcId: null };
+
 export function parseRoute(hash) {
-  const raw = String(hash || "").replace(/^#/, "");
-  const segments = raw.split("/").filter(Boolean); // "/p/foo/i/bar" -> ["p","foo","i","bar"]
+  const full = String(hash || "").replace(/^#/, "");
+  const qIndex = full.indexOf("?");
+  const rawPath = qIndex === -1 ? full : full.slice(0, qIndex);
+  const rawQuery = qIndex === -1 ? "" : full.slice(qIndex + 1);
+  const segments = rawPath.split("/").filter(Boolean); // "/p/foo/i/bar" -> ["p","foo","i","bar"]
+
+  const query = new URLSearchParams(rawQuery);
+  const extras = {
+    initialRole: query.get("role") || null,
+    initialTab: query.get("tab") || null,
+    initialPtcId: query.get("ptcId") || null,
+  };
 
   if (segments.length === 0) {
-    return { screen: "launcher", project: null, issueId: null };
+    return { screen: "launcher", project: null, issueId: null, ...NULL_ROUTE_EXTRAS };
   }
   if (segments[0] === "inbox") {
-    return { screen: "inbox", project: null, issueId: null };
+    return { screen: "inbox", project: null, issueId: null, ...NULL_ROUTE_EXTRAS };
   }
   if (segments[0] === "p" && segments.length >= 2 && segments[1]) {
     const project = decodeURIComponent(segments[1]);
     if (segments.length >= 4 && segments[2] === "i" && segments[3]) {
-      return { screen: "workspace", project, issueId: decodeURIComponent(segments[3]) };
+      return { screen: "workspace", project, issueId: decodeURIComponent(segments[3]), ...extras };
     }
-    return { screen: "workspace", project, issueId: null };
+    return { screen: "workspace", project, issueId: null, ...extras };
   }
 
-  return { screen: "launcher", project: null, issueId: null };
+  return { screen: "launcher", project: null, issueId: null, ...NULL_ROUTE_EXTRAS };
 }
 
 // ---------------------------------------------------------------------------
@@ -78,14 +101,53 @@ function navigate(hash) {
   location.hash = hash;
 }
 
+// `public/inbox.js`'s `where` (manualTestItemView/humanTaskItemView) carries
+// fields beyond `hash` — `roleId`/`doc`/`ptcId` for a manual TC, `tab`/
+// `stageKey` for a human task (CR-005: previously every field but `hash` was
+// silently dropped here). Encoded as the target hash's OWN query string
+// (`role=`/`tab=`/`ptcId=`), not a separate route — `parseRoute` above reads
+// it back into `{initialRole, initialTab, initialPtcId}` for
+// `workspace.js`'s `mount()`. `doc` (a document filename, e.g.
+// "manual_test_checklist.md") is forwarded verbatim as `tab` — the ".md"
+// stripping that turns a doc name into a tab id is `workspace.js`'s own
+// `tabIdFor` rule (`buildTabSet`), not duplicated here, so this file still
+// carries no document-name knowledge of its own (roles.test.js's "app.js
+// hard-codes no document name" check). `stageKey` is not forwarded: nothing
+// on the receiving end consumes it yet (landing on the "Дела" tab is the
+// whole fix this task requires) — CR-005's own "don't over-engineer this".
+//
+// Exported (unlike `navigate`/`optionsFor` below, which touch `location`/
+// build DOM-mounting option objects) for the same reason `parseRoute` above
+// is: it is a pure string-in/string-out function, testable without a
+// browser — driven end-to-end from `inbox.js`'s real `manualTestItemView`/
+// `humanTaskItemView` output in tests, not a hand-written hash string.
+export function inboxTargetHash(target) {
+  if (!target || typeof target !== "object") return target;
+  const base = target.hash || "";
+  const params = new URLSearchParams();
+  if (target.roleId) params.set("role", target.roleId);
+  const tab = target.doc || target.tab;
+  if (tab) params.set("tab", tab);
+  if (target.ptcId) params.set("ptcId", target.ptcId);
+  const qs = params.toString();
+  return qs ? `${base}?${qs}` : base;
+}
+
 function optionsFor(route) {
   switch (route.screen) {
     case "launcher":
       return { onNavigate: navigate };
     case "inbox":
-      return { onNavigate: (target) => navigate(target && target.hash ? target.hash : target) };
+      return { onNavigate: (target) => navigate(inboxTargetHash(target)) };
     case "workspace":
-      return { project: route.project, issueId: route.issueId, onNavigate: navigate };
+      return {
+        project: route.project,
+        issueId: route.issueId,
+        initialRole: route.initialRole || undefined,
+        initialTab: route.initialTab || undefined,
+        initialPtcId: route.initialPtcId || undefined,
+        onNavigate: navigate,
+      };
     default:
       return {};
   }

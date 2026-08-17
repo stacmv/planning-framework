@@ -98,6 +98,23 @@ class FakeElement {
     }
     return out;
   }
+  // CR-005 fix (Task 33) — just enough of `Element.querySelector`/
+  // `Element.scrollIntoView` to exercise `workspace.js`'s
+  // `maybeScrollToPtcId`'s ONE selector shape (`[data-tc-id="..."]`), so
+  // that scroll-to-TC path is actually asserted rather than only
+  // feature-detected-and-skipped under this fake DOM. `scrollIntoView` calls
+  // are recorded on `this` for tests to inspect, mirroring `dispatchClick`/
+  // `dispatchChange`'s own "record, don't actually do" convention.
+  querySelector(selector) {
+    const m = /^\[data-tc-id="([^"]*)"\]$/.exec(selector);
+    if (!m) return null;
+    const wanted = m[1];
+    return this.findAll((n) => n.dataset && n.dataset.tcId === wanted)[0] || null;
+  }
+  scrollIntoView(options) {
+    this._scrollIntoViewCalls = (this._scrollIntoViewCalls || 0) + 1;
+    this._lastScrollIntoViewOptions = options;
+  }
 }
 
 function installFakeDocument() {
@@ -687,6 +704,115 @@ test("mount(): selectTab only accepts a tab id from the current tab set", async 
   assert.strictEqual(handle.getState().activeTabId, before);
 });
 
+// ---------------------------------------------------------------------------
+// CR-005 fix (implementation_plan.md Task 33) — `options.initialRole`/
+// `initialTab`/`initialPtcId`, as `app.js` forwards them from an inbox
+// item's `where` (test/launcher.test.js covers that forwarding end-to-end;
+// these tests cover the consuming side: mount() actually landing there).
+// ---------------------------------------------------------------------------
+
+test("mount(): a manual-TC inbox click's initialRole/initialTab (unnormalized, \".md\"-suffixed) lands on the tester role's manual_test_checklist tab (TC-020 step 3)", async () => {
+  installFakeDocument();
+  const container = new FakeElement("div");
+  // No initialRole stored/default — proves initialRole, not the fallback
+  // chain, is what selects "tester" here (ROLES_RESPONSE's own first role
+  // is "analyst").
+  const fetchImpl = routedFetch(baseRoutes());
+
+  const mod = await loadModule();
+  const handle = mod.mount(container, {
+    project: "proj-a",
+    issueId: "20260101-feat-a",
+    // Exactly what app.js's inboxTargetHash forwards for a manual TC click
+    // (`where.roleId`, `where.doc` verbatim, not pre-stripped of ".md").
+    initialRole: "tester",
+    initialTab: "manual_test_checklist.md",
+    fetchImpl,
+  });
+  await handle.ready;
+
+  const state = handle.getState();
+  assert.strictEqual(state.roleId, "tester");
+  assert.strictEqual(state.activeTabId, "manual_test_checklist");
+});
+
+test("mount(): a human-task inbox click's initialTab (\"human-tasks\") lands on the Дела tab (TC-020 step 3)", async () => {
+  installFakeDocument();
+  const container = new FakeElement("div");
+  // baseRoutes()'s own fixtures only cover the "tester"/"developer" roles'
+  // .../roles/:role response for this issue — the fallback role chain here
+  // lands on "analyst" (ROLES_RESPONSE's first role, since no initialRole is
+  // given), so that route needs its own fixture too.
+  const fetchImpl = routedFetch(
+    baseRoutes({
+      "/api/projects/proj-a/issues/20260101-feat-a/roles/analyst": analystContents("20260101-feat-a", { brdPresent: true }),
+    })
+  );
+
+  const mod = await loadModule();
+  // No initialRole at all — a human task's `where` carries none; the role
+  // still resolves via the normal fallback chain (here: the server's first
+  // role, "analyst" per ROLES_RESPONSE) and the Дела tab is present on every
+  // role's tab set (buildTabSet), so landing on it does not depend on which
+  // role was picked.
+  const handle = mod.mount(container, {
+    project: "proj-a",
+    issueId: "20260101-feat-a",
+    initialTab: mod.HUMAN_TASKS_TAB_ID,
+    fetchImpl,
+  });
+  await handle.ready;
+
+  assert.strictEqual(handle.getState().activeTabId, mod.HUMAN_TASKS_TAB_ID);
+});
+
+test("mount(): initialTab only applies to the initial landing — a later selectRole()/selectIssue() does not re-consult it", async () => {
+  installFakeDocument();
+  const container = new FakeElement("div");
+  const fetchImpl = routedFetch(baseRoutes());
+
+  const mod = await loadModule();
+  const handle = mod.mount(container, {
+    project: "proj-a",
+    issueId: "20260101-feat-a",
+    initialRole: "tester",
+    initialTab: "qa_report",
+    fetchImpl,
+  });
+  await handle.ready;
+  assert.strictEqual(handle.getState().activeTabId, "qa_report");
+
+  // Role switch takes a fresh tab set (first tab), never re-applying the
+  // long-consumed initialTab.
+  await handle.selectRole("developer");
+  assert.strictEqual(handle.getState().activeTabId, "specs");
+});
+
+test("mount(): a garbled/stale initialRole not in this project's role list falls back to the server's first role, not a blank/broken screen", async () => {
+  installFakeDocument();
+  const container = new FakeElement("div");
+  // The fallback role ("analyst", ROLES_RESPONSE's first) needs its own
+  // fixture — see the identical note on the human-task initialTab test above.
+  const fetchImpl = routedFetch(
+    baseRoutes({
+      "/api/projects/proj-a/issues/20260101-feat-a/roles/analyst": analystContents("20260101-feat-a", { brdPresent: true }),
+    })
+  );
+
+  const mod = await loadModule();
+  const handle = mod.mount(container, {
+    project: "proj-a",
+    issueId: "20260101-feat-a",
+    initialRole: "no-such-role",
+    fetchImpl,
+  });
+  await handle.ready;
+
+  assert.strictEqual(handle.getState().error, null);
+  assert.strictEqual(handle.getState().roleId, ROLES_RESPONSE.roles[0].id);
+  assert.ok(handle.getState().tabs.length > 0, "expected a real tab set, not an empty/broken one");
+});
+
 test("mount(): document content is fetched by endpoint (not tab.id), deduped, and an A->B issue switch never paints A's content into B's panel", async () => {
   installFakeDocument();
   const container = new FakeElement("div");
@@ -920,6 +1046,71 @@ async function mountOnChecklistTab(fetchImpl) {
   await flush(); // let the checklist's own async fetchDoc().then(renderChecklistBody) settle
   return { mod, container, handle };
 }
+
+// CR-005 fix (Task 33) — a manual-TC inbox click's `ptcId`, forwarded as
+// `options.initialPtcId`, scrolls the matching TC's `.tc-wrap[data-tc-id]`
+// into view once the checklist tab has actually rendered. Landing on the
+// right TAB (asserted above) is the primary fix; this is the "nice-to-have
+// on top" the implementation notes describe — asserted here via
+// `FakeElement.querySelector`/`scrollIntoView` (see the class definition
+// above), a minimal-but-real stand-in, not a DOM library.
+test("mount(): initialPtcId scrolls the matching TC panel into view once the checklist tab has rendered (CR-005 nice-to-have)", async () => {
+  installFakeDocument();
+  const container = new FakeElement("div");
+  const { fetchImpl } = checklistFetchMock();
+
+  const mod = await loadModule();
+  const handle = mod.mount(container, {
+    project: "proj-a",
+    issueId: "20260101-feat-a",
+    initialRole: "tester",
+    initialTab: "manual_test_checklist.md",
+    initialPtcId: "TC-001",
+    fetchImpl,
+  });
+  await handle.ready;
+  await flush();
+  await flush(); // let the checklist's own async fetchDoc().then(renderChecklistBody) settle
+
+  assert.strictEqual(handle.getState().activeTabId, "manual_test_checklist");
+  const tcWrap = container.findAll((n) => n.dataset && n.dataset.tcId === "TC-001")[0];
+  assert.ok(tcWrap, "expected the TC-001 tc-wrap to have rendered");
+  assert.strictEqual(tcWrap._scrollIntoViewCalls, 1, "expected exactly one scrollIntoView call on the matching TC panel");
+});
+
+test("mount(): initialPtcId is a one-shot — revisiting the checklist tab later does not scroll again", async () => {
+  installFakeDocument();
+  const container = new FakeElement("div");
+  const { fetchImpl } = checklistFetchMock();
+
+  const mod = await loadModule();
+  const handle = mod.mount(container, {
+    project: "proj-a",
+    issueId: "20260101-feat-a",
+    initialRole: "tester",
+    initialTab: "manual_test_checklist.md",
+    initialPtcId: "TC-001",
+    fetchImpl,
+  });
+  await handle.ready;
+  await flush();
+  await flush();
+
+  // Navigate away and back to the checklist tab.
+  handle.selectTab("test_plan");
+  handle.selectTab("manual_test_checklist");
+  await flush();
+  await flush();
+
+  // Every render() rebuilds the DOM from scratch (`container.innerHTML =
+  // ""`), so the revisited tab's tc-wrap is a BRAND NEW node — it never had
+  // `scrollIntoView` called on it at all, which is exactly the proof that
+  // the one-shot flag suppressed a second scroll attempt (a re-triggered
+  // scroll would have called it on this very node).
+  const tcWrap = container.findAll((n) => n.dataset && n.dataset.tcId === "TC-001")[0];
+  assert.ok(tcWrap, "expected TC-001 to still be rendered after the tab revisit");
+  assert.ok(!tcWrap._scrollIntoViewCalls, "a tab revisit must not re-trigger the initial-landing scroll");
+});
 
 test("checklist: renders one checkbox/note/Save control per step, pre-filled from the fetched checklist", async () => {
   const { fetchImpl } = checklistFetchMock();

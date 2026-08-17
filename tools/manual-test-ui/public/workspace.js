@@ -1244,6 +1244,15 @@ function renderDocPanel(tab, runtime) {
       .then((data) => {
         if (runtime.getActiveEndpoint() !== endpoint) return; // reader moved on while it loaded
         renderChecklistBody(body, data, runtime);
+        // CR-005 fix: an inbox manual-TC click's `ptcId` (Task 33) — scroll
+        // the corresponding `.panel[data-tc-id="..."]` into view once the
+        // checklist has actually rendered. `runtime.tryScrollToInitialPtcId`
+        // is one-shot and self-guarding (see `mount()`) — safe to call on
+        // every checklist render, including a later tab revisit, since it is
+        // a no-op after the first landing.
+        if (typeof runtime.tryScrollToInitialPtcId === "function") {
+          runtime.tryScrollToInitialPtcId(body);
+        }
       })
       .catch((err) => {
         if (runtime.getActiveEndpoint() !== endpoint) return;
@@ -1292,20 +1301,50 @@ function renderDocPanel(tab, runtime) {
   return panel;
 }
 
+// One-shot, best-effort scroll to a checklist TC panel (CR-005 fix, Task 33:
+// an inbox manual-TC click's `ptcId` reaching the checklist tab). `container`
+// is the checklist tab's own `.checklist-body` node — real in a browser,
+// a `querySelector`-less stand-in under `node --test`'s fake DOM
+// (test/workspace-ui.test.js's `FakeElement`), so both `querySelector` and
+// `scrollIntoView` are feature-detected rather than assumed: landing on the
+// right TAB is this task's primary fix (see the module-level Task 33 comment
+// group), this scroll is strictly a nice-to-have on top of it and must never
+// throw if the DOM doesn't support it.
+function maybeScrollToPtcId(container, ptcId) {
+  if (!ptcId || !container || typeof container.querySelector !== "function") return;
+  let el = null;
+  try {
+    el = container.querySelector(`[data-tc-id="${String(ptcId).replace(/"/g, '\\"')}"]`);
+  } catch {
+    return; // malformed selector (e.g. an id containing characters the query can't express) — skip, don't throw
+  }
+  if (el && typeof el.scrollIntoView === "function") el.scrollIntoView({ block: "start" });
+}
+
 /**
  * Mount the level-2 workspace screen into `container` (an already-attached
  * DOM node — this module never inserts itself into `document.body`, matching
  * every other screen in this tool).
  *
  * `options.roleId` is intentionally not required: `public/app.js`'s router
- * only ever hands this screen `{project, issueId, onNavigate}` (the role is
- * this screen's own concern, exactly like on the launcher), so the initial
- * role comes from `options.initialRole`, then `localStorage`'s `pf.role`,
- * then the first role the server lists — the same fallback chain
- * `public/launcher.js` uses.
+ * only ever hands this screen `{project, issueId, onNavigate}` plus,
+ * starting with the CR-005 fix (Task 33), the initial-landing extras below —
+ * so the initial role comes from `options.initialRole`, then `localStorage`'s
+ * `pf.role`, then the first role the server lists — the same fallback chain
+ * `public/launcher.js` uses. `options.initialTab`/`options.initialPtcId`
+ * come from an inbox item's `where` (`public/inbox.js`), forwarded through
+ * `app.js`'s hash query string: `initialTab` is applied once the FIRST
+ * `buildTabSet()` of this mount resolves (a manual-TC click's `where.doc` or
+ * a human-task click's `where.tab`, normalized through the same `tabIdFor`
+ * rule every doc tab id already follows), `initialPtcId` scrolls the
+ * checklist tab's matching `.panel[data-tc-id]` into view once that tab has
+ * actually rendered (`maybeScrollToPtcId` above) — both apply ONLY on this
+ * mount's initial landing, never on a later role/issue switch within the
+ * same mount (`selectRole`/`selectIssue` never re-consult them).
  *
  * @param {Element} container
  * @param {{project: string, issueId?: string|null, initialRole?: string,
+ *   initialTab?: string, initialPtcId?: string,
  *   fetchImpl?: typeof fetch, storage?: Storage,
  *   onNavigate?: (hash: string) => void}} options
  * @returns {{selectIssue: (issueId: string) => Promise<void>,
@@ -1328,6 +1367,24 @@ export function mount(container, options = {}) {
     // of this mount's lifetime (a project never changes within one mount).
     projectTodoCount: null,
   };
+
+  // CR-005 fix (Task 33) — both one-shot, applied only on this mount's
+  // initial landing (never on a later `selectRole`/`selectIssue`):
+  //   * `initialTabApplied` flips true the first time `loadRoleContents()`
+  //     actually resolves a tab set (its success path only — see
+  //     `loadRoleContents` below), so a first-load fetch failure does not
+  //     burn `options.initialTab` before it ever had a tab set to apply to.
+  //   * `initialPtcIdConsumed` starts already-true when there is no
+  //     `options.initialPtcId` to begin with (nothing to consume), so
+  //     `tryScrollToInitialPtcId` is a guaranteed no-op for every mount that
+  //     didn't ask for one, at negligible cost.
+  let initialTabApplied = false;
+  let initialPtcIdConsumed = !options.initialPtcId;
+  function tryScrollToInitialPtcId(checklistContainer) {
+    if (initialPtcIdConsumed) return;
+    initialPtcIdConsumed = true; // one-shot regardless of whether the panel was actually found
+    maybeScrollToPtcId(checklistContainer, options.initialPtcId);
+  }
 
   function navigate(hash) {
     if (typeof options.onNavigate === "function") {
@@ -1443,6 +1500,7 @@ export function mount(container, options = {}) {
           issueId: state.issueId,
           fetchImpl: options.fetchImpl,
           invalidateDoc,
+          tryScrollToInitialPtcId,
         })
       );
     } else {
@@ -1469,7 +1527,25 @@ export function mount(container, options = {}) {
       const contents = await fetchRoleContents(state.project, state.issueId, state.roleId, options.fetchImpl);
       state.tabs = buildTabSet(contents);
       decorateHumanTasksTab(); // carry the already-known project-wide count into the fresh tab set
-      state.activeTabId = preserveActiveTab ? resolveActiveTab(prevTabId, contents) : state.tabs[0]?.id ?? null;
+      if (preserveActiveTab) {
+        state.activeTabId = resolveActiveTab(prevTabId, contents);
+      } else if (!initialTabApplied && options.initialTab) {
+        // CR-005 fix (Task 33): an inbox item's `where.doc`/`where.tab`,
+        // forwarded through `app.js` as `options.initialTab`, applied to
+        // this mount's very first tab set only — normalized through the
+        // same `tabIdFor` rule every doc tab id already follows, so a
+        // ".md"-suffixed `where.doc` (a manual TC) and an already-bare
+        // `where.tab` (a human task, "human-tasks") both resolve the same
+        // way. A tab id that doesn't exist in this tab set (stale/garbled
+        // hash) falls back to the first tab, same as the no-`initialTab`
+        // case, rather than leaving `activeTabId` unset.
+        const wantedTabId = tabIdFor({ name: options.initialTab });
+        const match = state.tabs.find((t) => t.id === wantedTabId);
+        state.activeTabId = match ? match.id : state.tabs[0]?.id ?? null;
+        initialTabApplied = true; // only ever consulted on this, the initial landing
+      } else {
+        state.activeTabId = state.tabs[0]?.id ?? null;
+      }
       state.error = null;
     } catch (err) {
       state.error = err;
@@ -1524,6 +1600,18 @@ export function mount(container, options = {}) {
       ]);
       state.roles = roles;
       state.issues = issues;
+      // CR-005 fix (Task 33): `state.roleId` may already be set here from
+      // `options.initialRole` — an inbox click's `where.roleId`, reachable
+      // via a bookmarkable/garbled hash a user can edit by hand. A role id
+      // that doesn't actually exist in this project's own role list must not
+      // stick (it would 404 `fetchRoleContents` into `state.error` and leave
+      // `[Роль ▾]` with no selected option — the exact "garbled hash leaves
+      // the page blank" failure `app.js`'s own routing comment promises
+      // never happens) — fall back the same way an absent `roleId` already
+      // does: stored role, then the server's first role.
+      if (state.roleId && roles.length && !roles.some((r) => r.id === state.roleId)) {
+        state.roleId = readStoredRole(options.storage) || roles[0].id;
+      }
       if (!state.roleId && roles.length) state.roleId = roles[0].id;
       if (!state.issueId && issues.length) state.issueId = issues[0].issueId;
     } catch (err) {
