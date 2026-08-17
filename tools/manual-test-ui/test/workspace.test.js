@@ -290,11 +290,11 @@ test("mount(): switching Issue against a real server keeps the active tab, even 
 // issues of one project, plus an unrelated second project.
 // ---------------------------------------------------------------------------
 
-const TODO_ISSUE_A = "20260201-feat-fixture-todos-a";
-const TODO_ISSUE_B = "20260202-feat-fixture-todos-b";
+const TASKS_ISSUE_A = "20260201-feat-fixture-todos-a";
+const TASKS_ISSUE_B = "20260202-feat-fixture-todos-b";
 const OTHER_HUMAN_ISSUE = "20260203-feat-fixture-todos-other";
 
-// Two valid `pending` rows, both Origin-ing to TODO_ISSUE_A — TC-029 step 1's
+// Two valid `pending` rows, both Origin-ing to TASKS_ISSUE_A — TC-029 step 1's
 // literal "2 pending manual TC" half.
 const TEST_PLAN_MD = [
   "# Manual Test Plan",
@@ -303,13 +303,13 @@ const TEST_PLAN_MD = [
   "",
   "| PTC | Area | Test case | Prio | Origin | Last run | Status |",
   "| --- | --- | --- | --- | --- | --- | --- |",
-  `| PTC-0001 | ui | First pending case | High | ${TODO_ISSUE_A}#TC-001 | 2026-08-01 | pending |`,
-  `| PTC-0002 | ui | Second pending case | High | ${TODO_ISSUE_A}#TC-002 | 2026-08-01 | pending |`,
+  `| PTC-0001 | ui | First pending case | High | ${TASKS_ISSUE_A}#TC-001 | 2026-08-01 | pending |`,
+  `| PTC-0002 | ui | Second pending case | High | ${TASKS_ISSUE_A}#TC-002 | 2026-08-01 | pending |`,
   "",
 ].join("\n");
 
 // roles.specs resolved to an actor agents.yml declares kind: human — one
-// human task, on TODO_ISSUE_B — TC-029 step 1's "1 human task" half.
+// human task, on TASKS_ISSUE_B — TC-029 step 1's "1 human task" half.
 function humanPromptDoc(issueId) {
   return [
     "---",
@@ -335,7 +335,7 @@ function buildTodosFixture(t) {
     extraFiles: {
       "docs/planning/test-plan.md": TEST_PLAN_MD,
       "docs/planning/agents.yml": HUMAN_AGENTS_YML,
-      [`docs/issues/open/${TODO_ISSUE_B}/prompt.md`]: humanPromptDoc(TODO_ISSUE_B),
+      [`docs/issues/open/${TASKS_ISSUE_B}/prompt.md`]: humanPromptDoc(TASKS_ISSUE_B),
     },
   });
   // A second, unrelated project with its own human task — proves
@@ -367,8 +367,8 @@ test("TC-029 step 1: countProjectTodos(inboxResponse, \"main\"), fed a real GET 
 
   // Precondition sanity: the real response really does carry both kinds,
   // spread across the two issues and the two projects — not a vacuous fixture.
-  assert.ok(inboxResponse.manualTests.some((m) => m.project === "main" && m.issueId === TODO_ISSUE_A));
-  assert.ok(inboxResponse.humanTasks.some((h) => h.project === "main" && h.issueId === TODO_ISSUE_B));
+  assert.ok(inboxResponse.manualTests.some((m) => m.project === "main" && m.issueId === TASKS_ISSUE_A));
+  assert.ok(inboxResponse.humanTasks.some((h) => h.project === "main" && h.issueId === TASKS_ISSUE_B));
   assert.ok(inboxResponse.humanTasks.some((h) => h.project === "other"));
 
   assert.strictEqual(mod.countProjectTodos(inboxResponse, "main"), 3);
@@ -387,7 +387,7 @@ test("mount(): Дела tab shows the real project-wide count from GET /api/inbo
   const container = new FakeElement("div");
   const fetchImpl = (pathname) => fetch(server.baseUrl + pathname);
 
-  const handle = mod.mount(container, { project: "main", issueId: TODO_ISSUE_B, initialRole: "analyst", fetchImpl });
+  const handle = mod.mount(container, { project: "main", issueId: TASKS_ISSUE_B, initialRole: "analyst", fetchImpl });
   await handle.ready;
   await new Promise((resolve) => setTimeout(resolve, 0)); // let loadProjectTodoCount settle
 
