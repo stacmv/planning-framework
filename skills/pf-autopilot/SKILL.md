@@ -44,6 +44,7 @@ Repeat until the issue is closed:
 3. After each completed stage — commit and push per `~/.claude/skills/pf-git/SKILL.md` ("Stage commit & push"). The stage skills already do this themselves; this line stays as the backstop for a stage that ended without it. An interruption must not lose work.
 4. If a sub-agent dies with "API Error: Connection closed mid-response" — immediately retry that same task once; don't wait for the cron resume.
 5. Honor the environment's global conventions (e.g. cheaper models for sub-agents, verify-before-claim: a stage isn't "done" without a real run).
+6. If `/pf-close` (the last stage in item 1's list) stops because of unresolved human-tasks, treat that as a run-ending condition, not a stage to retry: delete the schedule right away (`CronDelete pf-autopilot-<project>`, the same call Step 3 makes on normal completion) and end the run with a report naming the unresolved human-task keys from `/pf-close`'s own stop message. Do not let the next scheduled `continue` pick this back up — autopilot cannot resolve a human-task itself, so resuming would just spin uselessly waiting on it. This differs from the questions in item 2: there is no timeout-and-proceed-with-default here, because there is no safe default for a human-only task.
 
 ## Step 3. Completion
 

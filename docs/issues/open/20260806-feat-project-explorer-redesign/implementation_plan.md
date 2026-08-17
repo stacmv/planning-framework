@@ -147,7 +147,7 @@ Criteria этого раздела)
 - §4, раздел `### kind: human and code: skip during resolution` — обновить формулировку: `kind: human` больше не «hard-stop condition» в смысле ошибки резолвинга; переформулировать как «структурированный результат, требующий обработки вызывающим кодом», сохранив соседний абзац про `code: skip` без изменений (это по-прежнему настоящий hard-stop).
 
 **Acceptance Criteria:**
-- [ ] TC-027 passes (шаги 1-3 — hard-stop removed, default `agents.yml` entry; шаг 4 требует `lib/roles-resolve.js`, см. Задачу 4)
+- [x] TC-027 passes (шаги 1-3 — hard-stop removed, default `agents.yml` entry; шаг 4 требует `lib/roles-resolve.js`, см. Задачу 4)
 
 ---
 
@@ -168,7 +168,7 @@ Criteria этого раздела)
 - Это markdown-skill-native алгоритм: `pf-close` выполняет его сам через Read/Bash, без обращения к `tools/manual-test-ui` (который опциональный dev-инструмент со своим `projects.json`) и без JS.
 
 **Acceptance Criteria:**
-- [ ] TC-028 passes (часть про `/pf-close` Phase 0)
+- [x] TC-028 passes (часть про `/pf-close` Phase 0)
 
 ---
 
@@ -185,7 +185,7 @@ Criteria этого раздела)
 - Добавить явную обработку в Step 2, рядом с существующими пунктами 1-5 (пункт 1 уже упоминает `/pf-close` как одну из стадий цикла) — не отдельный новый Step.
 
 **Acceptance Criteria:**
-- [ ] TC-028 passes (часть про `/pf-autopilot`)
+- [x] TC-028 passes (часть про `/pf-autopilot`)
 
 ---
 
@@ -218,7 +218,7 @@ Criteria этого раздела)
 **Acceptance Criteria:**
 - [ ] TC-021 passes
 - [ ] TC-022 passes
-- [ ] TC-027 passes (шаг 4 — резолвинг `human: { kind: human, inbox: project-explorer }` возвращает `{ kind: "human", inbox: "project-explorer" }`, без исключения)
+- [x] TC-027 passes (шаг 4 — резолвинг `human: { kind: human, inbox: project-explorer }` возвращает `{ kind: "human", inbox: "project-explorer" }`, без исключения)
 
 ---
 
@@ -320,7 +320,7 @@ Criteria этого раздела)
 - Позитивный путь (непустой `note`) не задет — существующее поведение сохраняется.
 
 **Acceptance Criteria:**
-- [ ] TC-023 passes (шаги 5-6 — негативный и позитивный кейсы AC-05c)
+- [x] TC-023 passes (шаги 5-6 — негативный и позитивный кейсы AC-05c)
 
 ---
 
@@ -470,8 +470,8 @@ Criteria этого раздела)
 - Убрать `overflow: hidden` на `body` (сегодня `style.css:25`) — Problem Statement #3/AC-01f. Локальные `overflow-y`/`overflow-x` на внутренних панелях (`.doc-panel` и т.п.) — не баг, оставить.
 
 **Acceptance Criteria:**
-- [ ] TC-005 passes
-- [ ] TC-007 passes
+- [x] TC-005 passes
+- [x] TC-007 passes
 
 ---
 

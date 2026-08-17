@@ -1,14 +1,14 @@
 :root {
-  --bg: #0f1115;
-  --panel: #171a21;
-  --panel-2: #12151b;
-  --border: #2a2e38;
-  --text: #e6e8ec;
-  --muted: #8b91a0;
-  --accent: #4f8cff;
-  --pass: #35c266;
-  --fail: #e0554f;
-  --warn: #d9a441;
+  --bg: #16241b;
+  --surface: #1e3126;
+  --border: #3c5c46;
+  --text: #c6d5c8;
+  --muted: #96ac9c;
+  --ok: #6ec97f;
+  --fail: #f08d84;
+  --warn: #e0b95c;
+  --held: #b6a0ef;
+  --accent: #5cc4d4;
   font-family: -apple-system, "Segoe UI", Roboto, sans-serif;
 }
 
@@ -21,8 +21,6 @@ body {
   background: var(--bg);
   color: var(--text);
   font-size: 14px;
-  /* The page itself never scrolls — in either direction. Only the panes do. */
-  overflow: hidden;
 }
 
 .shell {
@@ -44,7 +42,7 @@ body {
   gap: 16px;
   flex-wrap: wrap;
   padding: 10px 20px;
-  background: var(--panel);
+  background: var(--surface);
   border-bottom: 1px solid var(--border);
 }
 
@@ -107,7 +105,7 @@ body {
 .sidebar {
   width: 288px;
   flex: 0 0 288px;
-  background: var(--panel);
+  background: var(--surface);
   border-right: 1px solid var(--border);
   padding: 16px;
   overflow-y: auto;
@@ -205,8 +203,8 @@ body {
   color: var(--muted);
   white-space: nowrap;
 }
-.badge.closed { border-color: var(--pass); color: var(--pass); }
-.badge.ok { border-color: var(--pass); color: var(--pass); }
+.badge.closed { border-color: var(--ok); color: var(--ok); }
+.badge.ok { border-color: var(--ok); color: var(--ok); }
 .badge.fail { border-color: var(--fail); color: var(--fail); }
 .badge.on-branch { border-color: var(--warn); color: var(--warn); }
 .badge.missing { border-color: var(--border); color: var(--muted); }
@@ -268,7 +266,7 @@ dl.facts dd {
   margin-top: 6px;
   font-size: 12px;
   color: var(--muted);
-  background: var(--panel-2);
+  background: var(--surface);
   border: 1px solid var(--border);
   border-radius: 5px;
   padding: 2px 6px;
@@ -287,7 +285,7 @@ dl.facts dd {
   border: 1px solid var(--border);
   border-left-width: 3px;
   border-radius: 8px;
-  background: var(--panel-2);
+  background: var(--surface);
   padding: 10px 14px;
   margin: 12px 0 0;
   max-width: 80ch;
@@ -349,7 +347,7 @@ dl.facts dd {
 .stack > * + * { margin-top: 14px; }
 
 .sub-card {
-  background: var(--panel);
+  background: var(--surface);
   border: 1px solid var(--border);
   border-radius: 10px;
   padding: 14px 18px;
@@ -368,7 +366,7 @@ dl.facts dd {
 .prepare-result:empty { display: none; }
 
 .prepare-result {
-  background: var(--panel);
+  background: var(--surface);
   border: 1px solid var(--border);
   border-radius: 10px;
   padding: 14px 18px;
@@ -384,7 +382,7 @@ dl.facts dd {
 }
 
 pre.output {
-  background: var(--panel-2);
+  background: var(--surface);
   border: 1px solid var(--border);
   border-radius: 6px;
   padding: 10px 12px;
@@ -426,7 +424,7 @@ pre.output {
 }
 
 .md-body code {
-  background: var(--panel-2);
+  background: var(--surface);
   border: 1px solid var(--border);
   border-radius: 4px;
   padding: 1px 5px;
@@ -435,7 +433,7 @@ pre.output {
 
 /* Code blocks keep their lines intact and scroll on their own. */
 .md-body pre {
-  background: var(--panel-2);
+  background: var(--surface);
   border: 1px solid var(--border);
   border-radius: 8px;
   padding: 12px 14px;
@@ -453,7 +451,7 @@ pre.output {
 
 /* Frontmatter is a definition list, and must not read as document content. */
 .md-frontmatter {
-  background: var(--panel-2);
+  background: var(--surface);
   border: 1px solid var(--border);
   border-radius: 8px;
   padding: 10px 14px;
@@ -501,7 +499,7 @@ pre.output {
 }
 
 .md-body th {
-  background: var(--panel);
+  background: var(--surface);
   text-align: left;
   font-weight: 600;
 }
@@ -526,7 +524,7 @@ pre.output {
 .tc-container { margin-top: 16px; }
 
 .tc-card {
-  background: var(--panel);
+  background: var(--surface);
   border: 1px solid var(--border);
   border-radius: 10px;
   padding: 16px 20px;
@@ -601,7 +599,7 @@ table.steps tr:last-child td { border-bottom: none; }
 .note-input {
   width: 100%;
   min-width: 140px;
-  background: var(--panel-2);
+  background: var(--surface);
   border: 1px solid var(--border);
   border-radius: 5px;
   color: var(--text);
@@ -627,7 +625,7 @@ table.steps tr:last-child td { border-bottom: none; }
 .tc-notes textarea {
   width: 100%;
   min-height: 44px;
-  background: var(--panel-2);
+  background: var(--surface);
   border: 1px solid var(--border);
   border-radius: 5px;
   color: var(--text);
@@ -648,7 +646,7 @@ table.steps tr:last-child td { border-bottom: none; }
   position: fixed;
   bottom: 20px;
   right: 20px;
-  background: var(--panel);
+  background: var(--surface);
   border: 1px solid var(--border);
   border-radius: 8px;
   padding: 8px 14px;
@@ -657,7 +655,7 @@ table.steps tr:last-child td { border-bottom: none; }
   z-index: 10;
 }
 .toast.error { border-color: var(--fail); color: var(--fail); }
-.toast.ok { border-color: var(--pass); color: var(--pass); }
+.toast.ok { border-color: var(--ok); color: var(--ok); }
 
 /* ----------------------------------------------------------- narrow view */
 /* At 1024×640 the three areas keep their own space and none of them overlaps

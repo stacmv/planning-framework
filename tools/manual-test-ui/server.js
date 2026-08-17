@@ -1003,6 +1003,13 @@ async function handleApi(req, res, parts, projects, query) {
     if (typeof tcId !== "string" || typeof step !== "number") {
       return sendJson(res, 400, { error: "tcId (string) and step (number) are required" });
     }
+    // A step marked passed with no explanation of what was actually verified
+    // is worse than an unchecked box — it looks done but records nothing.
+    // Unchecking never requires text: clearing a mistaken check is always
+    // allowed to leave the note blank.
+    if (checked === true && !String(note || "").trim()) {
+      return sendJson(res, 422, { error: "empty_result" });
+    }
     try {
       const content = fs.readFileSync(entry.checklistPath, "utf8");
       const patched = patchStepResult(content, tcId, step, { checked: !!checked, note: note || "" });

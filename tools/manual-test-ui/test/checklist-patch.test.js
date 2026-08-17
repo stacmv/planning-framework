@@ -253,7 +253,12 @@ test("TC-013 steps 5-6: line endings", async (t) => {
     assert.strictEqual(beforeLines[1].eol, "\r\n", "fixture precondition: the rest of the file is CRLF");
 
     const rowIndex = findLineIndex(before, (l) => l.startsWith("| 3 | Reload the page |"));
-    const res = await server.patch(`${base}/steps`, { tcId: "TC-001", step: 3, checked: true, note: "" });
+    // note is non-empty: a checked:true PATCH with an empty note is now
+    // rejected with 422 (empty_result) before any write happens, which
+    // would defeat this step's whole point (asserting what a *successful*
+    // write does to line endings). The EOL behaviour under test doesn't
+    // depend on the note's content.
+    const res = await server.patch(`${base}/steps`, { tcId: "TC-001", step: 3, checked: true, note: "ok" });
     assert.strictEqual(res.status, 200, `PATCH steps failed: ${res.text}`);
 
     const after = read();
@@ -274,7 +279,7 @@ test("TC-013 steps 5-6: line endings", async (t) => {
     assert.strictEqual(lineAt(after, 0).text, beforeLines[0].text, "line 0's text must be untouched");
     assert.strictEqual(lineAt(after, 0).eol, "\r\n", "line 0's ending is normalised to CRLF");
     assert.ok(!/(^|[^\r])\n/.test(after), "after the patch the whole file is CRLF");
-    assert.strictEqual(lineAt(after, rowIndex).text, "| 3 | Reload the page | The state survives the reload | [x] |");
+    assert.strictEqual(lineAt(after, rowIndex).text, "| 3 | Reload the page | The state survives the reload | [x] ok |");
   });
 });
 

@@ -81,6 +81,20 @@ Fields of a stage's role record:
   ```
   `code.review: skip` (skip *review only*, authorship still required) is a
   different, valid, value — see "`code.review: skip`" below.
+- **`mode`** — optional, `blocking | non-blocking`. Default `non-blocking` when
+  the field is absent. Governs whether this stage's task blocks the pipeline
+  from proceeding until it completes.
+
+  **Not to be confused with `review.mode` (§6).** These are two distinct
+  fields at different nesting levels, with different meanings:
+  - `roles.<key>.mode` (this field) — top-level on the role record, values
+    `blocking | non-blocking`, controls whether *the pipeline* waits on this
+    stage's task.
+  - `roles.<key>.review.mode` (§6) — nested under `review`, values
+    `parallel | sequential`, controls the *ordering of reviewers* within that
+    stage's review.
+
+  Do not conflate the two when editing either field.
 
 ### `code.review: skip`
 
@@ -111,6 +125,7 @@ actors:
   haiku:  { kind: llm, invoke: agent,  model: claude-haiku-4-5-20251001 }
   codex:  { kind: llm, invoke: codex-companion }
   gemini: { kind: llm, invoke: cli,    command: "gemini -p {prompt}" }
+  human:  { kind: human, inbox: project-explorer }
 ```
 
 `invoke` tells a consumer skill how to actually call the actor:
@@ -124,23 +139,25 @@ actors:
   this issue — the `gemini` entry above documents the shape only (see
   `specs.md` §12, Out of scope).
 
-### `kind: human` — not supported yet, and must fail explicitly
+### `kind: human` — handled by the resolver's caller
 
-An actor registry entry may eventually carry `kind: human`, e.g.:
+An actor registry entry may carry `kind: human`, e.g.:
 
 ```yaml
 human: { kind: human, inbox: project-explorer }
 ```
 
-This kind is **not implemented** in this issue (see BRD, Non-Goals — routed to
-`20260806-improve-project-explorer-redesign`). Any resolver that encounters
-`kind: human` while resolving an actor **must stop with an explicit,
-understandable error** — never an unhandled exception, never a silent
-no-op/skip:
+A resolver that encounters `kind: human` while resolving an actor does **not**
+stop with an error and does **not** throw an unhandled exception. It returns a
+structured result to its caller instead:
 
 ```
-actor '<name>' is kind: human — not supported until 20260806-improve-project-explorer-redesign
+{ kind: "human", inbox: <value> }
 ```
+
+Handling that result — i.e. queueing the task for a human to pick up — is the
+**calling code's** responsibility, not the resolver's. The queueing mechanics
+live in `lib/inbox.js` (`tools/manual-test-ui`), not in this skill file.
 
 ### Auto-creation
 
@@ -258,11 +275,18 @@ level 3 is checked first.
 
 ### `kind: human` and `code: skip` during resolution
 
-Resolving a stage's role can surface two distinct hard-stop conditions, each
-with its own explicit error (never an unhandled exception, never a silent
-skip) — see §2 for `kind: human` and §1 for `code: skip`. These are different
-failure conditions (an unsupported actor kind vs. an invalid role value) and
-must not be collapsed into one message.
+Resolving a stage's role can surface two distinct outcomes that consumers must
+handle explicitly, never with an unhandled exception and never by silently
+proceeding as if nothing happened:
+
+- **`kind: human`** (§2) is **not** a hard-stop/error condition — it is a
+  structured result (`{ kind: "human", inbox: <value> }`) requiring handling by
+  the calling code (queueing the task; see §2).
+- **`code: skip`** (§1) remains a real hard-stop: an invalid role value that the
+  resolver must reject with an explicit error.
+
+These are different conditions (a resolvable actor kind vs. an invalid role
+value) and must not be collapsed into one message or one handling path.
 
 ---
 
