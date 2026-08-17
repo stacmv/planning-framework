@@ -112,6 +112,28 @@ A TC marked `Auto` must be discoverable by `/pf-test`'s TC-ID scanning (Phase 3.
 | TC-001 | [Name]    | Auto/Manual | High | [ ]    |         |
 ```
 
+### Step 4a: Validate `Manual reason`
+
+After the Status Tracker is drafted, every `Manual`-type row's `Remarks` column must begin with `Manual reason: <value>` where `<value>` is one of the 5 words in `~/.claude/skills/pf-size-tiers/SKILL.md`'s closed vocabulary. If any `Manual` row is missing this prefix or uses a value outside the vocabulary, do not save `test_plan.md` yet — fix the offending row(s) (adding/correcting the `Manual reason:` prefix) before proceeding to Step 4b.
+
+### Step 4b: Count Manual cases and check budget
+
+Count how many rows in the Status Tracker have `Type: Manual`. Compare against the tier's budget from `~/.claude/skills/pf-size-tiers/SKILL.md`'s Manual test-case budget table (using this issue's own `size_tier`, read from `prompt.md`'s frontmatter). This budget check applies on every run of this skill — including a re-run against an issue that predates this rule (retroactive: an issue opened before this feature exists still gets its Manual count checked the same way on its next `/pf-test-plan` run). If the count is within budget, proceed straight to Step 5 (skip 4c/4d). If the count exceeds budget, proceed to Step 4c.
+
+### Step 4c: Automation pass
+
+Triggered only when Step 4b found the count over budget. Dispatch a separate, focused sub-agent (Agent tool, default/general-purpose type) whose sole job is: review the current Manual-type rows in the draft `test_plan.md`, and for each one, determine whether it is realistically convertible to `Auto` given a harness this repo's existing test conventions could support (see `test/lib.sh` and sibling `test/*.sh` for what "automatable" looks like in this repo — CLI output, file content checks, generated-document text checks are automatable; genuine human visual/UX judgment, a live interactive-agent-as-subject scenario, a paid/external system, or an environment unavailable in CI are not). For every row it converts, it changes that row's `Type` from `Manual` to `Auto` and updates `Remarks` to name the concrete harness/check that will verify it (replacing the `Manual reason: ...` text). For every row it does NOT convert, it must either confirm the row's existing `Manual reason` is one of the 5 valid categories that genuinely can't be automated, or — if the row needs a harness that doesn't exist yet — add a task for building that harness (do not silently leave the case Manual with no path forward; the missing-harness task belongs in `implementation_plan.md`, added at the next stage, not by this sub-agent itself — this sub-agent just names what's needed in its summary so the orchestrator or downstream author can act on it). After the automation pass returns, re-count Manual rows (same as Step 4b). If now within budget, proceed to Step 5. If still over budget, proceed to Step 4d.
+
+### Step 4d: Gate — ask the user
+
+Triggered only when Step 4c's post-automation-pass count is still over budget. Use `AskUserQuestion` with the question "This test plan has more Manual cases than the `<size_tier>` tier's budget (`<count>` vs `<budget>`, hard cap 5) even after automating what could be automated. How do you want to proceed?" and exactly these three options — no fourth option, no "accept as-is":
+
+- **"Split the issue"** (recommended when the excess is one coherent chunk of functionality) — on this choice, add a note to `test_plan.md` (e.g. a short paragraph above or within the Status Tracker section) recording that a split is recommended, and which cases are the excess.
+- **"Raise the tier"** (requires a written justification) — on this choice, ask the user for a short justification text, then update `prompt.md`'s `size_tier` field to the next tier up, record the justification and the old→new tier change as a note in `test_plan.md`, and re-check the Manual count against the new tier's budget (it should now fit, since budgets grow with tier up to the hard cap of 5 — if it still doesn't fit even at `large`, the hard cap itself is exceeded, which this same gate does not resolve further; save what you have and note that the hard cap is still exceeded).
+- **"Defer the excess"** — on this choice, add a note to `test_plan.md` (e.g. a "Deferred Manual cases" remark near the Status Tracker) naming which cases are deferred and why. This is purely informational — no debt registry exists yet (that's future issue `20260806-feat-product-test-plan`); the note is the whole mechanism for now.
+
+After the chosen option's action completes, save `test_plan.md` and finish normally (do not treat the gate as a failure state — the skill still completes successfully, per whichever option was chosen).
+
 ### Step 5: Add Known Issues Section
 
 (Omit this entire section for `size_tier: trivial` and `size_tier: small` — see the tier instructions above. Include it for `medium`/`large`.)
