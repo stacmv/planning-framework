@@ -593,9 +593,9 @@
 | TC-008 | Manual-кейс без `Manual reason` отклоняется | Auto | Critical | ✓ | Harness: validate-manual-reason-required |
 | TC-009 | Automation pass — успешная конвертация Manual→Auto | Auto | Critical | ✓ | Harness: automation-pass, cli-output-check |
 | TC-010 | Automation pass с отсутствующим харнессом | Auto | High | ✓ | Harness: automation-pass, missing-harness-detection, impl-plan-task-create |
-| TC-011 | Гейт — вариант «Разбить issue» | Manual | High | [ ] | Manual test; requires human verification of AskUserQuestion handling and decision recording in test_plan.md |
-| TC-012 | Гейт — вариант «Поднять tier» | Manual | High | [ ] | Manual test; requires human verification of tier-change logic and justification recording |
-| TC-013 | Гейт — вариант «Отложить избыток» | Manual | High | [ ] | Manual test; requires human inspection of deferred-case logic and prose accuracy in test_plan.md |
+| TC-011 | Гейт — вариант «Разбить issue» | Manual | High | ✓ | Прогнано вручную 2026-08-17 — см. manual_test_checklist.md |
+| TC-012 | Гейт — вариант «Поднять tier» | Manual | High | ✓ | Прогнано вручную 2026-08-17 — см. manual_test_checklist.md |
+| TC-013 | Гейт — вариант «Отложить избыток» | Manual | High | ✓ | Прогнано вручную 2026-08-17 — см. manual_test_checklist.md |
 | TC-014 | Ретроактивная применимость на старой issue | Auto | High | ✓ | Harness: retroactive-budget-enforcement; uses existing old issue |
 | TC-015 | Manual reason валидация vs. механическое покрытие | Auto | Medium | ✓ | Harness: validate-reason-vs-harness-coverage |
 | TC-016 | Успешная конвертация сохраняет логику | Auto | Medium | ✓ | Harness: compare-case-logic-before-after |
