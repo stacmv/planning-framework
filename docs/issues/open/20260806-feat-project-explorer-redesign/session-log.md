@@ -83,3 +83,12 @@ Prerequisite-раздел), ни одной Task Type: docs.
 @ 2026-08-17T15:22:11Z
 
 [pf-check PASSED] implementation_plan.md @ 2026-08-17T15:22:11Z
+
+[owner sign-off] AC-02k / specs.md §5.4 — референсные скриншоты GLog v.0.7
+сохранены в папку issue (`reference-glog-list.png`, `reference-glog-detail.png`).
+Итоговая палитра/типографика specs.md (Pine-токены §5.1, `.panel`-паттерн §5.2,
+h1 1.3–1.8× body §5.3) подтверждена владельцем по демо/скриншот-ревью как
+«удобно для длительной работы», не очередная отвергнутая попытка.
+Prerequisite (implementation_plan.md) выполнен полностью — /pf-execute для
+этой issue разблокирован.
+@ 2026-08-17T15:50:14Z
