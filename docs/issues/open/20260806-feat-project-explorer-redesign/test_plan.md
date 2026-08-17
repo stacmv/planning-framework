@@ -832,34 +832,34 @@ specs.md §4.4 утверждает обратное («существующая
 | TC-002 | Уровень 2 — рабочее пространство без сайдбара, `.doc-tabs` по роли | Auto | High | ✓ | |
 | TC-003 | Переключение issue сохраняет активный таб документа в рамках роли | Auto | High | ✓ | |
 | TC-004 | Клик-путь проект → документ — не больше двух/трёх кликов | Auto | High | ✓ | |
-| TC-005 | Страница скроллится штатно | Auto | High | [ ] | No test in the diffed suite labels itself TC-005 (title or adjacent comment) — unmapped, not a failure |
+| TC-005 | Страница скроллится штатно | Auto | High | ✓ | |
 | TC-006 | Автотест контраста `test/contrast.test.js` | Auto | Critical | ✓ | |
-| TC-007 | Токены `:root` — точное соответствие палитре Pine | Auto | High | [ ] | No test in the diffed suite labels itself TC-007 — unmapped, not a failure |
-| TC-008 | Захардкоженные цветовые литералы заменены токенами | Auto | High | [ ] | No test in the diffed suite labels itself TC-008 — unmapped, not a failure |
-| TC-009 | Соотношение размеров `h1`/body — 1.3–1.8x | Auto | Medium | [ ] | No test in the diffed suite labels itself TC-009 — unmapped, not a failure |
-| TC-010 | `.panel-table` — мягкая тональная заливка вместо жёстких grid-линий | Auto | High | [ ] | No test in the diffed suite labels itself TC-010 — unmapped, not a failure |
-| TC-011 | Sans-serif для прозы, monospace только для кода | Auto | Medium | [ ] | `font-family.test.js` covers this but no test title/adjacent comment carries "TC-011" — unmapped, not a failure |
+| TC-007 | Токены `:root` — точное соответствие палитре Pine | Auto | High | ✓ | |
+| TC-008 | Захардкоженные цветовые литералы заменены токенами | Auto | High | ✓ | |
+| TC-009 | Соотношение размеров `h1`/body — 1.3–1.8x | Auto | Medium | ✓ | |
+| TC-010 | `.panel-table` — мягкая тональная заливка вместо жёстких grid-линий | Auto | High | ✓ | |
+| TC-011 | Sans-serif для прозы, monospace только для кода | Auto | Medium | ✓ | |
 | TC-012 | Визуальная приёмка панельной раскладки по референсу | Manual | High | [ ] | Manual reason: human-judgment |
 | TC-013 | Owner sign-off палитры и типографики до старта `/pf-execute` | Manual | Critical | [ ] | Manual reason: human-judgment |
 | TC-014 | `:focus-visible` — контраст индикатора и нативные `<button>` | Auto | Medium | ✓ | |
 | TC-015 | Живая проверка табуляции и видимого фокуса по всему приложению | Manual | High | [ ] | Manual reason: environment — нет headless-браузерного харнесса в этом zero-dependency проекте |
-| TC-016 | `GET /api/inbox` — агрегация across projects, форма ответа | Auto | Critical | [ ] | `inbox.test.js` covers this but no test title/adjacent comment carries "TC-016" — unmapped, not a failure |
-| TC-017 | Парсинг `Origin` для `manualTests[].issueId` — обязательность и защита | Auto | High | [ ] | `inbox.test.js` covers this but "TC-017" only appears in an inline assertion comment, not a test label — unmapped, not a failure |
+| TC-016 | `GET /api/inbox` — агрегация across projects, форма ответа | Auto | Critical | ✓ | |
+| TC-017 | Парсинг `Origin` для `manualTests[].issueId` — обязательность и защита | Auto | High | ✓ | |
 | TC-018 | Инбокс — два раздела из одного ответа `/api/inbox` | Auto | High | ✓ | |
 | TC-019 | Карточка глобального инбокса на лаунчере — суммарное число дел | Auto | High | ✓ | |
 | TC-020 | Обязательные поля каждого элемента инбокса | Auto | High | ✓ | |
-| TC-021 | `lib/roles-resolve.js` — разбор ограниченного flow-YAML подмножества | Auto | High | [ ] | `roles-resolve.test.js` covers this but carries no "TC-021" anywhere — unmapped, not a failure |
-| TC-022 | `lib/roles-resolve.js` — задокументированное ограничение (multi-line block-style) | Auto | Medium | [ ] | `roles-resolve.test.js` covers this but carries no "TC-022" anywhere — unmapped, not a failure |
+| TC-021 | `lib/roles-resolve.js` — разбор ограниченного flow-YAML подмножества | Auto | High | ✓ | |
+| TC-022 | `lib/roles-resolve.js` — задокументированное ограничение (multi-line block-style) | Auto | Medium | ✓ | |
 | TC-023 | Операция → `human` — очередь вместо авто-выполнения, `mode` blocking/non-blocking; новая проверка непустого Result (AC-05c) | Auto | Critical | ✓ | |
 | TC-024 | `POST .../human-tasks/:key/complete` — валидация по типам | Auto | Critical | ✓ | |
-| TC-025 | Успешное завершение — хеш и маркер в `session-log.md`; переход в `stale` | Auto | High | [ ] | `human-tasks.test.js` covers this (stale round trip) but carries no "TC-025" in any test title or adjacent comment — unmapped, not a failure |
+| TC-025 | Успешное завершение — хеш и маркер в `session-log.md`; переход в `stale` | Auto | High | ✓ | |
 | TC-026 | `POST .../reassign` — построчная замена `write:` и её ограничение | Auto | High | ✓ | |
-| TC-027 | `agents.yml` дефолт получает `human`; hard-stop на `kind: human` снят | Auto | High | [ ] | No qualifying test file (no diffed test file, no file referencing the issue ID) covers this — unmapped, not a failure |
-| TC-028 | `/pf-close` Phase 0 — human-task check; `/pf-autopilot` снимает cron | Auto | Critical | [ ] | No qualifying test file covers this — unmapped, not a failure |
+| TC-027 | `agents.yml` дефолт получает `human`; hard-stop на `kind: human` снят | Auto | High | ✓ | |
+| TC-028 | `/pf-close` Phase 0 — human-task check; `/pf-autopilot` снимает cron | Auto | Critical | ✓ | |
 | TC-029 | Счётчик «Дела» на уровне 2 — project-wide сумма, стабильна при смене роли | Auto | High | ✓ | |
 | TC-030 | `looseSections` — рендер «Дополнительные заметки», включая orphan `afterTc` | Auto | High | ✓ | |
 | TC-031 | US-08 — отсутствие новых зависимостей, три состояния чек-листа, точечная запись | Auto | High | ✓ | |
-| TC-032 | Write-allowlist — новые эндпоинты не пишут ничего сверх заявленного; нет мастера выбора актора | Auto | High | [ ] | `readonly.test.js` fully covers this (its own doc says so) but internally still labels its tests "TC-012" (stale pre-renumbering id) — no literal "TC-032" anywhere — unmapped, not a failure |
+| TC-032 | Write-allowlist — новые эндпоинты не пишут ничего сверх заявленного; нет мастера выбора актора | Auto | High | ✓ | |
 
 ## Known Issues
 
