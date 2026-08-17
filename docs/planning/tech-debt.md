@@ -33,3 +33,27 @@
   `pf-size-tiers/SKILL.md` использует `0-1` для trivial, но `≤N` для
   остальных tier — неоднородная нотация, без функционального эффекта. —
   state: `wont-fix`
+
+- `CR-007` (P2, 20260806-feat-project-explorer-redesign) — проект без единой
+  issue навсегда зависает на «Загрузка…» вместо информативного пустого
+  состояния (`workspace.js`, ветка `state.project ? "Загрузка…" : "Проект не
+  выбран."`). — state: `open`
+- `CR-008` (P2, 20260806-feat-project-explorer-redesign) — в `style.css`
+  остались мёртвые блоки `.shell`/`.app`/`.topbar`/`.sidebar`/`.content` от
+  старой разметки. — state: `open`
+- `CR-009` (P2, 20260806-feat-project-explorer-redesign) — `readonly.test.js`'s
+  AC-05j-грепчек проходит формально даже когда единственного разрешённого
+  action тоже нет — ложная уверенность. — state: `open`
+- `CR-010` (P2, 20260806-feat-project-explorer-redesign) — `pf.lastIssue.${project}`
+  в `launcher.js` — потенциальная коллизия ключей localStorage, если имя
+  проекта содержит `.`. — state: `open`
+- `CR-011` (P2, 20260806-feat-project-explorer-redesign) — счётчик «Дела (N)»
+  на заголовке таба не обновляется после действия внутри самого таба
+  (`state.projectTodoCount` мемоизирован, не инвалидируется). — state: `open`
+- `CR-012` (P2, 20260806-feat-project-explorer-redesign) — «Завершить»/«Отдать
+  агенту» в табе «Дела» тестируются только через застабленный `fetchImpl`, без
+  server-round-trip теста, в отличие от соседних веток той же волны. —
+  state: `open`
+- `CR-013` (P2, 20260806-feat-project-explorer-redesign) — `renderChecklistPanel`
+  больше не вызывается из продуктового кода, живо только ради тестов. —
+  state: `open`
