@@ -266,6 +266,68 @@ test("source: selectRole's body never calls resolveActiveTab; loadRoleContents d
 });
 
 // ---------------------------------------------------------------------------
+// countProjectTodos — TC-029 (pure, no DOM, no fetch).
+// ---------------------------------------------------------------------------
+
+// TC-029 step 1, literally: 2 pending manual TC on issue A + 1 human task on
+// issue B, both project "main" -> 3, project-wide, not per-issue.
+test("countProjectTodos sums manualTests + humanTasks across all issues of one project (TC-029 step 1)", async () => {
+  const mod = await loadModule();
+  const inboxResponse = {
+    manualTests: [
+      { project: "main", issueId: "20260101-feat-a", ptcId: "PTC-001" },
+      { project: "main", issueId: "20260101-feat-a", ptcId: "PTC-002" },
+    ],
+    humanTasks: [{ project: "main", issueId: "20260102-feat-b", stageKey: "specs" }],
+  };
+  assert.strictEqual(mod.countProjectTodos(inboxResponse, "main"), 3);
+});
+
+// TC-029 step 2: exactly two parameters — no role parameter at all. This is
+// the structural half of AC-06b: the function is physically incapable of
+// depending on role because it cannot see one.
+test("countProjectTodos takes exactly two parameters — no role parameter (TC-029 step 2, AC-06b)", async () => {
+  const mod = await loadModule();
+  assert.strictEqual(mod.countProjectTodos.length, 2);
+});
+
+test("countProjectTodos returns 0, not undefined/throw, for a project with no todos (TC-029 step 3)", async () => {
+  const mod = await loadModule();
+  const inboxResponse = {
+    manualTests: [{ project: "other-project", issueId: "20260101-feat-a", ptcId: "PTC-001" }],
+    humanTasks: [{ project: "other-project", issueId: "20260101-feat-a", stageKey: "specs" }],
+  };
+  assert.strictEqual(mod.countProjectTodos(inboxResponse, "main"), 0);
+});
+
+test("countProjectTodos ignores items of other projects and never counts by role", async () => {
+  const mod = await loadModule();
+  const inboxResponse = {
+    manualTests: [
+      { project: "main", issueId: "20260101-feat-a", ptcId: "PTC-001" },
+      { project: "side-project", issueId: "20260101-feat-a", ptcId: "PTC-099" },
+    ],
+    humanTasks: [
+      { project: "main", issueId: "20260102-feat-b", stageKey: "specs" },
+      { project: "main", issueId: "20260102-feat-b", stageKey: "code" },
+    ],
+  };
+  // No item carries a "role" field at all — filtering by project alone
+  // already yields the "across all roles" sum (specs.md §3.4).
+  for (const item of [...inboxResponse.manualTests, ...inboxResponse.humanTasks]) {
+    assert.ok(!("role" in item), "fixture items must not carry a role field, mirroring the real endpoint's shape");
+  }
+  assert.strictEqual(mod.countProjectTodos(inboxResponse, "main"), 3);
+});
+
+test("countProjectTodos handles null/empty inboxResponse without throwing", async () => {
+  const mod = await loadModule();
+  assert.strictEqual(mod.countProjectTodos(null, "main"), 0);
+  assert.strictEqual(mod.countProjectTodos({}, "main"), 0);
+  assert.strictEqual(mod.countProjectTodos({ manualTests: [], humanTasks: [] }, "main"), 0);
+});
+
+// ---------------------------------------------------------------------------
 // buildTabSet — TC-002 steps 2-4 (pure, no DOM).
 // ---------------------------------------------------------------------------
 
@@ -309,6 +371,8 @@ test("source: no hardcoded literal array of role document names (TC-002 step 4)"
 // mount() — TC-002 steps 1-3 through the module's own DOM rendering.
 // ---------------------------------------------------------------------------
 
+const EMPTY_INBOX_RESPONSE = { manualTests: [], humanTasks: [], totalCount: 0 };
+
 function baseRoutes(overrides = {}) {
   return {
     "/api/roles": ROLES_RESPONSE,
@@ -316,8 +380,16 @@ function baseRoutes(overrides = {}) {
     "/api/projects/proj-a/issues/20260101-feat-a/roles/tester": testerContents("20260101-feat-a", { qaReportPresent: true }),
     "/api/projects/proj-a/issues/20260102-feat-b/roles/tester": testerContents("20260102-feat-b", { qaReportPresent: false }),
     "/api/projects/proj-a/issues/20260101-feat-a/roles/developer": developerContents("20260101-feat-a"),
+    "/api/inbox": EMPTY_INBOX_RESPONSE,
     ...overrides,
   };
+}
+
+// A microtask-queue flush, for tests that need to wait for a `mount()`-level
+// async chain (e.g. `loadProjectTodoCount()`) that is deliberately NOT part
+// of `handle.ready` to settle before asserting on rendered output.
+function flush() {
+  return new Promise((resolve) => setTimeout(resolve, 0));
 }
 
 test("mount() renders a header with a back link and no persistent sidebar container, plus Issue/Роль selects", async () => {
@@ -486,4 +558,84 @@ test("mount(): back link navigates to level 1 via onNavigate when provided", asy
   const back = container.findAll((n) => n.className === "workspace-back")[0];
   back.dispatchClick();
   assert.deepStrictEqual(navigated, ["#/"]);
+});
+
+// ---------------------------------------------------------------------------
+// mount(): "Дела" counter — GET /api/inbox fetched once, reused across
+// [Роль ▾]/[Issue ▾] switches (TC-029 step 4, AC-06b).
+// ---------------------------------------------------------------------------
+
+test("mount(): fetches /api/inbox exactly once, even after switching Role and Issue (TC-029 step 4, AC-06b)", async () => {
+  installFakeDocument();
+  const container = new FakeElement("div");
+
+  let inboxCalls = 0;
+  const routes = baseRoutes({
+    "/api/inbox": {
+      manualTests: [
+        { project: "proj-a", issueId: "20260101-feat-a", ptcId: "PTC-001" },
+        { project: "proj-a", issueId: "20260101-feat-a", ptcId: "PTC-002" },
+      ],
+      humanTasks: [{ project: "proj-a", issueId: "20260102-feat-b", stageKey: "specs" }],
+    },
+    // Needed for this test's own selectRole("developer") -> selectIssue("20260102-feat-b")
+    // sequence — baseRoutes() only wires the developer role up for issue A.
+    "/api/projects/proj-a/issues/20260102-feat-b/roles/developer": developerContents("20260102-feat-b"),
+  });
+  const fetchImpl = async (url) => {
+    if (url === "/api/inbox") inboxCalls++;
+    return routedFetch(routes)(url);
+  };
+
+  const mod = await loadModule();
+  const handle = mod.mount(container, { project: "proj-a", issueId: "20260101-feat-a", initialRole: "tester", fetchImpl });
+  await handle.ready;
+  await flush(); // let loadProjectTodoCount (started in parallel with loadShell) settle
+
+  assert.strictEqual(inboxCalls, 1, "expected exactly one GET /api/inbox on initial mount");
+
+  await handle.selectRole("developer");
+  await flush();
+  await handle.selectIssue("20260102-feat-b");
+  await flush();
+
+  assert.strictEqual(inboxCalls, 1, "switching Role/Issue must not trigger a repeat GET /api/inbox");
+
+  // The counter is visible on the Дела tab's own label (project-wide: 2
+  // manualTests + 1 humanTask = 3), unaffected by the role/issue it just
+  // switched through.
+  const tabButtons = container.findAll((n) => n.tagName === "BUTTON" && n.dataset.tabId === mod.HUMAN_TASKS_TAB_ID);
+  assert.strictEqual(tabButtons.length, 1);
+  assert.strictEqual(tabButtons[0].textContent, "Дела (3)");
+});
+
+test("mount(): Дела tab label shows no count until /api/inbox resolves, then updates in place", async () => {
+  installFakeDocument();
+  const container = new FakeElement("div");
+
+  let resolveInbox;
+  const inboxPromise = new Promise((resolve) => {
+    resolveInbox = resolve;
+  });
+  const routes = baseRoutes();
+  const fetchImpl = async (url) => {
+    if (url === "/api/inbox") {
+      await inboxPromise;
+      return { ok: true, status: 200, json: async () => ({ manualTests: [{ project: "proj-a", issueId: "x", ptcId: "PTC-1" }], humanTasks: [] }) };
+    }
+    return routedFetch(routes)(url);
+  };
+
+  const mod = await loadModule();
+  const handle = mod.mount(container, { project: "proj-a", issueId: "20260101-feat-a", initialRole: "tester", fetchImpl });
+  await handle.ready;
+
+  let tabButtons = container.findAll((n) => n.tagName === "BUTTON" && n.dataset.tabId === mod.HUMAN_TASKS_TAB_ID);
+  assert.strictEqual(tabButtons[0].textContent, "Дела", "no count yet — /api/inbox has not resolved");
+
+  resolveInbox();
+  await flush();
+
+  tabButtons = container.findAll((n) => n.tagName === "BUTTON" && n.dataset.tabId === mod.HUMAN_TASKS_TAB_ID);
+  assert.strictEqual(tabButtons[0].textContent, "Дела (1)", "count appears once /api/inbox resolves, without a role/issue switch");
 });

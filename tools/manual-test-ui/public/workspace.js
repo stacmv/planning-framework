@@ -31,11 +31,11 @@
 //     never goes through this function.
 //
 // "Дела" (human tasks) is a new tab in every role's tab set, present from
-// this task onward so later tasks have somewhere to attach to: its counter
-// logic (`countProjectTodos`) is Task 25's job, and the richer content of
-// `manual_test_checklist.md`'s `looseSections` block is Task 26's job. This
-// file's tab-set model already has room for both — it is not a fixed list
-// of document tabs only.
+// Task 24 onward so later tasks have somewhere to attach to: its counter
+// logic (`countProjectTodos`, exported below) is Task 25's job — done in
+// this file — and the richer content of `manual_test_checklist.md`'s
+// `looseSections` block is Task 26's job. This file's tab-set model already
+// has room for both — it is not a fixed list of document tabs only.
 
 // Same storage key `public/launcher.js` writes on level 1 (tech spec §2.1:
 // "role switch on the launcher stores its choice in localStorage (`pf.role`),
@@ -132,6 +132,39 @@ export function resolveActiveTab(prevTabId, docsOfNewIssue) {
   return tabs.length ? tabs[0].id : null;
 }
 
+/**
+ * The "Дела" tab's counter (specs.md §3.4, US-06, AC-06a/AC-06b, TC-029):
+ * the sum of unclosed todos across ALL roles and ALL open issues of one
+ * project — never scoped to the currently-selected issue/role. An earlier
+ * draft of specs.md §2.2 scoped this to "all roles of *this* issue"; §3.4
+ * corrected that to project-wide during `/pf-check`, and this function is
+ * that corrected computation.
+ *
+ * Deliberately takes NO role parameter — that absence is the structural
+ * half of AC-06b (TC-029 step 2): a function that cannot see the role
+ * cannot make the counter depend on it, so switching `[Роль ▾]` is
+ * physically incapable of changing the result. Neither `manualTests[]` nor
+ * `humanTasks[]` carries a "role" field at all (a manual TC is always the
+ * tester's business by construction; a human task is tied to `stageKey`,
+ * not to a viewing role) — filtering by project alone already yields the
+ * "across all roles" sum, no separate role-union step needed.
+ *
+ * @param {{manualTests?: Array<{project?: string}>, humanTasks?: Array<{project?: string}>}|null} inboxResponse
+ *   A `GET /api/inbox` response (`server.js`, `lib/inbox.js`'s
+ *   `collectManualTests`/`collectHumanTasks`) — the same one
+ *   `public/inbox.js`'s global inbox screen fetches, reused here rather
+ *   than refetched (see `fetchInbox`/`mount()` below).
+ * @param {string} projectName
+ * @returns {number}
+ */
+export function countProjectTodos(inboxResponse, projectName) {
+  if (!inboxResponse || !projectName) return 0;
+  const manualTests = Array.isArray(inboxResponse.manualTests) ? inboxResponse.manualTests : [];
+  const humanTasks = Array.isArray(inboxResponse.humanTasks) ? inboxResponse.humanTasks : [];
+  const countOf = (items) => items.filter((item) => item && item.project === projectName).length;
+  return countOf(manualTests) + countOf(humanTasks);
+}
+
 // ---------------------------------------------------------------------------
 // localStorage helpers — best effort, mirroring the pattern this issue's
 // other new screens already use: storage unavailable or full just means a
@@ -213,6 +246,16 @@ async function fetchIssues(project, fetchImpl) {
 // this one response, for whichever (issue, role) pair is currently selected.
 async function fetchRoleContents(project, issueId, roleId, fetchImpl) {
   return fetchJson(`${issueBase(project, issueId)}/roles/${encodeURIComponent(roleId)}`, fetchImpl);
+}
+
+// GET /api/inbox — the same project-independent endpoint
+// `public/inbox.js`'s global inbox screen calls (specs.md §3.4). Its own
+// URL carries no project/issue/role — `mount()` below fetches it exactly
+// once per mount (`fetchInboxOnce`) and reuses the response for
+// `countProjectTodos` across every `[Роль ▾]`/`[Issue ▾]` switch (AC-06b,
+// TC-029 step 4).
+async function fetchInbox(fetchImpl) {
+  return fetchJson("/api/inbox", fetchImpl);
 }
 
 // ---------------------------------------------------------------------------
@@ -305,8 +348,9 @@ function statusBadgeText(item) {
 
 // The active tab's content pane. Deliberately small for this task: a doc tab
 // shows the server's own header fields plus, when the document is actually
-// `present`, its fetched content; the "Дела" tab is a placeholder Task 25
-// fills in with the real project-wide counter and content. Kinds this screen
+// `present`, its fetched content; the "Дела" tab's counter is real as of
+// Task 25 (`tab.label` already carries it — see `decorateHumanTasksTab` in
+// `mount()`), its richer content is still Task 26's job. Kinds this screen
 // does not yet have a dedicated pane for (`instructions`/`memory`/`action`)
 // still show the server's own header fields, just without a richer body —
 // none of that is in TC-002/TC-003's scope.
@@ -315,8 +359,8 @@ function renderDocPanel(tab, runtime) {
   panel.dataset.tabId = tab.id;
 
   if (tab.kind === "human-tasks") {
-    panel.appendChild(h("h2", null, "Дела"));
-    panel.appendChild(h("p", "muted", "Счётчик и содержимое этой вкладки появятся отдельной задачей."));
+    panel.appendChild(h("h2", null, tab.label));
+    panel.appendChild(h("p", "muted", "Содержимое этой вкладки появится отдельной задачей."));
     return panel;
   }
 
@@ -406,6 +450,10 @@ export function mount(container, options = {}) {
     tabs: [],
     activeTabId: null,
     error: null,
+    // The "Дела" tab's project-wide counter (`countProjectTodos`, AC-06a) —
+    // `null` until `/api/inbox` first resolves, then a number for the rest
+    // of this mount's lifetime (a project never changes within one mount).
+    projectTodoCount: null,
   };
 
   function navigate(hash) {
@@ -433,6 +481,44 @@ export function mount(container, options = {}) {
   function activeEndpoint() {
     const tab = state.tabs.find((t) => t.id === state.activeTabId);
     return tab && tab.item ? tab.item.endpoint : null;
+  }
+
+  // `/api/inbox` has exactly one call site in this whole module: this
+  // memoized promise (AC-06b, TC-029 step 4). It is created at most once per
+  // mount and never invalidated by `selectRole`/`selectIssue` — a project
+  // never changes within one mount, and the endpoint carries no project/
+  // issue/role of its own, so the first response is valid for the rest of
+  // this mount's lifetime.
+  let inboxPromise = null;
+  function fetchInboxOnce() {
+    if (!inboxPromise) inboxPromise = fetchInbox(options.fetchImpl);
+    return inboxPromise;
+  }
+
+  // Bakes `state.projectTodoCount` into the "Дела" tab's own label (kept out
+  // of `buildTabSet` itself, which stays a pure function of one role's
+  // response and knows nothing of `/api/inbox`). Called every time
+  // `state.tabs` is rebuilt, so a role/issue switch's fresh tab set still
+  // carries the already-known count instead of losing it.
+  function decorateHumanTasksTab() {
+    const tab = state.tabs.find((t) => t.id === HUMAN_TASKS_TAB_ID);
+    if (!tab) return;
+    tab.label = state.projectTodoCount === null ? "Дела" : `Дела (${state.projectTodoCount})`;
+  }
+
+  // Fetches (once) and computes the project-wide "Дела" counter, independent
+  // of `loadShell()`/`loadRoleContents()` — it does not need roles, issues
+  // or role contents to resolve, only `state.project` (AC-06a/AC-06b).
+  async function loadProjectTodoCount() {
+    if (!state.project) return;
+    try {
+      const inboxResponse = await fetchInboxOnce();
+      state.projectTodoCount = countProjectTodos(inboxResponse, state.project);
+    } catch {
+      state.projectTodoCount = null; // Дела tab just renders without a count
+    }
+    decorateHumanTasksTab();
+    render();
   }
 
   function render() {
@@ -473,6 +559,7 @@ export function mount(container, options = {}) {
     try {
       const contents = await fetchRoleContents(state.project, state.issueId, state.roleId, options.fetchImpl);
       state.tabs = buildTabSet(contents);
+      decorateHumanTasksTab(); // carry the already-known project-wide count into the fresh tab set
       state.activeTabId = preserveActiveTab ? resolveActiveTab(prevTabId, contents) : state.tabs[0]?.id ?? null;
       state.error = null;
     } catch (err) {
@@ -540,6 +627,12 @@ export function mount(container, options = {}) {
 
   render(); // paint immediately (role/issue may already be known)
   const ready = loadShell();
+  // Independent of `loadShell()`/`loadRoleContents()`: the "Дела" counter
+  // needs only `state.project` (AC-06a/AC-06b), not roles/issues/role
+  // contents, so it starts in parallel rather than waiting its turn — and is
+  // not folded into `ready`, so a test/caller awaiting `ready` is not made
+  // to depend on `/api/inbox` succeeding.
+  loadProjectTodoCount();
 
   return {
     selectIssue,
