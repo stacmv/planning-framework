@@ -5,11 +5,13 @@
 // (implementation_plan.md Task 6/7, specs.md §3.2, issue
 // 20260806-feat-project-explorer-redesign).
 //
-// This file currently implements only the `manualTests[]` half of what will
-// become `collectInbox(projects)`: the pending rows of every project's
-// `docs/planning/test-plan.md`. A later task extends this same module with
-// `humanTasks[]` (roles resolved to `kind: human`) and assembles both into
-// `collectInbox()`, which `server.js` then exposes as `GET /api/inbox`.
+// Two halves, two functions, merged by the caller (`server.js`'s
+// `GET /api/inbox`, Task 7) rather than by a `collectInbox()` wrapper here:
+//   * `collectManualTests(projects)` — the pending rows of every project's
+//     `docs/planning/test-plan.md`.
+//   * `collectHumanTasks(projects)` — every `(issue, roles.<key>)` pair that
+//     resolves to `kind: "human"` (`lib/roles-resolve.js`) and is not
+//     already done.
 //
 // Design constraints, the same ones `lib/roles.js`/`lib/markdown.js` state
 // for themselves:
@@ -30,6 +32,11 @@
 
 const fs = require("node:fs");
 const path = require("node:path");
+const crypto = require("node:crypto");
+const { execFileSync } = require("node:child_process");
+
+const git = require("./git");
+const rolesResolve = require("./roles-resolve");
 
 // ---------------------------------------------------------------------------
 // Status Tracker parsing (docs/planning/test-plan.md)
@@ -194,9 +201,216 @@ function collectManualTests(projects) {
   return manualTests;
 }
 
+// ---------------------------------------------------------------------------
+// humanTasks[] collection
+// ---------------------------------------------------------------------------
+//
+// specs.md §3.2 п.2-3, implementation_plan.md Task 7. For every configured
+// project, every OPEN issue, every pipeline key that `lib/roles-resolve.js`
+// resolves to `kind: "human"`: a queued (or stale) entry, unless a
+// `[human-task done] <key> @ <ts> content-hash=<sha>` marker in that issue's
+// `session-log.md` matches the artifact's *current* on-disk content.
+//
+// This module never writes that marker (a later task, POST
+// .../human-tasks/:key/complete) — it only reads and compares.
+
+// Mirrors ISSUE_ID_RE in server.js.
+const ISSUE_ID_RE = /^[0-9]{8}-(?:feat|improve|bug)-[a-z0-9-]+$/;
+
+// The eight `roles.<key>` pipeline keys resolved for every open issue
+// (specs.md §3.2 п.2).
+const PIPELINE_KEYS = ["brd", "specs", "test_plan", "implementation_plan", "code", "tests", "user_docs", "dev_docs"];
+
+// `<key>` -> the single file it resolves to inside the issue's own folder,
+// for the six keys that map to exactly one document. `code`/`tests` are
+// deliberately absent: they don't resolve to a single artifact file
+// (specs.md §4.4) — `artifactPath` is `null` for them, and their "what
+// counts as content" is the issue branch's HEAD commit instead (see
+// `currentContentIdentifier` below). Not merged into `docstate.js`'s
+// `ISSUE_DOC_STAGES` on purpose — that table means "the stage that creates
+// this document", a different concern from this key -> filename mapping.
+const DOC_KEY_FILES = {
+  brd: "brd.md",
+  specs: "specs.md",
+  test_plan: "test_plan.md",
+  implementation_plan: "implementation_plan.md",
+  user_docs: "user_docs.md",
+  dev_docs: "dev_docs.md",
+};
+
+const HUMAN_TASK_MARKER_RE = /\[human-task done\]\s+(\S+)\s+@\s+(\S+)\s+content-hash=(\S+)/g;
+
+/**
+ * Read one project-relative file (POSIX-style `rel`), disk first — the
+ * common case, matching every other reader in this module and in
+ * `server.js` — falling back to `git show <ref>:<rel>` when it isn't on
+ * disk (e.g. an open issue whose own branch isn't checked out right now;
+ * the same `here` vs `on_branch` split `server.js`'s `classifyChecklist`
+ * already makes for `manual_test_checklist.md`). `ref` may be `null`
+ * (no fallback attempted, e.g. a non-git "bare" project) — returns `null`
+ * when the file exists nowhere reachable.
+ */
+function readProjectFile(projectRoot, rel, ref) {
+  const abs = path.join(projectRoot, ...rel.split("/"));
+  try {
+    return fs.readFileSync(abs, "utf8");
+  } catch {
+    if (!ref) return null;
+    return git.showFile(projectRoot, ref, rel);
+  }
+}
+
+function sha256Hex(content) {
+  return crypto.createHash("sha256").update(content, "utf8").digest("hex");
+}
+
+// The HEAD commit sha of `issue/<issueId>`, or `null` when that branch
+// doesn't exist (not yet created, or a non-git project). A later task
+// (specs.md §4.4) fully implements the code/tests completion check
+// (ahead-of-parent + touches-a-non-docs-path); this is only the "what
+// counts as content" identifier that check's stale-detection would share
+// with everything else here.
+function issueBranchHeadSha(projectRoot, issueId) {
+  try {
+    return execFileSync("git", ["rev-parse", `issue/${issueId}`], {
+      cwd: projectRoot,
+      encoding: "utf8",
+      stdio: ["ignore", "pipe", "pipe"],
+    }).trim();
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * "What is the current content-identifier for this key?" — the one piece
+ * `stale` detection needs and the one piece that differs by key: a file
+ * hash for the six document keys, the issue branch's HEAD sha for
+ * `code`/`tests` (specs.md §4.4 — "контент" for those two is branch state,
+ * not a file). Kept as its own small function, not inlined, so a later task
+ * can swap the `code`/`tests` half for the real ahead-of-parent check
+ * without touching the document half.
+ *
+ * @returns {string|null} `null` means "no current content to compare against"
+ *   (artifact missing on disk, or branch doesn't exist) — never fabricated.
+ */
+function currentContentIdentifier(projectRoot, issueId, key, artifactRelPath) {
+  if (key === "code" || key === "tests") return issueBranchHeadSha(projectRoot, issueId);
+  if (!artifactRelPath) return null;
+  const abs = path.join(projectRoot, ...artifactRelPath.split("/"));
+  try {
+    return sha256Hex(fs.readFileSync(abs, "utf8"));
+  } catch {
+    return null;
+  }
+}
+
+// The *last* `[human-task done] <key> @ <ts> content-hash=<sha>` marker for
+// `key` in `session-log.md` — append-only (specs.md §4.2), so a re-completion
+// after a `stale` round-trip adds a new line rather than replacing the old
+// one, and the last one is the current truth.
+function findLastMarker(sessionLogContent, key) {
+  if (!sessionLogContent) return null;
+  HUMAN_TASK_MARKER_RE.lastIndex = 0;
+  let match;
+  let found = null;
+  while ((match = HUMAN_TASK_MARKER_RE.exec(sessionLogContent)) !== null) {
+    if (match[1] === key) found = { ts: match[2], contentHash: match[3] };
+  }
+  return found;
+}
+
+function instructionFor(key) {
+  if (key === "code") return "Implement code for this issue.";
+  if (key === "tests") return "Write tests for this issue.";
+  return `Write ${DOC_KEY_FILES[key]} for this issue.`;
+}
+
+/**
+ * The `humanTasks[]` half of `collectInbox()` (specs.md §3.2): every
+ * `(open issue, roles.<key>)` pair resolving to `kind: "human"`
+ * (`lib/roles-resolve.js`, `pf-roles/SKILL.md` §4) that isn't already done.
+ *
+ * A pair with a `[human-task done]` marker whose recorded hash matches the
+ * artifact's *current* content is DONE and excluded entirely. A pair with a
+ * marker whose hash does **not** match is `stale` and included — never
+ * silently dropped (AC-05f/M5). A pair with no marker at all is `queued`.
+ *
+ * @param {Map<string, {root: string, configuredDefaultBranch?: string|null}>|
+ *   Iterable<[string, {root: string, configuredDefaultBranch?: string|null}]>} projects
+ * @returns {Array<{project: string, issueId: string, stageKey: string, operation: string,
+ *   mode: string, artifactPath: string|null, instruction: string, status: "queued"|"stale"}>}
+ */
+function collectHumanTasks(projects) {
+  const humanTasks = [];
+
+  for (const [projectName, project] of projects) {
+    const projectRoot = project.root;
+    const defaultBranch = git.resolveDefaultBranch(projectRoot, project.configuredDefaultBranch || null);
+    if (!defaultBranch) continue; // not a git repo (or no branch resolves) — nothing to enumerate
+
+    const openIssueIds = git
+      .listTreeNames(projectRoot, defaultBranch, "docs/issues/open")
+      .filter((name) => ISSUE_ID_RE.test(name));
+
+    const agentsText = readProjectFile(projectRoot, "docs/planning/agents.yml", defaultBranch) || "";
+    const roleProfilesText = readProjectFile(projectRoot, "docs/planning/role-profiles.yml", defaultBranch) || "";
+
+    for (const issueId of openIssueIds) {
+      const issueRel = `docs/issues/open/${issueId}`;
+      const issueBranch = `issue/${issueId}`;
+
+      const promptText = readProjectFile(projectRoot, `${issueRel}/prompt.md`, issueBranch);
+      if (promptText === null) continue; // no prompt.md anywhere for this issue — nothing to resolve
+
+      const sessionLogText = readProjectFile(projectRoot, `${issueRel}/session-log.md`, issueBranch) || "";
+
+      for (const key of PIPELINE_KEYS) {
+        const resolved = rolesResolve.resolveRole(key, { promptText, roleProfilesText, agentsText });
+        if (!resolved || resolved.kind !== "human") continue;
+
+        const artifactPath = DOC_KEY_FILES[key] ? `${issueRel}/${DOC_KEY_FILES[key]}` : null;
+        const currentId = currentContentIdentifier(projectRoot, issueId, key, artifactPath);
+        const marker = findLastMarker(sessionLogText, key);
+
+        let status;
+        if (!marker) {
+          status = "queued";
+        } else if (currentId !== null && marker.contentHash === currentId) {
+          continue; // marker matches current content — done, excluded entirely
+        } else {
+          status = "stale";
+        }
+
+        humanTasks.push({
+          project: projectName,
+          issueId,
+          stageKey: key,
+          // The only path `resolveRole` currently detects `kind: "human"`
+          // through is the `write` actor (it never inspects `review[]` for
+          // a human reviewer) — so every entry here is a write task today.
+          // Kept as its own field, not a literal, so a future `review[]`
+          // check doesn't have to touch this shape.
+          operation: "write",
+          mode: resolved.mode || "non-blocking",
+          artifactPath,
+          instruction: instructionFor(key),
+          status,
+        });
+      }
+    }
+  }
+
+  return humanTasks;
+}
+
 module.exports = {
   TEST_PLAN_RELATIVE_PATH,
   splitTableCells,
   parseStatusTrackerRows,
   collectManualTests,
+  ISSUE_ID_RE,
+  PIPELINE_KEYS,
+  DOC_KEY_FILES,
+  collectHumanTasks,
 };

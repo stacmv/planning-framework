@@ -216,8 +216,8 @@ Criteria этого раздела)
 - Экспортировать отдельно переиспользуемые примитивы (парсинг одной flow-строки в объект, парсинг списка) — понадобятся `POST .../reassign` (Задача 25) для построчной замены, хотя сама замена там текстовая, не через этот парсер.
 
 **Acceptance Criteria:**
-- [ ] TC-021 passes
-- [ ] TC-022 passes
+- [x] TC-021 passes
+- [x] TC-022 passes
 - [x] TC-027 passes (шаг 4 — резолвинг `human: { kind: human, inbox: project-explorer }` возвращает `{ kind: "human", inbox: "project-explorer" }`, без исключения)
 
 ---
@@ -237,8 +237,8 @@ Criteria этого раздела)
 - Негативный кейс (TC-022): fixture `prompt.md` с одним `<key>` в multi-line block-стиле — парсер не бросает необработанное исключение, результат для этого ключа не содержит вымышленных `write`/`review`.
 
 **Acceptance Criteria:**
-- [ ] TC-021 passes
-- [ ] TC-022 passes
+- [x] TC-021 passes
+- [x] TC-022 passes
 
 ---
 
@@ -259,8 +259,8 @@ Criteria этого раздела)
 - Human-задачи (`humanTasks[]`) — не в этой задаче, см. Задача 7 (зависит от Задачи 4, `lib/roles-resolve.js`).
 
 **Acceptance Criteria:**
-- [ ] TC-016 passes (часть про `manualTests[]`)
-- [ ] TC-017 passes
+- [x] TC-016 passes (часть про `manualTests[]`)
+- [x] TC-017 passes
 
 ---
 
@@ -281,9 +281,9 @@ Criteria этого раздела)
 - Один эндпоинт обслуживает и глобальный экран инбокса (Задача 15), и project-scoped счётчик «Дела» на уровне 2 (Задача 25) — клиент фильтрует один и тот же ответ по `project`, повторного запроса не требуется (`specs.md` §3.4).
 
 **Acceptance Criteria:**
-- [ ] TC-016 passes
-- [ ] TC-020 passes (обязательные поля `humanTasks[]`)
-- [ ] TC-025 passes (пересчёт stale при построении инбокса)
+- [x] TC-016 passes
+- [x] TC-020 passes (обязательные поля `humanTasks[]`)
+- [x] TC-025 passes (пересчёт stale при построении инбокса)
 
 ---
 
@@ -489,7 +489,7 @@ Criteria этого раздела)
 - Учесть, что эта задача выполняется поверх новой разметки Задач 23-27 (`.role-switch`/`.list`/`.notice` и т.п. могут получить новые имена классов) — искать литералы по факту в файле на момент выполнения, не по старым селекторам буквально.
 
 **Acceptance Criteria:**
-- [ ] TC-008 passes
+- [x] TC-008 passes
 
 ---
 

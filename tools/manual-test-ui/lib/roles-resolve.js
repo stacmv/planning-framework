@@ -372,7 +372,11 @@
    * @returns {object} one of:
    *   - `{ ok: true, key, level, skip: true }`
    *   - `{ ok: true, key, level, skip: false, write, review, run?, mode?, confirmed? }`
-   *   - `{ kind: "human", inbox, key }` — the resolved `write` actor is a human
+   *   - `{ kind: "human", inbox, key, level, mode? }` — the resolved `write` actor
+   *     is a human; `mode` travels with this result exactly as it does with the
+   *     non-human one (specs.md §4.1 — read "naravne s write/review/skip"),
+   *     since a caller queuing a human task (`lib/inbox.js`) needs to know
+   *     `blocking` vs. `non-blocking` just as much as any other caller does
    *   - `{ ok: false, key, error, message }` — an explicit, non-throwing failure
    *     (`invalid_skip`, `unrecognized`, `profile_not_found`, `no_default`)
    */
@@ -437,7 +441,9 @@
     if (result.write) {
       var actor = resolveActor(result.write, agentsText);
       if (actor.ok && actor.kind === "human") {
-        return { kind: "human", inbox: actor.inbox, key: key };
+        var humanResult = { kind: "human", inbox: actor.inbox, key: key, level: result.level };
+        if (result.mode !== undefined) humanResult.mode = result.mode;
+        return humanResult;
       }
     }
 

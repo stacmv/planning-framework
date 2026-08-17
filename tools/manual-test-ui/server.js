@@ -25,6 +25,7 @@ const memory = require("./lib/memory");
 const roles = require("./lib/roles");
 const docstate = require("./lib/docstate");
 const prepare = require("./lib/prepare");
+const inbox = require("./lib/inbox");
 
 const TOOL_DIR = __dirname;
 const PUBLIC_DIR = path.join(TOOL_DIR, "public");
@@ -812,6 +813,7 @@ async function handlePrepare(req, res, projectName, projectRoot, entry) {
 async function handleApi(req, res, parts, projects, query) {
   // parts = pathname split on "/", filtered — e.g.
   // ["api","roles"]
+  // ["api","inbox"]
   // ["api","projects"]
   // ["api","projects",":name","docs"]           ?path=<relative path>
   // ["api","projects",":name","instructions"]
@@ -831,6 +833,17 @@ async function handleApi(req, res, parts, projects, query) {
   // not of a repository.
   if (parts.length === 2 && parts[1] === "roles" && req.method === "GET") {
     return sendJson(res, 200, { roles: roles.listRoles() });
+  }
+
+  // GET /api/inbox — the "things to do" across every configured project, not
+  // scoped to whichever one the tool happens to be pointed "at" (specs.md
+  // §3.2, AC-04a): every pending manual test case plus every open issue's
+  // `roles.<key>` pair resolved to `kind: human` and not yet done
+  // (`lib/inbox.js`'s `collectManualTests`/`collectHumanTasks`).
+  if (parts.length === 2 && parts[1] === "inbox" && req.method === "GET") {
+    const manualTests = inbox.collectManualTests(projects);
+    const humanTasks = inbox.collectHumanTasks(projects);
+    return sendJson(res, 200, { manualTests, humanTasks, totalCount: manualTests.length + humanTasks.length });
   }
 
   if (parts.length === 2 && parts[1] === "projects" && req.method === "GET") {

@@ -90,7 +90,7 @@ body {
 .role-tab.active {
   background: var(--accent);
   border-color: var(--accent);
-  color: #fff;
+  color: var(--text);
   font-weight: 600;
 }
 
@@ -152,7 +152,7 @@ body {
 }
 
 .list li:hover { background: #1f232c; }
-.list li.active { background: var(--accent); color: #fff; }
+.list li.active { background: var(--accent); color: var(--text); }
 
 .list li .meta {
   font-size: 11px;
@@ -162,7 +162,7 @@ body {
   align-items: center;
   gap: 4px;
 }
-.list li.active .meta { color: #dbe6ff; }
+.list li.active .meta { color: var(--text); }
 
 .list li.note {
   color: var(--muted);
@@ -209,7 +209,7 @@ body {
 .badge.on-branch { border-color: var(--warn); color: var(--warn); }
 .badge.missing { border-color: var(--border); color: var(--muted); }
 .badge.na { border-color: var(--border); color: var(--muted); font-style: italic; }
-.list li.active .badge { border-color: rgba(255,255,255,0.5); color: #fff; }
+.list li.active .badge { border-color: rgba(255,255,255,0.5); color: var(--text); }
 
 /* ------------------------------------------------------------ intro pane */
 
@@ -294,14 +294,14 @@ dl.facts dd {
 .notice p { margin: 0 0 6px; line-height: 1.45; overflow-wrap: anywhere; }
 .notice p:last-child { margin-bottom: 0; }
 .notice.info { border-left-color: var(--accent); }
-.notice.warn { border-left-color: var(--warn); color: #f0d9a0; }
-.notice.error { border-left-color: var(--fail); color: #f2b5b1; }
+.notice.warn { border-left-color: var(--warn); color: var(--warn); }
+.notice.error { border-left-color: var(--fail); color: var(--fail); }
 .notice.muted-notice { border-left-color: var(--border); color: var(--muted); }
 
 .checkout-banner {
   background: #2a2210;
   border: 1px solid var(--warn);
-  color: #f0d9a0;
+  color: var(--warn);
   border-radius: 8px;
   padding: 12px 16px;
   margin-top: 12px;
@@ -314,7 +314,7 @@ dl.facts dd {
 
 .btn {
   background: var(--warn);
-  color: #1a1508;
+  color: var(--bg);
   border: none;
   border-radius: 6px;
   padding: 7px 14px;
