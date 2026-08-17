@@ -77,9 +77,9 @@ API/lib/CSS-текста/git-состояния — числовые контр�
 | Step | Action | Expected Result |
 |------|--------|-----------------|
 | 1 | Проверить `public/index.html`/`public/style.css` на отсутствие постоянного `.sidebar`-контейнера, использовавшегося в прежней раскладке. | Персистентного сайдбара нет — только `.workspace-header` с выпадающими списками. |
-| 2 | Выполнить `GET /api/roles`, затем для роли `tester` — `GET /api/projects/:name/issues/:id/docs`. | Ответ содержит ровно набор `roles.itemsOf("tester")` плюс таб «Дела»; ни `brd`, ни `specs`, ни `implementation_plan` не входят в этот набор (переиспользует инвариант `test/roles.test.js` TC-006 — «роль показывает ровно то, что объявляет»). |
-| 3 | Повторить шаг 2, запросив документы для роли `developer` вместо `tester` (эквивалент переключения `[Роль ▾]` на уровне API, без браузера). | Набор — ровно `roles.itemsOf("developer")` плюс «Дела»; `test_plan`/`brd` не входят в него ни в одном ответе — оба набора никогда не пересекаются. |
-| 4 | Grep `public/workspace.js` на захардкоженный литеральный список имён документов (например массив, одновременно содержащий `"specs"`, `"implementation_plan"`, `"test_plan"`, `"brd"`). | Такого списка нет — `.doc-tabs` строится из данных, полученных от `GET /api/roles`, а не из константы в клиентском коде (`lib/roles.js` не потребовал правок — специфицировано в §2.2). |
+| 2 | Выполнить `GET /api/roles`, затем `GET /api/projects/:name/issues/:id/roles/tester` (`buildRoleContents` для роли «Тестировщик», `server.js`, specs.md §2.2 — НЕ `GET .../docs`, который отдаёт один документ по `?path=` и не принимает роль вовсе). | Ответ (`payload.items`) содержит ровно набор `roles.itemsOf("tester")` — `test_plan.md`, `manual_test_checklist.md`, `qa_report.md`, `.qa-workflow.md`, `prepare`; ни `brd.md`, ни `specs.md`, ни `implementation_plan.md` не входят в этот набор (переиспользует инвариант `test/roles.test.js` TC-006 — «роль показывает ровно то, что объявляет»). Клиентский таб «Дела» добавляется поверх этого ответа самим `workspace.js`, не отдаётся `GET .../roles/:role` (specs.md §2.2). |
+| 3 | Повторить шаг 2, вызвав `GET /api/projects/:name/issues/:id/roles/developer` вместо `.../roles/tester` (эквивалент переключения `[Роль ▾]` на уровне API, без браузера). | Набор — ровно `roles.itemsOf("developer")` — `specs.md`, `implementation_plan.md`, `docs/planning/implementation-plan.md`, `docs/planning/session-log.md`, `CLAUDE.md`, `memory`; `test_plan.md`/`brd.md` не входят в него ни в одном ответе — оба набора никогда не пересекаются. |
+| 4 | Grep `public/workspace.js` на захардкоженный литеральный список имён документов (например массив, одновременно содержащий `"specs"`, `"implementation_plan"`, `"test_plan"`, `"brd"`). | Такого списка нет — `.doc-tabs` строится из данных, полученных от `GET .../issues/:id/roles/:role` (`buildRoleContents`), а не из константы в клиентском коде (`lib/roles.js` не потребовал правок — специфицировано в §2.2). |
 
 **Test Data:**
 - `tools/manual-test-ui/test/helpers/fixtures.js` (issue-фикстура с полным набором документов по всем ролям)
@@ -92,17 +92,18 @@ API/lib/CSS-текста/git-состояния — числовые контр�
 
 ### TC-003: Переключение issue сохраняет активный таб документа в рамках роли
 
-**Description:** Проверяет правило specs.md §2.2 (снимает P0 из `/pf-check`): переключение issue в выпадающем списке не сбрасывает активный таб — если открыт `brd` issue A, переключение на issue B оставляет активным `brd` (или ближайший существующий документ, если `brd` у B ещё нет, по тем же правилам `missing`/`not_applicable`, что и сегодня). Это клиентское состояние, недостижимое через HTTP напрямую — тест предполагает, что `workspace.js` выражает это правило чистой функцией, экспортированной для тестирования (`require`d напрямую или загруженной через `node:vm`, как уже делает `test/roles.test.js` для клиентских модулей), например `resolveActiveTab(prevTabId, docsOfNewIssue)`, а не только вплетённой в обработчик клика.
+**Description:** Проверяет правило specs.md §2.2 (снимает P0 из `/pf-check`): переключение issue в выпадающем списке не сбрасывает активный таб — если открыт `brd` issue A, переключение на issue B оставляет активным `brd` (или ближайший существующий документ, если `brd` у B ещё нет, по тем же правилам `missing`/`not_applicable`, что и сегодня). Это клиентское состояние, недостижимое через HTTP напрямую — тест предполагает, что `workspace.js` экспортирует чистую функцию `resolveActiveTab(prevTabId, docsOfNewIssue)`, а не только вплетает правило в обработчик клика. Загрузка модуля — динамическим `import()` (см. Preconditions): `public/workspace.js` — нативный ES-модуль (`export`/`import`, specs.md §2.3), не UMD-модуль вроде `lib/roles.js`, поэтому `require()`/`vm.runInContext` для него не работают (`export` — синтаксическая ошибка вне модульного контекста); `test/roles.test.js`'s `node:vm`-загрузка `lib/roles.js` не прецедент для файлов из `public/`.
 
 **Preconditions:**
 - Проект с двумя issue: issue A имеет `brd.md`, issue B — не имеет `brd.md` (документ `missing`).
-- `public/workspace.js` экспортирует (или допускает загрузку через `node:vm` и последующий вызов) чистую функцию, реализующую правило «сохранить таб при смене issue» — задача на это должна быть заведена в `implementation_plan.md`, если модуль сейчас пишет это правило только внутри DOM-обработчика.
+- `public/workspace.js` экспортирует (`export function resolveActiveTab(...)`) чистую функцию, реализующую правило «сохранить таб при смене issue» — задача на это должна быть заведена в `implementation_plan.md`, если модуль сейчас пишет это правило только внутри DOM-обработчика.
+- Тест загружает модуль динамическим `import()`: `const { resolveActiveTab } = await import(pathToFileURL(path.join(TOOL_DIR, "public", "workspace.js")).href)` (`node:url`'s `pathToFileURL`). Это работает из CommonJS-тестового файла без флагов — Node's dynamic `import()` поддерживает ESM независимо от типа вызывающего модуля, в отличие от `require()`/`vm.runInContext` (non-module context), которым `export`-синтаксис недоступен без `vm.SourceTextModule` за флагом `--experimental-vm-modules` (нигде не подключённым в этом проекте).
 
 **Steps:**
 | Step | Action | Expected Result |
 |------|--------|-----------------|
-| 1 | Вызвать `resolveActiveTab("brd", docsOfIssueA)`, где `docsOfIssueA` — ответ `GET .../docs` issue A (роль `analyst`, `brd.md` присутствует). | Возвращает `"brd"` — таб не меняется, когда документ есть у обеих issue. |
-| 2 | Вызвать `resolveActiveTab("brd", docsOfIssueB)`, где `docsOfIssueB` — ответ `GET .../docs` issue B (`brd.md` отсутствует, `lib/docstate.js` классифицирует как `missing`). | Возвращает `"brd"` (таб остаётся тем же, документ рендерится в состоянии `missing`) — не переключение на другой документ автоматически, по тем же правилам, что и сегодня для `missing`/`not_applicable`. |
+| 1 | Вызвать `resolveActiveTab("brd", docsOfIssueA)`, где `docsOfIssueA` — ответ `GET .../issues/A/roles/analyst` (роль `analyst`, `brd.md` присутствует). | Возвращает `"brd"` — таб не меняется, когда документ есть у обеих issue. |
+| 2 | Вызвать `resolveActiveTab("brd", docsOfIssueB)`, где `docsOfIssueB` — ответ `GET .../issues/B/roles/analyst` (`brd.md` отсутствует, статус `"missing"` — `lib/docstate.js`). | Возвращает `"brd"` (таб остаётся тем же, документ рендерится в состоянии `missing`) — не переключение на другой документ автоматически, по тем же правилам, что и сегодня для `missing`/`not_applicable`. |
 | 3 | Отдельно проверить: смена роли не проходит через `resolveActiveTab` — набор вкладок для новой роли берётся заново из `roles.itemsOf(newRoleId)` (TC-002 шаг 3), не из предыдущего активного таба. | Правило «сохранить таб» применяется только внутри одной роли при смене issue, не при смене роли. |
 
 **Test Data:**
@@ -125,13 +126,13 @@ API/lib/CSS-текста/git-состояния — числовые контр�
 | Step | Action | Expected Result |
 |------|--------|-----------------|
 | 1 | Вызвать `resolveLandingRoute("A", { A: "20260806-feat-example" })`. | Возвращает hash, ведущий напрямую на уровень 2 issue `20260806-feat-example` (без промежуточного списка issue) — один клик по карточке проекта уже приводит к этому вызову, второй — переход к самому документу: итог 2 клика (проект → документ). |
-| 2 | Вызвать `resolveLandingRoute("B", {})` (записи `pf.lastIssue.B` нет). | Возвращает hash списка issue проекта B, не документ наугад и не пустой экран. |
+| 2 | Вызвать `resolveLandingRoute("B", {})` (записи `pf.lastIssue.B` нет). | Возвращает `#/p/B` — hash списка issue проекта B (специфицировано specs.md §2.3), не документ наугад и не пустой экран. |
 | 3 | Смоделировать выбор другой issue того же проекта из выпадающего списка на уровне 2 как отдельный вызов роутера (не через `resolveLandingRoute` — это уже происходящая на уровне 2 операция). | Итоговый маршрут достигается за 3 перехода (проект → issue → документ) — специфицировано как ожидаемое поведение, не нарушение M1 (AC-01e). |
 
 **Test Data:**
 - не требуются
 
-**Expected Outcome:** Хэш-роутинг (`#/`, `#/p/<project>/i/<issue>`) и `pf.lastIssue.<project>` дают ≤2 клика для уже активной issue и ровно на 1 клик больше при явном выборе другой issue.
+**Expected Outcome:** Хэш-роутинг (`#/`, `#/p/<project>`, `#/p/<project>/i/<issue>`) и `pf.lastIssue.<project>` дают ≤2 клика для уже активной issue и ровно на 1 клик больше при явном выборе другой issue.
 
 **Priority:** High
 
@@ -464,7 +465,8 @@ API/lib/CSS-текста/git-состояния — числовые контр�
 
 **Preconditions:**
 - Фикстура, где `manualTests.length + humanTasks.length === 7` (например 4 + 3).
-- `public/launcher.js` экспортирует (или допускает вызов через `require`/`node:vm`) чистую функцию форматирования подписи карточки, например `formatInboxCardLabel(totalCount)`, отдельную от DOM-рендеринга — если сейчас это не выделено, задача на это должна быть в `implementation_plan.md`.
+- `public/launcher.js` экспортирует (`export function formatInboxCardLabel(...)`) чистую функцию форматирования подписи карточки, `formatInboxCardLabel(totalCount)`, отдельную от DOM-рендеринга — если сейчас это не выделено, задача на это должна быть в `implementation_plan.md`.
+- Загрузка — динамическим `import()`: `await import(pathToFileURL(path.join(TOOL_DIR, "public", "launcher.js")).href)`. `public/launcher.js` — нативный ES-модуль (`export`/`import`, specs.md §2.3), не UMD-модуль вроде `lib/roles.js` — `require()`/`vm.runInContext` не годятся (`export` — `SyntaxError` вне модульного контекста; `test/roles.test.js`'s `node:vm`-загрузка не прецедент для файлов из `public/`). Dynamic `import()` работает из CommonJS-тестового файла без флагов.
 
 **Steps:**
 | Step | Action | Expected Result |
@@ -517,12 +519,12 @@ API/lib/CSS-текста/git-состояния — числовые контр�
 | 1 | Скормить `lib/roles-resolve.js` строку `roles: { specs: { write: claude, review: [codex] } }`. | Верно разобраны `write: "claude"`, `review: ["codex"]` для ключа `specs`. |
 | 2 | Скормить `roles: { code: { write: codex, review: [claude], mode: blocking } }`. | Поле `mode` разобрано и возвращено в объекте резолвинга наравне с `write`/`review` (новое поле схемы §4.1). |
 | 3 | Скормить `roles: { dev_docs: skip }` (голый скаляр на уровне `<key>`). | Разобрано как `dev_docs: "skip"`, не как ошибка формата. |
-| 4 | Прогнать разбор на реальных `prompt.md` открытых issue этого репозитория (не выдуманная фикстура). | Все встречающиеся сегодня формы `roles:`-блока разбираются без исключений — специфика явно требует совместимости с реальными файлами, не только с синтетическими примерами. |
+| 4 | Скормить `lib/roles-resolve.js` фикстурный `roles:`-блок из нескольких ключей, зафиксированный как commit-нутый файл `tools/manual-test-ui/test/fixtures/prompt-roles-flow.md` (снимок реального однострочного flow-стиля, каким он написан в `prompt.md` этого репозитория на момент написания этого плана — не живой grep по `docs/issues/open/` при каждом прогоне), например:<br>`roles:`<br>`  brd: { write: claude, review: [codex] }`<br>`  specs: { write: codex, review: [claude], mode: blocking }`<br>`  code: { write: codex, review: [claude] }`<br>`  dev_docs: skip` | Все перечисленные `<key>` разобраны без исключений, с `write`/`review`/`mode`/голым-скаляром как на шагах 1-3 — набор фикстуры фиксирован коммитом, не зависит от текущего состояния `docs/issues/open/` в момент прогона теста (устраняет риск вакуумного прохождения при 0 совпадений или ложного падения от чужого issue в будущем). |
 
 **Test Data:**
-- `docs/issues/open/*/prompt.md` (реальные файлы репозитория на момент теста)
+- `tools/manual-test-ui/test/fixtures/prompt-roles-flow.md` (committed fixture, не живой glob по `docs/issues/open/`)
 
-**Expected Outcome:** Узкое, но полностью достаточное для сегодняшних `prompt.md` подмножество YAML разбирается корректно.
+**Expected Outcome:** Узкое, но полностью достаточное для сегодняшних `prompt.md` подмножество YAML разбирается корректно и воспроизводимо, на стабильном наборе фикстур.
 
 **Priority:** High
 
@@ -556,12 +558,15 @@ API/lib/CSS-текста/git-состояния — числовые контр�
 
 ---
 
-### TC-023: Операция → `human` — очередь вместо авто-выполнения, `mode` blocking/non-blocking
+### TC-023: Операция → `human` — очередь вместо авто-выполнения, `mode` blocking/non-blocking; новая проверка непустого Result (AC-05c)
 
-**Description:** Проверяет AC-05a/AC-05b — операция, зарезолвившаяся в `human`, не выполняется автоматически, а записывается в очередь с полями issue/стадия/операция/путь к артефакту/инструкция/статус; поддерживает `mode: blocking` и `mode: non-blocking` (дефолт), и `GET /api/projects/:name/issues/:id/human-tasks` отдаёт эти задачи.
+**Description:** Проверяет AC-05a/AC-05b — операция, зарезолвившаяся в `human`, не выполняется автоматически, а записывается в очередь с полями issue/стадия/операция/путь к артефакту/инструкция/статус; поддерживает `mode: blocking` и `mode: non-blocking` (дефолт), и `GET /api/projects/:name/issues/:id/human-tasks` отдаёт эти задачи. Отдельно проверяет AC-05c для ручных TC («UI не даёт закрыть кейс с пустыми результатами шагов») как **новое поведение, которое эта issue должна реализовать, а не существующую защиту**: прямая проверка кода показывает, что сегодня её нет — `lib/checklist.js`'s `patchStepResult(content, tcId, stepNum, { checked, note })` принимает `note || ""` без какой-либо проверки непустоты, `summarize()` считает только `checked` (не `note`), а маршрут `PATCH .../checklist/steps` в `server.js` валидирует только типы тела запроса (`tcId` — строка, `step` — число), не содержимое `note`. Понятия «закрыть кейс» в клиенте сегодня тоже не существует — есть только поштучная запись Result по шагам.
+
+specs.md §4.4 утверждает обратное («существующая проверка непустого Result по шагам (`lib/checklist.js`) уже это делает — не меняется, только становится видна как часть инбокса») — это тот же ошибочный тезис, что и в прежней редакции этого TC, зафиксированный уже в самом specs.md. Это пробел спецификации, который реализация должна закрыть: `implementation_plan.md` заводит отдельную задачу на саму проверку, а не только на её показ в инбоксе. Поскольку specs.md не определяет отдельный API «закрытия» ручного TC (Manual TC явно не проходит через `/human-tasks`, см. §4.4), самый конкретный и проверяемый механизм — расширить существующий путь записи Result: `PATCH .../checklist/steps` отклоняет попытку записать `checked: true` с пустым (после `trim()`) `note`. При таком правиле кейс физически не может оказаться «закрытым» (все шаги отмечены) с пустыми результатами — цель AC-05c достигается на уровне единственной существующей точки записи, без изобретения отдельного «closed»-статуса, которого нет ни в специфике, ни в формате `manual_test_checklist.md`.
 
 **Preconditions:**
 - Issue с `prompt.md`, где `roles.specs.write` резолвится в `human` актора (`kind: human` в `agents.yml`).
+- Отдельная issue-фикстура (или тот же чек-лист) с TC, у которого есть хотя бы 2 шага, для проверки шагов 5-6.
 
 **Steps:**
 | Step | Action | Expected Result |
@@ -570,12 +575,13 @@ API/lib/CSS-текста/git-состояния — числовые контр�
 | 2 | Выполнить `GET /api/projects/:name/issues/:id/human-tasks`. | Задача для `specs` присутствует со статусом `queued`, полями `stageKey, operation, mode, artifactPath, instruction, status`. |
 | 3 | Проверить `mode`, когда `prompt.md` не указывает его явно. | `mode === "non-blocking"` (дефолт). |
 | 4 | Установить в фикстуре `roles.specs.mode: blocking`, повторить `GET .../human-tasks`. | `mode === "blocking"` отражён в ответе. |
-| 5 | (Регрессия AC-05c) Попытаться закрыть manual TC с пустым Result хотя бы одного шага через существующий checklist-флоу. | UI/сервер по-прежнему не позволяет отметить кейс выполненным — существующее поведение `lib/checklist.js` не нарушено редизайном инбокса. |
+| 5 | (AC-05c, негативный кейс — новая проверка) `PATCH .../checklist/steps` с телом `{ tcId, step, checked: true, note: "" }` (пустой/только-пробельный `note`) для шага manual TC. | Запрос отклонён (`4xx`, например `422 empty_result`) — сервер не позволяет отметить шаг выполненным без непустого текста в Result. До реализации этой issue тот же запрос проходил бы (см. Description) — это фиксирует именно новое поведение, не регрессию существующей защиты. |
+| 6 | (AC-05c, позитивный кейс) `PATCH .../checklist/steps` с тем же `tcId`/`step`, `checked: true, note: "ok"` (непустой Result). | `200`, шаг записан с `checked: true` и записанным `note` — путь успешной записи не задет новой проверкой. |
 
 **Test Data:**
-- `tools/manual-test-ui/test/helpers/fixtures.js` (issue с `roles.specs` → `human`, вариант с explicit `mode: blocking`)
+- `tools/manual-test-ui/test/helpers/fixtures.js` (issue с `roles.specs` → `human`, вариант с explicit `mode: blocking`; чек-лист-фикстура с TC на 2+ шага для шагов 5-6)
 
-**Expected Outcome:** Human-операция никогда не выполняется автоматически; режим блокировки читается корректно, дефолт — non-blocking.
+**Expected Outcome:** Human-операция никогда не выполняется автоматически; режим блокировки читается корректно, дефолт — non-blocking; AC-05c проверена как новая функциональность на конкретном, существующем эндпоинте (`PATCH .../checklist/steps`), а не задекларирована как уже работающая.
 
 **Priority:** Critical
 
@@ -718,7 +724,8 @@ API/lib/CSS-текста/git-состояния — числовые контр�
 
 **Preconditions:**
 - Проект с двумя открытыми issue: issue A имеет 2 `pending` manual TC, issue B — 1 human-задачу.
-- `public/workspace.js` экспортирует (или допускает загрузку через `require`/`node:vm`) чистую функцию, вычисляющую значение счётчика из ответа `/api/inbox`, например `countProjectTodos(inboxResponse, projectName)` — **без параметра роли**: отсутствие такого параметра в сигнатуре — сама структурная проверка AC-06b (счётчик физически не может зависеть от роли, если функция её не принимает). Если сейчас вычисление вплетено в рендер и не выделено, задача на это должна быть в `implementation_plan.md`.
+- `public/workspace.js` экспортирует (`export function countProjectTodos(...)`) чистую функцию, вычисляющую значение счётчика из ответа `/api/inbox`, `countProjectTodos(inboxResponse, projectName)` — **без параметра роли**: отсутствие такого параметра в сигнатуре — сама структурная проверка AC-06b (счётчик физически не может зависеть от роли, если функция её не принимает). Если сейчас вычисление вплетено в рендер и не выделено, задача на это должна быть в `implementation_plan.md`.
+- Загрузка — динамическим `import()`: `await import(pathToFileURL(path.join(TOOL_DIR, "public", "workspace.js")).href)`. `public/workspace.js` — нативный ES-модуль (specs.md §2.3), не UMD — `require()`/`vm.runInContext` не годятся для его `export`-синтаксиса; `test/roles.test.js`'s `node:vm`-загрузка `lib/roles.js` не прецедент здесь (`lib/roles.js` — UMD, `public/workspace.js` — нет). Dynamic `import()` работает из CommonJS-тестового файла без флагов.
 
 **Steps:**
 | Step | Action | Expected Result |
@@ -743,13 +750,14 @@ API/lib/CSS-текста/git-состояния — числовые контр�
 
 **Preconditions:**
 - `manual_test_checklist.md`-фикстура со строкой между двумя TC-блоками, не подходящей ни под одну известную метку (`lib/checklist.js` кладёт её в `looseSections`).
-- Рендер чек-листа вынесен в чистую функцию, экспортированную для тестирования (например `renderChecklistPanel(parsedChecklist)`, возвращающую HTML-строку или структуру узлов — вызываемую напрямую либо загруженную через `node:vm`, как уже делает `test/roles.test.js` для клиентских модулей). Если сейчас рендер вплетён только в DOM-обработчик без выделенной функции, задача на это должна быть в `implementation_plan.md`.
+- Рендер чек-листа вынесен в чистую функцию, экспортированную для тестирования: `export function renderChecklistPanel(parsedChecklist)`, возвращающую **HTML-строку (или другое чисто сериализуемое значение) и только это** — не структуру DOM-узлов: под `node --test` в этом zero-dependency проекте нет `document.createElement`/любого DOM API, так что ветка контракта, требующая построения узлов, невыполнима здесь в принципе. Если сейчас рендер вплетён только в DOM-обработчик без выделенной функции, задача на это должна быть в `implementation_plan.md`.
+- Загрузка — динамическим `import()`: `await import(pathToFileURL(path.join(TOOL_DIR, "public", "workspace.js")).href)` (предполагая, что `renderChecklistPanel` живёт в `public/workspace.js`, наследующем текущую логику рендера чек-листа, specs.md §2.4). `public/workspace.js` — нативный ES-модуль (specs.md §2.3) — `require()`/`vm.runInContext` не годятся для его `export`-синтаксиса; `test/roles.test.js`'s `node:vm`-загрузка `lib/roles.js` не прецедент здесь (`lib/roles.js` — UMD, `public/workspace.js` — нет). Dynamic `import()` работает из CommonJS-тестового файла без флагов.
 
 **Steps:**
 | Step | Action | Expected Result |
 |------|--------|-----------------|
 | 1 | Выполнить `GET /api/projects/:name/issues/:id/checklist`. | Ответ включает `looseSections: [{ afterTc, lineIndex, text }]`, как и сегодня (сервер уже отдаёт это поле). |
-| 2 | Вызвать `renderChecklistPanel(parsedChecklist)` с ответом шага 1; проверить порядок блоков в результате (строкой/по индексу узла). | Блок `.loose-sections` идёт после последнего TC-блока (`.panel`) в возвращённой разметке — не внутри какого-либо TC-блока; заголовок — «Дополнительные заметки», подпись «нераспознанный текст между блоками чек-листа — не тест-кейс». |
+| 2 | Вызвать `renderChecklistPanel(parsedChecklist)` с ответом шага 1; проверить порядок блоков в возвращённой строке по индексу вхождения подстроки (`String.prototype.indexOf`). | Блок `.loose-sections` идёт после последнего TC-блока (`.panel`) в возвращённой строке — не внутри какого-либо TC-блока; заголовок — «Дополнительные заметки», подпись «нераспознанный текст между блоками чек-листа — не тест-кейс». |
 | 3 | Проверить CSS-класс блока. | Не `.panel` — отдельный класс (пунктирная граница, `color-mix(in srgb, var(--surface) 92%, var(--warn))` или эквивалент на `--warn`, не на `--accent`). |
 | 4 | Проверить порядок элементов внутри блока при нескольких `looseSections` с разными `afterTc`. | Группировка по `afterTc`, порядок — по возрастанию `lineIndex` (порядок появления в файле). |
 | 5 | Добавить в фикстуру элемент с `afterTc`, не совпадающим ни с одним TC-блоком чек-листа (искусственно рассинхронизированные данные). | Элемент всё равно отрендерен, в конце блока — не отброшен молча (переносит принцип `lib/checklist.js` «don't let it vanish silently» на UI). |
@@ -790,23 +798,25 @@ API/lib/CSS-текста/git-состояния — числовые контр�
 
 ### TC-032: Write-allowlist — новые эндпоинты не пишут ничего сверх заявленного; никакого мастера выбора актора не добавлено
 
-**Description:** Проверяет BRD Non-Goals (точный allowlist автоматических записей: `roles.<key>.write` в `prompt.md` при переназначении — AC-05g; append-only запись о переназначении в `session-log.md` — AC-05g; запись Result/чекбоксов в `manual_test_checklist.md` — AC-05c/действующее поведение US-08c; плюс маркер `[human-task done]` в `session-log.md` — §4.2) и AC-05j (точка входа для назначения актора остаётся ручной правкой `prompt.md`, отдельного UI-визарда эта issue не добавляет). Расширяет существующий `test/readonly.test.js` (сегодня инвентаризирует три разрешённых мутирующих действия) на два новых POST-маршрута этой issue.
+**Description:** Проверяет BRD Non-Goals (точный allowlist автоматических записей: `roles.<key>.write` в `prompt.md` при переназначении — AC-05g; append-only запись о переназначении в `session-log.md` — AC-05g; запись Result/чекбоксов в `manual_test_checklist.md` — AC-05c/действующее поведение US-08c; плюс маркер `[human-task done]` в `session-log.md` — §4.2) и AC-05j (точка входа для назначения актора остаётся ручной правкой `prompt.md`, отдельного UI-визарда эта issue не добавляет). Расширяет существующий `test/readonly.test.js` на два фронта: маршрутную инвентаризацию (сегодня три разрешённых мутирующих семейства, плюс два новых POST-маршрута этой issue) **и** инвентаризацию git-аргументов в `lib/git.js` (сегодня `checkout`/`ls-tree`/`rev-parse`/`show`/`status`, TC-012 шаг 4 в `test/readonly.test.js`), которую эта issue расширяет пятью новыми обёртками (`git rev-list`, `git diff --name-only`, `git status --porcelain`, `git rev-parse`, `git config` — specs.md §4.4).
 
 **Preconditions:**
-- Существующий `test/readonly.test.js` (source-инвентаризация мутирующих маршрутов в `server.js` + поведенческая проверка через снимки рабочего дерева).
+- Существующий `test/readonly.test.js` (source-инвентаризация мутирующих маршрутов и git-аргументов в `server.js`/`lib/git.js` + поведенческая проверка через снимки рабочего дерева).
 
 **Steps:**
 | Step | Action | Expected Result |
 |------|--------|-----------------|
 | 1 | Прочитать `handleApi` в `server.js`, перечислить все `req.method !== "GET"` маршруты. | Ровно пять немутирующих-в-остальном семейств: три существующих (checklist patch, prepare, checkout) плюс `POST .../human-tasks/:key/complete` и `POST .../human-tasks/:key/reassign` — никакого шестого маршрута. |
-| 2 | Снять fingerprint рабочего дерева репозитория (как уже делает `test/readonly.test.js` для существующих трёх действий), вызвать `POST .../human-tasks/:key/complete` (успешный путь) для документного ключа. | Diff снимков показывает изменение ровно двух файлов: артефакт-документ (уже существовал, не создан заново) и `session-log.md` (добавлена ровно строка `[human-task done] ...`) — ничего больше. |
-| 3 | Тот же снимок/diff для `POST .../human-tasks/:key/reassign`. | Diff показывает изменение ровно `prompt.md` (только подстрока `write:`, см. TC-026) и `session-log.md` (append-only запись о переназначении) — ничего больше. |
-| 4 | Прогнать `POST .../human-tasks/:key/complete`/`.../reassign` против каждого pipeline-документа, которого Non-Goals не называет (например произвольная попытка через `artifactPath` затронуть `brd.md` при незапрошенном ключе). | Запись ограничена ровно тем артефактом, что резолвится для данного `:key` — нет способа затронуть произвольный файл issue через эти эндпоинты. |
-| 5 | Grep `public/*.js` на UI-элемент выбора актора вне действия «отдать агенту» на уже существующей human-задаче (например отдельный визард создания/переназначения роли из произвольного места интерфейса). | Такого элемента нет — назначение актора остаётся точечной правкой `prompt.md` владельцем, кроме единственного действия «отдать агенту» (AC-05g), которое уже покрыто TC-026 (AC-05j). |
+| 2 | Прочитать `lib/git.js`, тем же построчным способом, что и `test/readonly.test.js` TC-012 шаг 4 (regex по литеральным первым аргументам каждого `tryGit(cwd, [...])`), перечислить все git-подкоманды — включая пять новых обёрток этой issue (`rev-list`, `diff --name-only`, `status --porcelain`, `rev-parse`, `config`, specs.md §4.4). | Полный набор подкоманд — ровно `checkout`, `ls-tree`, `rev-parse`, `show`, `status` (существующие) плюс `rev-list`, `diff`, `config` (новые); ни одна не входит в запрещённый список (`commit`/`push`/`merge`/`reset`/`clean`), и ни одна из пяти новых обёрток не строит аргумент из непровалидированного пользовательского ввода (`issueId` уже прошёл `ISSUE_ID_RE`, `:key` уже провалидирован против ключей `roles:`, `actor` — против `agents.yml`). |
+| 3 | Снять fingerprint рабочего дерева репозитория (как уже делает `test/readonly.test.js` для существующих трёх действий), вызвать `POST .../human-tasks/:key/complete` (успешный путь) для документного ключа. | Diff снимков показывает изменение ровно двух файлов: артефакт-документ (уже существовал, не создан заново) и `session-log.md` (добавлена ровно строка `[human-task done] ...`) — ничего больше. |
+| 4 | Тот же снимок/diff для `POST .../human-tasks/:key/reassign`. | Diff показывает изменение ровно `prompt.md` (только подстрока `write:`, см. TC-026) и `session-log.md` (append-only запись о переназначении) — ничего больше. |
+| 5 | Прогнать `POST .../human-tasks/:key/complete`/`.../reassign` против каждого pipeline-документа, которого Non-Goals не называет (например произвольная попытка через `artifactPath` затронуть `brd.md` при незапрошенном ключе). | Запись ограничена ровно тем артефактом, что резолвится для данного `:key` — нет способа затронуть произвольный файл issue через эти эндпоинты. |
+| 6 | Grep `public/*.js` на UI-элемент выбора актора вне действия «отдать агенту» на уже существующей human-задаче (например отдельный визард создания/переназначения роли из произвольного места интерфейса). | Такого элемента нет — назначение актора остаётся точечной правкой `prompt.md` владельцем, кроме единственного действия «отдать агенту» (AC-05g), которое уже покрыто TC-026 (AC-05j). |
 
 **Test Data:**
 - `tools/manual-test-ui/test/helpers/snapshot.js` (существующий helper для fingerprint/diff рабочего дерева)
 - `tools/manual-test-ui/server.js`
+- `tools/manual-test-ui/lib/git.js`
 
 **Expected Outcome:** Allowlist мутаций остаётся исчерпывающим и явным после добавления human-actor эндпоинтов; отдельного UI-визарда назначения актора не появилось.
 
@@ -840,7 +850,7 @@ API/lib/CSS-текста/git-состояния — числовые контр�
 | TC-020 | Обязательные поля каждого элемента инбокса | Auto | High | [ ] | |
 | TC-021 | `lib/roles-resolve.js` — разбор ограниченного flow-YAML подмножества | Auto | High | [ ] | |
 | TC-022 | `lib/roles-resolve.js` — задокументированное ограничение (multi-line block-style) | Auto | Medium | [ ] | |
-| TC-023 | Операция → `human` — очередь вместо авто-выполнения, `mode` blocking/non-blocking | Auto | Critical | [ ] | |
+| TC-023 | Операция → `human` — очередь вместо авто-выполнения, `mode` blocking/non-blocking; новая проверка непустого Result (AC-05c) | Auto | Critical | [ ] | |
 | TC-024 | `POST .../human-tasks/:key/complete` — валидация по типам | Auto | Critical | [ ] | |
 | TC-025 | Успешное завершение — хеш и маркер в `session-log.md`; переход в `stale` | Auto | High | [ ] | |
 | TC-026 | `POST .../reassign` — построчная замена `write:` и её ограничение | Auto | High | [ ] | |
