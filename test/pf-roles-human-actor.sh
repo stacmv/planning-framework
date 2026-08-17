@@ -33,8 +33,7 @@ ROLES="$REPO_ROOT/skills/pf-roles/SKILL.md"
 CLOSE="$REPO_ROOT/skills/pf-close/SKILL.md"
 AUTOPILOT="$REPO_ROOT/skills/pf-autopilot/SKILL.md"
 
-# ══════════════════════════════════════════════════════════════════════════════
-printf '=== TC-027: agents.yml default gains `human`; kind: human hard-stop removed\n'
+printf '=== TC-027: agents.yml default gains human; kind: human hard-stop removed\n'
 # ══════════════════════════════════════════════════════════════════════════════
 
 if [ ! -f "$ROLES" ]; then
