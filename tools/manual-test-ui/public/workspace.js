@@ -166,6 +166,55 @@ export function countProjectTodos(inboxResponse, projectName) {
   return countOf(manualTests) + countOf(humanTasks);
 }
 
+// The "Дела" tab's "Отдать агенту" dropdown (AC-05g/AC-05j, Task 30, CR-002
+// fix) is built from `docs/planning/agents.yml`'s `actors:` block — a
+// project-specific, runtime-fetched list, never a literal name written down
+// here (the same "never hardcode what the server/config can answer" rule
+// `buildTabSet` follows for role documents). This is a minimal, independent
+// reimplementation of just enough of `lib/roles-resolve.js`'s flow-mapping
+// parse to list the `actors:` block's own top-level keys — NOT a reuse of
+// that module, which is UMD-wrapped for Node and not on `BROWSER_MODULES`'
+// allowlist (`server.js`) for browser `<script>`/import loading, and pulling
+// it in for one name list would be disproportionate. Pure (no DOM, no
+// fetch) so it's directly testable against a raw YAML string, the same way
+// `renderChecklistPanel` above is pure over a parsed-JSON input.
+//
+// Only reads flow-style entries (`  name: { ... }`, the one shape
+// `docs/planning/agents.yml` ships with — see `server.js`'s own
+// `DEFAULT_AGENTS_YAML`/`replacePromptRolesWrite` comments for why this
+// project standardizes on that style) at the `actors:` block's own
+// indentation level; a block-style or deeper-nested entry simply isn't
+// picked up (an empty/short list is a safe degradation — the dropdown just
+// offers fewer names — never a thrown error or a wrong name).
+export function parseActorNames(agentsYamlText) {
+  if (!agentsYamlText) return [];
+  const lines = String(agentsYamlText).replace(/\r\n/g, "\n").replace(/\r/g, "\n").split("\n");
+
+  let start = -1;
+  for (let i = 0; i < lines.length; i++) {
+    if (/^actors:\s*$/.test(lines[i])) {
+      start = i;
+      break;
+    }
+  }
+  if (start === -1) return [];
+
+  const names = [];
+  const entryRe = /^(\s+)([^\s:]+):\s*\{/;
+  let baseIndent = null;
+  for (let i = start + 1; i < lines.length; i++) {
+    const line = lines[i];
+    if (line.trim() === "") continue; // blank line inside the block — keep scanning
+    const m = entryRe.exec(line);
+    if (!m) break; // dedent (block ended) or a shape this parser doesn't read
+    const indent = m[1].length;
+    if (baseIndent === null) baseIndent = indent;
+    if (indent < baseIndent) break; // dedented past the block's own entries
+    if (indent === baseIndent) names.push(m[2]);
+  }
+  return names;
+}
+
 // The checklist document's own tab id (`tabIdFor("manual_test_checklist.md")`
 // — ".md" stripped, same rule every tab id follows). This is the one doc tab
 // `renderDocPanel` routes through the structured `GET .../checklist` fetch
@@ -474,6 +523,38 @@ async function patchJson(pathname, body, fetchImpl) {
   return data;
 }
 
+// POST counterpart of `patchJson` — same shape and same reasoning (one call
+// site per verb, `fetchImpl`-overridable, always tries to read a JSON error
+// body, surfaces `data.message`/`data.error` rather than swallowing a
+// rejection). Used by the "Дела" tab's complete/reassign actions below
+// (`POST .../human-tasks/:key/complete`, `POST .../human-tasks/:key/reassign`
+// — server.js, unchanged by this task): every error branch of both handlers
+// already sets a human `message` in its JSON body, so — unlike
+// `patchJson`'s `CHECKLIST_PATCH_ERROR_MESSAGES` map for a couple of bare
+// checklist codes — there is no bare-code case here to override.
+async function postJson(pathname, body, fetchImpl) {
+  const doFetch = fetchImpl || fetch;
+  const res = await doFetch(pathname, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+  });
+  let data = null;
+  try {
+    data = await res.json();
+  } catch {
+    /* no/invalid JSON body — data stays null, message falls back below */
+  }
+  if (!res.ok) {
+    const message = (data && data.message) || (data && data.error) || `POST ${pathname} failed: ${res.status}`;
+    const err = new Error(message);
+    err.status = res.status;
+    err.body = data;
+    throw err;
+  }
+  return data;
+}
+
 function projectBase(project) {
   return `/api/projects/${encodeURIComponent(project)}`;
 }
@@ -499,6 +580,38 @@ function checklistStepsEndpoint(project, issueId) {
 }
 function checklistNotesEndpoint(project, issueId) {
   return `${checklistEndpointFor(project, issueId)}/notes`;
+}
+
+// `GET .../issues/:id/human-tasks` (server.js, Task 10) — every `roles.<key>`
+// pair of this issue resolving to a human actor, `queued` or `stale`
+// (`lib/inbox.js`'s `collectHumanTasksForIssue`). The "Дела" tab's one list
+// endpoint (Task 30, CR-002 fix); also this module's own identity for that
+// tab in `activeEndpoint()` below, so a late response after the reader has
+// switched away is never painted into a panel that's no longer live.
+function humanTasksListEndpoint(project, issueId) {
+  return `${issueBase(project, issueId)}/human-tasks`;
+}
+
+// `POST .../human-tasks/:key/complete` / `POST .../human-tasks/:key/reassign`
+// (server.js, Tasks 11/12 — untouched by this task): the two writes the
+// "Дела" tab's own actions call. `key` is always one of `roles:`'s pipeline
+// keys (`stageKey` on a fetched task), never client-composed from anything
+// else.
+function humanTaskCompleteEndpoint(project, issueId, key) {
+  return `${humanTasksListEndpoint(project, issueId)}/${encodeURIComponent(key)}/complete`;
+}
+function humanTaskReassignEndpoint(project, issueId, key) {
+  return `${humanTasksListEndpoint(project, issueId)}/${encodeURIComponent(key)}/reassign`;
+}
+
+// `GET .../docs?path=docs/planning/agents.yml` — the one generic
+// project-document read route (`server.js`'s `parts.length === 4 &&
+// parts[3] === "docs"`) this module reuses rather than adding a
+// project-explorer-specific "list actors" endpoint for one dropdown.
+// `parseActorNames` above turns the raw YAML text this returns into the
+// "Отдать агенту" dropdown's option list.
+function agentsYamlEndpoint(project) {
+  return `${projectBase(project)}/docs?path=${encodeURIComponent("docs/planning/agents.yml")}`;
 }
 
 async function fetchRoles(fetchImpl) {
@@ -750,7 +863,12 @@ function buildNotesEditorNode(tc, handlers) {
   return wrap;
 }
 
-function setChecklistStatus(el, text, isError) {
+// Shared by the checklist write UI below AND the "Дела" tab's human-task
+// actions (`buildHumanTasksHandlers`) — both are "click Save/Завершить,
+// see Saving…/Saved/a visible error in the same status span" flows, so one
+// function, not two drifting copies. Not renamed to something checklist-
+// specific: the name predates the human-tasks UI, kept generic on purpose.
+function setActionStatus(el, text, isError) {
   el.textContent = text;
   el.className = `${el.className.split(" ")[0]}${isError ? " error" : ""}`;
 }
@@ -781,7 +899,7 @@ function buildChecklistWriteHandlers(runtime) {
     async onSaveStep({ tc, step, checkbox, noteInput, statusEl, saveBtn }) {
       const checked = !!checkbox.checked;
       const note = noteInput.value || "";
-      setChecklistStatus(statusEl, "Saving…", false);
+      setActionStatus(statusEl, "Saving…", false);
       saveBtn.disabled = true;
       try {
         await patchJson(
@@ -792,16 +910,16 @@ function buildChecklistWriteHandlers(runtime) {
         step.checked = checked;
         step.note = note;
         runtime.invalidateDoc(runtime.checklistEndpoint);
-        setChecklistStatus(statusEl, "Saved", false);
+        setActionStatus(statusEl, "Saved", false);
       } catch (err) {
-        setChecklistStatus(statusEl, err.message, true);
+        setActionStatus(statusEl, err.message, true);
       } finally {
         saveBtn.disabled = false;
       }
     },
     async onSaveNotes({ tc, textarea, statusEl, saveBtn }) {
       const notesText = textarea.value || "";
-      setChecklistStatus(statusEl, "Saving…", false);
+      setActionStatus(statusEl, "Saving…", false);
       saveBtn.disabled = true;
       try {
         await patchJson(
@@ -811,9 +929,9 @@ function buildChecklistWriteHandlers(runtime) {
         );
         tc.notesText = notesText;
         runtime.invalidateDoc(runtime.checklistEndpoint);
-        setChecklistStatus(statusEl, "Saved", false);
+        setActionStatus(statusEl, "Saved", false);
       } catch (err) {
-        setChecklistStatus(statusEl, err.message, true);
+        setActionStatus(statusEl, err.message, true);
       } finally {
         saveBtn.disabled = false;
       }
@@ -864,21 +982,233 @@ function renderChecklistBody(container, parsedChecklist, runtime) {
   container.appendChild(looseWrap);
 }
 
-// The active tab's content pane. Deliberately small for this task: a doc tab
-// shows the server's own header fields plus, when the document is actually
-// `present`, its fetched content; the "Дела" tab's counter is real as of
-// Task 25 (`tab.label` already carries it — see `decorateHumanTasksTab` in
-// `mount()`), its richer content is still Task 26's job. Kinds this screen
-// does not yet have a dedicated pane for (`instructions`/`memory`/`action`)
-// still show the server's own header fields, just without a richer body —
-// none of that is in TC-002/TC-003's scope.
+// ---------------------------------------------------------------------------
+// "Дела" (human-tasks) tab UI (Task 30, CR-002 fix — code_review.md).
+//
+// Round-1 `/pf-codereview` found this tab was a pure stub, even though its
+// server-side API is fully implemented and tested: `GET .../human-tasks`
+// (Task 10), `POST .../human-tasks/:key/complete` (Task 11), `POST
+// .../human-tasks/:key/reassign` (Task 12). This section is the real UI:
+// the task queue itself, a "Завершить" action per task (a `verdict` input
+// for `operation: "review"` items, a plain confirmation button for
+// `operation: "write"` items — document keys and code/tests alike, per
+// AC-05c/AC-05d/AC-05e's three verification paths server-side), and the one
+// "Отдать агенту" hand-off action (AC-05g/AC-05j) this whole UI offers an
+// actor picker for — `test/readonly.test.js`'s AC-05j grep check verifies no
+// second one exists anywhere in `public/*.js`.
+//
+// Real, interactive DOM nodes — the same convention the checklist write UI
+// above (`buildStepRow`/`buildNotesEditorNode`) already established for
+// this file's non-pure, click/change-driven pieces.
+// ---------------------------------------------------------------------------
+
+// One task row: stageKey/operation/instruction/status, a "Завершить" action,
+// and the "Отдать агенту" hand-off action. `actorNames` is already resolved
+// (`parseActorNames` of `docs/planning/agents.yml`'s `actors:` block) by the
+// caller — this function only builds the `<select>` from it.
+function buildHumanTaskRow(task, actorNames, handlers) {
+  const row = h("div", "human-task-row");
+  row.dataset.stageKey = task.stageKey;
+
+  const header = h("div", "human-task-header");
+  header.appendChild(h("span", "human-task-key", task.stageKey));
+  header.appendChild(h("span", "human-task-operation", `(${task.operation})`));
+  // `queued` is the default, unremarkable state — only `stale` (specs.md
+  // §4.2/AC-05f/M5: the artifact changed since it was last marked done) gets
+  // a badge, the same `.badge` class doc tabs already use for their own
+  // status word (`statusBadgeText`), not a second status-badge class.
+  if (task.status === "stale") header.appendChild(h("span", "badge", "stale"));
+  row.appendChild(header);
+
+  if (task.instruction) row.appendChild(h("p", "human-task-instruction", task.instruction));
+
+  const actions = h("div", "human-task-actions");
+
+  // "Завершить" (complete) — a `verdict` text input for `operation: "review"`
+  // (AC-05c: any non-empty text after trim, e.g. "замечаний нет", is valid —
+  // this UI does not further judge the content, `handleHumanTaskComplete`
+  // server-side is the one authority on what counts as done), a plain
+  // confirmation button with no extra input for `operation: "write"` (both
+  // the six document keys and `code`/`tests` — server.js's three
+  // verification paths decide the rest; this UI only has to send the right
+  // request body shape for each).
+  const completeWrap = h("div", "human-task-complete-wrap");
+  let verdictInput = null;
+  if (task.operation === "review") {
+    verdictInput = document.createElement("input");
+    verdictInput.type = "text";
+    verdictInput.className = "human-task-verdict-input";
+    verdictInput.placeholder = "Verdict";
+    completeWrap.appendChild(verdictInput);
+  }
+  const completeStatus = h("span", "human-task-complete-status");
+  completeStatus.setAttribute("aria-live", "polite");
+  const completeBtn = h("button", "human-task-complete-btn", "Завершить");
+  completeBtn.type = "button";
+  completeBtn.addEventListener("click", () => {
+    handlers.onComplete({ task, verdictInput, statusEl: completeStatus, button: completeBtn });
+  });
+  completeWrap.appendChild(completeBtn);
+  completeWrap.appendChild(completeStatus);
+  actions.appendChild(completeWrap);
+
+  // "Отдать агенту" (hand-off) — AC-05g/AC-05j: the ONLY actor-picker
+  // control anywhere in this UI, not a general actor/role-assignment
+  // wizard — one dropdown, built from `agents.yml`'s own `actors:` list,
+  // scoped to this one already-queued human task. Calls
+  // `POST .../human-tasks/:key/reassign` (server.js, Task 12, unchanged).
+  const reassignWrap = h("div", "human-task-reassign-wrap");
+  const actorSelect = document.createElement("select");
+  actorSelect.className = "human-task-actor-select";
+  actorSelect.setAttribute("aria-label", "Актор");
+  for (const name of actorNames) {
+    const opt = document.createElement("option");
+    opt.value = name;
+    opt.textContent = name;
+    actorSelect.appendChild(opt);
+  }
+  // No known actor to hand off to (e.g. a project whose agents.yml hasn't
+  // been created yet) disables the control rather than offering an empty
+  // selection that would 422 (`unknown_actor`) on every click.
+  actorSelect.disabled = actorNames.length === 0;
+  reassignWrap.appendChild(actorSelect);
+  const reassignStatus = h("span", "human-task-reassign-status");
+  reassignStatus.setAttribute("aria-live", "polite");
+  const reassignBtn = h("button", "human-task-reassign-btn", "Отдать агенту");
+  reassignBtn.type = "button";
+  reassignBtn.disabled = actorNames.length === 0;
+  reassignBtn.addEventListener("click", () => {
+    handlers.onReassign({ task, actorSelect, statusEl: reassignStatus, button: reassignBtn });
+  });
+  reassignWrap.appendChild(reassignBtn);
+  reassignWrap.appendChild(reassignStatus);
+  actions.appendChild(reassignWrap);
+
+  row.appendChild(actions);
+  return row;
+}
+
+// The two write handlers `buildHumanTaskRow`'s buttons call — same shape as
+// `buildChecklistWriteHandlers` above (Saving…/success/visible-error status
+// text via `setActionStatus`, button disabled while in flight, the server's
+// own error message surfaced verbatim rather than swallowed, CR-001's
+// pattern applied here too). `reload` re-fetches and re-renders the whole
+// task list after a successful action (this tab's own "fresh GET .../
+// human-tasks" refresh, per this task's implementation notes) — simpler and
+// more robust than an optimistic single-row removal, since a `complete` can
+// also flip a *different* task's status (none today, but nothing here
+// assumes otherwise) and a `reassign` does not remove a task from the queue
+// at all (only complete does).
+function buildHumanTasksHandlers(runtime, reload) {
+  return {
+    async onComplete({ task, verdictInput, statusEl, button }) {
+      const body = task.operation === "review" ? { verdict: verdictInput ? verdictInput.value || "" : "" } : {};
+      setActionStatus(statusEl, "Saving…", false);
+      button.disabled = true;
+      try {
+        await postJson(humanTaskCompleteEndpoint(runtime.project, runtime.issueId, task.stageKey), body, runtime.fetchImpl);
+        setActionStatus(statusEl, "Done", false);
+        await reload();
+      } catch (err) {
+        setActionStatus(statusEl, err.message, true);
+        button.disabled = false;
+      }
+    },
+    async onReassign({ task, actorSelect, statusEl, button }) {
+      const actor = actorSelect.value || "";
+      setActionStatus(statusEl, "Saving…", false);
+      button.disabled = true;
+      try {
+        await postJson(humanTaskReassignEndpoint(runtime.project, runtime.issueId, task.stageKey), { actor }, runtime.fetchImpl);
+        setActionStatus(statusEl, "Reassigned", false);
+        await reload();
+      } catch (err) {
+        setActionStatus(statusEl, err.message, true);
+        button.disabled = false;
+      }
+    },
+  };
+}
+
+// `body`'s full contents for the current (tasks, actorNames) pair — cleared
+// and rebuilt from scratch each call, same convention `renderChecklistBody`
+// above uses. An empty queue renders a plain message, never a blank pane
+// indistinguishable from "still loading".
+function renderHumanTasksBody(body, tasks, actorNames, runtime, reload) {
+  body.innerHTML = "";
+  if (!tasks.length) {
+    body.appendChild(h("p", "muted human-tasks-empty", "Нет задач для этой issue."));
+    return;
+  }
+  const handlers = buildHumanTasksHandlers(runtime, reload);
+  const list = h("div", "human-tasks-list");
+  for (const task of tasks) list.appendChild(buildHumanTaskRow(task, actorNames, handlers));
+  body.appendChild(list);
+}
+
+// The "Дела" tab's async load + (re)render — the counterpart of the doc-tab
+// `fetchDoc().then(...)` pattern below, but fetching TWO things in parallel
+// (the task list itself, and `agents.yml`'s raw text for the hand-off
+// dropdown) via `Promise.allSettled`: a project that has no `agents.yml` yet
+// must still show the task queue (with hand-off degraded to a disabled,
+// empty dropdown), not fail the whole tab over one missing config file.
+//
+// Guarded by `runtime.getActiveEndpoint()` exactly like every other async
+// render in this file (`humanTasksListEndpoint` is this tab's own identity
+// there — see `activeEndpoint()` in `mount()`) — a reader who switched away
+// from "Дела" (or to a different issue) while this was in flight must never
+// have a late response painted into a panel that's no longer live.
+//
+// `reload` (passed to `renderHumanTasksBody`/`buildHumanTasksHandlers`)
+// invalidates the cached list fetch and calls this function again — a
+// *fresh* `GET .../human-tasks` after a successful complete/reassign, not a
+// full document/page reload, matching this task's implementation notes.
+function loadAndRenderHumanTasks(body, runtime) {
+  const tasksEndpoint = humanTasksListEndpoint(runtime.project, runtime.issueId);
+  const agentsEndpoint = agentsYamlEndpoint(runtime.project);
+
+  const reload = () => {
+    runtime.invalidateDoc(tasksEndpoint);
+    return loadAndRenderHumanTasks(body, runtime);
+  };
+
+  return Promise.allSettled([runtime.fetchDoc(tasksEndpoint), runtime.fetchDoc(agentsEndpoint)]).then(
+    ([tasksResult, agentsResult]) => {
+      if (runtime.getActiveEndpoint() !== tasksEndpoint) return; // reader moved on while it loaded
+
+      if (tasksResult.status === "rejected") {
+        body.innerHTML = "";
+        body.appendChild(h("p", "notice error", tasksResult.reason.message));
+        return;
+      }
+
+      const tasks = Array.isArray(tasksResult.value) ? tasksResult.value : [];
+      const actorNames =
+        agentsResult.status === "fulfilled" ? parseActorNames(agentsResult.value && agentsResult.value.content) : [];
+      renderHumanTasksBody(body, tasks, actorNames, runtime, reload);
+    }
+  );
+}
+
+// The active tab's content pane. A doc tab shows the server's own header
+// fields plus, when the document is actually `present`, its fetched
+// content; the "Дела" tab's counter is real as of Task 25 (`tab.label`
+// already carries it — see `decorateHumanTasksTab` in `mount()`) and its
+// content is the full human-task queue UI above (Task 30, CR-002 fix — the
+// tab used to stop here with a placeholder). Kinds this screen does not yet
+// have a dedicated pane for (`instructions`/`memory`/`action`) still show
+// the server's own header fields, just without a richer body — none of that
+// is in TC-002/TC-003's scope.
 function renderDocPanel(tab, runtime) {
   const panel = h("div", "doc-panel");
   panel.dataset.tabId = tab.id;
 
   if (tab.kind === "human-tasks") {
     panel.appendChild(h("h2", null, tab.label));
-    panel.appendChild(h("p", "muted", "Содержимое этой вкладки появится отдельной задачей."));
+    const body = h("div", "human-tasks-body");
+    body.appendChild(h("p", "muted", "Загрузка…"));
+    panel.appendChild(body);
+    loadAndRenderHumanTasks(body, runtime);
     return panel;
   }
 
@@ -1034,7 +1364,15 @@ export function mount(container, options = {}) {
   }
   function activeEndpoint() {
     const tab = state.tabs.find((t) => t.id === state.activeTabId);
-    if (!tab || !tab.item) return null;
+    if (!tab) return null;
+    // The "Дела" tab has no `tab.item` at all (it's client-added, not a
+    // server-listed document — see `buildTabSet`), so it needs its own
+    // identity here rather than falling into the `!tab.item` guard below,
+    // which would make `loadAndRenderHumanTasks`'s staleness check compare
+    // against `null` on every render and always treat its own response as
+    // stale.
+    if (tab.kind === "human-tasks") return humanTasksListEndpoint(state.project, state.issueId);
+    if (!tab.item) return null;
     // manual_test_checklist's "endpoint" is the structured checklist route,
     // not `item.endpoint` (the raw-markdown fetch every other doc tab uses)
     // — see the checklist branch in `renderDocPanel`.

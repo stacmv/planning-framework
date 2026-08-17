@@ -372,11 +372,16 @@
    * @returns {object} one of:
    *   - `{ ok: true, key, level, skip: true }`
    *   - `{ ok: true, key, level, skip: false, write, review, run?, mode?, confirmed? }`
-   *   - `{ kind: "human", inbox, key, level, mode? }` — the resolved `write` actor
-   *     is a human; `mode` travels with this result exactly as it does with the
-   *     non-human one (specs.md §4.1 — read "naravne s write/review/skip"),
-   *     since a caller queuing a human task (`lib/inbox.js`) needs to know
-   *     `blocking` vs. `non-blocking` just as much as any other caller does
+   *   - `{ kind: "human", via, inbox, key, level, mode? }` — either the resolved
+   *     `write` actor is a human (`via: "write"`), or `write` resolves to a
+   *     non-human actor but at least one entry of `review[]` resolves to a
+   *     human (`via: "review"`) — checked in that order, so a human `write`
+   *     actor always wins when both are human. `inbox` is the matching actor's
+   *     own `inbox:` value. `mode` travels with this result exactly as it does
+   *     with the non-human one (specs.md §4.1 — read "naravne s
+   *     write/review/skip"), since a caller queuing a human task
+   *     (`lib/inbox.js`) needs to know `blocking` vs. `non-blocking` just as
+   *     much as any other caller does
    *   - `{ ok: false, key, error, message }` — an explicit, non-throwing failure
    *     (`invalid_skip`, `unrecognized`, `profile_not_found`, `no_default`)
    */
@@ -439,11 +444,30 @@
     if (!result.ok || result.skip) return result;
 
     if (result.write) {
-      var actor = resolveActor(result.write, agentsText);
-      if (actor.ok && actor.kind === "human") {
-        var humanResult = { kind: "human", inbox: actor.inbox, key: key, level: result.level };
-        if (result.mode !== undefined) humanResult.mode = result.mode;
-        return humanResult;
+      var writeActor = resolveActor(result.write, agentsText);
+      if (writeActor.ok && writeActor.kind === "human") {
+        var writeHumanResult = { kind: "human", via: "write", inbox: writeActor.inbox, key: key, level: result.level };
+        if (result.mode !== undefined) writeHumanResult.mode = result.mode;
+        return writeHumanResult;
+      }
+    }
+
+    // `write` is not human (or absent) — check `review[]` too (§4.2's
+    // `human-review` state, reachable independently of `human-write`). Only
+    // a flow-style list resolves here; a review shaped as a mapping (e.g.
+    // `review: { mode: sequential, by: [...] }`) is out of scope for this
+    // check exactly like it already is for `resolveHumanTaskOperation()` in
+    // `lib/inbox.js` (kept here as the shared source of truth so the two
+    // paths — discovery and completion — can never disagree again, see
+    // 20260806-feat-project-explorer-redesign CR-004).
+    if (Array.isArray(result.review)) {
+      for (var i = 0; i < result.review.length; i++) {
+        var reviewActor = resolveActor(result.review[i], agentsText);
+        if (reviewActor.ok && reviewActor.kind === "human") {
+          var reviewHumanResult = { kind: "human", via: "review", inbox: reviewActor.inbox, key: key, level: result.level };
+          if (result.mode !== undefined) reviewHumanResult.mode = result.mode;
+          return reviewHumanResult;
+        }
       }
     }
 

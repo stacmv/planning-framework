@@ -84,6 +84,9 @@ const SESSION_LOG_MD = [
 // roles.code: human, code/tests path (no artifactPath, content identity is
 //   the issue branch HEAD sha) -> queued (no issue/<id> branch exists in
 //   this fixture, so there is nothing to hash yet — contentHash omitted).
+// roles.implementation_plan: write: claude (an llm, not human on its own),
+//   review: [human] -> a human-REVIEW task, distinct from all the human-WRITE
+//   ones above (CR-004). No marker -> queued, operation: "review".
 // Every other PIPELINE_KEYS key falls through to the general default
 // (write: claude), an `llm` actor — contributes nothing to the response.
 const PROMPT_MD = [
@@ -96,6 +99,7 @@ const PROMPT_MD = [
   "  test_plan: { write: human }",
   "  dev_docs: { write: human }",
   "  code: { write: human }",
+  "  implementation_plan: { write: claude, review: [human] }",
   "---",
   "",
   `# ${ISSUE_ID}`,
@@ -191,12 +195,24 @@ test("GET .../issues/:id/human-tasks reports queued/stale human tasks, excludes 
   assert.ok(!("contentHash" in codeTask), `contentHash must be omitted with no issue/<id> branch to hash: ${JSON.stringify(codeTask)}`);
 
   // -------------------------------------------------------------------
-  // Exactly these four present, nothing else (test_plan excluded, every
+  // implementation_plan — write: claude (llm), review: [human] -> a
+  // human-REVIEW task (CR-004): discoverable through this route just like a
+  // human-WRITE one, with operation: "review", not "write".
+  // -------------------------------------------------------------------
+  const implPlanTask = tasks.find((t2) => t2.stageKey === "implementation_plan");
+  assert.ok(implPlanTask, `expected an "implementation_plan" (human-review) task, got ${JSON.stringify(tasks)}`);
+  assert.strictEqual(implPlanTask.operation, "review", "write: claude is not human — only review: [human] is, so operation must be review");
+  assert.strictEqual(implPlanTask.status, "queued");
+  assert.strictEqual(implPlanTask.artifactPath, `docs/issues/open/${ISSUE_ID}/implementation_plan.md`);
+  assert.match(implPlanTask.instruction, /review/i, "a review task's instruction should read as a review instruction, not a write one");
+
+  // -------------------------------------------------------------------
+  // Exactly these five present, nothing else (test_plan excluded, every
   // other pipeline key falls through to the general default: write: claude).
   // -------------------------------------------------------------------
   assert.deepStrictEqual(
     tasks.map((t2) => t2.stageKey).sort(),
-    ["code", "dev_docs", "specs", "user_docs"],
+    ["code", "dev_docs", "implementation_plan", "specs", "user_docs"],
     `unexpected stageKeys: ${JSON.stringify(tasks.map((t2) => t2.stageKey))}`
   );
 

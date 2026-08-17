@@ -1044,3 +1044,293 @@ test("checklist: a TC with no **Notes:** line to patch (notesLineIndex null) get
   const notesInputs = container.findAll((n) => n.className === "tc-notes-input");
   assert.strictEqual(notesInputs.length, 0);
 });
+
+// ---------------------------------------------------------------------------
+// "Дела" (human-tasks) tab UI (Task 30, CR-002 fix — code_review.md: the tab
+// used to be a pure placeholder, "Содержимое этой вкладки появится отдельной
+// задачей", even though GET .../human-tasks (Task 10) and
+// POST .../human-tasks/:key/complete|reassign (Tasks 11/12) were already
+// fully implemented server-side). TC-024/TC-025/TC-026 map to server-side
+// tests of those three routes (test/workspace.test.js/test/readonly.test.js
+// — untouched by this task, per implementation notes); these tests cover
+// this tab's own wiring to them: request shapes, the review-vs-write
+// complete UI split, the reassign dropdown, and visible error surfacing.
+// TC-032 (write-allowlist / no second actor picker) is
+// test/readonly.test.js's own grep check, unaffected by adding this UI as
+// long as it stays scoped to the one hand-off action — see that test.
+// ---------------------------------------------------------------------------
+
+// `docs/planning/agents.yml`'s shipped default shape (`server.js`'s own
+// `DEFAULT_AGENTS_YAML` comment) plus a `human` actor, mirroring
+// test/workspace.test.js's own `HUMAN_AGENTS_YML` fixture convention.
+const AGENTS_YAML_TEXT = [
+  "actors:",
+  "  claude: { kind: llm, invoke: agent,  model: claude-sonnet-5 }",
+  "  human:  { kind: human }",
+  "",
+].join("\n");
+
+const AGENTS_YAML_ROUTE = "/api/projects/proj-a/docs?path=docs%2Fplanning%2Fagents.yml";
+
+function humanTask(overrides = {}) {
+  return {
+    stageKey: "user_docs",
+    operation: "write",
+    mode: "non-blocking",
+    artifactPath: "docs/issues/open/20260101-feat-a/user_docs.md",
+    instruction: "Write user_docs.md for this issue.",
+    status: "queued",
+    ...overrides,
+  };
+}
+
+// `patchResponses`-style mock, mirroring `checklistFetchMock()` above:
+// `completeResponse`/`reassignResponse` are `{status, json}`, defaulting to
+// a 200 success shape matching server.js's real ones. `tasksData` re-fetched
+// on every GET (a function, not a fixed value), so a test can hand back a
+// different list after a reload without hand-rolling its own fetch impl.
+function humanTasksFetchMock({ tasks, completeResponse, reassignResponse, agentsYamlText } = {}) {
+  const tasksList = tasks || [humanTask()];
+  const tasksEndpoint = "/api/projects/proj-a/issues/20260101-feat-a/human-tasks";
+  const calls = []; // { url, method, body }
+  const tasksGetCalls = [];
+  const routes = baseRoutes({ [AGENTS_YAML_ROUTE]: { content: agentsYamlText === undefined ? AGENTS_YAML_TEXT : agentsYamlText } });
+
+  const fetchImpl = async (url, init) => {
+    if (url === tasksEndpoint && (!init || !init.method)) {
+      tasksGetCalls.push(url);
+      return { ok: true, status: 200, json: async () => tasksList };
+    }
+    if (init && init.method === "POST" && url.startsWith(tasksEndpoint)) {
+      const body = JSON.parse(init.body);
+      calls.push({ url, method: init.method, body });
+      const isComplete = url.endsWith("/complete");
+      const resp = isComplete
+        ? completeResponse || { status: 200, json: { status: "done", contentHash: "abc123" } }
+        : reassignResponse || { status: 200, json: { status: "reassigned", actor: body.actor } };
+      return { ok: resp.status < 300, status: resp.status, json: async () => resp.json };
+    }
+    return routedFetch(routes)(url);
+  };
+  return { fetchImpl, calls, tasksGetCalls, tasksEndpoint };
+}
+
+async function mountOnHumanTasksTab(fetchImpl) {
+  installFakeDocument();
+  const container = new FakeElement("div");
+  const mod = await loadModule();
+  const handle = mod.mount(container, { project: "proj-a", issueId: "20260101-feat-a", initialRole: "tester", fetchImpl });
+  await handle.ready;
+  handle.selectTab(mod.HUMAN_TASKS_TAB_ID);
+  await flush();
+  await flush(); // let loadAndRenderHumanTasks's Promise.allSettled settle
+  return { mod, container, handle };
+}
+
+test("Дела tab: renders the task list from GET .../human-tasks — stageKey/operation/instruction/status, no longer the placeholder", async () => {
+  const { fetchImpl, tasksGetCalls } = humanTasksFetchMock({
+    tasks: [humanTask({ stageKey: "specs", operation: "review", instruction: "Review specs.md.", status: "stale" })],
+  });
+  const { container } = await mountOnHumanTasksTab(fetchImpl);
+
+  assert.strictEqual(tasksGetCalls.length, 1, "expected one GET of the human-tasks list");
+  assert.ok(
+    !container.findAll((n) => n.textContent === "Содержимое этой вкладки появится отдельной задачей.").length,
+    "the old stub text must be gone"
+  );
+
+  const rows = container.findAll((n) => n.className === "human-task-row");
+  assert.strictEqual(rows.length, 1);
+  assert.strictEqual(rows[0].dataset.stageKey, "specs");
+  assert.ok(container.findAll((n) => n.className === "human-task-key" && n.textContent === "specs").length);
+  assert.ok(container.findAll((n) => n.className === "human-task-operation" && n.textContent === "(review)").length);
+  assert.ok(container.findAll((n) => n.className === "human-task-instruction" && n.textContent === "Review specs.md.").length);
+  // stale renders with the same .badge class doc tabs already use.
+  assert.ok(container.findAll((n) => n.className === "badge" && n.textContent === "stale").length);
+});
+
+test("Дела tab: an empty queue renders a message, not a blank pane", async () => {
+  const { fetchImpl } = humanTasksFetchMock({ tasks: [] });
+  const { container } = await mountOnHumanTasksTab(fetchImpl);
+
+  const empty = container.findAll((n) => n.className && n.className.split(" ").includes("human-tasks-empty"));
+  assert.strictEqual(empty.length, 1);
+  assert.ok(empty[0].textContent.length > 0);
+  assert.strictEqual(container.findAll((n) => n.className === "human-task-row").length, 0);
+});
+
+test("Дела tab: operation \"review\" shows a verdict input; complete sends {verdict} to POST .../complete (TC-024 step 1-2 shape)", async () => {
+  const { fetchImpl, calls } = humanTasksFetchMock({
+    tasks: [humanTask({ stageKey: "specs", operation: "review" })],
+  });
+  const { container } = await mountOnHumanTasksTab(fetchImpl);
+
+  const verdictInputs = container.findAll((n) => n.className === "human-task-verdict-input");
+  assert.strictEqual(verdictInputs.length, 1, "a review task must get a verdict input");
+  verdictInputs[0].value = "замечаний нет";
+
+  const completeButtons = container.findAll((n) => n.className === "human-task-complete-btn");
+  completeButtons[0].dispatchClick();
+  await flush();
+
+  assert.strictEqual(calls.length, 1);
+  assert.strictEqual(calls[0].url, "/api/projects/proj-a/issues/20260101-feat-a/human-tasks/specs/complete");
+  assert.strictEqual(calls[0].method, "POST");
+  assert.deepStrictEqual(calls[0].body, { verdict: "замечаний нет" });
+});
+
+test("Дела tab: operation \"write\" (document/code/tests key) shows no verdict input; complete sends no verdict field", async () => {
+  const { fetchImpl, calls } = humanTasksFetchMock({
+    tasks: [humanTask({ stageKey: "code", operation: "write" })],
+  });
+  const { container } = await mountOnHumanTasksTab(fetchImpl);
+
+  assert.strictEqual(container.findAll((n) => n.className === "human-task-verdict-input").length, 0);
+
+  const completeButtons = container.findAll((n) => n.className === "human-task-complete-btn");
+  completeButtons[0].dispatchClick();
+  await flush();
+
+  assert.strictEqual(calls.length, 1);
+  assert.strictEqual(calls[0].url, "/api/projects/proj-a/issues/20260101-feat-a/human-tasks/code/complete");
+  assert.ok(!("verdict" in calls[0].body), "a write task's complete body must carry no verdict field");
+});
+
+test("Дела tab: reassign dropdown is built from agents.yml's actors: list, and calls POST .../reassign with {actor} (AC-05g/TC-026 step 2 shape)", async () => {
+  const { fetchImpl, calls } = humanTasksFetchMock({
+    tasks: [humanTask({ stageKey: "specs" })],
+  });
+  const { container } = await mountOnHumanTasksTab(fetchImpl);
+
+  const select = container.findAll((n) => n.className === "human-task-actor-select")[0];
+  assert.ok(select, "expected the hand-off actor <select>");
+  const optionValues = select.children.map((o) => o.value);
+  assert.deepStrictEqual(optionValues, ["claude", "human"], "options come from agents.yml's actors:, in file order");
+
+  select.value = "claude";
+  const reassignButtons = container.findAll((n) => n.className === "human-task-reassign-btn");
+  reassignButtons[0].dispatchClick();
+  await flush();
+
+  assert.strictEqual(calls.length, 1);
+  assert.strictEqual(calls[0].url, "/api/projects/proj-a/issues/20260101-feat-a/human-tasks/specs/reassign");
+  assert.strictEqual(calls[0].method, "POST");
+  assert.deepStrictEqual(calls[0].body, { actor: "claude" });
+});
+
+test("Дела tab: the reassign control is the ONLY actor-picker <select> anywhere on this tab", async () => {
+  const { fetchImpl } = humanTasksFetchMock({ tasks: [humanTask(), humanTask({ stageKey: "code" })] });
+  const { container } = await mountOnHumanTasksTab(fetchImpl);
+
+  const actorSelects = container.findAll((n) => n.className === "human-task-actor-select");
+  assert.strictEqual(actorSelects.length, 2, "one per task row — still the single control TYPE, AC-05j");
+});
+
+test("Дела tab: when agents.yml has no actors, the reassign dropdown/button are disabled rather than offering an empty/broken pick", async () => {
+  const { fetchImpl } = humanTasksFetchMock({ tasks: [humanTask()], agentsYamlText: "" });
+  const { container } = await mountOnHumanTasksTab(fetchImpl);
+
+  const select = container.findAll((n) => n.className === "human-task-actor-select")[0];
+  const button = container.findAll((n) => n.className === "human-task-reassign-btn")[0];
+  assert.strictEqual(select.disabled, true);
+  assert.strictEqual(button.disabled, true);
+});
+
+test("Дела tab: a rejected complete (422 invalid_verdict) surfaces the server's message visibly — not silently swallowed", async () => {
+  const { fetchImpl } = humanTasksFetchMock({
+    tasks: [humanTask({ stageKey: "specs", operation: "review" })],
+    completeResponse: {
+      status: 422,
+      json: { error: "invalid_verdict", message: "A non-empty verdict is required to complete a review task." },
+    },
+  });
+  const { container } = await mountOnHumanTasksTab(fetchImpl);
+
+  const completeButtons = container.findAll((n) => n.className === "human-task-complete-btn");
+  completeButtons[0].dispatchClick(); // verdict left empty on purpose
+  await flush();
+
+  const statuses = container.findAll((n) => n.className && n.className.split(" ")[0] === "human-task-complete-status");
+  assert.strictEqual(statuses.length, 1);
+  assert.ok(statuses[0].textContent.length > 0, "the rejection must render visible text, not be swallowed");
+  assert.match(statuses[0].textContent, /verdict/i);
+  assert.ok(statuses[0].className.includes("error"), "the status element must carry a visible error indicator");
+});
+
+test("Дела tab: a rejected reassign (409 unsupported_roles_format) surfaces the server's message visibly (TC-026 step 6)", async () => {
+  const { fetchImpl } = humanTasksFetchMock({
+    tasks: [humanTask({ stageKey: "specs" })],
+    reassignResponse: {
+      status: 409,
+      json: {
+        error: "unsupported_roles_format",
+        message: "roles.specs in prompt.md is not written in the single-line flow-style this tool can edit — reassign it manually by editing prompt.md.",
+      },
+    },
+  });
+  const { container } = await mountOnHumanTasksTab(fetchImpl);
+
+  const reassignButtons = container.findAll((n) => n.className === "human-task-reassign-btn");
+  reassignButtons[0].dispatchClick();
+  await flush();
+
+  const statuses = container.findAll((n) => n.className && n.className.split(" ")[0] === "human-task-reassign-status");
+  assert.strictEqual(statuses.length, 1);
+  assert.ok(statuses[0].textContent.length > 0);
+  assert.match(statuses[0].textContent, /manually/i);
+  assert.ok(statuses[0].className.includes("error"));
+});
+
+test("Дела tab: a successful complete triggers a fresh GET .../human-tasks (reload, not a full page reload)", async () => {
+  const { fetchImpl, tasksGetCalls } = humanTasksFetchMock({ tasks: [humanTask({ stageKey: "specs", operation: "review" })] });
+  const { container } = await mountOnHumanTasksTab(fetchImpl);
+
+  assert.strictEqual(tasksGetCalls.length, 1);
+
+  const verdictInputs = container.findAll((n) => n.className === "human-task-verdict-input");
+  verdictInputs[0].value = "замечаний нет";
+  const completeButtons = container.findAll((n) => n.className === "human-task-complete-btn");
+  completeButtons[0].dispatchClick();
+  await flush();
+  await flush(); // let the reload's own GET + re-render settle
+
+  assert.strictEqual(tasksGetCalls.length, 2, "a successful complete must re-fetch the task list, not just mutate in place silently");
+});
+
+test("Дела tab: a successful reassign also triggers a fresh GET .../human-tasks", async () => {
+  const { fetchImpl, tasksGetCalls } = humanTasksFetchMock({ tasks: [humanTask({ stageKey: "specs" })] });
+  const { container } = await mountOnHumanTasksTab(fetchImpl);
+
+  assert.strictEqual(tasksGetCalls.length, 1);
+
+  const reassignButtons = container.findAll((n) => n.className === "human-task-reassign-btn");
+  reassignButtons[0].dispatchClick();
+  await flush();
+  await flush();
+
+  assert.strictEqual(tasksGetCalls.length, 2);
+});
+
+// ---------------------------------------------------------------------------
+// parseActorNames — pure (TC-026-adjacent: the source docs/planning/agents.yml
+// this reads from is the same file POST .../reassign validates `actor`
+// against server-side).
+// ---------------------------------------------------------------------------
+
+test("parseActorNames extracts flow-style actors: entries in file order", async () => {
+  const mod = await loadModule();
+  assert.deepStrictEqual(mod.parseActorNames(AGENTS_YAML_TEXT), ["claude", "human"]);
+});
+
+test("parseActorNames handles null/empty/no actors: block without throwing", async () => {
+  const mod = await loadModule();
+  assert.deepStrictEqual(mod.parseActorNames(null), []);
+  assert.deepStrictEqual(mod.parseActorNames(""), []);
+  assert.deepStrictEqual(mod.parseActorNames("some: other\nyaml: here\n"), []);
+});
+
+test("parseActorNames stops at the actors: block's dedent, not picking up an unrelated later block", async () => {
+  const mod = await loadModule();
+  const text = ["actors:", "  claude: { kind: llm }", "other_block:", "  claude2: { kind: llm }", ""].join("\n");
+  assert.deepStrictEqual(mod.parseActorNames(text), ["claude"]);
+});

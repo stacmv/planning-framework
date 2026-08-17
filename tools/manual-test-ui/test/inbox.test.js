@@ -218,3 +218,70 @@ test("GET /api/inbox aggregates manualTests[]/humanTasks[] across every configur
 
   assert.strictEqual(body.totalCount, body.manualTests.length + body.humanTasks.length);
 });
+
+// ---------------------------------------------------------------------------
+// CR-004: a human-REVIEW task (roles.<key>.review: [human], write: an llm)
+// must be just as discoverable through GET /api/inbox as a human-write one —
+// before the fix, lib/roles-resolve.js's resolveRole() only ever inspected
+// the `write` actor, so this fixture's `specs` key was invisible to
+// collectHumanTasks() and never counted toward totalCount.
+// ---------------------------------------------------------------------------
+
+const REVIEW_ISSUE_ID = "20260301-feat-fixture-human-review";
+
+// roles.specs — write: claude (an llm, not a human task on its own), but
+// review: [human] — a human REVIEW task, distinct from a human WRITE task.
+const REVIEW_PROMPT_MD = [
+  "---",
+  "doc_language: English",
+  "size_tier: medium",
+  "roles:",
+  "  specs: { write: claude, review: [human] }",
+  "---",
+  "",
+  `# ${REVIEW_ISSUE_ID}`,
+  "",
+  "Type: feat. A pipeline key resolved to a human REVIEW task, not write.",
+  "",
+].join("\n");
+
+function buildReviewFixture(t) {
+  autoCleanup(t);
+
+  const projC = makeTempRepo({
+    name: "proj-c",
+    issues: [],
+    extraFiles: {
+      [`docs/issues/open/${REVIEW_ISSUE_ID}/prompt.md`]: REVIEW_PROMPT_MD,
+      "docs/planning/agents.yml": HUMAN_AGENTS_YML,
+    },
+  });
+
+  const config = makeConfig({ projects: [{ name: "proj-c", path: projC.root }] });
+
+  return { projC, configPath: config.configPath };
+}
+
+test("GET /api/inbox discovers a human-REVIEW task (roles.<key>.review: [human]), operation: review, counted in totalCount", async (t) => {
+  const fx = buildReviewFixture(t);
+  const server = await startServerFor(t, { configPath: fx.configPath });
+
+  const res = await server.get("/api/inbox");
+  assert.strictEqual(res.status, 200, `GET /api/inbox → ${res.status}: ${res.text}`);
+
+  const body = res.json;
+  const reviewEntry = body.humanTasks.find((h) => h.project === "proj-c" && h.issueId === REVIEW_ISSUE_ID && h.stageKey === "specs");
+  assert.ok(
+    reviewEntry,
+    `expected a humanTasks[] entry for proj-c/${REVIEW_ISSUE_ID}/specs (a human-review task), got ${JSON.stringify(body.humanTasks)}`
+  );
+  assert.strictEqual(reviewEntry.operation, "review", "roles.specs.write is claude (llm) — only review[] is human, so operation must be review, not write");
+  assert.strictEqual(reviewEntry.status, "queued");
+  assert.strictEqual(reviewEntry.artifactPath, `docs/issues/open/${REVIEW_ISSUE_ID}/specs.md`);
+  assert.match(reviewEntry.instruction, /review/i, "a review task's instruction should read as a review instruction, not a write one");
+
+  // The counter (specs.md §3.4, AC-06a) must include this review task, not
+  // just human-write ones.
+  assert.strictEqual(body.totalCount, body.manualTests.length + body.humanTasks.length);
+  assert.ok(body.totalCount >= 1, "totalCount must include the discovered human-review task");
+});

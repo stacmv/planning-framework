@@ -1241,6 +1241,127 @@ table.steps tr:last-child td { border-bottom: none; }
 .tc-notes-save-btn:hover { filter: brightness(1.08); }
 .tc-notes-save-btn:disabled { opacity: 0.55; cursor: default; filter: none; }
 
+/* ------------------------------------------------- "Дела" (human tasks) */
+/* The task queue in the "Дела" tab (public/workspace.js's `buildHumanTaskRow`/
+   `renderHumanTasksBody`) — one row per queued human task, each with a
+   "Завершить" (complete) action and an "Отдать агенту" (reassign) action.
+   Rows reuse `.panel`'s card look (border + `--surface`) instead of a table,
+   since each row's content (instruction text, two action groups) doesn't fit
+   the fixed-column `.panel-table` shape the rest of the app uses for tabular
+   data. */
+
+/* `.human-tasks-body` is the tab's whole content wrapper (loading text, the
+   error `.notice`, or the list below) — no layout of its own, just a hook
+   the coverage guard and `loadAndRenderHumanTasks` share for "this is the
+   pane that gets cleared and re-rendered". */
+.human-tasks-body { margin-top: 4px; }
+
+.human-tasks-list { display: flex; flex-direction: column; gap: 10px; margin-top: 10px; }
+
+.human-tasks-empty { margin-top: 10px; }
+
+.human-task-row {
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface);
+  padding: 12px 14px;
+}
+
+.human-task-header {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.human-task-key { font-weight: 600; }
+
+.human-task-operation { color: var(--muted); font-size: 13px; }
+
+.human-task-instruction {
+  color: var(--muted);
+  margin: 8px 0 0;
+  line-height: 1.45;
+  max-width: 80ch;
+}
+
+/* Same `.action-row` layout the doc-panel toolbar above uses (flex, wrap,
+   gap) — the complete and reassign action groups sit side by side and wrap
+   to their own line on narrow viewports. */
+.human-task-actions {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  flex-wrap: wrap;
+  margin-top: 10px;
+}
+
+.human-task-complete-wrap,
+.human-task-reassign-wrap {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.human-task-verdict-input {
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 5px;
+  color: var(--text);
+  padding: 6px 8px;
+  font-size: 13px;
+  font-family: inherit;
+  min-width: 160px;
+}
+
+.human-task-verdict-input:focus { border-color: var(--accent); }
+
+.human-task-actor-select {
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 5px;
+  color: var(--text);
+  padding: 5px 8px;
+  font-size: 13px;
+  font-family: inherit;
+}
+
+.human-task-actor-select:disabled { opacity: 0.55; cursor: default; }
+
+.human-task-complete-btn,
+.human-task-reassign-btn {
+  background: var(--accent);
+  border: none;
+  border-radius: 6px;
+  color: var(--bg);
+  padding: 5px 12px;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.human-task-complete-btn:hover,
+.human-task-reassign-btn:hover { filter: brightness(1.08); }
+.human-task-complete-btn:disabled,
+.human-task-reassign-btn:disabled { opacity: 0.55; cursor: default; filter: none; }
+
+/* Same success/error split as `.step-save-status`/`.tc-notes-status` above:
+   plain reads in --ok, `setActionStatus` (public/workspace.js) toggling
+   "error" on the span switches it to --fail. */
+.human-task-complete-status,
+.human-task-reassign-status {
+  display: inline-block;
+  font-size: 12px;
+  color: var(--ok);
+}
+
+.human-task-complete-status.error,
+.human-task-reassign-status.error {
+  color: var(--fail);
+}
+
 /* ----------------------------------------------------------- narrow view */
 /* At 1024×640 the three areas keep their own space and none of them overlaps
    another: the sidebar just gets narrower, the document pane keeps scrolling. */

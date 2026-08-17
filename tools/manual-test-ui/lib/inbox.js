@@ -320,7 +320,15 @@ function findLastMarker(sessionLogContent, key) {
   return found;
 }
 
-function instructionFor(key) {
+// `operation` ("write" | "review") distinguishes a human-write instruction
+// from a human-review one (CR-004) — a reviewer isn't being told to author
+// the artifact, just to look at it and record a verdict (specs.md §4.2).
+function instructionFor(key, operation) {
+  if (operation === "review") {
+    if (key === "code") return "Review the code for this issue.";
+    if (key === "tests") return "Review the tests for this issue.";
+    return `Review ${DOC_KEY_FILES[key]} for this issue.`;
+  }
   if (key === "code") return "Implement code for this issue.";
   if (key === "tests") return "Write tests for this issue.";
   return `Write ${DOC_KEY_FILES[key]} for this issue.`;
@@ -382,19 +390,20 @@ function collectHumanTasks(projects) {
           status = "stale";
         }
 
+        // `resolveRole` now detects `kind: "human"` through either the
+        // `write` actor or a human entry in `review[]` — `resolved.via`
+        // says which one matched (CR-004: a human-review task must be just
+        // as discoverable as a human-write one).
+        const operation = resolved.via === "review" ? "review" : "write";
+
         humanTasks.push({
           project: projectName,
           issueId,
           stageKey: key,
-          // The only path `resolveRole` currently detects `kind: "human"`
-          // through is the `write` actor (it never inspects `review[]` for
-          // a human reviewer) — so every entry here is a write task today.
-          // Kept as its own field, not a literal, so a future `review[]`
-          // check doesn't have to touch this shape.
-          operation: "write",
+          operation,
           mode: resolved.mode || "non-blocking",
           artifactPath,
-          instruction: instructionFor(key),
+          instruction: instructionFor(key, operation),
           status,
         });
       }
@@ -469,14 +478,17 @@ function collectHumanTasksForIssue(projectRoot, issueId, issueStatus, defaultBra
       status = "stale";
     }
 
+    // See the identical comment in collectHumanTasks(): resolveRole surfaces
+    // `kind: "human"` through either the `write` actor or a human entry in
+    // `review[]` — `resolved.via` says which one matched.
+    const operation = resolved.via === "review" ? "review" : "write";
+
     const task = {
       stageKey: key,
-      // See the identical comment in collectHumanTasks(): resolveRole only
-      // ever surfaces `kind: "human"` through the `write` actor today.
-      operation: "write",
+      operation,
       mode: resolved.mode || "non-blocking",
       artifactPath,
-      instruction: instructionFor(key),
+      instruction: instructionFor(key, operation),
       status,
     };
     // Never fabricated: omitted entirely when there is no current content to
@@ -501,13 +513,15 @@ function collectHumanTasksForIssue(projectRoot, issueId, issueStatus, defaultBra
 //
 // `POST .../human-tasks/:key/complete` (server.js) needs to know, for the one
 // key it was called with, whether the human actor is on the WRITE side
-// (`roles.<key>.write` resolves to `kind: "human"` — same detection
-// `collectHumanTasksForIssue` already does) or the REVIEW side
-// (`roles.<key>.review` lists an actor that resolves to `kind: "human"` —
-// `resolveRole` itself never inspects `review[]` for this, per its own
-// module comment, so this is the one place that does). Kept here, next to
-// `collectHumanTasksForIssue`, so both read the same `roles.<key>` the same
-// way and cannot disagree about what's a human task.
+// (`roles.<key>.write` resolves to `kind: "human"`) or the REVIEW side
+// (`roles.<key>.review` lists an actor that resolves to `kind: "human"`).
+// `resolveRole()` itself now detects both (`resolved.via`, CR-004 fix) and is
+// the single source of truth for that detection — this function just
+// translates `via` into the `operation`/`mode` shape this route's caller
+// wants, and stays the one place that also has to handle "not a human task
+// at all" (`operation: null`). Kept here, next to `collectHumanTasksForIssue`,
+// so both read the same `roles.<key>` the same way and cannot disagree about
+// what's a human task.
 //
 // @returns {null} the issue itself cannot be resolved at all (no prompt.md
 //   anywhere reachable) — distinct from "resolved, but not a human task for
@@ -529,17 +543,8 @@ function resolveHumanTaskOperation(projectRoot, issueId, issueStatus, defaultBra
   const base = { key, artifactPath, issueRel, issueBranch };
 
   if (resolved && resolved.kind === "human") {
-    return { ...base, operation: "write", mode: resolved.mode || "non-blocking" };
-  }
-
-  if (resolved && resolved.ok && !resolved.skip && Array.isArray(resolved.review)) {
-    const reviewedByHuman = resolved.review.some((name) => {
-      const actor = rolesResolve.resolveActor(name, agentsText);
-      return actor.ok && actor.kind === "human";
-    });
-    if (reviewedByHuman) {
-      return { ...base, operation: "review", mode: resolved.mode || "non-blocking" };
-    }
+    const operation = resolved.via === "review" ? "review" : "write";
+    return { ...base, operation, mode: resolved.mode || "non-blocking" };
   }
 
   return { ...base, operation: null, mode: null };

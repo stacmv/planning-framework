@@ -112,6 +112,41 @@ test("the committed prompt-roles-flow.md fixture resolves every key it declares"
   assert.strictEqual(devDocs.skip, true);
 });
 
+// --------------------------------------------------------------- CR-004: review[]-kind human
+
+test("write: claude, review: [human] resolves to kind: human via: review, not a non-human result", () => {
+  const promptText = ["---", "roles:", "  specs: { write: claude, review: [human] }", "---", ""].join("\n");
+  const agentsText = ["actors:", "  human: { kind: human, inbox: project-explorer }", ""].join("\n");
+
+  const result = resolveRole("specs", { promptText, agentsText, roleProfilesText: "" });
+
+  assert.strictEqual(result.kind, "human", `expected kind: human, got ${JSON.stringify(result)}`);
+  assert.strictEqual(result.via, "review", "the write actor (claude) is not human — only review[] is");
+  assert.strictEqual(result.inbox, "project-explorer");
+  assert.strictEqual(result.key, "specs");
+});
+
+test("write: human, review: [claude] still resolves via: write (write wins when both could match)", () => {
+  const promptText = ["---", "roles:", "  specs: { write: human, review: [claude] }", "---", ""].join("\n");
+  const agentsText = ["actors:", "  human: { kind: human, inbox: project-explorer }", ""].join("\n");
+
+  const result = resolveRole("specs", { promptText, agentsText, roleProfilesText: "" });
+
+  assert.strictEqual(result.kind, "human");
+  assert.strictEqual(result.via, "write");
+});
+
+test("write: claude, review: [claude] — neither side human — resolves normally, no kind: human", () => {
+  const promptText = ["---", "roles:", "  specs: { write: claude, review: [claude] }", "---", ""].join("\n");
+  const agentsText = ["actors:", "  human: { kind: human, inbox: project-explorer }", ""].join("\n");
+
+  const result = resolveRole("specs", { promptText, agentsText, roleProfilesText: "" });
+
+  assert.strictEqual(result.kind, undefined);
+  assert.strictEqual(result.ok, true);
+  assert.strictEqual(result.write, "claude");
+});
+
 // --------------------------------------------------------------- negative case
 
 test("multi-line block-style roles.<key> never throws and never fabricates write/review", () => {
