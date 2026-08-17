@@ -718,7 +718,7 @@ Criteria этого раздела)
 - Известная недетерминированность `prepare.test.js`/`read-paths.test.js` (BRD Non-Goals) — не путать с регрессией этой issue; при флаке этих двух файлов повторить прогон, не относить на счёт редизайна.
 
 **Acceptance Criteria:**
-- [ ] TC-031 passes
+- [x] TC-031 passes
 
 ---
 
