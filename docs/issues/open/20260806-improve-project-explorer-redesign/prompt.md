@@ -1,12 +1,12 @@
 ---
 doc_language: Russian
 size_tier: large
-reviewers:
-  brd: codex
-  specs: codex
-  test_plan: codex
-  implementation_plan: both
-  code: both
+roles:
+  brd: { write: claude, review: [claude] }
+  specs: { write: claude, review: [claude] }
+  test_plan: { write: claude, review: [claude] }
+  implementation_plan: { write: claude, review: [claude] }
+  code: { write: claude, review: [claude] }
 ---
 
 Переделать Project Explorer (`tools/manual-test-ui`): двухуровневая навигация,
