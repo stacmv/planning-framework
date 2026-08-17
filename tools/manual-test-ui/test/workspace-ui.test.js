@@ -1525,3 +1525,461 @@ test("parseActorNames stops at the actors: block's dedent, not picking up an unr
   const text = ["actors:", "  claude: { kind: llm }", "other_block:", "  claude2: { kind: llm }", ""].join("\n");
   assert.deepStrictEqual(mod.parseActorNames(text), ["claude"]);
 });
+
+// ---------------------------------------------------------------------------
+// Checkout banner + "prepare test data" action (Task 34, CR-006 fix —
+// code_review.md). Round-1 /pf-codereview found the pre-redesign app.js's
+// checkout banner (`item.checkout`) and "Prepare test data" action
+// (`item.kind === "action"`, lib/roles.js's "prepare" tester-role entry) had
+// no replacement in the redesigned `renderDocPanel` — the server routes
+// (`POST .../checklist/checkout`, `POST .../issues/:id/prepare`) were never
+// touched, only the client stopped offering them.
+// ---------------------------------------------------------------------------
+
+const ISSUE_A = "20260101-feat-a";
+
+// `checklistCheckout` mirrors `docstate.classifyIssueDoc`'s `checkout` shape
+// for a document that lives only on the issue branch; `action` overrides the
+// tester role's "prepare" entry (`lib/roles.js`), whose shape mirrors
+// server.js's `prepareActionState()` verdict.
+function testerContentsWithExtras(issueId, { checklistCheckout = null, action = {} } = {}) {
+  return {
+    project: "proj-a",
+    issueId,
+    issueStatus: "open",
+    role: { id: "tester", title: "Тестировщик", description: "" },
+    items: [
+      { id: "test_plan.md", kind: "issue_doc", name: "test_plan.md", label: "Test plan", status: "present" },
+      {
+        id: "manual_test_checklist.md",
+        kind: "issue_doc",
+        name: "manual_test_checklist.md",
+        label: "Manual test checklist",
+        status: "present",
+        location: checklistCheckout ? "branch" : "disk",
+        checkout: checklistCheckout,
+      },
+      {
+        id: "prepare",
+        kind: "action",
+        name: "prepare",
+        label: "Prepare test data",
+        offered: false,
+        enabled: false,
+        status: "missing",
+        endpoint: `/api/projects/proj-a/issues/${issueId}/prepare`,
+        method: "POST",
+        checkout: null,
+        ...action,
+      },
+    ],
+  };
+}
+
+function extrasRoutes(issueId, contents, overrides = {}) {
+  return {
+    "/api/roles": ROLES_RESPONSE,
+    "/api/projects/proj-a/issues": ISSUES_RESPONSE,
+    [`/api/projects/proj-a/issues/${issueId}/roles/tester`]: contents,
+    [`/api/projects/proj-a/issues/${issueId}/checklist`]: { meta: {}, tcs: [], looseSections: [] },
+    ...overrides,
+  };
+}
+
+function countingFetch(routes, { onPost } = {}) {
+  const getCounts = {};
+  const postCalls = [];
+  const fetchImpl = async (url, init) => {
+    if (init && init.method === "POST") {
+      const body = init.body ? JSON.parse(init.body) : null;
+      postCalls.push({ url, body });
+      if (onPost) return onPost(url, body);
+    } else {
+      getCounts[url] = (getCounts[url] || 0) + 1;
+    }
+    return routedFetch(routes)(url);
+  };
+  return { fetchImpl, getCounts, postCalls };
+}
+
+test("checkout banner renders for an item with item.checkout, regardless of item.kind (CR-006)", async () => {
+  installFakeDocument();
+  const container = new FakeElement("div");
+  const checkout = {
+    branch: `issue/${ISSUE_A}`,
+    endpoint: `/api/projects/proj-a/issues/${ISSUE_A}/checklist/checkout`,
+    method: "POST",
+    message: "This checklist lives on the issue branch, which isn't checked out. Showing a read-only preview.",
+  };
+  const contents = testerContentsWithExtras(ISSUE_A, { checklistCheckout: checkout });
+  const { fetchImpl, postCalls } = countingFetch(extrasRoutes(ISSUE_A, contents));
+
+  const mod = await loadModule();
+  const handle = mod.mount(container, {
+    project: "proj-a",
+    issueId: ISSUE_A,
+    initialRole: "tester",
+    fetchImpl,
+    confirmImpl: () => false,
+  });
+  await handle.ready;
+  handle.selectTab("manual_test_checklist");
+  await flush();
+
+  const banners = container.findAll((n) => n.className === "checkout-banner");
+  assert.strictEqual(banners.length, 1, "expected exactly one checkout banner");
+  assert.ok(
+    banners[0].findAll((n) => typeof n.textContent === "string" && n.textContent.includes("isn't checked out")).length,
+    "expected the checkout message to render"
+  );
+
+  const btn = container.findAll((n) => n.className === "btn" && n.textContent.startsWith("Checkout"))[0];
+  assert.ok(btn, "expected a Checkout <branch> button");
+
+  // Declining the confirmation must send no request at all (the protection
+  // against an accidental branch switch this task is explicitly required to
+  // keep).
+  btn.dispatchClick();
+  await flush();
+  assert.strictEqual(postCalls.length, 0, "declining confirm() must not POST the checkout route");
+});
+
+test("checkout banner: confirming calls POST checkout.endpoint, then reloads issues + role contents (CR-006)", async () => {
+  installFakeDocument();
+  const container = new FakeElement("div");
+  const checkout = {
+    branch: `issue/${ISSUE_A}`,
+    endpoint: `/api/projects/proj-a/issues/${ISSUE_A}/checklist/checkout`,
+    method: "POST",
+    message: "This checklist lives on the issue branch, which isn't checked out.",
+  };
+  const contents = testerContentsWithExtras(ISSUE_A, { checklistCheckout: checkout });
+  const { fetchImpl, getCounts, postCalls } = countingFetch(extrasRoutes(ISSUE_A, contents), {
+    onPost: async () => ({ ok: true, status: 200, json: async () => ({ ok: true, branch: checkout.branch }) }),
+  });
+
+  const mod = await loadModule();
+  const handle = mod.mount(container, {
+    project: "proj-a",
+    issueId: ISSUE_A,
+    initialRole: "tester",
+    fetchImpl,
+    confirmImpl: () => true,
+  });
+  await handle.ready;
+  handle.selectTab("manual_test_checklist");
+  await flush();
+
+  const rolesUrl = `/api/projects/proj-a/issues/${ISSUE_A}/roles/tester`;
+  const issuesUrl = "/api/projects/proj-a/issues";
+  assert.strictEqual(getCounts[rolesUrl], 1, "sanity: one role-contents fetch before the checkout");
+  assert.strictEqual(getCounts[issuesUrl], 1, "sanity: one issue-list fetch before the checkout");
+
+  const btn = container.findAll((n) => n.className === "btn" && n.textContent.startsWith("Checkout"))[0];
+  btn.dispatchClick();
+  await flush();
+  await flush();
+
+  assert.strictEqual(postCalls.length, 1);
+  assert.strictEqual(postCalls[0].url, checkout.endpoint);
+  assert.strictEqual(postCalls[0].body === null || Object.keys(postCalls[0].body).length === 0, true, "checkout POST carries no meaningful body");
+
+  // afterCheckout() re-fetches both the issue list and this role's contents
+  // (docCache.clear() + loadRoleContents(true)) — the same full reload the
+  // pre-redesign app.js did via loadIssues()+refreshRoleContents().
+  assert.strictEqual(getCounts[rolesUrl], 2, "expected role contents to be re-fetched after a successful checkout");
+  assert.strictEqual(getCounts[issuesUrl], 2, "expected the issue list to be re-fetched after a successful checkout");
+});
+
+test("checkout banner: a failed checkout surfaces the server's error message and re-enables the button", async () => {
+  installFakeDocument();
+  const container = new FakeElement("div");
+  const checkout = {
+    branch: `issue/${ISSUE_A}`,
+    endpoint: `/api/projects/proj-a/issues/${ISSUE_A}/checklist/checkout`,
+    method: "POST",
+    message: "This checklist lives on the issue branch, which isn't checked out.",
+  };
+  const contents = testerContentsWithExtras(ISSUE_A, { checklistCheckout: checkout });
+  const { fetchImpl } = countingFetch(extrasRoutes(ISSUE_A, contents), {
+    onPost: async () => ({
+      ok: false,
+      status: 409,
+      json: async () => ({ error: "dirty_working_tree", message: "Working tree has uncommitted changes — commit or stash them yourself first, then retry." }),
+    }),
+  });
+
+  const mod = await loadModule();
+  const handle = mod.mount(container, {
+    project: "proj-a",
+    issueId: ISSUE_A,
+    initialRole: "tester",
+    fetchImpl,
+    confirmImpl: () => true,
+  });
+  await handle.ready;
+  handle.selectTab("manual_test_checklist");
+  await flush();
+
+  const btn = container.findAll((n) => n.className === "btn" && n.textContent.startsWith("Checkout"))[0];
+  btn.dispatchClick();
+  await flush();
+  await flush();
+
+  assert.strictEqual(btn.disabled, false, "the button must be re-enabled after a failed checkout");
+  const errors = container.findAll((n) => n.className === "notice error" && n.textContent.includes("uncommitted changes"));
+  assert.strictEqual(errors.length, 1, "expected the server's own error message to render visibly, not be swallowed");
+});
+
+test("prepare action: item.kind \"action\" not offered renders no action-row/prepare-result at all", async () => {
+  installFakeDocument();
+  const container = new FakeElement("div");
+  const contents = testerContentsWithExtras(ISSUE_A, {
+    action: { offered: false, enabled: false, message: "This issue is closed; the prepare action is not offered for it." },
+  });
+  const { fetchImpl } = countingFetch(extrasRoutes(ISSUE_A, contents));
+
+  const mod = await loadModule();
+  const handle = mod.mount(container, { project: "proj-a", issueId: ISSUE_A, initialRole: "tester", fetchImpl });
+  await handle.ready;
+  handle.selectTab("prepare");
+  await flush();
+
+  assert.strictEqual(container.findAll((n) => n.className === "action-row").length, 0);
+  assert.strictEqual(container.findAll((n) => n.className === "prepare-result").length, 0);
+  // The item's own message still renders (generic notice, every item kind).
+  assert.ok(container.findAll((n) => n.className === "notice" && n.textContent.includes("closed")).length);
+});
+
+test("prepare action: offered but not enabled renders a disabled button and the reason", async () => {
+  installFakeDocument();
+  const container = new FakeElement("div");
+  const contents = testerContentsWithExtras(ISSUE_A, {
+    action: {
+      offered: true,
+      enabled: false,
+      reason: "the checklist lives on issue/20260101-feat-a, which is not checked out",
+      message: "Check out issue/20260101-feat-a first — test data is prepared into the checked-out issue.",
+    },
+  });
+  const { fetchImpl } = countingFetch(extrasRoutes(ISSUE_A, contents));
+
+  const mod = await loadModule();
+  const handle = mod.mount(container, { project: "proj-a", issueId: ISSUE_A, initialRole: "tester", fetchImpl });
+  await handle.ready;
+  handle.selectTab("prepare");
+  await flush();
+
+  const buttons = container.findAll((n) => n.className === "btn" && n.textContent.includes("Prepare test data"));
+  assert.strictEqual(buttons.length, 1);
+  assert.strictEqual(buttons[0].disabled, true);
+  assert.ok(
+    container.findAll((n) => n.className === "muted" && n.textContent.includes("not checked out")).length,
+    "expected the disabled reason to render"
+  );
+});
+
+test("prepare action: offered and enabled — click (after confirmation) POSTs {confirm:true} to item.endpoint and renders the result", async () => {
+  installFakeDocument();
+  const container = new FakeElement("div");
+  const prepareEndpoint = `/api/projects/proj-a/issues/${ISSUE_A}/prepare`;
+  const contents = testerContentsWithExtras(ISSUE_A, {
+    action: { offered: true, enabled: true, endpoint: prepareEndpoint, message: "The declared test data of this issue can be prepared." },
+  });
+  const { fetchImpl, postCalls } = countingFetch(extrasRoutes(ISSUE_A, contents), {
+    onPost: async () => ({
+      ok: true,
+      status: 200,
+      json: async () => ({
+        ok: true,
+        ran: true,
+        tcId: null,
+        exitCode: 0,
+        signal: null,
+        timedOut: false,
+        durationMs: 120,
+        scriptPath: "/fixture/test-data/setup.mjs",
+        stdout: "prepared TC-001\n",
+        stderr: "",
+        prepared: [{ tcId: "TC-001", workdir: "/tmp/pf-test-data/TC-001" }],
+        message: "Prepared 1 case.",
+      }),
+    }),
+  });
+
+  const mod = await loadModule();
+  const handle = mod.mount(container, {
+    project: "proj-a",
+    issueId: ISSUE_A,
+    initialRole: "tester",
+    fetchImpl,
+    confirmImpl: () => true,
+  });
+  await handle.ready;
+  handle.selectTab("prepare");
+  await flush();
+
+  const btn = container.findAll((n) => n.className === "btn" && n.textContent.includes("Prepare test data"))[0];
+  assert.ok(btn && !btn.disabled);
+  btn.dispatchClick();
+  await flush();
+  await flush();
+
+  assert.strictEqual(postCalls.length, 1);
+  assert.strictEqual(postCalls[0].url, prepareEndpoint);
+  assert.deepStrictEqual(postCalls[0].body, { confirm: true });
+
+  const results = container.findAll((n) => n.className === "prepare-result");
+  assert.strictEqual(results.length, 1);
+  assert.ok(results[0].findAll((n) => n.textContent === "Prepared").length, "expected a Prepared heading");
+  assert.ok(results[0].findAll((n) => n.className === "badge ok").length, "expected an ok badge");
+  assert.ok(
+    results[0].findAll((n) => n.tagName === "PRE").length,
+    "expected stdout to render as a pre.output block"
+  );
+});
+
+test("prepare action: a refused run (non-2xx, ok:false body) renders \"Not prepared\" with the server's reason — not silently swallowed", async () => {
+  installFakeDocument();
+  const container = new FakeElement("div");
+  const prepareEndpoint = `/api/projects/proj-a/issues/${ISSUE_A}/prepare`;
+  const contents = testerContentsWithExtras(ISSUE_A, {
+    action: { offered: true, enabled: true, endpoint: prepareEndpoint, message: "The declared test data of this issue can be prepared." },
+  });
+  const { fetchImpl } = countingFetch(extrasRoutes(ISSUE_A, contents), {
+    onPost: async () => ({
+      ok: false,
+      status: 500,
+      json: async () => ({
+        ok: false,
+        ran: true,
+        reason: "script_failed",
+        error: "script_failed",
+        exitCode: 1,
+        signal: null,
+        timedOut: false,
+        durationMs: 40,
+        stdout: "",
+        stderr: "boom\n",
+        prepared: [],
+        message: "The setup script exited with code 1.",
+      }),
+    }),
+  });
+
+  const mod = await loadModule();
+  const handle = mod.mount(container, {
+    project: "proj-a",
+    issueId: ISSUE_A,
+    initialRole: "tester",
+    fetchImpl,
+    confirmImpl: () => true,
+  });
+  await handle.ready;
+  handle.selectTab("prepare");
+  await flush();
+
+  const btn = container.findAll((n) => n.className === "btn" && n.textContent.includes("Prepare test data"))[0];
+  btn.dispatchClick();
+  await flush();
+  await flush();
+
+  const results = container.findAll((n) => n.className === "prepare-result");
+  assert.strictEqual(results.length, 1);
+  assert.ok(results[0].findAll((n) => n.textContent === "Not prepared").length);
+  assert.ok(results[0].findAll((n) => n.className === "badge fail" && n.textContent === "script_failed").length);
+  assert.ok(
+    results[0].findAll((n) => n.textContent === "The setup script exited with code 1.").length,
+    "expected the server's own message to render, not be swallowed"
+  );
+});
+
+test("prepare action: declining the confirmation sends no request", async () => {
+  installFakeDocument();
+  const container = new FakeElement("div");
+  const prepareEndpoint = `/api/projects/proj-a/issues/${ISSUE_A}/prepare`;
+  const contents = testerContentsWithExtras(ISSUE_A, {
+    action: { offered: true, enabled: true, endpoint: prepareEndpoint, message: "The declared test data of this issue can be prepared." },
+  });
+  const { fetchImpl, postCalls } = countingFetch(extrasRoutes(ISSUE_A, contents));
+
+  const mod = await loadModule();
+  const handle = mod.mount(container, {
+    project: "proj-a",
+    issueId: ISSUE_A,
+    initialRole: "tester",
+    fetchImpl,
+    confirmImpl: () => false,
+  });
+  await handle.ready;
+  handle.selectTab("prepare");
+  await flush();
+
+  const btn = container.findAll((n) => n.className === "btn" && n.textContent.includes("Prepare test data"))[0];
+  btn.dispatchClick();
+  await flush();
+
+  assert.strictEqual(postCalls.length, 0);
+});
+
+test("prepare action: a rejected fetch (network failure) re-enables the button and surfaces a visible error, instead of hanging on \"Preparing…\"", async () => {
+  installFakeDocument();
+  const container = new FakeElement("div");
+  const prepareEndpoint = `/api/projects/proj-a/issues/${ISSUE_A}/prepare`;
+  const contents = testerContentsWithExtras(ISSUE_A, {
+    action: { offered: true, enabled: true, endpoint: prepareEndpoint, message: "The declared test data of this issue can be prepared." },
+  });
+  const routes = extrasRoutes(ISSUE_A, contents);
+  const fetchImpl = async (url, init) => {
+    if (init && init.method === "POST") throw new Error("network unreachable");
+    return routedFetch(routes)(url);
+  };
+
+  const mod = await loadModule();
+  const handle = mod.mount(container, {
+    project: "proj-a",
+    issueId: ISSUE_A,
+    initialRole: "tester",
+    fetchImpl,
+    confirmImpl: () => true,
+  });
+  await handle.ready;
+  handle.selectTab("prepare");
+  await flush();
+
+  const btn = container.findAll((n) => n.className === "btn" && n.textContent.includes("Prepare test data"))[0];
+  const originalLabel = btn.textContent;
+  btn.dispatchClick();
+  await flush();
+  await flush();
+
+  assert.strictEqual(btn.disabled, false, "the button must be re-enabled after a rejected fetch, not stuck reading \"Preparing…\"");
+  assert.strictEqual(btn.textContent, originalLabel);
+  const errors = container.findAll((n) => n.className === "notice error" && n.textContent.includes("network unreachable"));
+  assert.strictEqual(errors.length, 1, "expected the rejection's message to render visibly, not be silently swallowed");
+});
+
+test("defaultConfirm: declines when no real window.confirm is reachable (safe default, no accidental confirmation)", async () => {
+  const mod = await loadModule();
+  // No `global.window` installed in this suite at all — mirrors node --test's
+  // own environment, exactly the case this default has to handle safely.
+  const contents = testerContentsWithExtras(ISSUE_A, {
+    action: { offered: true, enabled: true, endpoint: `/api/projects/proj-a/issues/${ISSUE_A}/prepare` },
+  });
+  const { fetchImpl, postCalls } = countingFetch(extrasRoutes(ISSUE_A, contents));
+
+  installFakeDocument();
+  const container = new FakeElement("div");
+  const handle = mod.mount(container, { project: "proj-a", issueId: ISSUE_A, initialRole: "tester", fetchImpl });
+  // No confirmImpl passed — falls back to defaultConfirm(), which must not
+  // throw even without a `window` at all, and must not proceed.
+  await handle.ready;
+  handle.selectTab("prepare");
+  await flush();
+
+  const btn = container.findAll((n) => n.className === "btn" && n.textContent.includes("Prepare test data"))[0];
+  btn.dispatchClick();
+  await flush();
+
+  assert.strictEqual(postCalls.length, 0, "with no confirm mechanism reachable, the default must decline, not proceed");
+});

@@ -555,6 +555,30 @@ async function postJson(pathname, body, fetchImpl) {
   return data;
 }
 
+// Non-throwing POST — CR-006 fix (code_review.md): used only by the
+// "prepare" action below. `POST .../issues/:id/prepare` (server.js's
+// `handlePrepare`) reports a refused/failed run as a non-2xx status that
+// still carries a full, meaningful JSON body (`ok: false`, `reason`,
+// `exitCode`, `stdout`/`stderr`, …) — that body is the whole point of
+// `renderPrepareResult` below, so `postJson`'s "throw away the body, throw an
+// Error" contract would lose it. Mirrors the pre-redesign app.js's own
+// `apiRaw()` (`{status, data}` regardless of `res.ok`) for the same reason.
+async function postJsonRaw(pathname, body, fetchImpl) {
+  const doFetch = fetchImpl || fetch;
+  const res = await doFetch(pathname, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+  });
+  let data = null;
+  try {
+    data = await res.json();
+  } catch {
+    /* no/invalid JSON body — data stays null */
+  }
+  return { status: res.status, data };
+}
+
 function projectBase(project) {
   return `/api/projects/${encodeURIComponent(project)}`;
 }
@@ -645,6 +669,21 @@ async function fetchInbox(fetchImpl) {
 // DOM rendering
 // ---------------------------------------------------------------------------
 
+// The confirmation gate in front of a state-changing action (checkout,
+// prepare) — CR-006 fix (code_review.md), carrying over the pre-redesign
+// app.js's bare `confirm(...)` call in front of both `requestCheckout()` and
+// `runPrepare()`. Independently overridable via `runtime.confirmImpl`
+// (`mount()`'s `options.confirmImpl`), the same "one call site, test
+// overridable" convention `fetchImpl` already follows throughout this file —
+// under `node --test`'s fake DOM there is no real `window.confirm` to call,
+// and a test asserting the "declined" path needs a way to make that happen
+// deterministically. Defaults to declining (not confirming) when no real
+// `window.confirm` is reachable at all — a missing confirmation mechanism
+// must never be read as "go ahead".
+function defaultConfirm(message) {
+  return typeof window !== "undefined" && typeof window.confirm === "function" ? window.confirm(message) : false;
+}
+
 function h(tag, className, text) {
   const node = document.createElement(tag);
   if (className) node.className = className;
@@ -727,6 +766,212 @@ function statusBadgeText(item) {
   if (item.status === "not_applicable") return "n/a";
   if (item.status === "missing") return "missing";
   return null;
+}
+
+// ---------------------------------------------------------------------------
+// Checkout banner + "prepare test data" action (Task 34, CR-006 fix —
+// code_review.md). Round-1 `/pf-codereview` found the pre-redesign app.js
+// rendered a checkout banner (`item.checkout`) and a "Prepare test data"
+// action (`item.kind === "action"`, `lib/roles.js`'s "prepare" tester-role
+// entry) that `renderDocPanel`'s redesign dropped entirely, even though
+// neither `server.js`'s routes (`POST .../checklist/checkout`,
+// `POST .../issues/:id/prepare`) nor `lib/git.js`/`lib/prepare.js` changed at
+// all — the finding is purely "the UI stopped offering an unchanged server
+// capability". Both builders below reuse `.checkout-banner`/`.btn`/
+// `.action-row`/`.prepare-result`/`dl.facts`/`pre.output` — present in
+// `style.css` since before this redesign and never removed, so restoring
+// this UI needs no new CSS class.
+// ---------------------------------------------------------------------------
+
+// `item.checkout` — populated by `buildRoleContents()`'s per-item state
+// (`docstate.classifyIssueDoc` for a document that exists only on the issue
+// branch; `prepareActionState`'s `requiresCheckout` for the prepare action)
+// — is a property of the ITEM, independent of `item.kind`: a plain document
+// tab and the "prepare" action tab can both carry one. One banner covers
+// both, the same way the pre-redesign app.js's `entryHeader` rendered
+// `checkoutBanner(item.checkout)` for every item kind alike.
+//
+// Same confirmation gate and the same route (`checkout.endpoint` — always
+// present here, `buildRoleContents` fills a default of
+// `.../checklist/checkout` whenever a state omits one) the pre-redesign
+// `checkoutBanner()`/`requestCheckout()` used; `lib/git.js`/`server.js` are
+// untouched by this task, only this visual wrapper is new.
+function buildCheckoutBanner(checkout, runtime) {
+  const wrap = h("div");
+  const banner = h("div", "checkout-banner");
+  banner.appendChild(
+    h(
+      "span",
+      null,
+      checkout.message || `${checkout.branch} isn't checked out — switching to it is offered on your confirmation.`
+    )
+  );
+
+  const btn = h("button", "btn", `Checkout ${checkout.branch}`);
+  btn.type = "button";
+  banner.appendChild(btn);
+  wrap.appendChild(banner);
+
+  // Only ever shown on a failed checkout: a successful one runs
+  // `runtime.afterCheckout()`, which re-fetches this role's contents and
+  // re-renders the whole panel from scratch — this exact node (and any
+  // "Checking out…" state it was in) is simply discarded, the same way a
+  // successful `PATCH`/`POST` write elsewhere in this file leaves its own
+  // success case to a re-render rather than a lingering "Saved" label.
+  const errorEl = h("p", "notice error");
+  errorEl.hidden = true;
+  wrap.appendChild(errorEl);
+
+  btn.addEventListener("click", async () => {
+    const confirmFn = runtime.confirmImpl || defaultConfirm;
+    const ok = confirmFn(
+      `Checkout "${checkout.branch}" in ${runtime.project}?\n\n` +
+        `This runs "git checkout ${checkout.branch}" in that project's working directory. ` +
+        `It will be refused if there are uncommitted changes.`
+    );
+    if (!ok) return;
+
+    const originalLabel = btn.textContent;
+    btn.disabled = true;
+    btn.textContent = "Checking out…";
+    errorEl.hidden = true;
+
+    try {
+      await postJson(checkout.endpoint, {}, runtime.fetchImpl);
+      await runtime.afterCheckout();
+    } catch (err) {
+      errorEl.hidden = false;
+      errorEl.textContent = err.message;
+      btn.disabled = false;
+      btn.textContent = originalLabel;
+    }
+  });
+
+  return wrap;
+}
+
+// The prepare action's own result — same facts and same stdout/stderr this
+// pane always showed (`prepareEnvelope`/`handlePrepare`'s response shape,
+// server.js, unchanged by this task), rebuilt as real DOM nodes instead of
+// the pre-redesign app.js's `elem()` calls.
+function renderPrepareResult(result, res) {
+  const data = res.data || {};
+  result.innerHTML = "";
+
+  const head = h("div", "doc-title-row");
+  head.appendChild(h("h3", null, data.ok ? "Prepared" : "Not prepared"));
+  head.appendChild(
+    h("span", `badge ${data.ok ? "ok" : "fail"}`, data.ok ? "ok" : data.reason || data.error || `HTTP ${res.status}`)
+  );
+  result.appendChild(head);
+
+  if (data.message) result.appendChild(h("p", null, data.message));
+
+  const dl = h("dl", "facts");
+  const facts = [
+    ["Case", data.tcId || "whole issue"],
+    ["Ran the script", data.ran ? "yes" : "no"],
+    ["Exit code", data.exitCode === null || data.exitCode === undefined ? "—" : String(data.exitCode)],
+    ["Signal", data.signal || "—"],
+    ["Timed out", data.timedOut ? "yes" : "no"],
+    ["Duration", typeof data.durationMs === "number" ? `${data.durationMs} ms` : "—"],
+    ["Script", data.scriptPath || "—"],
+  ];
+  if (data.workdir) facts.push(["Working copy", data.workdir]);
+  for (const [key, value] of facts) {
+    dl.appendChild(h("dt", null, key));
+    dl.appendChild(h("dd", null, value));
+  }
+  result.appendChild(dl);
+
+  const prepared = Array.isArray(data.prepared) ? data.prepared : [];
+  if (prepared.length) {
+    const list = h("ul", "plain-list");
+    for (const entry of prepared) {
+      const li = h("li");
+      li.appendChild(h("strong", null, entry.tcId || "—"));
+      li.appendChild(h("code", "doc-path", entry.workdir || ""));
+      list.appendChild(li);
+    }
+    result.appendChild(list);
+  }
+
+  for (const [label, text] of [
+    ["stdout", data.stdout],
+    ["stderr", data.stderr],
+  ]) {
+    if (!text) continue;
+    result.appendChild(h("h4", null, label));
+    const pre = h("pre", "output");
+    pre.appendChild(h("code", null, text));
+    result.appendChild(pre);
+  }
+}
+
+// `item.kind === "action"` — the "prepare" tester-role entry's own tab
+// (`lib/roles.js`). `item.offered`/`item.enabled`/`item.reason` are exactly
+// `prepareActionState()`'s verdict (server.js) — this function renders that
+// verdict, it never re-derives it, so the button can never offer what the
+// route would refuse.
+function buildPrepareActionNode(item, runtime) {
+  // Not offered at all (e.g. a closed issue, or a checklist that declares no
+  // data needed) — no body, matching the pre-redesign app.js's `openAction`
+  // (`if (!item.offered) return;`, nothing appended past the shared header).
+  // The item's own `item.message` (rendered above, generically, for every
+  // item kind) already carries the "why".
+  if (!item.offered) return null;
+
+  const wrap = h("div", "stack");
+  const actions = h("div", "action-row");
+  const btn = h("button", "btn", "Prepare test data for the whole issue");
+  btn.type = "button";
+  btn.disabled = !item.enabled;
+  actions.appendChild(btn);
+  if (!item.enabled) actions.appendChild(h("span", "muted", item.reason || "Not available right now."));
+  wrap.appendChild(actions);
+
+  const result = h("div", "prepare-result");
+  wrap.appendChild(result);
+
+  btn.addEventListener("click", async () => {
+    const confirmFn = runtime.confirmImpl || defaultConfirm;
+    const ok = confirmFn(
+      `Prepare test data for every case of ${runtime.issueId} in ${runtime.project}?\n\n` +
+        `This runs the issue's own setup script and rebuilds its working copy from scratch, ` +
+        `outside the repository. Anything already in that working copy is replaced.`
+    );
+    if (!ok) return;
+
+    const originalLabel = btn.textContent;
+    btn.disabled = true;
+    btn.textContent = "Preparing…";
+    result.innerHTML = "";
+    result.appendChild(h("p", "muted", "Running…"));
+
+    // `postJsonRaw` never throws on an HTTP error status (that's the whole
+    // point — `renderPrepareResult` needs the body of a refused/failed run,
+    // not just a status code) but the underlying `fetch` call itself can
+    // still reject outright (network failure, server unreachable) — the one
+    // failure mode `postJsonRaw`'s own contract does not cover. Without this
+    // catch that rejection would be unhandled and this button would be stuck
+    // on "Preparing…"/disabled forever, with `.prepare-result` stuck on
+    // "Running…" — a silently swallowed failure, the one thing every other
+    // write handler in this file (`buildCheckoutBanner`,
+    // `buildChecklistWriteHandlers`, `buildHumanTasksHandlers`) is careful
+    // never to do.
+    try {
+      const res = await postJsonRaw(item.endpoint, { confirm: true }, runtime.fetchImpl);
+      renderPrepareResult(result, res);
+    } catch (err) {
+      result.innerHTML = "";
+      result.appendChild(h("p", "notice error", err.message));
+    } finally {
+      btn.disabled = false;
+      btn.textContent = originalLabel;
+    }
+  });
+
+  return wrap;
 }
 
 // ---------------------------------------------------------------------------
@@ -1228,6 +1473,21 @@ function renderDocPanel(tab, runtime) {
   if (item.description) panel.appendChild(h("p", "doc-description", item.description));
   if (item.message) panel.appendChild(h("p", "notice", item.message));
 
+  // CR-006 fix: `item.checkout` is a property of the item, not of `item.kind`
+  // — see the comment above `buildCheckoutBanner`.
+  if (item.checkout && item.checkout.branch) {
+    panel.appendChild(buildCheckoutBanner(item.checkout, runtime));
+  }
+
+  // CR-006 fix: the "prepare" tester-role entry (`item.kind === "action"`)
+  // has no readable document/checklist body of its own — everything it
+  // needs is the action UI above, so this branch returns early.
+  if (item.kind === "action") {
+    const actionNode = buildPrepareActionNode(item, runtime);
+    if (actionNode) panel.appendChild(actionNode);
+    return panel;
+  }
+
   // manual_test_checklist.md gets the structured render (`renderChecklistPanel`
   // above), not the generic raw-markdown path below: `GET .../checklist`
   // instead of `item.endpoint`, so `looseSections` — a field that endpoint
@@ -1346,7 +1606,11 @@ function maybeScrollToPtcId(container, ptcId) {
  * @param {{project: string, issueId?: string|null, initialRole?: string,
  *   initialTab?: string, initialPtcId?: string,
  *   fetchImpl?: typeof fetch, storage?: Storage,
+ *   confirmImpl?: (message: string) => boolean,
  *   onNavigate?: (hash: string) => void}} options
+ *   `confirmImpl` (CR-006 fix) — the confirmation gate in front of the
+ *   checkout banner's/prepare action's write; defaults to `window.confirm`
+ *   when reachable, declining otherwise (see `defaultConfirm` above).
  * @returns {{selectIssue: (issueId: string) => Promise<void>,
  *   selectRole: (roleId: string) => Promise<void>,
  *   selectTab: (tabId: string) => void,
@@ -1437,6 +1701,24 @@ export function mount(container, options = {}) {
     return tab.item.endpoint;
   }
 
+  // CR-006 fix — run after a checkout banner's `POST .../checklist/checkout`
+  // succeeds: the working tree just switched branches, so every cached
+  // document fetch may now be stale (a document that was `branch`-only can
+  // now be `disk`, or vice versa) — the same full reload the pre-redesign
+  // app.js's `requestCheckout()` did (`await loadIssues(); await
+  // refreshRoleContents();`), rebuilt on this module's own primitives.
+  // `docCache.clear()`, not `invalidateDoc` of one endpoint: a checkout can
+  // change many documents' state at once, unlike a single checklist write.
+  async function afterCheckout() {
+    docCache.clear();
+    try {
+      state.issues = await fetchIssues(state.project, options.fetchImpl);
+    } catch {
+      /* keep the previous issue list — not fatal to a successful checkout */
+    }
+    await loadRoleContents(true);
+  }
+
   // `/api/inbox` has exactly one call site in this whole module: this
   // memoized promise (AC-06b, TC-029 step 4). It is created at most once per
   // mount and never invalidated by `selectRole`/`selectIssue` — a project
@@ -1499,8 +1781,10 @@ export function mount(container, options = {}) {
           project: state.project,
           issueId: state.issueId,
           fetchImpl: options.fetchImpl,
+          confirmImpl: options.confirmImpl,
           invalidateDoc,
           tryScrollToInitialPtcId,
+          afterCheckout,
         })
       );
     } else {

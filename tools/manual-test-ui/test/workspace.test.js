@@ -40,7 +40,8 @@ const fs = require("node:fs");
 const path = require("node:path");
 const { pathToFileURL } = require("node:url");
 
-const { TOOL_DIR, makeTempRepo, makeConfig, autoCleanup, checklistDoc } = require("./helpers/fixtures");
+const { TOOL_DIR, makeTempRepo, makeConfig, autoCleanup, checklistDoc, isolateTempRoot, cleanupAll } = require("./helpers/fixtures");
+const { preparedIssueRoot } = require("../lib/prepare");
 const { startServerFor } = require("./helpers/server");
 
 const MODULE_PATH = path.join(TOOL_DIR, "public", "workspace.js");
@@ -564,4 +565,118 @@ test("mount(): checklist step Save against the real server surfaces the real 422
   // The rejected write must not have reached disk.
   const onDisk = fs.readFileSync(path.join(repo.root, "docs", "issues", "open", FULL, "manual_test_checklist.md"), "utf8");
   assert.ok(!onDisk.includes("[x]"), "a rejected empty-Result write must leave every step unchecked on disk");
+});
+
+// ---------------------------------------------------------------------------
+// Task 34 (CR-006 fix, code_review.md) — checkout banner + "prepare test
+// data" action, through a REAL HTTP round trip. test/workspace-ui.test.js
+// already covers both handlers against a hand-built fake `fetchImpl`; that
+// alone cannot catch a request-body shape the real routes would reject
+// (`POST .../checklist/checkout`, `POST .../issues/:id/prepare` both refuse
+// requests today, and `handlePrepare` specifically 400s anything without
+// `{"confirm": true}` — same reasoning as the checklist-write tests above,
+// test_plan.md TC-031 step 4). These two feed the real fixture catalogue
+// `test/checklist-git.test.js`/`test/prepare*.test.js` already exercise
+// server-side, but this time driven by `public/workspace.js`'s own click
+// handlers, end to end.
+// ---------------------------------------------------------------------------
+
+const ONBRANCH = "20260104-feat-fixture-onbranch"; // checklistStatus "on_branch" — real checkout target
+const TWOCASES = "20260107-feat-fixture-twocases"; // has test-data/setup.mjs — real prepare target
+
+test("mount(): the checkout banner's real POST .../checklist/checkout actually switches the repo's branch (TC-031 step 4)", async (t) => {
+  autoCleanup(t);
+  const repo = makeTempRepo({ name: "main", issues: [ONBRANCH] });
+  const config = makeConfig({ projects: [{ name: "main", path: repo.root }] });
+  const server = await startServerFor(t, { configPath: config.configPath });
+  const mod = await loadModule();
+
+  assert.ok(repo.isClean(), "precondition: the working tree must be clean");
+  assert.notStrictEqual(repo.currentBranch(), `issue/${ONBRANCH}`, "precondition: not already on the issue branch");
+
+  installFakeDocument();
+  const container = new FakeElement("div");
+  const fetchImpl = (pathname, init) => fetch(server.baseUrl + pathname, init);
+
+  const handle = mod.mount(container, {
+    project: "main",
+    issueId: ONBRANCH,
+    initialRole: "tester",
+    fetchImpl,
+    confirmImpl: () => true,
+  });
+  await handle.ready;
+  handle.selectTab("manual_test_checklist");
+  await waitFor(() => container.findAll((n) => n.className === "checkout-banner").length > 0);
+
+  const btn = container.findAll((n) => n.className === "btn" && n.textContent.startsWith("Checkout"))[0];
+  assert.ok(btn, "expected a real Checkout <branch> button for the on_branch fixture");
+  btn.dispatchClick();
+
+  await waitFor(() => repo.currentBranch() === `issue/${ONBRANCH}`, 5000);
+  assert.ok(repo.isClean(), "a successful checkout through the UI must not leave the tree dirty");
+
+  // And the reload this task wires up (afterCheckout) actually landed: the
+  // checklist is no longer a read-only branch preview.
+  await waitFor(() => {
+    const banners = container.findAll((n) => n.className === "checkout-banner");
+    return banners.length === 0;
+  }, 5000);
+});
+
+test("mount(): the prepare action's real POST .../prepare with {confirm:true} runs the fixture's own setup.mjs and reports success (TC-031 step 4-adjacent)", async (t) => {
+  // setup.mjs unpacks under <tmpdir>/pf-test-data/<ISSUE-ID> — isolate that
+  // root, same convention test/checklist-git.test.js TC-014 step 6 uses, so
+  // this suite cannot collide with another one running in parallel and
+  // leaves nothing behind in the developer's real /tmp.
+  const isolated = isolateTempRoot("pf-ui-workspace-prepare-");
+  t.after(() => {
+    cleanupAll();
+    isolated.restore();
+  });
+
+  const repo = makeTempRepo({ name: "main", issues: [TWOCASES] });
+  const config = makeConfig({ projects: [{ name: "main", path: repo.root }] });
+  const server = await startServerFor(t, { configPath: config.configPath });
+  const mod = await loadModule();
+
+  installFakeDocument();
+  const container = new FakeElement("div");
+  const fetchImpl = (pathname, init) => fetch(server.baseUrl + pathname, init);
+
+  const handle = mod.mount(container, {
+    project: "main",
+    issueId: TWOCASES,
+    initialRole: "tester",
+    fetchImpl,
+    confirmImpl: () => true,
+  });
+  await handle.ready;
+  handle.selectTab("prepare");
+  await waitFor(() => {
+    const buttons = container.findAll((n) => n.className === "btn" && n.textContent.includes("Prepare test data"));
+    return buttons.length > 0 && !buttons[0].disabled;
+  }, 5000);
+
+  const btn = container.findAll((n) => n.className === "btn" && n.textContent.includes("Prepare test data"))[0];
+  btn.dispatchClick();
+
+  // Proves the client's `{confirm: true}` body actually cleared the real
+  // route's confirmation gate (`handlePrepare`'s `confirmation_required`
+  // 400) — a fake-fetch test cannot tell "sent the right body" from "sent
+  // any body at all".
+  await waitFor(() => container.findAll((n) => n.className === "prepare-result").length > 0, 5000);
+  await waitFor(() => {
+    const result = container.findAll((n) => n.className === "prepare-result")[0];
+    return result.findAll((n) => n.textContent === "Prepared" || n.textContent === "Not prepared").length > 0;
+  }, 10000);
+
+  const result = container.findAll((n) => n.className === "prepare-result")[0];
+  const heading = result.findAll((n) => n.textContent === "Prepared" || n.textContent === "Not prepared")[0];
+  assert.strictEqual(heading.textContent, "Prepared", "expected the real setup.mjs run to succeed for this fixture");
+  assert.ok(result.findAll((n) => n.className === "badge ok").length, "expected an ok badge on a real successful run");
+
+  // And the working copy the script produced is real, on disk, outside the
+  // repository — not a fabricated success.
+  assert.ok(fs.existsSync(preparedIssueRoot(TWOCASES)), "expected the real prepared working copy to exist on disk");
 });
