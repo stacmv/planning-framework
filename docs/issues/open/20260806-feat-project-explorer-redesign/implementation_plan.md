@@ -692,13 +692,13 @@ Criteria этого раздела)
 - `test/workspace.test.js`: `resolveActiveTab` (документ есть у обеих issue / отсутствует у новой — TC-003), `.doc-tabs` через `GET .../roles/:role` для двух ролей без пересечения наборов (TC-002, через `test/helpers/server.js`, не через `import()` — это серверный HTTP-вызов), отсутствие захардкоженного списка документов в `workspace.js` (TC-002 шаг 4), `countProjectTodos` — сигнатура ровно из двух аргументов, project-wide сумма, 0 для проекта без дел, отсутствие повторного `fetch` при смене роли/issue (TC-029), `renderChecklistPanel` — порядок блоков, CSS-класс, группировка `looseSections` по `afterTc`/`lineIndex`, orphan `afterTc` не отброшен, no-markdown (TC-030).
 
 **Acceptance Criteria:**
-- [ ] TC-001 passes
-- [ ] TC-002 passes
-- [ ] TC-003 passes
-- [ ] TC-004 passes
-- [ ] TC-019 passes
-- [ ] TC-029 passes
-- [ ] TC-030 passes
+- [x] TC-001 passes
+- [x] TC-002 passes
+- [x] TC-003 passes
+- [x] TC-004 passes
+- [x] TC-019 passes
+- [x] TC-029 passes
+- [x] TC-030 passes
 
 ---
 
