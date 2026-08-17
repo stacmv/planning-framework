@@ -30,6 +30,20 @@ body {
   min-height: 0;
 }
 
+/* --------------------------------------------------------- focus visible */
+/* `:focus-visible`, not bare `:focus` (specs.md §6, US-03): the outline must
+   show for keyboard/programmatic focus but stay hidden on a mouse click.
+   Applies to every interactive element in the app — no `.role-switch` /
+   `.inbox-card` / `.project-grid` / `.workspace-header` / `.doc-tabs`-scoped
+   duplicate needed, since tabindex order there is plain DOM order (never
+   reordered via CSS), so one global rule already reaches all of them in the
+   right order. `--accent`'s contrast against `--bg`/`--surface` is covered
+   by `test/contrast.test.js` (Task 18/AC-02b). */
+:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
 /* ------------------------------------------------------------- role tabs */
 /* Roles are the top level of the tool: this strip is above everything, is
    never scrolled away, and every tab stays clickable at all times. */
@@ -702,8 +716,11 @@ table.steps tr:last-child td { border-bottom: none; }
   font-size: 13px;
 }
 
+/* No `outline: none` here (Task 22, specs.md §6): a scoped `:focus` rule at
+   specificity 0,2,0 would outrank the global `:focus-visible` rule above
+   (0,1,0) and silently swallow the keyboard focus ring on this element. The
+   accent border-color still highlights on any focus, keyboard or mouse. */
 .note-input:focus {
-  outline: none;
   border-color: var(--accent);
 }
 
@@ -730,8 +747,8 @@ table.steps tr:last-child td { border-bottom: none; }
   resize: vertical;
 }
 
+/* Same reasoning as .note-input:focus above — no outline: none here. */
 .tc-notes textarea:focus {
-  outline: none;
   border-color: var(--accent);
 }
 
