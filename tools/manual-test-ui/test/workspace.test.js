@@ -101,6 +101,7 @@ class FakeElement {
     this.disabled = false;
     this.value = undefined;
     this.selected = undefined;
+    this.checked = undefined;
     this._href = undefined;
   }
   get textContent() {
@@ -467,4 +468,100 @@ test("TC-030: renderChecklistPanel(), fed a real GET .../checklist response, pla
 
   const looseBlock = html.slice(looseSectionsIndex, html.lastIndexOf("</div>"));
   assert.ok(!looseBlock.includes('class="panel"'), ".loose-sections must never carry the .panel class");
+});
+
+// ---------------------------------------------------------------------------
+// Task 29 (CR-001 fix): the checklist write UI, against a REAL server round
+// trip — a fake-fetch test (test/workspace-ui.test.js already has plenty)
+// cannot catch a request-body shape the real route would reject (e.g. `step`
+// serialized as a string instead of a number); this is what actually proves
+// the client's PATCH satisfies `server.js`'s route. Also test_plan.md
+// TC-023 step 5-6 and TC-031 step 5 (point-write, not a full rewrite).
+// ---------------------------------------------------------------------------
+
+// Polls a real event loop (real fetch, real child-process HTTP round trips —
+// not just a single microtask flush) until `check()` is true or `timeoutMs`
+// elapses.
+async function waitFor(check, timeoutMs = 2000) {
+  const start = Date.now();
+  while (!check()) {
+    if (Date.now() - start > timeoutMs) {
+      throw new Error(`waitFor: condition not met within ${timeoutMs}ms`);
+    }
+    await new Promise((resolve) => setTimeout(resolve, 5));
+  }
+}
+
+test("mount(): checklist step Save PATCHes the real server and the write actually lands on disk (TC-023 step 6, TC-031 step 5)", async (t) => {
+  autoCleanup(t);
+  const repo = makeTempRepo({ name: "main", issues: [FULL] });
+  const config = makeConfig({ projects: [{ name: "main", path: repo.root }] });
+  const server = await startServerFor(t, { configPath: config.configPath });
+  const mod = await loadModule();
+
+  installFakeDocument();
+  const container = new FakeElement("div");
+  const fetchImpl = (pathname, init) => fetch(server.baseUrl + pathname, init);
+
+  const handle = mod.mount(container, { project: "main", issueId: FULL, initialRole: "tester", fetchImpl });
+  await handle.ready;
+  handle.selectTab("manual_test_checklist");
+  await waitFor(() => container.findAll((n) => n.className === "step-checkbox").length > 0);
+
+  const checkboxes = container.findAll((n) => n.className === "step-checkbox");
+  const noteInputs = container.findAll((n) => n.className === "step-note-input");
+  const saveButtons = container.findAll((n) => n.className === "step-save-btn");
+  assert.ok(checkboxes.length >= 1, "expected the real checklist fixture to render at least one step control");
+
+  checkboxes[0].checked = true;
+  noteInputs[0].value = "Verified against the real server.";
+  saveButtons[0].dispatchClick();
+  await waitFor(() => {
+    const s = container.findAll((n) => n.className && n.className.split(" ")[0] === "step-save-status")[0];
+    return s && s.textContent && s.textContent !== "Saving…";
+  });
+
+  const statuses = container.findAll((n) => n.className && n.className.split(" ")[0] === "step-save-status");
+  assert.strictEqual(statuses[0].textContent, "Saved", `expected the real PATCH to succeed, got status text: ${statuses[0].textContent}`);
+
+  // The write actually reached disk, through the real route/lib/checklist.js
+  // — not just an optimistic UI update.
+  const onDisk = fs.readFileSync(path.join(repo.root, "docs", "issues", "open", FULL, "manual_test_checklist.md"), "utf8");
+  assert.ok(onDisk.includes("Verified against the real server."), "the real file on disk must contain the saved note");
+  assert.match(onDisk, /\[x\]\s*Verified against the real server\./, "the real file must show the step as checked");
+});
+
+test("mount(): checklist step Save against the real server surfaces the real 422 empty_result as visible text (TC-023 step 5)", async (t) => {
+  autoCleanup(t);
+  const repo = makeTempRepo({ name: "main", issues: [FULL] });
+  const config = makeConfig({ projects: [{ name: "main", path: repo.root }] });
+  const server = await startServerFor(t, { configPath: config.configPath });
+  const mod = await loadModule();
+
+  installFakeDocument();
+  const container = new FakeElement("div");
+  const fetchImpl = (pathname, init) => fetch(server.baseUrl + pathname, init);
+
+  const handle = mod.mount(container, { project: "main", issueId: FULL, initialRole: "tester", fetchImpl });
+  await handle.ready;
+  handle.selectTab("manual_test_checklist");
+  await waitFor(() => container.findAll((n) => n.className === "step-checkbox").length > 0);
+
+  const checkboxes = container.findAll((n) => n.className === "step-checkbox");
+  const saveButtons = container.findAll((n) => n.className === "step-save-btn");
+  checkboxes[0].checked = true; // note left empty — the real route must reject this (AC-05c)
+  saveButtons[0].dispatchClick();
+  await waitFor(() => {
+    const s = container.findAll((n) => n.className && n.className.split(" ")[0] === "step-save-status")[0];
+    return s && s.textContent && s.textContent !== "Saving…";
+  });
+
+  const statuses = container.findAll((n) => n.className && n.className.split(" ")[0] === "step-save-status");
+  assert.notStrictEqual(statuses[0].textContent, "", "the real 422 must render as visible text, not be swallowed");
+  assert.notStrictEqual(statuses[0].textContent, "empty_result", "must not leak the raw machine error code");
+  assert.ok(statuses[0].className.includes("error"));
+
+  // The rejected write must not have reached disk.
+  const onDisk = fs.readFileSync(path.join(repo.root, "docs", "issues", "open", FULL, "manual_test_checklist.md"), "utf8");
+  assert.ok(!onDisk.includes("[x]"), "a rejected empty-Result write must leave every step unchecked on disk");
 });

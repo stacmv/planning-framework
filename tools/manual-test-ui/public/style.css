@@ -23,6 +23,34 @@ body {
   font-size: 14px;
 }
 
+/* Minimal element reset, same spirit as the `*{box-sizing}`/`body` rules
+   above: every `<button>`/`<select>` in this tool (`.role-btn`, `.doc-tab`,
+   `.issue-select`, `.role-select`, …) inherits the interface font/size/color
+   instead of the browser's native control chrome, and `<a>` (`.inbox-card`,
+   `.project-card`, `.workspace-back`, …) reads in the accent color by
+   default. Each of those classes still sets its own colors/borders/padding —
+   this only removes the browser-default starting point. */
+button, select {
+  font-family: inherit;
+  font-size: inherit;
+  color: inherit;
+}
+
+a {
+  color: var(--accent);
+}
+
+/* The single mount point every screen (launcher/workspace/inbox) renders
+   into (`public/index.html`'s `#app.app-root` — `public/app.js` swaps its
+   children on every hashchange). Page-level padding/max-width lives here,
+   once, rather than duplicated per screen — `.inbox.js`'s `mount()` has no
+   wrapping element of its own to hold it. */
+.app-root {
+  max-width: 1100px;
+  margin: 0 auto;
+  padding: 20px 24px 48px;
+}
+
 .shell {
   display: flex;
   flex-direction: column;
@@ -768,6 +796,450 @@ table.steps tr:last-child td { border-bottom: none; }
 }
 .toast.error { border-color: var(--fail); color: var(--fail); }
 .toast.ok { border-color: var(--ok); color: var(--ok); }
+
+/* ------------------------------------------------------------- launcher */
+/* Level 1 (`public/launcher.js`, test_plan.md TC-001): role switch, the
+   single global inbox entry point, and the project grid — one screen. */
+
+.launcher {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.role-switch {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+/* Same pill shape as the (unrelated, top-bar) `.role-tab` above — this is
+   the level-1 role picker, `.role-tab` is dead markup (CR-008) from the
+   previous layout, not something this reuses directly. */
+.role-btn {
+  background: transparent;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  color: var(--text);
+  padding: 7px 18px;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.role-btn:hover { background: color-mix(in srgb, var(--surface) 80%, var(--accent)); }
+
+.role-btn.active {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: var(--text);
+  font-weight: 600;
+}
+
+.inbox-card {
+  display: block;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-left: 3px solid var(--accent);
+  border-radius: 10px;
+  padding: 14px 18px;
+  text-decoration: none;
+}
+
+.inbox-card:hover { background: color-mix(in srgb, var(--surface) 88%, var(--accent)); }
+
+.inbox-card-label {
+  color: var(--accent);
+  font-weight: 600;
+  font-size: 15px;
+}
+
+.project-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 12px;
+}
+
+.project-card {
+  display: block;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 14px 16px;
+  color: var(--text);
+  text-decoration: none;
+}
+
+.project-card:hover { border-color: var(--accent); }
+
+.project-card-name {
+  color: var(--accent);
+  font-weight: 600;
+  font-size: 15px;
+  margin-bottom: 4px;
+  overflow-wrap: anywhere;
+}
+
+.project-card-meta {
+  color: var(--muted);
+  font-size: 12px;
+}
+
+/* --------------------------------------------------------------- inbox */
+/* Global inbox screen (`public/inbox.js`, test_plan.md TC-018/TC-019/TC-020):
+   `.inbox-tabs` switches which of the two `.inbox-panels` sections is
+   visible; each section is its own `.panel`-style block of `.inbox-item`
+   rows. */
+
+.inbox-tabs {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+  margin-bottom: 16px;
+}
+
+.inbox-tab {
+  background: transparent;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  color: var(--text);
+  padding: 7px 16px;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.inbox-tab:hover { background: color-mix(in srgb, var(--surface) 80%, var(--accent)); }
+
+.inbox-tab--active {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: var(--text);
+  font-weight: 600;
+}
+
+.inbox-panels { display: flex; flex-direction: column; gap: 20px; }
+
+.inbox-section {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 14px 18px;
+}
+
+.inbox-section-title {
+  color: var(--accent);
+  font-weight: 600;
+  font-size: 15px;
+  margin: 0 0 10px;
+}
+
+.inbox-empty, .inbox-loading { color: var(--muted); margin: 0; }
+.inbox-error { color: var(--fail); margin: 0; }
+
+.inbox-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.inbox-list li + li { margin-top: 8px; }
+
+.inbox-item {
+  display: block;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 10px 14px;
+  color: var(--text);
+  text-decoration: none;
+}
+
+.inbox-item:hover { border-color: var(--accent); }
+
+.inbox-item-label {
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+
+.inbox-item-instruction {
+  color: var(--text);
+  font-size: 13px;
+  margin-top: 4px;
+  overflow-wrap: anywhere;
+}
+
+.inbox-item-meta {
+  color: var(--muted);
+  font-size: 11px;
+  margin-top: 4px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* ----------------------------------------------------------- workspace */
+/* Level 2 (`public/workspace.js`, test_plan.md TC-002/TC-003): no persistent
+   sidebar (AC-01b) — `.workspace-header` holds the Issue/Role dropdowns,
+   `.doc-tabs` holds exactly the current role's documents plus "Дела", and
+   `.doc-panel` is the one visible content panel for whichever tab is active. */
+
+.workspace {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.workspace-header {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  flex-wrap: wrap;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 12px 16px;
+}
+
+.workspace-back {
+  color: var(--accent);
+  font-size: 13px;
+  text-decoration: none;
+  white-space: nowrap;
+}
+.workspace-back:hover { text-decoration: underline; }
+
+.workspace-project {
+  font-weight: 600;
+  font-size: 15px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.workspace-field {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+/* Both dropdowns sit together at the header's trailing edge, Issue before
+   Role — `--issue`/`--role` only need to say which `<select>` they wrap for
+   `.issue-select`/`.role-select` sizing below, not a different layout. */
+.workspace-field--role { margin-left: auto; }
+
+.field-label {
+  color: var(--muted);
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  white-space: nowrap;
+}
+
+.issue-select,
+.role-select {
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  color: var(--text);
+  padding: 5px 8px;
+}
+
+.issue-select:disabled,
+.role-select:disabled { opacity: 0.6; cursor: default; }
+
+.workspace-field--issue .issue-select { min-width: 160px; }
+.workspace-field--role .role-select { min-width: 140px; }
+
+.doc-tabs {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.doc-tab {
+  background: transparent;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  color: var(--text);
+  padding: 7px 16px;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.doc-tab:hover { background: color-mix(in srgb, var(--surface) 80%, var(--accent)); }
+
+.doc-tab--active {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: var(--text);
+  font-weight: 600;
+}
+
+/* The one visible content panel for whichever `.doc-tab` is active — the
+   same bordered/padded block the rest of the app uses for a distinct area
+   (`.panel`, `.sub-card`), AC-02f's "each area its own panel, not one
+   solid canvas". */
+.doc-panel {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 18px 22px;
+}
+
+.checklist-body { margin-top: 4px; }
+
+.checklist-meta { margin-bottom: 12px; }
+
+/* ------------------------------------------------- checklist write UI */
+/* Task 29's interactive Result/Notes editing, layered onto the read-only
+   checklist body `renderChecklistBody` (public/workspace.js) builds:
+   `.checklist-meta-wrap` wraps the same meta HTML `.checklist-meta` styled
+   above, `.tc-wrap` is one TC's read-only `.tc-info-wrap` panel plus its
+   `.checklist-steps-table`/`.tc-notes-editor`, and `.loose-sections-wrap`
+   wraps the same loose-sections HTML `.loose-sections` above already styles
+   — none of these wrapper divs need their own visual treatment beyond
+   spacing, since the elements they wrap already carry `.panel`/`.loose-sections`
+   styling from innerHTML. */
+
+.checklist-meta-wrap { margin-bottom: 12px; }
+
+.tc-wrap { margin-bottom: 16px; }
+
+.tc-info-wrap { margin-bottom: 0; }
+
+.loose-sections-wrap { margin-top: 4px; }
+
+/* The interactive steps table — same `.panel-table` look the rest of the
+   app uses for tabular data (striped rows, muted uppercase headers), plus
+   the fixed-width Result column that holds the checkbox/textarea/button
+   stack below. */
+.checklist-steps-table { margin-top: 8px; }
+
+.checklist-steps-table .step-result-cell {
+  min-width: 220px;
+}
+
+.checklist-step-row td {
+  border-bottom: 1px solid var(--border);
+}
+
+.checklist-step-row:last-child td {
+  border-bottom: none;
+}
+
+.step-check-label {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  cursor: pointer;
+  margin-bottom: 6px;
+}
+
+.step-checkbox {
+  width: 16px;
+  height: 16px;
+  cursor: pointer;
+}
+
+.step-note-input {
+  display: block;
+  width: 100%;
+  min-width: 160px;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 5px;
+  color: var(--text);
+  padding: 6px 8px;
+  font-size: 13px;
+  font-family: inherit;
+  resize: vertical;
+  margin-bottom: 6px;
+}
+
+/* Same reasoning as .note-input:focus/.tc-notes textarea:focus above — no
+   outline: none here, so the global :focus-visible ring still shows. */
+.step-note-input:focus,
+.tc-notes-input:focus {
+  border-color: var(--accent);
+}
+
+.step-save-btn {
+  background: var(--accent);
+  border: none;
+  border-radius: 6px;
+  color: var(--bg);
+  padding: 5px 12px;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.step-save-btn:hover { filter: brightness(1.08); }
+.step-save-btn:disabled { opacity: 0.55; cursor: default; filter: none; }
+
+/* Save status text: plain (Saving…/Saved) reads in --ok, the same
+   "error" class `setChecklistStatus` (public/workspace.js) toggles on the
+   span switches it to --fail — same success/error split the .toast classes
+   above already use. */
+.step-save-status,
+.tc-notes-status {
+  display: inline-block;
+  margin-left: 8px;
+  font-size: 12px;
+  color: var(--ok);
+}
+
+.step-save-status.error,
+.tc-notes-status.error {
+  color: var(--fail);
+}
+
+/* The TC-level free-text Notes editor, directly below its read-only
+   .tc-info-wrap panel — same textarea/button/status pattern as the steps
+   table's per-row Result editor above. */
+.tc-notes-editor {
+  margin-top: 10px;
+  padding-top: 10px;
+  border-top: 1px dashed var(--border);
+}
+
+.tc-notes-editor strong {
+  display: block;
+  color: var(--muted);
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  margin-bottom: 4px;
+}
+
+.tc-notes-input {
+  display: block;
+  width: 100%;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 5px;
+  color: var(--text);
+  padding: 8px;
+  font-size: 13px;
+  font-family: inherit;
+  resize: vertical;
+  margin-bottom: 6px;
+}
+
+.tc-notes-save-btn {
+  background: var(--accent);
+  border: none;
+  border-radius: 6px;
+  color: var(--bg);
+  padding: 5px 12px;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.tc-notes-save-btn:hover { filter: brightness(1.08); }
+.tc-notes-save-btn:disabled { opacity: 0.55; cursor: default; filter: none; }
 
 /* ----------------------------------------------------------- narrow view */
 /* At 1024×640 the three areas keep their own space and none of them overlaps

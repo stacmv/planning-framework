@@ -219,27 +219,28 @@ function renderTestDataHtml(tc) {
 
 // One TC's own body as a `.panel` block — the same panel convention every
 // other document uses (implementation_plan.md Task 20's `.panel`/
-// `.panel-table`). Read-only (Non-Goals: no manual editing of pipeline
-// documents through this UI) but otherwise carries the same information the
-// generic raw-markdown render this tab used before this task would have
-// shown — prerequisites, declared test data, parse warnings, notes — not
-// only the steps table, so switching to the structured render (needed for
+// `.panel-table`). Otherwise carries the same information the generic
+// raw-markdown render this tab used before this task would have shown —
+// prerequisites, declared test data, parse warnings, notes — not only the
+// steps table, so switching to the structured render (needed for
 // `.loose-sections` below to have a real "after the last TC `.panel`" to
 // come after, TC-030 step 2) does not narrow what the reader can see.
+//
+// Task 29 (CR-001 fix): the steps table used to render here too, as static
+// ☑/☐ text with zero interactive elements — the finding this task fixes.
+// It has moved OUT of this function: this function stays a pure string
+// builder (TC-030's Preconditions, still asserted by test/workspace-ui.test.js
+// and test/workspace.test.js), but a real `<input>`/`<textarea>`/click
+// handler cannot be embedded in a string — an event listener is not
+// serializable HTML. `buildStepsTableNode` below builds the steps table as
+// real, interactive DOM nodes instead, appended alongside this function's
+// output by `renderChecklistBody` (mount()'s own DOM-building code, not a
+// pure function, and not asserted on by TC-030 — see that function's own
+// comment). The TC-level free-text Notes line below is left exactly as it
+// was (still asserted on, e.g. "Nothing unusual observed." in
+// test/workspace-ui.test.js) — `buildNotesEditorNode` adds an editable
+// control alongside it, not in place of it.
 function renderTcPanelHtml(tc) {
-  const steps = Array.isArray(tc.steps) ? tc.steps : [];
-  const stepsRows = steps
-    .map(
-      (step) =>
-        `<tr><td>${escapeHtml(step.step)}</td><td>${escapeHtml(step.action)}</td>` +
-        `<td>${escapeHtml(step.expected)}</td>` +
-        `<td>${step.checked ? "☑" : "☐"} ${escapeHtml(step.note || "")}</td></tr>`
-    )
-    .join("");
-  const stepsTable = steps.length
-    ? `<table class="panel-table"><thead><tr><th>Step</th><th>Action</th><th>Expected</th><th>Result</th></tr></thead>` +
-      `<tbody>${stepsRows}</tbody></table>`
-    : "";
   const prerequisites = renderBulletBlockHtml("Prerequisites", tc.prerequisites);
   const testData = renderTestDataHtml(tc);
   const notes = tc.notesText ? `<p class="doc-description"><strong>Notes:</strong> ${escapeHtml(tc.notesText)}</p>` : "";
@@ -250,7 +251,7 @@ function renderTcPanelHtml(tc) {
   return (
     `<div class="panel" data-tc-id="${escapeHtml(tc.id)}">` +
     `<h2 class="panel-header">${escapeHtml(tc.id)}: ${escapeHtml(tc.name || "")}</h2>` +
-    `${prerequisites}${testData}${stepsTable}${notes}${warnings}</div>`
+    `${prerequisites}${testData}${notes}${warnings}</div>`
   );
 }
 
@@ -424,6 +425,55 @@ async function fetchJson(pathname, fetchImpl) {
   return res.json();
 }
 
+// Some of `server.js`'s error bodies are machine codes with no prose at all
+// (`PATCH .../checklist/steps`'s 422 is just `{ error: "empty_result" }` —
+// AC-05c's whole point is a check that previously did not exist, so there
+// was never a message to write). Others already carry a human `message`
+// (`requireCheckedOut`'s 409/404) and some encode the message directly as
+// `error` text (the 400 "tcId (string) and step (number) are required").
+// This map only overrides the codes known to be bare — everything else
+// falls through to whatever the server actually said, so a future server
+// error this map does not know about still reaches the reader as text
+// instead of vanishing.
+const CHECKLIST_PATCH_ERROR_MESSAGES = {
+  empty_result: "Result notes can't be empty when marking a step as passed.",
+  invalid_json_body: "The request body was not valid JSON.",
+};
+
+// PATCH counterpart of `fetchJson` — same "one call site per verb" shape,
+// independently overridable via `fetchImpl` for tests. Unlike `fetchJson`
+// this always tries to read a JSON body even on failure (`server.js`'s error
+// responses are themselves JSON), so a rejected write can surface the
+// server's own reason rather than just an HTTP status code (CR-001: the
+// server-side validation added earlier must "surface as a clear, visible
+// error in the UI — not silently swallowed").
+async function patchJson(pathname, body, fetchImpl) {
+  const doFetch = fetchImpl || fetch;
+  const res = await doFetch(pathname, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+  });
+  let data = null;
+  try {
+    data = await res.json();
+  } catch {
+    /* no/invalid JSON body — data stays null, message falls back below */
+  }
+  if (!res.ok) {
+    const message =
+      (data && data.message) ||
+      (data && CHECKLIST_PATCH_ERROR_MESSAGES[data.error]) ||
+      (data && data.error) ||
+      `PATCH ${pathname} failed: ${res.status}`;
+    const err = new Error(message);
+    err.status = res.status;
+    err.body = data;
+    throw err;
+  }
+  return data;
+}
+
 function projectBase(project) {
   return `/api/projects/${encodeURIComponent(project)}`;
 }
@@ -437,6 +487,18 @@ function issueBase(project, issueId) {
 // for the `manual_test_checklist` tab specifically (specs.md §2.4).
 function checklistEndpointFor(project, issueId) {
   return `${issueBase(project, issueId)}/checklist`;
+}
+
+// `PATCH .../checklist/steps` / `PATCH .../checklist/notes` (server.js) —
+// the two existing write routes this task wires the UI up to. Neither
+// route/request shape changes here (implementation notes: `lib/checklist.js`
+// and the server handlers are untouched); these are just the two matching
+// client-side URLs, built the same way `checklistEndpointFor` already is.
+function checklistStepsEndpoint(project, issueId) {
+  return `${checklistEndpointFor(project, issueId)}/steps`;
+}
+function checklistNotesEndpoint(project, issueId) {
+  return `${checklistEndpointFor(project, issueId)}/notes`;
 }
 
 async function fetchRoles(fetchImpl) {
@@ -554,6 +616,254 @@ function statusBadgeText(item) {
   return null;
 }
 
+// ---------------------------------------------------------------------------
+// Checklist write UI (Task 29, CR-001 fix) — real, interactive DOM nodes.
+//
+// Deliberately NOT part of `renderChecklistPanel`/`renderTcPanelHtml` above:
+// those stay pure functions returning an HTML **string** (TC-030's
+// Preconditions, asserted by test/workspace-ui.test.js and
+// test/workspace.test.js), and a `click`/`change` handler cannot be
+// serialized into a string — it is a closure, not markup. These functions
+// build real nodes with `document.createElement`/`addEventListener`
+// instead, the same convention `renderHeader`/`renderTabs` above already use
+// for their own interactive controls (the `[Issue ▾]`/`[Роль ▾]` selects),
+// and are testable the same way those are — via a fake `document` and
+// `dispatchClick`/`dispatchChange`, not by parsing an HTML string.
+// ---------------------------------------------------------------------------
+
+// One step's Result cell: a checkbox (`checked`), a note `<textarea>`, a
+// Save button and a status/error span — the fix for CR-001's literal
+// complaint ("zero interactive elements — no `<input>`, no click/change
+// handler"). A per-row Save button, not a `change` listener firing on every
+// keystroke/tick: `checked: true` with an empty note is rejected server-side
+// (AC-05c) — firing a PATCH per keystroke would mean a 422 on every
+// intermediate state while the tester is still typing the note, not just the
+// deliberate save this button represents. This also maps 1:1 onto
+// test_plan.md TC-023 steps 5 (empty note, checked, rejected) and 6 (same
+// call with a note, accepted).
+function buildStepRow(tc, step, handlers) {
+  const row = h("tr", "checklist-step-row");
+  row.dataset.tcId = tc.id;
+  row.dataset.step = String(step.step);
+  row.appendChild(h("td", null, String(step.step)));
+  row.appendChild(h("td", null, step.action || ""));
+  row.appendChild(h("td", null, step.expected || ""));
+
+  const resultCell = h("td", "step-result-cell");
+
+  const checkLabel = h("label", "step-check-label");
+  const checkbox = document.createElement("input");
+  checkbox.type = "checkbox";
+  checkbox.className = "step-checkbox";
+  checkbox.checked = !!step.checked;
+  checkbox.dataset.tcId = tc.id;
+  checkbox.dataset.step = String(step.step);
+  checkLabel.appendChild(checkbox);
+  checkLabel.appendChild(h("span", null, " Passed"));
+  resultCell.appendChild(checkLabel);
+
+  const noteInput = document.createElement("textarea");
+  noteInput.className = "step-note-input";
+  noteInput.rows = 2;
+  noteInput.placeholder = "Result notes";
+  noteInput.value = step.note || "";
+  noteInput.dataset.tcId = tc.id;
+  noteInput.dataset.step = String(step.step);
+  resultCell.appendChild(noteInput);
+
+  const statusEl = h("span", "step-save-status");
+  statusEl.setAttribute("aria-live", "polite");
+
+  const saveBtn = h("button", "step-save-btn", "Save");
+  saveBtn.type = "button";
+  saveBtn.dataset.tcId = tc.id;
+  saveBtn.dataset.step = String(step.step);
+  saveBtn.addEventListener("click", () => {
+    handlers.onSaveStep({ tc, step, checkbox, noteInput, statusEl, saveBtn });
+  });
+  resultCell.appendChild(saveBtn);
+  resultCell.appendChild(statusEl);
+
+  row.appendChild(resultCell);
+  return row;
+}
+
+// The full interactive steps table for one TC — `null` when the TC has no
+// steps at all (mirrors `renderTcPanelHtml`'s own pre-Task-29
+// `steps.length ? table : ""` guard, just returning a node-or-null instead
+// of a string-or-"").
+function buildStepsTableNode(tc, handlers) {
+  const steps = Array.isArray(tc.steps) ? tc.steps : [];
+  if (!steps.length) return null;
+
+  const table = h("table", "panel-table checklist-steps-table");
+  table.dataset.tcId = tc.id;
+  const thead = h("thead");
+  const headRow = h("tr");
+  for (const label of ["Step", "Action", "Expected", "Result"]) headRow.appendChild(h("th", null, label));
+  thead.appendChild(headRow);
+  table.appendChild(thead);
+
+  const tbody = h("tbody");
+  for (const step of steps) tbody.appendChild(buildStepRow(tc, step, handlers));
+  table.appendChild(tbody);
+  return table;
+}
+
+// The TC-level free-text Notes editor (`patchNotes`/`PATCH .../checklist/notes`
+// — distinct from a step's own Result note, which goes through
+// `PATCH .../checklist/steps` above). Gated on `tc.notesLineIndex` rather
+// than on `tc.notesText`: `patchNotes` (`lib/checklist.js`) throws
+// `"<tcId> has no **Notes:** line to patch"` when a TC's source markdown
+// never had a `**Notes:**` line at all, and `server.js`'s route turns that
+// into a 400 with the raw exception text — offering an editor that can only
+// ever fail like that would be worse than not offering one. `notesLineIndex`
+// is `null` in exactly that case (present-but-empty is a real line with an
+// empty value, still patchable) — the same "unknown"-vs-"none" distinction
+// `renderTestDataHtml` already draws for a different field, applied here.
+function buildNotesEditorNode(tc, handlers) {
+  if (tc.notesLineIndex === null || tc.notesLineIndex === undefined) return null;
+
+  const wrap = h("div", "tc-notes-editor");
+  wrap.dataset.tcId = tc.id;
+  wrap.appendChild(h("strong", null, "Notes (edit):"));
+
+  const textarea = document.createElement("textarea");
+  textarea.className = "tc-notes-input";
+  textarea.rows = 2;
+  textarea.placeholder = "Notes";
+  textarea.value = tc.notesText || "";
+  textarea.dataset.tcId = tc.id;
+  wrap.appendChild(textarea);
+
+  const statusEl = h("span", "tc-notes-status");
+  statusEl.setAttribute("aria-live", "polite");
+
+  const saveBtn = h("button", "tc-notes-save-btn", "Save notes");
+  saveBtn.type = "button";
+  saveBtn.dataset.tcId = tc.id;
+  saveBtn.addEventListener("click", () => {
+    handlers.onSaveNotes({ tc, textarea, statusEl, saveBtn });
+  });
+  wrap.appendChild(saveBtn);
+  wrap.appendChild(statusEl);
+  return wrap;
+}
+
+function setChecklistStatus(el, text, isError) {
+  el.textContent = text;
+  el.className = `${el.className.split(" ")[0]}${isError ? " error" : ""}`;
+}
+
+// The two write handlers `buildStepRow`/`buildNotesEditorNode`'s Save
+// buttons call. `runtime` carries exactly what a write needs: `project`/
+// `issueId` (to build the PATCH URL, `checklistStepsEndpoint`/
+// `checklistNotesEndpoint` above), `fetchImpl` (test override, same as every
+// other fetch in this module) and `invalidateDoc` (targeted cache
+// invalidation — see `mount()`'s `docCache`/`invalidateDoc` below).
+//
+// On success: mutates the in-memory `tc`/`step` object the caller already
+// holds (so a later re-render of *this* mount from that same object reflects
+// the write) and updates the two DOM controls directly from the values just
+// sent — not from a re-fetch, which is the "without a full document reload"
+// half of this task. `invalidateDoc` still runs, so a *later* fresh fetch of
+// this same document (a tab revisit, `refresh()`, another mount) is not
+// served the pre-write cached response.
+//
+// On failure: the server's own message (`patchJson`'s error-mapping above)
+// lands in the status span as visible text — never a silently swallowed
+// rejection (CR-001's "not silently swallowed"). The checkbox/textarea are
+// left exactly as the tester set them, so fixing an empty Result and
+// clicking Save again (TC-023 step 6, right after step 5's rejection) does
+// not require re-entering anything.
+function buildChecklistWriteHandlers(runtime) {
+  return {
+    async onSaveStep({ tc, step, checkbox, noteInput, statusEl, saveBtn }) {
+      const checked = !!checkbox.checked;
+      const note = noteInput.value || "";
+      setChecklistStatus(statusEl, "Saving…", false);
+      saveBtn.disabled = true;
+      try {
+        await patchJson(
+          checklistStepsEndpoint(runtime.project, runtime.issueId),
+          { tcId: tc.id, step: step.step, checked, note },
+          runtime.fetchImpl
+        );
+        step.checked = checked;
+        step.note = note;
+        runtime.invalidateDoc(runtime.checklistEndpoint);
+        setChecklistStatus(statusEl, "Saved", false);
+      } catch (err) {
+        setChecklistStatus(statusEl, err.message, true);
+      } finally {
+        saveBtn.disabled = false;
+      }
+    },
+    async onSaveNotes({ tc, textarea, statusEl, saveBtn }) {
+      const notesText = textarea.value || "";
+      setChecklistStatus(statusEl, "Saving…", false);
+      saveBtn.disabled = true;
+      try {
+        await patchJson(
+          checklistNotesEndpoint(runtime.project, runtime.issueId),
+          { tcId: tc.id, notesText },
+          runtime.fetchImpl
+        );
+        tc.notesText = notesText;
+        runtime.invalidateDoc(runtime.checklistEndpoint);
+        setChecklistStatus(statusEl, "Saved", false);
+      } catch (err) {
+        setChecklistStatus(statusEl, err.message, true);
+      } finally {
+        saveBtn.disabled = false;
+      }
+    },
+  };
+}
+
+// The checklist tab's full body: reuses the exact same pure sub-pieces
+// `renderChecklistPanel` itself composes (`renderChecklistMetaHtml`,
+// `renderTcPanelHtml`, `renderLooseSectionsHtml`) — not a second, drifting
+// implementation of the same rendering — but interleaves each TC's real
+// interactive steps table/notes editor right after that TC's own read-only
+// `.panel`, instead of `renderChecklistPanel`'s single concatenated string
+// (which has no seam to interleave nodes into after the fact — see the
+// comment above `buildStepRow`). `container` is cleared and rebuilt from
+// scratch each call; call sites use `runtime.invalidateDoc` + a fresh
+// `fetchDoc` when they actually need a full reload, not this function.
+function renderChecklistBody(container, parsedChecklist, runtime) {
+  container.innerHTML = "";
+  const tcs = Array.isArray(parsedChecklist && parsedChecklist.tcs) ? parsedChecklist.tcs : [];
+  const looseSections = Array.isArray(parsedChecklist && parsedChecklist.looseSections) ? parsedChecklist.looseSections : [];
+
+  const metaWrap = h("div", "checklist-meta-wrap");
+  metaWrap.innerHTML = renderChecklistMetaHtml(parsedChecklist && parsedChecklist.meta);
+  container.appendChild(metaWrap);
+
+  const handlers = buildChecklistWriteHandlers(runtime);
+
+  for (const tc of tcs) {
+    const tcWrap = h("div", "tc-wrap");
+    tcWrap.dataset.tcId = tc.id;
+
+    const infoWrap = h("div", "tc-info-wrap");
+    infoWrap.innerHTML = renderTcPanelHtml(tc);
+    tcWrap.appendChild(infoWrap);
+
+    const stepsTable = buildStepsTableNode(tc, handlers);
+    if (stepsTable) tcWrap.appendChild(stepsTable);
+
+    const notesEditor = buildNotesEditorNode(tc, handlers);
+    if (notesEditor) tcWrap.appendChild(notesEditor);
+
+    container.appendChild(tcWrap);
+  }
+
+  const looseWrap = h("div", "loose-sections-wrap");
+  looseWrap.innerHTML = renderLooseSectionsHtml(looseSections, tcs);
+  container.appendChild(looseWrap);
+}
+
 // The active tab's content pane. Deliberately small for this task: a doc tab
 // shows the server's own header fields plus, when the document is actually
 // `present`, its fetched content; the "Дела" tab's counter is real as of
@@ -603,7 +913,7 @@ function renderDocPanel(tab, runtime) {
       .fetchDoc(endpoint)
       .then((data) => {
         if (runtime.getActiveEndpoint() !== endpoint) return; // reader moved on while it loaded
-        body.innerHTML = renderChecklistPanel(data);
+        renderChecklistBody(body, data, runtime);
       })
       .catch((err) => {
         if (runtime.getActiveEndpoint() !== endpoint) return;
@@ -711,6 +1021,17 @@ export function mount(container, options = {}) {
     if (!docCache.has(endpoint)) docCache.set(endpoint, fetchJson(endpoint, options.fetchImpl));
     return docCache.get(endpoint);
   }
+  // Targeted invalidation for exactly one document's cached fetch, after a
+  // successful checklist write (`buildChecklistWriteHandlers` above) — not
+  // a full `docCache.clear()`, which would also throw away every other doc
+  // tab's already-resolved fetch for no reason. The write itself already
+  // updated the in-memory object the currently-rendered panel is showing
+  // (no full document reload needed for *this* render); this only makes
+  // sure a *later* fetch of the same endpoint — a tab revisit, `refresh()`,
+  // another mount — is not served the pre-write cached promise.
+  function invalidateDoc(endpoint) {
+    if (endpoint) docCache.delete(endpoint);
+  }
   function activeEndpoint() {
     const tab = state.tabs.find((t) => t.id === state.activeTabId);
     if (!tab || !tab.item) return null;
@@ -775,7 +1096,17 @@ export function mount(container, options = {}) {
     if (activeTab) {
       const checklistEndpoint =
         activeTab.id === CHECKLIST_DOC_ID ? checklistEndpointFor(state.project, state.issueId) : null;
-      root.appendChild(renderDocPanel(activeTab, { fetchDoc, getActiveEndpoint: activeEndpoint, checklistEndpoint }));
+      root.appendChild(
+        renderDocPanel(activeTab, {
+          fetchDoc,
+          getActiveEndpoint: activeEndpoint,
+          checklistEndpoint,
+          project: state.project,
+          issueId: state.issueId,
+          fetchImpl: options.fetchImpl,
+          invalidateDoc,
+        })
+      );
     } else {
       root.appendChild(h("p", "muted", state.project ? "Загрузка…" : "Проект не выбран."));
     }

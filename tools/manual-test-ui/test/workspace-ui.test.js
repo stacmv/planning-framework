@@ -55,6 +55,7 @@ class FakeElement {
     this.disabled = false;
     this.value = undefined;
     this.selected = undefined;
+    this.checked = undefined;
     this._href = undefined;
   }
   get textContent() {
@@ -843,4 +844,203 @@ test("mount(): Дела tab label shows no count until /api/inbox resolves, then
 
   tabButtons = container.findAll((n) => n.tagName === "BUTTON" && n.dataset.tabId === mod.HUMAN_TASKS_TAB_ID);
   assert.strictEqual(tabButtons[0].textContent, "Дела (1)", "count appears once /api/inbox resolves, without a role/issue switch");
+});
+
+// ---------------------------------------------------------------------------
+// Checklist write UI (Task 29, CR-001 fix) — real, interactive `.step-*`/
+// `.tc-notes-*` DOM nodes built by `buildStepRow`/`buildNotesEditorNode`,
+// wired to `PATCH .../checklist/steps`/`PATCH .../checklist/notes`
+// (server.js, unchanged by this task). Fake-fetch unit tests: the real HTTP
+// round trip against server.js/lib/checklist.js lives in
+// test/workspace.test.js (that file is the one already wired to
+// startServerFor, and a fake-fetch test alone cannot catch a request-body
+// shape the real route would reject — e.g. `step` sent as a string).
+// ---------------------------------------------------------------------------
+
+function checklistFixture(overrides = {}) {
+  return {
+    meta: { "Feature Name": "Fixture" },
+    tcs: [
+      {
+        id: "TC-001",
+        name: "First case",
+        headingLineIndex: 0,
+        prerequisites: [],
+        requiredData: [],
+        dataStatus: "unknown",
+        steps: [
+          { step: 1, action: "Do thing 1", expected: "Thing 1 happens", checked: false, note: "", lineIndex: 10, resultColIndex: 3 },
+          { step: 2, action: "Do thing 2", expected: "Thing 2 happens", checked: true, note: "already ok", lineIndex: 11, resultColIndex: 3 },
+        ],
+        notesLineIndex: 20,
+        notesText: "",
+        parseWarnings: [],
+      },
+    ],
+    looseSections: [],
+    ...overrides,
+  };
+}
+
+// `patchResponses.steps`/`patchResponses.notes` — `{ status, json }` for the
+// two PATCH routes; defaults to a 200 `{ ok: true }` for both, matching
+// server.js's real success shape. `checklistGetCalls` counts GETs of the
+// checklist document itself (not its /steps or /notes children) — the
+// signal a cache-invalidation test needs.
+function checklistFetchMock({ patchResponses = {}, checklistData } = {}) {
+  const calls = []; // PATCH calls: { url, method, body }
+  const checklistGetCalls = [];
+  const routes = baseRoutes();
+  const checklistUrl = "/api/projects/proj-a/issues/20260101-feat-a/checklist";
+
+  const fetchImpl = async (url, init) => {
+    if (url === checklistUrl && (!init || !init.method)) {
+      checklistGetCalls.push(url);
+      return { ok: true, status: 200, json: async () => (checklistData ? checklistData() : checklistFixture()) };
+    }
+    if (init && init.method === "PATCH") {
+      const key = url.endsWith("/steps") ? "steps" : "notes";
+      calls.push({ url, method: init.method, body: JSON.parse(init.body) });
+      const resp = patchResponses[key] || { status: 200, json: { ok: true } };
+      return { ok: resp.status < 300, status: resp.status, json: async () => resp.json };
+    }
+    return routedFetch(routes)(url);
+  };
+  return { fetchImpl, calls, checklistGetCalls };
+}
+
+async function mountOnChecklistTab(fetchImpl) {
+  installFakeDocument();
+  const container = new FakeElement("div");
+  const mod = await loadModule();
+  const handle = mod.mount(container, { project: "proj-a", issueId: "20260101-feat-a", initialRole: "tester", fetchImpl });
+  await handle.ready;
+  handle.selectTab("manual_test_checklist");
+  await flush();
+  await flush(); // let the checklist's own async fetchDoc().then(renderChecklistBody) settle
+  return { mod, container, handle };
+}
+
+test("checklist: renders one checkbox/note/Save control per step, pre-filled from the fetched checklist", async () => {
+  const { fetchImpl } = checklistFetchMock();
+  const { container } = await mountOnChecklistTab(fetchImpl);
+
+  const checkboxes = container.findAll((n) => n.className === "step-checkbox");
+  const noteInputs = container.findAll((n) => n.className === "step-note-input");
+  assert.strictEqual(checkboxes.length, 2, "expected one checkbox per step");
+  assert.strictEqual(checkboxes[0].checked, false);
+  assert.strictEqual(checkboxes[1].checked, true);
+  assert.strictEqual(noteInputs[1].value, "already ok");
+});
+
+test("checklist: Save on a step calls PATCH .../checklist/steps with {tcId, step (number), checked, note} (TC-023 step 6)", async () => {
+  const { fetchImpl, calls } = checklistFetchMock();
+  const { container } = await mountOnChecklistTab(fetchImpl);
+
+  const checkboxes = container.findAll((n) => n.className === "step-checkbox");
+  const noteInputs = container.findAll((n) => n.className === "step-note-input");
+  const saveButtons = container.findAll((n) => n.className === "step-save-btn");
+
+  checkboxes[0].checked = true;
+  noteInputs[0].value = "Verified manually";
+  saveButtons[0].dispatchClick();
+  await flush();
+
+  assert.strictEqual(calls.length, 1);
+  assert.strictEqual(calls[0].url, "/api/projects/proj-a/issues/20260101-feat-a/checklist/steps");
+  assert.strictEqual(calls[0].method, "PATCH");
+  assert.deepStrictEqual(calls[0].body, { tcId: "TC-001", step: 1, checked: true, note: "Verified manually" });
+  assert.strictEqual(typeof calls[0].body.step, "number", "step must be sent as a number — server.js rejects a string");
+});
+
+test("checklist: a rejected empty-Result PATCH (422 empty_result) surfaces a visible, human error — not the raw code, not swallowed (TC-023 step 5)", async () => {
+  const { fetchImpl } = checklistFetchMock({ patchResponses: { steps: { status: 422, json: { error: "empty_result" } } } });
+  const { container } = await mountOnChecklistTab(fetchImpl);
+
+  const checkboxes = container.findAll((n) => n.className === "step-checkbox");
+  const saveButtons = container.findAll((n) => n.className === "step-save-btn");
+  checkboxes[0].checked = true; // note left empty on purpose
+  saveButtons[0].dispatchClick();
+  await flush();
+
+  const statuses = container.findAll((n) => n.className && n.className.split(" ")[0] === "step-save-status");
+  assert.strictEqual(statuses.length, 2);
+  const [status] = statuses;
+  assert.ok(status.textContent && status.textContent.length > 0, "the rejection must render visible text, not be swallowed");
+  assert.notStrictEqual(status.textContent, "empty_result", "must not leak the raw machine error code verbatim");
+  assert.match(status.textContent, /result|note/i, "expected a human explanation, not just a code");
+  assert.ok(status.className.includes("error"), "the status element must carry a visible error indicator");
+});
+
+test("checklist: a successful save shows a confirmation and keeps the tester's entered values on screen (no full reload)", async () => {
+  const { fetchImpl } = checklistFetchMock();
+  const { container } = await mountOnChecklistTab(fetchImpl);
+
+  const checkboxes = container.findAll((n) => n.className === "step-checkbox");
+  const noteInputs = container.findAll((n) => n.className === "step-note-input");
+  const saveButtons = container.findAll((n) => n.className === "step-save-btn");
+
+  checkboxes[0].checked = true;
+  noteInputs[0].value = "Verified manually";
+  saveButtons[0].dispatchClick();
+  await flush();
+
+  const statuses = container.findAll((n) => n.className && n.className.split(" ")[0] === "step-save-status");
+  assert.strictEqual(statuses[0].textContent, "Saved");
+  assert.strictEqual(checkboxes[0].checked, true, "the checkbox must still reflect what was just saved");
+  assert.strictEqual(noteInputs[0].value, "Verified manually", "the note must still reflect what was just saved");
+});
+
+test("checklist: a successful step save invalidates the cached checklist fetch, so revisiting the tab re-fetches instead of replaying stale data", async () => {
+  const { fetchImpl, checklistGetCalls } = checklistFetchMock();
+  const { mod, container, handle } = await mountOnChecklistTab(fetchImpl);
+
+  assert.strictEqual(checklistGetCalls.length, 1, "expected exactly one GET of the checklist on first visit");
+
+  const checkboxes = container.findAll((n) => n.className === "step-checkbox");
+  const noteInputs = container.findAll((n) => n.className === "step-note-input");
+  const saveButtons = container.findAll((n) => n.className === "step-save-btn");
+  checkboxes[0].checked = true;
+  noteInputs[0].value = "Verified manually";
+  saveButtons[0].dispatchClick();
+  await flush();
+
+  // Navigate away and back to the checklist tab — before this task's
+  // targeted `invalidateDoc`, the memoized `docCache` entry would still be
+  // there and no second GET would ever happen, even though the document was
+  // just written to.
+  handle.selectTab("test_plan");
+  await flush();
+  handle.selectTab("manual_test_checklist");
+  await flush();
+  await flush();
+
+  assert.strictEqual(checklistGetCalls.length, 2, "expected a fresh GET of the checklist after a successful write");
+});
+
+test("checklist: the TC notes editor sends PATCH .../checklist/notes with {tcId, notesText}", async () => {
+  const { fetchImpl, calls } = checklistFetchMock();
+  const { container } = await mountOnChecklistTab(fetchImpl);
+
+  const notesInputs = container.findAll((n) => n.className === "tc-notes-input");
+  const notesSaveButtons = container.findAll((n) => n.className === "tc-notes-save-btn");
+  assert.strictEqual(notesInputs.length, 1, "TC-001 has a notesLineIndex, so it must get a notes editor");
+
+  notesInputs[0].value = "Ran the full flow twice.";
+  notesSaveButtons[0].dispatchClick();
+  await flush();
+
+  assert.strictEqual(calls.length, 1);
+  assert.strictEqual(calls[0].url, "/api/projects/proj-a/issues/20260101-feat-a/checklist/notes");
+  assert.deepStrictEqual(calls[0].body, { tcId: "TC-001", notesText: "Ran the full flow twice." });
+});
+
+test("checklist: a TC with no **Notes:** line to patch (notesLineIndex null) gets no notes editor — avoids a guaranteed-400 control", async () => {
+  const noNotesLine = checklistFixture();
+  noNotesLine.tcs[0].notesLineIndex = null;
+  const { fetchImpl } = checklistFetchMock({ checklistData: () => noNotesLine });
+  const { container } = await mountOnChecklistTab(fetchImpl);
+
+  const notesInputs = container.findAll((n) => n.className === "tc-notes-input");
+  assert.strictEqual(notesInputs.length, 0);
 });
