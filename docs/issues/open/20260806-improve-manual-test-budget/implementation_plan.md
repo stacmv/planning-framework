@@ -10,10 +10,12 @@
 - `skills/pf-test-plan/SKILL.md` — реализовать бюджетную проверку, валидацию `Manual reason`, запуск automation pass, 3-вариантный гейт
 - `skills/pf-check/SKILL.md` — расширить "Claude review path" для проверки Manual-бюджета и закрытого словаря
 - `test/lib.sh` — добавить helpers для парсинга Status Tracker, подсчёта Manual-кейсов, валидации `Manual reason`
-- `tools/manual-budget-validator.js` — новый инструмент для парсинга `test_plan.md` и валидации бюджета
-- `test/manual-budget.sh` — новый bash-хارнесс для всех 20 тестовых кейсов
+- ~~`tools/manual-budget-validator.js`~~ — не создан, см. Task 2 DEVIATION (bash в `test/lib.sh` вместо Node)
+- `test/manual-budget.sh` — новый bash-харнесс, покрывает 17 из 18 Auto TC (см. Task 7 SCOPE EXPANDED)
+- `test/skills-static.sh` — расширен одной проверкой для TC-021 (не в исходном списке — добавлено вместе с TC-021 во время execution, см. Task 7)
 - `test/fixtures/manual-budget-tc-001/` ... `test/fixtures/manual-budget-tc-020/` — fixture-issue для каждого TC
 - `Makefile` — уже автоматически запускает test/*.sh, изменений не требует
+- `docs/planning/tech-debt.md` — стандартный remnant-carry `/pf-codereview`'а (BR-5) для не-`fixed` находок ревью (CR-001/002/003, все `wont-fix`), не часть исходно объявленного скоупа этой issue
 
 ## Dependencies
 
@@ -186,9 +188,9 @@ Medium
   - Порядок варианта и их точный текст должны соответствовать требованиям AC-04
 
 **Acceptance Criteria:**
-- [ ] TC-011 pass — вариант "Разбить issue" записан в test_plan.md
-- [ ] TC-012 pass — вариант "Поднять tier" с обоснованием записан, prompt.md обновлён, бюджет пересчитан
-- [ ] TC-013 pass — вариант "Отложить избыток" с примечанием записан
+- [x] TC-011 pass — вариант "Разбить issue" записан в test_plan.md
+- [x] TC-012 pass — вариант "Поднять tier" с обоснованием записан, prompt.md обновлён, бюджет пересчитан
+- [x] TC-013 pass — вариант "Отложить избыток" с примечанием записан
 
 ---
 
