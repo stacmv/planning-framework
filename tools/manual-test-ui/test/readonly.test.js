@@ -2,13 +2,14 @@
 // action.
 //
 // The whole promise of this tool is "it reads everything, it changes exactly
-// three things": checklist marks/notes, a branch checkout on confirmation,
-// and preparing a test case's data. This suite verifies that promise from
-// two directions:
+// four things": checklist marks/notes, a branch checkout on confirmation,
+// preparing a test case's data, and completing a human task (an append-only
+// marker line in the issue's own session-log.md). This suite verifies that
+// promise from two directions:
 //
 //  1. Source inventory (no server involved): every `req.method === "..."`
 //     check inside `handleApi` in server.js is read straight from the file,
-//     not copied into this suite, so a fourth mutating route added anywhere
+//     not copied into this suite, so a sixth mutating route added anywhere
 //     in that function is caught even if nobody updates this test. Likewise
 //     `lib/git.js` is scanned for the literal argument arrays it passes to
 //     `git`, so a `commit`/`push`/`merge`/`reset`/`clean` slipping in (or a
@@ -17,10 +18,11 @@
 //     non-GET route is fired at every pipeline document — project-level and
 //     per-issue — with the document's own name in the body, and the whole
 //     repository tree is fingerprinted before and after. Then the three
-//     permitted actions are exercised for real and each is shown to touch
-//     only what it is supposed to: the checklist file, the checked-out
+//     original permitted actions are exercised for real and each is shown to
+//     touch only what it is supposed to: the checklist file, the checked-out
 //     issue's own directory, or nothing in the repository at all (prepare
-//     writes outside it, in the OS temp dir).
+//     writes outside it, in the OS temp dir) — human-task completion has its
+//     own dedicated coverage in test/human-task-complete.test.js.
 //
 // Run: node --test tools/manual-test-ui/test/readonly.test.js
 "use strict";
@@ -97,12 +99,12 @@ test("TC-012 step 1: server.js has exactly three non-GET route families, nowhere
   const methods = [...handleApiSrc.matchAll(/req\.method\s*===\s*"([A-Z]+)"/g)].map((m) => m[1]);
   const nonGet = methods.filter((m) => m !== "GET");
 
-  // The four routes this tool is allowed to mutate anything through, grouped
-  // into the three families the implementation plan and TC-012 name. Matched
+  // The five routes this tool is allowed to mutate anything through, grouped
+  // into the four families the implementation plan and TC-012 name. Matched
   // by the exact path-segment conditions they sit behind, not just by verb,
   // so a same-verb same-count route added under a different name still fails
   // an assertion below (its own regex simply won't be found, or the total
-  // count of non-GET checks will exceed 4).
+  // count of non-GET checks will exceed 5).
   const expectedRoutes = [
     {
       family: "checklist marks (PATCH .../checklist/steps)",
@@ -120,6 +122,10 @@ test("TC-012 step 1: server.js has exactly three non-GET route families, nowhere
       family: "prepare a test case (POST .../issues/:id/prepare)",
       re: /parts\[5\]\s*===\s*"prepare"\s*&&\s*req\.method\s*===\s*"POST"/,
     },
+    {
+      family: "human-task completion (POST .../human-tasks/:key/complete)",
+      re: /parts\[5\]\s*===\s*"human-tasks"\s*&&\s*parts\[7\]\s*===\s*"complete"\s*&&\s*req\.method\s*===\s*"POST"/,
+    },
   ];
 
   for (const route of expectedRoutes) {
@@ -129,13 +135,13 @@ test("TC-012 step 1: server.js has exactly three non-GET route families, nowhere
   assert.strictEqual(
     nonGet.length,
     expectedRoutes.length,
-    `expected exactly ${expectedRoutes.length} non-GET route checks (three families: checklist marks/notes, ` +
-      `branch checkout, prepare), found ${nonGet.length}: [${nonGet.join(", ")}]. ` +
+    `expected exactly ${expectedRoutes.length} non-GET route checks (four families: checklist marks/notes, ` +
+      `branch checkout, prepare, human-task completion), found ${nonGet.length}: [${nonGet.join(", ")}]. ` +
       "A new one has appeared, or one of the expected ones changed verb."
   );
   assert.deepStrictEqual(
     [...nonGet].sort(),
-    ["PATCH", "PATCH", "POST", "POST"],
+    ["PATCH", "PATCH", "POST", "POST", "POST"],
     `unexpected verb mix among the non-GET routes: [${nonGet.join(", ")}]`
   );
 });
@@ -159,7 +165,7 @@ test("TC-012 step 4: lib/git.js only ever runs read-only git commands, plus a pl
   const subcommands = new Set(literalArgsPerCall.map((args) => args[0]));
   assert.deepStrictEqual(
     [...subcommands].sort(),
-    ["checkout", "ls-tree", "rev-parse", "show", "status"].sort(),
+    ["checkout", "config", "diff", "ls-tree", "rev-list", "rev-parse", "show", "status"].sort(),
     `lib/git.js invokes a different set of git subcommands than expected: [${[...subcommands].sort().join(", ")}]`
   );
 

@@ -368,8 +368,8 @@ Criteria этого раздела)
 - Новые обёртки `lib/git.js`: `commitsAhead(cwd, parent, branch)` (`git rev-list --count`), `changedFilesBetween(cwd, parent, branch)` (`git diff --name-only`), `isPathCommitted(cwd, relPath)` (`git status --porcelain -- <path>`, пустой вывод = true), `revParse(cwd, ref)` (`git rev-parse <ref>` — полный SHA, не `--abbrev-ref`), `parentBranchOf(cwd, issueBranch)` (`git config branch.<issueBranch>.merge`, fallback `develop`/`main`). Ни одна не строит аргумент из непровалидированного пользовательского ввода — `issueId` уже прошёл `ISSUE_ID_RE`, `:key` — против ключей `roles:`.
 
 **Acceptance Criteria:**
-- [ ] TC-024 passes
-- [ ] TC-025 passes
+- [x] TC-024 passes
+- [x] TC-025 passes
 
 ---
 
@@ -547,7 +547,7 @@ Criteria этого раздела)
 - TC-012 (визуальная приёмка по референсу) — manual, требует готовых Задач 23-27 (разметка) и выполненного Prerequisite (референсы GLog v.0.7, см. раздел выше); acceptance здесь фиксирует, что паттерн реализован и владелец подтверждает соответствие референсу на живом экране. Эта проверка происходит **после** реализации, а не до старта `/pf-execute` — в отличие от TC-009/TC-013 она не входит в Prerequisite-раздел и остаётся Acceptance Criteria этой задачи.
 
 **Acceptance Criteria:**
-- [ ] TC-010 passes
+- [x] TC-010 passes
 - [ ] TC-012 passes (manual — владелец подтверждает соответствие референсу)
 
 ---

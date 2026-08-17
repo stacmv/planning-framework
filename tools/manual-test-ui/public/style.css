@@ -122,7 +122,11 @@ body {
   overflow-x: hidden;
 }
 
-.panel { margin-bottom: 20px; }
+.panel {
+  margin-bottom: 20px;
+  border: 1px solid var(--border);
+  padding: 12px;
+}
 
 .panel h2 {
   font-size: 11px;
@@ -130,6 +134,43 @@ body {
   letter-spacing: 0.06em;
   color: var(--muted);
   margin: 0 0 8px;
+}
+
+/* The label for a panel's contents — distinct from the data below it. */
+.panel .panel-header {
+  color: var(--accent);
+  font-weight: 600;
+  font-size: 15px;
+  margin: 0 0 8px;
+}
+
+/* Tables/lists living inside a .panel: alternating tint is the row
+   separator, not a grid of borders between every row. */
+.panel-table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.panel-table th {
+  text-align: left;
+  color: var(--muted);
+  font-weight: normal;
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  padding: 6px 8px;
+  border-bottom: 1px solid var(--border);
+}
+
+.panel-table td {
+  padding: 8px;
+  vertical-align: top;
+  overflow-wrap: anywhere;
+}
+
+.panel-table tbody tr:nth-child(odd),
+.panel-table > li:nth-child(odd) {
+  background: color-mix(in srgb, var(--surface) 85%, var(--accent));
 }
 
 /* ----------------------------------------------------------------- lists */

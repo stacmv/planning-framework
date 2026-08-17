@@ -495,6 +495,56 @@ function collectHumanTasksForIssue(projectRoot, issueId, issueStatus, defaultBra
   return tasks;
 }
 
+// ---------------------------------------------------------------------------
+// Resolving one (issue, key) pair's operation — write vs. review
+// ---------------------------------------------------------------------------
+//
+// `POST .../human-tasks/:key/complete` (server.js) needs to know, for the one
+// key it was called with, whether the human actor is on the WRITE side
+// (`roles.<key>.write` resolves to `kind: "human"` — same detection
+// `collectHumanTasksForIssue` already does) or the REVIEW side
+// (`roles.<key>.review` lists an actor that resolves to `kind: "human"` —
+// `resolveRole` itself never inspects `review[]` for this, per its own
+// module comment, so this is the one place that does). Kept here, next to
+// `collectHumanTasksForIssue`, so both read the same `roles.<key>` the same
+// way and cannot disagree about what's a human task.
+//
+// @returns {null} the issue itself cannot be resolved at all (no prompt.md
+//   anywhere reachable) — distinct from "resolved, but not a human task for
+//   this key", which returns `operation: null` instead.
+function resolveHumanTaskOperation(projectRoot, issueId, issueStatus, defaultBranch, key) {
+  if (!PIPELINE_KEYS.includes(key)) return null;
+
+  const issueRel = `docs/issues/${issueStatus}/${issueId}`;
+  const issueBranch = issueStatus === "open" && git.branchExists(projectRoot, `issue/${issueId}`) ? `issue/${issueId}` : null;
+
+  const promptText = readProjectFile(projectRoot, `${issueRel}/prompt.md`, issueBranch);
+  if (promptText === null) return null;
+
+  const agentsText = readProjectFile(projectRoot, "docs/planning/agents.yml", defaultBranch || null) || "";
+  const roleProfilesText = readProjectFile(projectRoot, "docs/planning/role-profiles.yml", defaultBranch || null) || "";
+
+  const resolved = rolesResolve.resolveRole(key, { promptText, roleProfilesText, agentsText });
+  const artifactPath = DOC_KEY_FILES[key] ? `${issueRel}/${DOC_KEY_FILES[key]}` : null;
+  const base = { key, artifactPath, issueRel, issueBranch };
+
+  if (resolved && resolved.kind === "human") {
+    return { ...base, operation: "write", mode: resolved.mode || "non-blocking" };
+  }
+
+  if (resolved && resolved.ok && !resolved.skip && Array.isArray(resolved.review)) {
+    const reviewedByHuman = resolved.review.some((name) => {
+      const actor = rolesResolve.resolveActor(name, agentsText);
+      return actor.ok && actor.kind === "human";
+    });
+    if (reviewedByHuman) {
+      return { ...base, operation: "review", mode: resolved.mode || "non-blocking" };
+    }
+  }
+
+  return { ...base, operation: null, mode: null };
+}
+
 module.exports = {
   TEST_PLAN_RELATIVE_PATH,
   splitTableCells,
@@ -505,4 +555,7 @@ module.exports = {
   DOC_KEY_FILES,
   collectHumanTasks,
   collectHumanTasksForIssue,
+  resolveHumanTaskOperation,
+  currentContentIdentifier,
+  sha256Hex,
 };

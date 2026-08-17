@@ -810,6 +810,159 @@ async function handlePrepare(req, res, projectName, projectRoot, entry) {
   });
 }
 
+// ---------------------------------------------------------------------------
+// Completing a human task
+// ---------------------------------------------------------------------------
+//
+// POST .../human-tasks/:key/complete — the one write this route performs is
+// an append-only marker line in the issue's own session-log.md
+// (`[human-task done] <key> @ <ts> content-hash=<hash>`), recording that a
+// human has finished the `roles.<key>` task `GET .../human-tasks`
+// queues/reports on. Three shapes of verification, one per operation/key-kind:
+//   * review  — the caller supplies a non-empty verdict; nothing else is
+//     checked (a reviewer's word is the artifact here, not a file).
+//   * write, one of the six document keys — the mapped file must exist, be
+//     real (`docstate.isRealDocument`) and be fully committed
+//     (`git.isPathCommitted`); contentHash is its sha256.
+//   * write, code/tests — the issue branch must be ahead of its parent
+//     branch and touch at least one path outside docs/issues/ (for `tests`,
+//     that path must also look like a test file, `test/*.test.js`);
+//     contentHash is the branch HEAD's sha1 (`git.revParse`), never a file
+//     hash.
+//
+// `:key` is checked against the 8 known PIPELINE_KEYS (`inbox.PIPELINE_KEYS`)
+// before anything else — before any git command sees it — so an unknown key
+// can never reach a git argument.
+const TEST_FILE_RE = /(^|\/)test\/[^/]+\.test\.js$/;
+
+// Append `[human-task done] <key> @ <ISO-8601 UTC ts> content-hash=<hash>` to
+// the issue's session-log.md — append-only, never touching a byte of what's
+// already there (the same marker `lib/inbox.js`'s `findLastMarker()` reads
+// back). Creates the file if it does not exist yet rather than failing: a
+// human task can be the very first thing recorded in a fresh issue's log.
+function appendHumanTaskMarker(projectRoot, issueRel, key, contentHash) {
+  const sessionLogPath = path.join(projectRoot, ...issueRel.split("/"), "session-log.md");
+  let existing = "";
+  try {
+    existing = fs.readFileSync(sessionLogPath, "utf8");
+  } catch {
+    existing = "";
+  }
+  const ts = new Date().toISOString();
+  const separator = existing && !existing.endsWith("\n") ? "\n" : "";
+  const line = `[human-task done] ${key} @ ${ts} content-hash=${contentHash}\n`;
+  fs.writeFileSync(sessionLogPath, existing + separator + line, "utf8");
+}
+
+// POST .../issues/:id/human-tasks/:key/complete  { verdict? }
+async function handleHumanTaskComplete(req, res, projectRoot, entry, defaultBranch, key) {
+  if (!inbox.PIPELINE_KEYS.includes(key)) {
+    return sendJson(res, 404, {
+      error: "unknown_key",
+      message: `No such pipeline key. Known keys: ${inbox.PIPELINE_KEYS.join(", ")}.`,
+    });
+  }
+
+  let body;
+  try {
+    body = await readJsonBody(req);
+  } catch {
+    return sendJson(res, 400, { error: "invalid_json_body", message: "The request body is not valid JSON." });
+  }
+  if (body === null || typeof body !== "object" || Array.isArray(body)) {
+    return sendJson(res, 400, { error: "invalid_json_body", message: "The request body must be a JSON object." });
+  }
+
+  const resolved = inbox.resolveHumanTaskOperation(projectRoot, entry.issueId, entry.status, defaultBranch, key);
+  if (!resolved) return sendJson(res, 404, { error: "issue_not_found" });
+  if (!resolved.operation) {
+    return sendJson(res, 404, {
+      error: "not_a_human_task",
+      message: `roles.${key} does not resolve to a human actor for this issue.`,
+    });
+  }
+
+  // The content-identifier this key currently carries — the SAME value
+  // GET .../human-tasks compares a marker against
+  // (`inbox.currentContentIdentifier`). Writing anything else into the
+  // marker would make a just-completed task show right back up as "stale".
+  // `fallbackSeed` only matters when there is no current content to hash
+  // (e.g. a review of a key whose artifact doesn't exist on disk) — in that
+  // case the next read will find no current content either and treat the
+  // task as stale regardless of what was written here.
+  function currentHash(fallbackSeed) {
+    const id = inbox.currentContentIdentifier(projectRoot, entry.issueId, key, resolved.artifactPath);
+    return id !== null ? id : inbox.sha256Hex(fallbackSeed);
+  }
+
+  if (resolved.operation === "review") {
+    const verdict = typeof body.verdict === "string" ? body.verdict.trim() : "";
+    if (!verdict) {
+      return sendJson(res, 422, {
+        error: "invalid_verdict",
+        message: "A non-empty verdict is required to complete a review task.",
+      });
+    }
+    const contentHash = currentHash(`${key}:${verdict}`);
+    appendHumanTaskMarker(projectRoot, resolved.issueRel, key, contentHash);
+    return sendJson(res, 200, { status: "done", contentHash });
+  }
+
+  // operation === "write"
+  if (key === "code" || key === "tests") {
+    const issueBranch = `issue/${entry.issueId}`;
+    if (!git.branchExists(projectRoot, issueBranch)) {
+      return sendJson(res, 422, { error: "artifact_missing", message: `No ${issueBranch} branch exists yet.` });
+    }
+    const parentBranch = git.parentBranchOf(projectRoot, issueBranch);
+    const ahead = git.commitsAhead(projectRoot, parentBranch, issueBranch);
+    if (!(ahead > 0)) {
+      return sendJson(res, 422, {
+        error: "artifact_missing",
+        message: `${issueBranch} has no commits ahead of ${parentBranch} yet.`,
+      });
+    }
+    const changed = git.changedFilesBetween(projectRoot, parentBranch, issueBranch);
+    const outsideDocs = changed.filter((p) => !p.startsWith("docs/issues/"));
+    const qualifies = key === "tests" ? outsideDocs.some((p) => TEST_FILE_RE.test(p)) : outsideDocs.length > 0;
+    if (!qualifies) {
+      return sendJson(res, 422, {
+        error: "artifact_missing",
+        message:
+          key === "tests"
+            ? `No test/*.test.js file outside docs/issues/ was changed on ${issueBranch}.`
+            : `No file outside docs/issues/ was changed on ${issueBranch}.`,
+      });
+    }
+    const contentHash = git.revParse(projectRoot, issueBranch);
+    appendHumanTaskMarker(projectRoot, resolved.issueRel, key, contentHash);
+    return sendJson(res, 200, { status: "done", contentHash });
+  }
+
+  // The six document keys (brd, specs, test_plan, implementation_plan,
+  // user_docs, dev_docs).
+  const artifactPath = resolved.artifactPath;
+  const abs = path.join(projectRoot, ...artifactPath.split("/"));
+  let content;
+  try {
+    content = fs.readFileSync(abs, "utf8");
+  } catch {
+    return sendJson(res, 422, { error: "artifact_missing", message: `${artifactPath} does not exist yet.` });
+  }
+  if (!docstate.isRealDocument(content)) {
+    return sendJson(res, 422, { error: "artifact_missing", message: `${artifactPath} is empty or still a stub.` });
+  }
+  if (!git.isPathCommitted(projectRoot, artifactPath)) {
+    return sendJson(res, 422, {
+      error: "artifact_not_committed",
+      message: `${artifactPath} has uncommitted changes — commit it first.`,
+    });
+  }
+  const contentHash = inbox.sha256Hex(content);
+  appendHumanTaskMarker(projectRoot, resolved.issueRel, key, contentHash);
+  return sendJson(res, 200, { status: "done", contentHash });
+}
+
 async function handleApi(req, res, parts, projects, query) {
   // parts = pathname split on "/", filtered — e.g.
   // ["api","roles"]
@@ -960,6 +1113,14 @@ async function handleApi(req, res, parts, projects, query) {
   // itself (AC-05a): no write, no side effect, just the queue.
   if (parts.length === 6 && parts[5] === "human-tasks" && req.method === "GET") {
     return sendJson(res, 200, inbox.collectHumanTasksForIssue(projectRoot, entry.issueId, entry.status, defaultBranch));
+  }
+
+  // POST .../issues/:id/human-tasks/:key/complete  { verdict? } — mark this
+  // issue's roles.<key> human task done. See handleHumanTaskComplete for the
+  // three verification paths (review / write-doc / write-code).
+  if (parts.length === 8 && parts[5] === "human-tasks" && parts[7] === "complete" && req.method === "POST") {
+    const key = decodeURIComponent(parts[6]);
+    return handleHumanTaskComplete(req, res, projectRoot, entry, defaultBranch, key);
   }
 
   if (parts[5] !== "checklist") {

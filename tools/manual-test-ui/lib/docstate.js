@@ -208,6 +208,32 @@ function stageFor(docName) {
 }
 
 // ---------------------------------------------------------------------------
+// Stub detection
+// ---------------------------------------------------------------------------
+//
+// The single "is this document real, not a stub" criterion, conjunct 2 of the
+// "Stage completion" definition in `skills/pf-size-tiers/SKILL.md`: the file
+// has a non-empty body beyond its heading, AND the stub marker
+// `TODO: Run /pf-` occurs nowhere in it. That skill documents the criterion
+// for an LLM to apply manually (`wc -c`, `grep -c`); this is its one code
+// implementation, so a caller that needs the same answer mechanically (e.g.
+// the human-task completion route) does not have to restate the rule.
+const STUB_MARKER = "TODO: Run /pf-";
+
+/**
+ * @param {string} content Raw file content.
+ * @returns {boolean} true iff `content` is a real document, not a stub.
+ */
+function isRealDocument(content) {
+  if (typeof content !== "string") return false;
+  if (content.includes(STUB_MARKER)) return false;
+  // Strip one leading heading line ("# Title") and the blank line(s) around
+  // it; what remains is the "body beyond its heading".
+  const withoutHeading = content.replace(/^\s*#[^\n]*\n?/, "");
+  return withoutHeading.trim() !== "";
+}
+
+// ---------------------------------------------------------------------------
 // Per-issue context
 // ---------------------------------------------------------------------------
 
@@ -754,6 +780,8 @@ module.exports = {
   stageFor,
   buildIssueContext,
   readIssueFile,
+  STUB_MARKER,
+  isRealDocument,
   classifyIssueDoc,
   classifyProjectDoc,
   classifyInstructions,
