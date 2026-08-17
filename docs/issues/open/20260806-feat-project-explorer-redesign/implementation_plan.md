@@ -611,9 +611,9 @@ Criteria этого раздела)
 - `.inbox-card` вызывает `GET /api/inbox` (Задача 7) для `totalCount`.
 
 **Acceptance Criteria:**
-- [ ] TC-001 passes
-- [ ] TC-004 passes
-- [ ] TC-019 passes
+- [x] TC-001 passes
+- [x] TC-004 passes
+- [x] TC-019 passes
 
 ---
 
@@ -633,8 +633,8 @@ Criteria этого раздела)
 - Таб «Дела» — новый в наборе каждой роли, счётчик — см. Задачу 25.
 
 **Acceptance Criteria:**
-- [ ] TC-002 passes
-- [ ] TC-003 passes
+- [x] TC-002 passes
+- [x] TC-003 passes
 
 ---
 
