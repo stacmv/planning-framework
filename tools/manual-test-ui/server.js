@@ -23,6 +23,7 @@ const paths = require("./lib/paths");
 const instructions = require("./lib/instructions");
 const memory = require("./lib/memory");
 const roles = require("./lib/roles");
+const rolesResolve = require("./lib/roles-resolve");
 const docstate = require("./lib/docstate");
 const prepare = require("./lib/prepare");
 const inbox = require("./lib/inbox");
@@ -963,6 +964,224 @@ async function handleHumanTaskComplete(req, res, projectRoot, entry, defaultBran
   return sendJson(res, 200, { status: "done", contentHash });
 }
 
+// ---------------------------------------------------------------------------
+// Reassigning a human task's write actor
+// ---------------------------------------------------------------------------
+//
+// POST .../human-tasks/:key/reassign — the one write this route performs is a
+// single-substring text edit of `prompt.md`'s `roles.<key>` entry (AC-05g,
+// specs.md §4.3): NOT a parse-mutate-serialize round trip — a full YAML
+// rewrite risks corrupting the formatting/comments the rest of `roles:`
+// relies on, and a real YAML writer is out of scope for this zero-dependency
+// tool. Instead, a targeted single-line replacement of just the `write: <old>`
+// substring, leaving the file byte-identical everywhere else (line endings,
+// indentation, adjacent comments, key order). Only the single-line flow-style
+// `<key>: { write: ..., review: [...] }` shape `lib/roles-resolve.js` itself
+// reads (see that module's own comment) is supported — a `roles.<key>` entry
+// split across multiple lines (block-style YAML) is an explicitly accepted
+// limitation: refused with an error, file left untouched, never a silent
+// no-op and never a partial/corrupting edit.
+
+// A bare `roles:` block-opening line — no inline value, i.e. its children are
+// one level of indentation deeper (mirrors lib/roles-resolve.js's
+// parseIndentTree: a key with children and no inline value is a block, not a
+// flow scalar).
+const ROLES_BLOCK_LINE_RE = /^([ \t]*)roles:\s*$/;
+
+// A line's content with any trailing "\r" removed, for matching only — the
+// original line (with its "\r" intact, if any) is always what gets written
+// back, so CRLF files round-trip byte-identical.
+function stripTrailingCR(line) {
+  return line.endsWith("\r") ? line.slice(0, -1) : line;
+}
+
+/**
+ * Locate the single line, if any, that carries `<key>: { ... }` inside the
+ * `roles:` block of `promptText`'s YAML frontmatter — the same frontmatter
+ * `lib/roles-resolve.js`'s `extractFrontmatterText`/`resolveRole` reads
+ * `roles:` from; nowhere else in the file is searched.
+ *
+ * @returns {{lineIndex: number, lineText: string}|null} `null` when there is
+ *   no `roles:` block, no entry for `key` inside it, or the entry for `key`
+ *   exists but does not fit on one line (multi-line block-style — the
+ *   documented limitation).
+ */
+function findRolesKeyLine(promptText, key) {
+  const lines = String(promptText).split("\n");
+  if (stripTrailingCR(lines[0]) !== "---") return null;
+  let frontmatterEnd = -1;
+  for (let i = 1; i < lines.length; i++) {
+    const s = stripTrailingCR(lines[i]);
+    if (s === "---" || s === "...") {
+      frontmatterEnd = i;
+      break;
+    }
+  }
+  if (frontmatterEnd === -1) return null;
+
+  let rolesIndent = -1;
+  let rolesLine = -1;
+  for (let i = 1; i < frontmatterEnd; i++) {
+    const m = ROLES_BLOCK_LINE_RE.exec(stripTrailingCR(lines[i]));
+    if (m) {
+      rolesIndent = m[1].length;
+      rolesLine = i;
+      break;
+    }
+  }
+  if (rolesLine === -1) return null;
+
+  const escapedKey = key.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  const keyLineRe = new RegExp(`^([ \\t]*)${escapedKey}:\\s*(\\{.*\\})\\s*$`);
+  for (let i = rolesLine + 1; i < frontmatterEnd; i++) {
+    const raw = lines[i];
+    const line = stripTrailingCR(raw);
+    const indentMatch = /^([ \t]*)\S/.exec(line);
+    const indent = indentMatch ? indentMatch[1].length : Infinity; // blank line: keep scanning
+    if (line.trim() !== "" && indent <= rolesIndent) break; // roles: block ended
+    if (keyLineRe.test(line)) return { lineIndex: i, lineText: raw };
+  }
+  return null;
+}
+
+/**
+ * Replace only the `write: <old>` substring of one line with `write: <new>`
+ * — nothing else on the line (`review`, `mode`, whitespace, the trailing
+ * comma/brace) is touched.
+ *
+ * @returns {{newLine: string, oldValue: string}|null} `null` when the line
+ *   has no `write:` field to replace (e.g. a review-only entry).
+ */
+function replaceWriteField(lineText, newActor) {
+  const re = /\bwrite\s*:\s*("(?:[^"\\]|\\.)*"|'(?:[^'\\]|\\.)*'|[^,}]+?)(?=\s*[,}])/;
+  const m = re.exec(lineText);
+  if (!m) return null;
+  const oldValue = m[1].trim();
+  const before = lineText.slice(0, m.index);
+  const after = lineText.slice(m.index + m[0].length);
+  return { newLine: `${before}write: ${newActor}${after}`, oldValue };
+}
+
+/**
+ * The whole point-edit: find `roles.<key>`'s single-line flow-style entry in
+ * `promptText` and swap its `write:` value, leaving every other byte of the
+ * file untouched.
+ *
+ * @returns {{ok: true, newText: string, oldValue: string}|{ok: false}}
+ */
+function replacePromptRolesWrite(promptText, key, newActor) {
+  const found = findRolesKeyLine(promptText, key);
+  if (!found) return { ok: false };
+  const replaced = replaceWriteField(found.lineText, newActor);
+  if (!replaced) return { ok: false };
+  const lines = promptText.split("\n");
+  lines[found.lineIndex] = replaced.newLine;
+  return { ok: true, newText: lines.join("\n"), oldValue: replaced.oldValue };
+}
+
+// `docs/planning/agents.yml`'s raw text for one project — disk first (the
+// common case), falling back to `git show <defaultBranch>:...` when it isn't
+// on disk right now, exactly like `lib/inbox.js`'s own reads of this same
+// file. Never fabricated: an unreadable/nonexistent file on both paths comes
+// back as `""`, which `rolesResolve.resolveActor` already treats as "nothing
+// explicit — fall back to the shipped default actors" rather than throwing.
+function readAgentsYamlText(projectRoot, defaultBranch) {
+  const abs = path.join(projectRoot, "docs", "planning", "agents.yml");
+  try {
+    return fs.readFileSync(abs, "utf8");
+  } catch {
+    if (!defaultBranch) return "";
+    return git.showFile(projectRoot, defaultBranch, "docs/planning/agents.yml") || "";
+  }
+}
+
+// Append `[human-task reassigned] <key> @ <ISO-8601 UTC ts> from=<old> to=<new>`
+// to the issue's session-log.md — append-only, never touching a byte of
+// what's already there, symmetric to `appendHumanTaskMarker` above.
+function appendReassignMarker(projectRoot, issueRel, key, oldActor, newActor) {
+  const sessionLogPath = path.join(projectRoot, ...issueRel.split("/"), "session-log.md");
+  let existing = "";
+  try {
+    existing = fs.readFileSync(sessionLogPath, "utf8");
+  } catch {
+    existing = "";
+  }
+  const ts = new Date().toISOString();
+  const separator = existing && !existing.endsWith("\n") ? "\n" : "";
+  const line = `[human-task reassigned] ${key} @ ${ts} from=${oldActor} to=${newActor}\n`;
+  fs.writeFileSync(sessionLogPath, existing + separator + line, "utf8");
+}
+
+// POST .../issues/:id/human-tasks/:key/reassign  { actor }
+async function handleHumanTaskReassign(req, res, projectRoot, entry, defaultBranch, key) {
+  if (!inbox.PIPELINE_KEYS.includes(key)) {
+    return sendJson(res, 404, {
+      error: "unknown_key",
+      message: `No such pipeline key. Known keys: ${inbox.PIPELINE_KEYS.join(", ")}.`,
+    });
+  }
+
+  let body;
+  try {
+    body = await readJsonBody(req);
+  } catch {
+    return sendJson(res, 400, { error: "invalid_json_body", message: "The request body is not valid JSON." });
+  }
+  if (body === null || typeof body !== "object" || Array.isArray(body)) {
+    return sendJson(res, 400, { error: "invalid_json_body", message: "The request body must be a JSON object." });
+  }
+
+  const actor = typeof body.actor === "string" ? body.actor.trim() : "";
+  if (!actor) {
+    return sendJson(res, 422, { error: "invalid_actor", message: "A non-empty actor name is required." });
+  }
+
+  // The actor must be a name agents.yml (explicit or shipped-default) can
+  // resolve — not just any string (specs.md §4.3). Deliberately NOT gated on
+  // roles.<key> currently resolving to a human actor: TC-022's multi-line
+  // block-style fixture (TC-026 step 6) doesn't resolve to `kind: human`
+  // either — parseIndentTree drops an unparseable point-entry and the whole
+  // five-level fallback (lib/roles-resolve.js's resolveRole) falls through
+  // to whatever default applies, human or not. A gate keyed on "is this
+  // currently a human task" would make that very fixture 404 before ever
+  // reaching the format check TC-026 step 6 actually exercises. This route's
+  // only job is the point-edit itself: any known actor, onto any known
+  // pipeline key, expressed in the one text shape it can safely rewrite.
+  const agentsText = readAgentsYamlText(projectRoot, defaultBranch);
+  const actorCheck = rolesResolve.resolveActor(actor, agentsText);
+  if (!actorCheck.ok) {
+    return sendJson(res, 422, {
+      error: "unknown_actor",
+      message: `"${actor}" is not a known actor in docs/planning/agents.yml.`,
+    });
+  }
+
+  const issueRel = `docs/issues/${entry.status}/${entry.issueId}`;
+  const promptRelPath = `${issueRel}/prompt.md`;
+  const promptAbsPath = path.join(projectRoot, ...promptRelPath.split("/"));
+  let promptText;
+  try {
+    promptText = fs.readFileSync(promptAbsPath, "utf8");
+  } catch {
+    return sendJson(res, 422, { error: "artifact_missing", message: `${promptRelPath} does not exist yet.` });
+  }
+
+  const edit = replacePromptRolesWrite(promptText, key, actor);
+  if (!edit.ok) {
+    return sendJson(res, 409, {
+      error: "unsupported_roles_format",
+      message:
+        `roles.${key} in ${promptRelPath} is not written in the single-line flow-style this tool can edit ` +
+        `("${key}: { write: ..., review: [...] }") — reassign it manually by editing prompt.md.`,
+    });
+  }
+
+  fs.writeFileSync(promptAbsPath, edit.newText, "utf8");
+  appendReassignMarker(projectRoot, issueRel, key, edit.oldValue, actor);
+
+  return sendJson(res, 200, { status: "reassigned", actor });
+}
+
 async function handleApi(req, res, parts, projects, query) {
   // parts = pathname split on "/", filtered — e.g.
   // ["api","roles"]
@@ -1121,6 +1340,16 @@ async function handleApi(req, res, parts, projects, query) {
   if (parts.length === 8 && parts[5] === "human-tasks" && parts[7] === "complete" && req.method === "POST") {
     const key = decodeURIComponent(parts[6]);
     return handleHumanTaskComplete(req, res, projectRoot, entry, defaultBranch, key);
+  }
+
+  // POST .../issues/:id/human-tasks/:key/reassign  { actor } — edit
+  // roles.<key>.write in prompt.md via a targeted single-line text
+  // replacement (AC-05g). See handleHumanTaskReassign for the
+  // byte-identical-except-one-substring mechanism and its documented
+  // multi-line block-style limitation.
+  if (parts.length === 8 && parts[5] === "human-tasks" && parts[7] === "reassign" && req.method === "POST") {
+    const key = decodeURIComponent(parts[6]);
+    return handleHumanTaskReassign(req, res, projectRoot, entry, defaultBranch, key);
   }
 
   if (parts[5] !== "checklist") {
