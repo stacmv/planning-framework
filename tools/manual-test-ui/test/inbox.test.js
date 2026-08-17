@@ -112,7 +112,7 @@ function buildFixture(t) {
 // The test
 // ---------------------------------------------------------------------------
 
-test("GET /api/inbox aggregates manualTests[]/humanTasks[] across every configured project", async (t) => {
+test("GET /api/inbox aggregates manualTests[]/humanTasks[] across every configured project (TC-016, TC-017)", async (t) => {
   const fx = buildFixture(t);
   const server = await startServerFor(t, { configPath: fx.configPath });
 
@@ -262,7 +262,7 @@ function buildReviewFixture(t) {
   return { projC, configPath: config.configPath };
 }
 
-test("GET /api/inbox discovers a human-REVIEW task (roles.<key>.review: [human]), operation: review, counted in totalCount", async (t) => {
+test("GET /api/inbox discovers a human-REVIEW task (roles.<key>.review: [human]), operation: review, counted in totalCount (TC-027 step 4)", async (t) => {
   const fx = buildReviewFixture(t);
   const server = await startServerFor(t, { configPath: fx.configPath });
 

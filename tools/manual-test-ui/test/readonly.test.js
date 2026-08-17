@@ -1,4 +1,4 @@
-// TC-012 — strictly read-only: an exhaustive inventory of every mutating
+// TC-032 — strictly read-only: an exhaustive inventory of every mutating
 // action.
 //
 // The whole promise of this tool is "it reads everything, it changes exactly
@@ -66,7 +66,7 @@ const DECLARED = "20260109-feat-fixture-declared";
 // Step 1 — the route inventory, read from the source
 // ---------------------------------------------------------------------------
 
-test("TC-012 step 1: server.js has exactly five non-GET route families, nowhere else", () => {
+test("TC-032 step 1: server.js has exactly five non-GET route families, nowhere else", () => {
   const src = fs.readFileSync(SERVER_PATH, "utf8");
 
   const startMarker = "async function handleApi(";
@@ -107,7 +107,7 @@ test("TC-012 step 1: server.js has exactly five non-GET route families, nowhere 
   const nonGet = methods.filter((m) => m !== "GET");
 
   // The six route checks this tool is allowed to mutate anything through,
-  // grouped into the five families the implementation plan and TC-012 name
+  // grouped into the five families the implementation plan and TC-032 name
   // (checklist marks/notes count as one family, two route checks). Matched
   // by the exact path-segment conditions they sit behind, not just by verb,
   // so a same-verb same-count route added under a different name still fails
@@ -162,7 +162,7 @@ test("TC-012 step 1: server.js has exactly five non-GET route families, nowhere 
 // Step 4 — git operations available to the server
 // ---------------------------------------------------------------------------
 
-test("TC-012 step 4: lib/git.js only ever runs read-only git commands, plus a plain checkout", () => {
+test("TC-032 step 4: lib/git.js only ever runs read-only git commands, plus a plain checkout", () => {
   const src = fs.readFileSync(GIT_LIB_PATH, "utf8");
 
   const callRe = /tryGit\(cwd,\s*\[([^\]]*)\]\)/g;
@@ -254,7 +254,7 @@ function buildDocInventory(repo, memRoot) {
   };
 }
 
-test("TC-012 steps 2-3, 5: no existing route can write a pipeline document, and the whole tree proves it", async (t) => {
+test("TC-032 steps 2-3, 5: no existing route can write a pipeline document, and the whole tree proves it", async (t) => {
   const repo = fixtures.makeTempRepo({ issues: [FULL], name: "readonly-negative" });
   const memRoot = fixtures.makeMemoryRoot();
   memRoot.addProject({ projectPath: repo.root });
@@ -295,7 +295,7 @@ test("TC-012 steps 2-3, 5: no existing route can write a pipeline document, and 
   // successful call would correctly fail this test's whole-tree
   // `assertSameSnapshot` below, so its scoping (prompt.md + session-log.md,
   // nothing else) gets its own dedicated positive-control check instead
-  // (TC-012 step 6e, further down).
+  // (TC-032 step 6e, further down).
   const base = `/api/projects/main/issues/${FULL}/checklist`;
   for (const evilId of ["brd.md", "PLANNING.md", "../../../etc/passwd", "../brd.md"]) {
     const stepsRes = await server.patch(`${base}/steps`, { tcId: evilId, step: 1, checked: true, note: "PWNED" });
@@ -329,7 +329,7 @@ test("TC-012 steps 2-3, 5: no existing route can write a pipeline document, and 
   assertSameSnapshot(memBefore, snapshot(memRoot.root), "memory root changed after read-only attempts");
 });
 
-test("TC-012: each mutating action requires either an explicit body or (for checkout) a precondition it cannot fake", async (t) => {
+test("TC-032: each mutating action requires either an explicit body or (for checkout) a precondition it cannot fake", async (t) => {
   const repo = fixtures.makeTempRepo({ issues: [FULL, ONBRANCH], name: "readonly-gating" });
   const config = fixtures.makeConfig({ projects: [{ name: "main", path: repo.root, defaultBranch: repo.defaultBranch }] });
   const server = await startServerFor(t, { configPath: config.configPath });
@@ -369,7 +369,7 @@ test("TC-012: each mutating action requires either an explicit body or (for chec
 // Step 6 — positive control: the three permitted actions, each scoped
 // ---------------------------------------------------------------------------
 
-test("TC-012 step 6a: checklist marks and notes change only manual_test_checklist.md", async (t) => {
+test("TC-032 step 6a: checklist marks and notes change only manual_test_checklist.md", async (t) => {
   const repo = fixtures.makeTempRepo({ issues: [FULL], name: "readonly-positive-checklist" });
   const config = fixtures.makeConfig({ projects: [{ name: "main", path: repo.root, defaultBranch: repo.defaultBranch }] });
   const server = await startServerFor(t, { configPath: config.configPath });
@@ -394,7 +394,7 @@ test("TC-012 step 6a: checklist marks and notes change only manual_test_checklis
   );
 });
 
-test("TC-012 step 6b: checkout on confirmation only ever brings in that issue's own branch content", async (t) => {
+test("TC-032 step 6b: checkout on confirmation only ever brings in that issue's own branch content", async (t) => {
   const repo = fixtures.makeTempRepo({ issues: [ONBRANCH], name: "readonly-positive-checkout" });
   const config = fixtures.makeConfig({ projects: [{ name: "main", path: repo.root, defaultBranch: repo.defaultBranch }] });
   const server = await startServerFor(t, { configPath: config.configPath });
@@ -422,7 +422,7 @@ test("TC-012 step 6b: checkout on confirmation only ever brings in that issue's 
   );
 });
 
-test("TC-012 step 6c: preparing a test case never touches the repository at all", async (t) => {
+test("TC-032 step 6c: preparing a test case never touches the repository at all", async (t) => {
   const repo = fixtures.makeTempRepo({ issues: [DECLARED], name: "readonly-positive-prepare" });
   const config = fixtures.makeConfig({ projects: [{ name: "main", path: repo.root, defaultBranch: repo.defaultBranch }] });
   const server = await startServerFor(t, {
@@ -451,7 +451,7 @@ test("TC-012 step 6c: preparing a test case never touches the repository at all"
 // human-tasks.test.js already use.
 const HUMAN_TASK_AGENTS_YML = ["actors:", "  human: { kind: human }", ""].join("\n");
 
-test("TC-012 step 6d: completing a human task (write/doc path) changes only session-log.md", async (t) => {
+test("TC-032 step 6d: completing a human task (write/doc path) changes only session-log.md", async (t) => {
   const issueId = "20260115-feat-fixture-complete";
   const brdContent = "# BRD — complete fixture\n\nReal body beyond the heading, not a stub.\n";
   const promptMd = [
@@ -464,7 +464,7 @@ test("TC-012 step 6d: completing a human task (write/doc path) changes only sess
     "",
     `# ${issueId}`,
     "",
-    "Type: feat. Fixture for TC-012 step 6d.",
+    "Type: feat. Fixture for TC-032 step 6d.",
     "",
   ].join("\n");
 
@@ -501,7 +501,7 @@ test("TC-012 step 6d: completing a human task (write/doc path) changes only sess
   );
 });
 
-test("TC-012 step 6e: reassigning a human task's write actor changes only prompt.md (write: substring) and session-log.md", async (t) => {
+test("TC-032 step 6e: reassigning a human task's write actor changes only prompt.md (write: substring) and session-log.md", async (t) => {
   const issueId = "20260116-feat-fixture-reassign";
   const promptMd = [
     "---",
@@ -513,7 +513,7 @@ test("TC-012 step 6e: reassigning a human task's write actor changes only prompt
     "",
     `# ${issueId}`,
     "",
-    "Type: feat. Fixture for TC-012 step 6e.",
+    "Type: feat. Fixture for TC-032 step 6e.",
     "",
   ].join("\n");
 
@@ -563,7 +563,7 @@ test("TC-012 step 6e: reassigning a human task's write actor changes only prompt
 // Client-side note — no actor-picker wizard outside the one hand-off action
 // ---------------------------------------------------------------------------
 
-test("TC-012 note: public/*.js carries no actor-picker wizard outside the single hand-off action (AC-05j)", () => {
+test("TC-032 note: public/*.js carries no actor-picker wizard outside the single hand-off action (AC-05j)", () => {
   const publicDir = path.join(TOOL_DIR, "public");
   const files = fs.readdirSync(publicDir).filter((f) => f.endsWith(".js"));
   assert.ok(files.length > 0, "no public/*.js files found — has the client moved?");

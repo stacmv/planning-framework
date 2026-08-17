@@ -25,7 +25,7 @@ const STYLE_CSS = path.join(__dirname, "..", "public", "style.css");
 
 // --------------------------------------------------------------- step 1
 
-test("public/style.css's :root palette clears every AC-02a-02c threshold", () => {
+test("public/style.css's :root palette clears every AC-02a-02c threshold (TC-007 step 1)", () => {
   const cssText = fs.readFileSync(STYLE_CSS, "utf8");
   const parsed = parseRootTokens(cssText);
 

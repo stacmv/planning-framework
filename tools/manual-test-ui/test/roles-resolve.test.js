@@ -32,7 +32,7 @@ function fixture(name) {
 
 // --------------------------------------------------------------- step 1
 
-test("single-line flow-style entry with write/review parses correctly", () => {
+test("single-line flow-style entry with write/review parses correctly (TC-021 step 1)", () => {
   const promptText = [
     "---",
     "roles:",
@@ -52,7 +52,7 @@ test("single-line flow-style entry with write/review parses correctly", () => {
 
 // --------------------------------------------------------------- step 2
 
-test("mode: blocking is parsed and returned on the resolution result", () => {
+test("mode: blocking is parsed and returned on the resolution result (TC-021 step 2)", () => {
   const promptText = [
     "---",
     "roles:",
@@ -72,7 +72,7 @@ test("mode: blocking is parsed and returned on the resolution result", () => {
 
 // --------------------------------------------------------------- step 3
 
-test("a bare scalar (dev_docs: skip) parses as a skip, not a format error", () => {
+test("a bare scalar (dev_docs: skip) parses as a skip, not a format error (TC-021 step 3)", () => {
   const promptText = ["---", "roles:", "  dev_docs: skip", "---", ""].join("\n");
 
   const result = resolveRole("dev_docs", { promptText, agentsText: "", roleProfilesText: "" });
@@ -84,7 +84,7 @@ test("a bare scalar (dev_docs: skip) parses as a skip, not a format error", () =
 
 // --------------------------------------------------------------- step 4
 
-test("the committed prompt-roles-flow.md fixture resolves every key it declares", () => {
+test("the committed prompt-roles-flow.md fixture resolves every key it declares (TC-021 step 4)", () => {
   const promptText = fixture("prompt-roles-flow.md");
 
   const brd = resolveRole("brd", { promptText, agentsText: "", roleProfilesText: "" });
@@ -114,7 +114,7 @@ test("the committed prompt-roles-flow.md fixture resolves every key it declares"
 
 // --------------------------------------------------------------- CR-004: review[]-kind human
 
-test("write: claude, review: [human] resolves to kind: human via: review, not a non-human result", () => {
+test("write: claude, review: [human] resolves to kind: human via: review, not a non-human result (TC-027 step 4)", () => {
   const promptText = ["---", "roles:", "  specs: { write: claude, review: [human] }", "---", ""].join("\n");
   const agentsText = ["actors:", "  human: { kind: human, inbox: project-explorer }", ""].join("\n");
 
@@ -126,7 +126,7 @@ test("write: claude, review: [human] resolves to kind: human via: review, not a 
   assert.strictEqual(result.key, "specs");
 });
 
-test("write: human, review: [claude] still resolves via: write (write wins when both could match)", () => {
+test("write: human, review: [claude] still resolves via: write (write wins when both could match) (TC-027 step 4)", () => {
   const promptText = ["---", "roles:", "  specs: { write: human, review: [claude] }", "---", ""].join("\n");
   const agentsText = ["actors:", "  human: { kind: human, inbox: project-explorer }", ""].join("\n");
 
@@ -149,7 +149,7 @@ test("write: claude, review: [claude] — neither side human — resolves normal
 
 // --------------------------------------------------------------- negative case
 
-test("multi-line block-style roles.<key> never throws and never fabricates write/review", () => {
+test("multi-line block-style roles.<key> never throws and never fabricates write/review (TC-022 steps 1-2)", () => {
   // test/fixtures/roles-resolve-multiline.md writes roles.specs as multi-line
   // block-style YAML (write: haiku, review: [codex] on their own indented
   // lines) — the form lib/roles-resolve.js's module comment documents as

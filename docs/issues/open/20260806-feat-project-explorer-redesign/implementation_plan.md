@@ -147,7 +147,7 @@ Criteria этого раздела)
 - §4, раздел `### kind: human and code: skip during resolution` — обновить формулировку: `kind: human` больше не «hard-stop condition» в смысле ошибки резолвинга; переформулировать как «структурированный результат, требующий обработки вызывающим кодом», сохранив соседний абзац про `code: skip` без изменений (это по-прежнему настоящий hard-stop).
 
 **Acceptance Criteria:**
-- [x] TC-027 passes (шаги 1-3 — hard-stop removed, default `agents.yml` entry; шаг 4 требует `lib/roles-resolve.js`, см. Задачу 4)
+- [x] TC-027 passes (шаги 1-3 — hard-stop removed, default `agents.yml` entry; шаг 4 требует `lib/roles-resolve.js`, см. Задачу 4; покрыто `test/pf-roles-human-actor.sh`)
 
 ---
 
@@ -168,7 +168,7 @@ Criteria этого раздела)
 - Это markdown-skill-native алгоритм: `pf-close` выполняет его сам через Read/Bash, без обращения к `tools/manual-test-ui` (который опциональный dev-инструмент со своим `projects.json`) и без JS.
 
 **Acceptance Criteria:**
-- [x] TC-028 passes (часть про `/pf-close` Phase 0)
+- [x] TC-028 passes (часть про `/pf-close` Phase 0; покрыто `test/pf-roles-human-actor.sh`)
 
 ---
 
@@ -185,7 +185,7 @@ Criteria этого раздела)
 - Добавить явную обработку в Step 2, рядом с существующими пунктами 1-5 (пункт 1 уже упоминает `/pf-close` как одну из стадий цикла) — не отдельный новый Step.
 
 **Acceptance Criteria:**
-- [x] TC-028 passes (часть про `/pf-autopilot`)
+- [x] TC-028 passes (часть про `/pf-autopilot`; покрыто `test/pf-roles-human-actor.sh`)
 
 ---
 
@@ -471,7 +471,7 @@ Criteria этого раздела)
 - Убрать `overflow: hidden` на `body` (сегодня `style.css:25`) — Problem Statement #3/AC-01f. Локальные `overflow-y`/`overflow-x` на внутренних панелях (`.doc-panel` и т.п.) — не баг, оставить.
 
 **Acceptance Criteria:**
-- [x] TC-005 passes
+- [x] TC-005 passes (покрыто `test/style-tokens.test.js`)
 - [x] TC-007 passes
 
 ---
@@ -490,7 +490,7 @@ Criteria этого раздела)
 - Учесть, что эта задача выполняется поверх новой разметки Задач 23-27 (`.role-switch`/`.list`/`.notice` и т.п. могут получить новые имена классов) — искать литералы по факту в файле на момент выполнения, не по старым селекторам буквально.
 
 **Acceptance Criteria:**
-- [x] TC-008 passes
+- [x] TC-008 passes (покрыто `test/style-tokens.test.js` — `textLiterals.length === 0`)
 
 ---
 
@@ -529,7 +529,7 @@ Criteria этого раздела)
 - Проверяется построчным парсером `font-size` для `body`/`html` и `h1` (может быть в `em`/`px`/`calc()`).
 
 **Acceptance Criteria:**
-- [x] TC-009 passes (шаги 1-2 — числовой диапазон `h1`/body; шаг 3 — файловая проверка референсов — см. раздел «Prerequisite» выше, не эту задачу)
+- [x] TC-009 passes (шаги 1-2 — числовой диапазон `h1`/body, покрыто `test/style-tokens.test.js`; шаг 3 — файловая проверка референсов — см. раздел «Prerequisite» выше, не эту задачу)
 
 ---
 
@@ -548,7 +548,7 @@ Criteria этого раздела)
 - TC-012 (визуальная приёмка по референсу) — manual, требует готовых Задач 23-27 (разметка) и выполненного Prerequisite (референсы GLog v.0.7, см. раздел выше); acceptance здесь фиксирует, что паттерн реализован и владелец подтверждает соответствие референсу на живом экране. Эта проверка происходит **после** реализации, а не до старта `/pf-execute` — в отличие от TC-009/TC-013 она не входит в Prerequisite-раздел и остаётся Acceptance Criteria этой задачи.
 
 **Acceptance Criteria:**
-- [x] TC-010 passes
+- [x] TC-010 passes (покрыто `test/style-tokens.test.js` — `color-mix` заливка, контраст ≥4.5:1)
 - [ ] TC-012 passes (manual — владелец подтверждает соответствие референсу)
 
 ---
@@ -790,7 +790,7 @@ Criteria этого раздела)
 **Acceptance Criteria:**
 - [x] TC-001 passes (лаунчер визуально оформлен)
 - [x] TC-002 passes (рабочее пространство визуально оформлено)
-- [x] TC-010 passes (панельный паттерн распространён на все новые контейнеры)
+- [x] TC-010 passes (панельный паттерн распространён на все новые контейнеры; покрыто `test/css-class-coverage.test.js` + `test/style-tokens.test.js`)
 - [ ] TC-012 passes (визуальная приёмка владельцем — теперь возможна без «голой» разметки)
 
 ---
@@ -812,8 +812,8 @@ Criteria этого раздела)
 - Не менять семантику самого `POST .../complete` (Задача 11) — только обнаружение/перечисление ниже по цепочке (инбокс, счётчик «Дела», `/pf-close`).
 
 **Acceptance Criteria:**
-- [x] TC-027 passes (human-review-задачи обнаружимы наравне с human-write)
-- [x] TC-028 passes (`/pf-close` Phase 0 блокируется и на незакрытой review-задаче)
+- [x] TC-027 passes (human-review-задачи обнаружимы наравне с human-write — покрыто `roles-resolve.test.js`/`inbox.test.js`, TC-ID метки добавлены)
+- [x] TC-028 passes (`/pf-close` Phase 0 блокируется и на незакрытой review-задаче; покрыто `test/pf-roles-human-actor.sh`)
 
 ---
 

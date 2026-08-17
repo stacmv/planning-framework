@@ -55,7 +55,7 @@ test('style.css declares at least one font-family rule', () => {
   assert.ok(rules.length > 0, 'expected to find font-family declarations in style.css');
 });
 
-test('prose selectors (body/.doc-panel/.panel/:root) use a sans-serif stack', () => {
+test('prose selectors (body/.doc-panel/.panel/:root) use a sans-serif stack (TC-011 step 1)', () => {
   const proseRules = rules.filter((rule) =>
     rule.selectors.some((sel) => PROSE_SELECTORS.has(sel))
   );
@@ -75,7 +75,7 @@ test('prose selectors (body/.doc-panel/.panel/:root) use a sans-serif stack', ()
   }
 });
 
-test('no non-code selector declares a monospace font-family', () => {
+test('no non-code selector declares a monospace font-family (TC-011 step 2)', () => {
   for (const rule of rules) {
     const nonCodeSelectors = rule.selectors.filter((sel) => !isCodeLikeSelector(sel));
     if (nonCodeSelectors.length === 0) continue;
@@ -86,7 +86,7 @@ test('no non-code selector declares a monospace font-family', () => {
   }
 });
 
-test('code-like selectors that declare font-family keep it monospace', () => {
+test('code-like selectors that declare font-family keep it monospace (TC-011 step 2)', () => {
   const codeRules = rules.filter((rule) => rule.selectors.every(isCodeLikeSelector));
   for (const rule of codeRules) {
     assert.ok(

@@ -287,7 +287,7 @@ function staleSessionLogPath(project) {
   return path.join(project.root, "docs", "issues", "open", STALE_ISSUE_ID, "session-log.md");
 }
 
-test("complete -> edit artifact -> GET /api/inbox reports stale -> recommit -> complete again moves marker/hash forward", async (t) => {
+test("complete -> edit artifact -> GET /api/inbox reports stale -> recommit -> complete again moves marker/hash forward (TC-025)", async (t) => {
   const fx = buildStaleFixture(t);
   const server = await startServerFor(t, { configPath: fx.configPath });
   const base = `/api/projects/${STALE_PROJECT_NAME}/issues/${STALE_ISSUE_ID}/human-tasks`;
