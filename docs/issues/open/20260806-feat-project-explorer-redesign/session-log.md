@@ -166,3 +166,28 @@ workspace.js-писателем и параллельной style.css-задач
 open+P2→tech-debt.md параллельно deferred-пути; не упомянута
 недетерминированность tools/manual-test-ui/test/ из prompt.md; не
 задокументирована ловушка `"type": "module"` в package.json).
+
+[/pf-qa] Verdict: FAIL. Все автоматические/AI-проверки .qa-workflow.md
+зелёные (shellcheck, debug-output, TODO, secrets, curl|sh, working tree,
+branch-up-to-date, scope guard, CHANGELOG — последний пофикшен в рамках
+этого прогона, commit a9a6f23). TC-013 подтверждён по существующей записи
+owner sign-off в этом же файле (@ 2026-08-17T15:50:14Z, до первого
+/pf-execute) — Status Tracker обновлён на ✓.
+
+TC-012 (визуальная приёмка по референсу — human-judgment) и TC-015 (живая
+проверка табуляции — нет headless-браузерного харнесса в этом
+zero-dependency проекте) остаются [ ] — оба по дизайну требуют реального
+человека и/или живого браузера. Chrome-расширение в этой автономной сессии
+не подключено ("Browser extension is not connected") — ожидаемо для
+headless/cron-запуска. Тестовые данные для TC-012 подготовлены
+(<tmpdir>/pf-test-data/20260806-feat-project-explorer-redesign/TC-012).
+
+[autopilot stop — genuine human-only blocker] Дальше по конвейеру не
+продвигаюсь: /pf-close's Phase 0 требует verdict: PASS. Это не то, что
+автономная сессия может обойти честно — не буду подделывать
+человеческое суждение. Снял оба cron-расписания (3d296a4f recurring,
+22245b08 one-shot) — дальнейшие resume ничего не решат без реального
+прогона TC-012/TC-015 пользователем. Стандартная инструкция /goal
+(«довести до /pf-close, не останавливаясь») не отменяет честность QA-
+вердикта; это ближайший законный терминал для полностью автономного
+прогона этой issue.
