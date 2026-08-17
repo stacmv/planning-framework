@@ -840,7 +840,7 @@ specs.md §4.4 утверждает обратное («существующая
 | TC-010 | `.panel-table` — мягкая тональная заливка вместо жёстких grid-линий | Auto | High | ✓ | |
 | TC-011 | Sans-serif для прозы, monospace только для кода | Auto | Medium | ✓ | |
 | TC-012 | Визуальная приёмка панельной раскладки по референсу | Manual | High | [ ] | Manual reason: human-judgment |
-| TC-013 | Owner sign-off палитры и типографики до старта `/pf-execute` | Manual | Critical | [ ] | Manual reason: human-judgment |
+| TC-013 | Owner sign-off палитры и типографики до старта `/pf-execute` | Manual | Critical | ✓ | Подтверждено по существующей записи `[owner sign-off]` в session-log.md @ 2026-08-17T15:50:14Z (до первого /pf-execute) — см. manual_test_checklist.md |
 | TC-014 | `:focus-visible` — контраст индикатора и нативные `<button>` | Auto | Medium | ✓ | |
 | TC-015 | Живая проверка табуляции и видимого фокуса по всему приложению | Manual | High | [ ] | Manual reason: environment — нет headless-браузерного харнесса в этом zero-dependency проекте |
 | TC-016 | `GET /api/inbox` — агрегация across projects, форма ответа | Auto | Critical | ✓ | |
