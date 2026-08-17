@@ -54,7 +54,7 @@ body {
 }
 
 .brand h1 {
-  font-size: 15px;
+  font-size: calc(1em * 1.5);
   margin: 0;
   white-space: nowrap;
 }

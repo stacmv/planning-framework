@@ -826,6 +826,7 @@ async function handleApi(req, res, parts, projects, query) {
   // ["api","projects",":name","issues",":id","checklist","checkout"]
   // ["api","projects",":name","issues",":id","docs"]             ?path=<relative path>
   // ["api","projects",":name","issues",":id","roles",":role"]
+  // ["api","projects",":name","issues",":id","human-tasks"]
   // ["api","projects",":name","issues",":id","prepare"]          POST {confirm, tcId?}
 
   // GET /api/roles — the role table itself. Project- and issue-independent:
@@ -949,6 +950,16 @@ async function handleApi(req, res, parts, projects, query) {
       });
     }
     return sendJson(res, 200, buildRoleContents(projectName, projectRoot, entry, roleId));
+  }
+
+  // GET .../issues/:id/human-tasks — every `roles.<key>` pair of this issue
+  // resolving to `kind: "human"` (lib/roles-resolve.js) and not yet done
+  // (lib/inbox.js's collectHumanTasksForIssue, the same marker/content-hash
+  // logic GET /api/inbox's humanTasks[] already uses, scoped to one issue).
+  // Pure read/report — this route NEVER performs the resolved operation
+  // itself (AC-05a): no write, no side effect, just the queue.
+  if (parts.length === 6 && parts[5] === "human-tasks" && req.method === "GET") {
+    return sendJson(res, 200, inbox.collectHumanTasksForIssue(projectRoot, entry.issueId, entry.status, defaultBranch));
   }
 
   if (parts[5] !== "checklist") {

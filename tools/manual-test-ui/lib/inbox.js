@@ -404,6 +404,97 @@ function collectHumanTasks(projects) {
   return humanTasks;
 }
 
+/**
+ * The per-issue slice of `collectHumanTasks()`, scoped to exactly one
+ * project's exactly one issue — for `GET .../issues/:id/human-tasks`
+ * (specs.md §4.3, implementation_plan.md Task 10). Same resolution and
+ * done/stale logic as `collectHumanTasks()` (marker lookup, content-hash
+ * comparison), just without the "every configured project, every open
+ * issue" enumeration that route doesn't need — the caller has already
+ * resolved the one issue this is for (`server.js`'s `resolveIssue()`).
+ *
+ * READ-ONLY, like the rest of this module and like `collectHumanTasks()`:
+ * this never writes `session-log.md` (that is a later task, `POST
+ * .../human-tasks/:key/complete`) and never performs the resolved operation
+ * itself (AC-05a) — it only reports on what is queued or stale.
+ *
+ * @param {string} projectRoot
+ * @param {string} issueId       Already validated against ISSUE_ID_RE.
+ * @param {"open"|"closed"} issueStatus
+ * @param {string|null} defaultBranch The project's resolved default branch
+ *   (`git.resolveDefaultBranch()`), used only as the read fallback for
+ *   `docs/planning/agents.yml`/`role-profiles.yml` when they aren't on disk
+ *   right now — the same fallback `collectHumanTasks()` uses for them, so
+ *   the two never disagree about whether a `roles.<key>` actor is `human`.
+ * @returns {Array<{stageKey: string, operation: string, mode: string,
+ *   artifactPath: string|null, instruction: string, status: "queued"|"stale",
+ *   contentHash?: string}>}
+ */
+function collectHumanTasksForIssue(projectRoot, issueId, issueStatus, defaultBranch) {
+  const issueRel = `docs/issues/${issueStatus}/${issueId}`;
+  // Mirrors docstate.buildIssueContext: only OPEN issues ever get a branch
+  // fallback (a closed issue is merged by definition — its own `issue/<id>`
+  // branch, if it still exists, says nothing about where its documents
+  // live).
+  const issueBranch = issueStatus === "open" && git.branchExists(projectRoot, `issue/${issueId}`) ? `issue/${issueId}` : null;
+
+  const promptText = readProjectFile(projectRoot, `${issueRel}/prompt.md`, issueBranch);
+  if (promptText === null) return []; // no prompt.md anywhere for this issue — nothing to resolve
+
+  const sessionLogText = readProjectFile(projectRoot, `${issueRel}/session-log.md`, issueBranch) || "";
+  // Same read + fallback as collectHumanTasks() for these two project-level
+  // files: disk first, then `defaultBranch` via `git show` — NOT `ref: null`.
+  // A project whose agents.yml/role-profiles.yml aren't checked out right
+  // now (e.g. this route is hit against an issue branch that doesn't carry
+  // them) must resolve `human` actors exactly like /api/inbox does, or a key
+  // would silently vanish from this route while still showing up there.
+  const agentsText = readProjectFile(projectRoot, "docs/planning/agents.yml", defaultBranch || null) || "";
+  const roleProfilesText = readProjectFile(projectRoot, "docs/planning/role-profiles.yml", defaultBranch || null) || "";
+
+  const tasks = [];
+  for (const key of PIPELINE_KEYS) {
+    const resolved = rolesResolve.resolveRole(key, { promptText, roleProfilesText, agentsText });
+    if (!resolved || resolved.kind !== "human") continue;
+
+    const artifactPath = DOC_KEY_FILES[key] ? `${issueRel}/${DOC_KEY_FILES[key]}` : null;
+    const currentId = currentContentIdentifier(projectRoot, issueId, key, artifactPath);
+    const marker = findLastMarker(sessionLogText, key);
+
+    let status;
+    if (!marker) {
+      status = "queued";
+    } else if (currentId !== null && marker.contentHash === currentId) {
+      continue; // marker matches current content — done, excluded entirely
+    } else {
+      status = "stale";
+    }
+
+    const task = {
+      stageKey: key,
+      // See the identical comment in collectHumanTasks(): resolveRole only
+      // ever surfaces `kind: "human"` through the `write` actor today.
+      operation: "write",
+      mode: resolved.mode || "non-blocking",
+      artifactPath,
+      instruction: instructionFor(key),
+      status,
+    };
+    // Never fabricated: omitted entirely when there is no current content to
+    // hash against (artifact missing on disk, or — for code/tests — the
+    // issue branch doesn't exist), matching currentContentIdentifier()'s own
+    // contract. Deliberate choice for `stale`: this is the CURRENT content's
+    // hash (`currentId`), not the stale marker's recorded one
+    // (`marker.contentHash`) — "what would `.../complete` write if called
+    // right now", not "what was true when it was last marked done". A future
+    // caller that wants the old value can still read it via the
+    // `[human-task done]` marker in session-log.md directly.
+    if (currentId !== null) task.contentHash = currentId;
+    tasks.push(task);
+  }
+
+  return tasks;
+}
+
 module.exports = {
   TEST_PLAN_RELATIVE_PATH,
   splitTableCells,
@@ -413,4 +504,5 @@ module.exports = {
   PIPELINE_KEYS,
   DOC_KEY_FILES,
   collectHumanTasks,
+  collectHumanTasksForIssue,
 };
