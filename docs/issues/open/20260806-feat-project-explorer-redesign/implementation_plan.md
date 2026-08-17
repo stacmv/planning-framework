@@ -673,7 +673,7 @@ Criteria этого раздела)
 - Каждая строка `text` рендерится как есть, без markdown-разбора — read-only, как и весь остальной `.doc-panel` (Non-Goals: без ручного редактирования документов пайплайна через UI).
 
 **Acceptance Criteria:**
-- [ ] TC-030 passes
+- [x] TC-030 passes
 
 ---
 

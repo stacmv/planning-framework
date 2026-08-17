@@ -250,6 +250,211 @@ test("resolveActiveTab falls back to the first tab when prevTabId names no tab o
   assert.strictEqual(result, "test_plan");
 });
 
+// ---------------------------------------------------------------------------
+// renderChecklistPanel — TC-030 (pure, no DOM, returns a string).
+// ---------------------------------------------------------------------------
+
+function tc(id, name, overrides = {}) {
+  return {
+    id,
+    name,
+    headingLineIndex: 0,
+    prerequisites: [],
+    requiredData: [],
+    dataStatus: "unknown",
+    preparedPath: null,
+    steps: [],
+    notesLineIndex: null,
+    notesText: "",
+    parseWarnings: [],
+    ...overrides,
+  };
+}
+
+test("renderChecklistPanel returns a plain string, not a DOM node (TC-030 Preconditions)", async () => {
+  const mod = await loadModule();
+  const result = mod.renderChecklistPanel({ tcs: [tc("TC-001", "First case")], looseSections: [] });
+  assert.strictEqual(typeof result, "string");
+});
+
+test("renderChecklistPanel handles a null/malformed input without throwing, still returns a string", async () => {
+  const mod = await loadModule();
+  assert.strictEqual(typeof mod.renderChecklistPanel(null), "string");
+  assert.strictEqual(typeof mod.renderChecklistPanel({}), "string");
+});
+
+// TC-030 step 2: .loose-sections comes after the last TC .panel in the
+// returned string, never inside a TC block — checked by substring index of
+// occurrence, not via DOM. Also checks the required heading/caption text.
+test("renderChecklistPanel places .loose-sections after the last TC .panel, with the required heading and caption (TC-030 step 2)", async () => {
+  const mod = await loadModule();
+  const parsed = {
+    tcs: [tc("TC-001", "First case"), tc("TC-002", "Second case")],
+    looseSections: [{ afterTc: "TC-001", lineIndex: 5, text: "## Stray heading between blocks" }],
+  };
+  const html = mod.renderChecklistPanel(parsed);
+
+  const lastPanelOpenIndex = html.lastIndexOf('<div class="panel"');
+  const lastPanelCloseIndex = html.indexOf("</div>", lastPanelOpenIndex);
+  const looseSectionsIndex = html.indexOf('<div class="loose-sections">');
+
+  assert.ok(lastPanelOpenIndex >= 0, "expected at least one TC .panel");
+  assert.ok(looseSectionsIndex >= 0, "expected a .loose-sections block");
+  assert.ok(
+    looseSectionsIndex > lastPanelCloseIndex,
+    ".loose-sections must come after the last TC .panel closes, not inside it"
+  );
+  assert.ok(html.includes("Дополнительные заметки"), "expected the required heading");
+  assert.ok(
+    html.includes("нераспознанный текст между блоками чек-листа — не тест-кейс"),
+    "expected the required caption"
+  );
+  assert.ok(html.includes("Stray heading between blocks"), "expected the loose line's own text to appear");
+});
+
+// TC-030 step 3: not `.panel` — a distinct class.
+test("renderChecklistPanel's .loose-sections block never carries the .panel class (TC-030 step 3)", async () => {
+  const mod = await loadModule();
+  const html = mod.renderChecklistPanel({
+    tcs: [tc("TC-001", "First case")],
+    looseSections: [{ afterTc: "TC-001", lineIndex: 3, text: "stray line" }],
+  });
+  const looseBlockStart = html.indexOf('<div class="loose-sections">');
+  const looseBlockEnd = html.lastIndexOf("</div>");
+  const looseBlock = html.slice(looseBlockStart, looseBlockEnd);
+  assert.ok(!looseBlock.includes('class="panel"'), ".loose-sections must not be (or contain) a .panel");
+});
+
+// TC-030 step 4: grouped by afterTc, items within a group in ascending
+// lineIndex order, groups in file order — fed out of natural order to
+// confirm the function itself sorts/groups rather than trusting input order.
+test("renderChecklistPanel groups looseSections by afterTc, items in ascending lineIndex order (TC-030 step 4)", async () => {
+  const mod = await loadModule();
+  const parsed = {
+    tcs: [tc("TC-001", "First"), tc("TC-002", "Second")],
+    looseSections: [
+      { afterTc: "TC-002", lineIndex: 20, text: "after-TC-002 line A" },
+      { afterTc: "TC-001", lineIndex: 12, text: "after-TC-001 line B (later)" },
+      { afterTc: "TC-001", lineIndex: 8, text: "after-TC-001 line A (earlier)" },
+    ],
+  };
+  const html = mod.renderChecklistPanel(parsed);
+
+  // Group order: TC-001's group (first afterTc to appear by lineIndex) must
+  // come before TC-002's group.
+  const tc1GroupIndex = html.indexOf("После TC-001");
+  const tc2GroupIndex = html.indexOf("После TC-002");
+  assert.ok(tc1GroupIndex >= 0 && tc2GroupIndex >= 0, "expected both groups to render");
+  assert.ok(tc1GroupIndex < tc2GroupIndex, "TC-001's group must render before TC-002's group (file order)");
+
+  // Within TC-001's group, the earlier lineIndex (8) item must render
+  // before the later one (12), regardless of input array order.
+  const earlierIndex = html.indexOf("after-TC-001 line A (earlier)");
+  const laterIndex = html.indexOf("after-TC-001 line B (later)");
+  assert.ok(earlierIndex >= 0 && laterIndex >= 0);
+  assert.ok(earlierIndex < laterIndex, "items within a group must be in ascending lineIndex order");
+});
+
+// TC-030 step 5: an item whose afterTc matches no rendered TC still renders,
+// at the end of the block — not dropped.
+test("renderChecklistPanel keeps an orphan afterTc item, appended at the end of the block (TC-030 step 5)", async () => {
+  const mod = await loadModule();
+  const parsed = {
+    tcs: [tc("TC-001", "First"), tc("TC-002", "Second")],
+    looseSections: [
+      { afterTc: "TC-001", lineIndex: 4, text: "known group line" },
+      { afterTc: "TC-999", lineIndex: 2, text: "orphan line — no TC-999 in this checklist" },
+    ],
+  };
+  const html = mod.renderChecklistPanel(parsed);
+
+  assert.ok(html.includes("orphan line — no TC-999 in this checklist"), "the orphan item must still be rendered, not dropped");
+
+  const knownIndex = html.indexOf("known group line");
+  const orphanIndex = html.indexOf("orphan line — no TC-999 in this checklist");
+  assert.ok(
+    orphanIndex > knownIndex,
+    "the orphan item (lineIndex 2, earlier than the known item's lineIndex 4) must still land at the END of the block, not in lineIndex position"
+  );
+});
+
+// TC-030 step 6: each text line rendered as-is, no markdown parsing —
+// markdown syntax characters appear literally (escaped for HTML safety),
+// never transformed into markup.
+test("renderChecklistPanel renders each loose line as-is, without markdown parsing (TC-030 step 6)", async () => {
+  const mod = await loadModule();
+  const html = mod.renderChecklistPanel({
+    tcs: [tc("TC-001", "First")],
+    looseSections: [{ afterTc: "TC-001", lineIndex: 3, text: "**not bold** and _not italic_ and `not code`" }],
+  });
+  // Escaped literally: no markdown transformation (no <strong>/<em>/<code>
+  // produced from this line), just the escaped source text.
+  assert.ok(!html.includes("<strong>"), "must not markdown-parse ** as bold");
+  assert.ok(!html.includes("<em>"), "must not markdown-parse _..._ as italic");
+  assert.ok(
+    html.includes("**not bold** and _not italic_ and `not code`"),
+    "the raw text must appear verbatim (escaped, not interpreted)"
+  );
+});
+
+test("renderChecklistPanel renders no .loose-sections block at all when looseSections is empty", async () => {
+  const mod = await loadModule();
+  const html = mod.renderChecklistPanel({ tcs: [tc("TC-001", "First")], looseSections: [] });
+  assert.ok(!html.includes("loose-sections"), "no looseSections means no .loose-sections block");
+});
+
+// Switching manual_test_checklist.md to the structured render must not
+// narrow what the reader can see compared to the generic raw-markdown path
+// this tab used before this task: prerequisites, declared test data,
+// header meta and parse warnings still have to show up somewhere in the
+// returned string, not only the steps table.
+test("renderChecklistPanel includes meta, prerequisites, declared test data and parse warnings, read-only", async () => {
+  const mod = await loadModule();
+  const parsed = {
+    meta: { "Feature Name": "Widget export", "Issue ID": "20260101-feat-a" },
+    tcs: [
+      tc("TC-001", "Export a widget", {
+        prerequisites: ["The fixture repo is checked out."],
+        requiredData: ["fixtures/widget.json"],
+        dataStatus: "declared",
+        notesText: "Nothing unusual observed.",
+        parseWarnings: ["row 5: fewer columns than header — skipped"],
+      }),
+    ],
+    looseSections: [],
+  };
+  const html = mod.renderChecklistPanel(parsed);
+
+  assert.ok(html.includes("Widget export"), "expected meta (Feature Name) to appear");
+  assert.ok(html.includes("20260101-feat-a"), "expected meta (Issue ID) to appear");
+  assert.ok(html.includes("The fixture repo is checked out."), "expected the TC's prerequisite to appear");
+  assert.ok(html.includes("fixtures/widget.json"), "expected the TC's declared test data to appear");
+  assert.ok(html.includes("Nothing unusual observed."), "expected the TC's notes to appear");
+  assert.ok(
+    html.includes("row 5: fewer columns than header — skipped"),
+    "expected the TC's parseWarnings to appear, not be silently dropped"
+  );
+});
+
+test("renderChecklistPanel renders dataStatus \"none\" distinctly from \"declared\"/\"unknown\"", async () => {
+  const mod = await loadModule();
+  const html = mod.renderChecklistPanel({
+    tcs: [tc("TC-001", "No data needed", { dataStatus: "none", requiredData: [] })],
+    looseSections: [],
+  });
+  assert.ok(html.includes("Test Data"), "expected a Test Data label for the explicit \"none\" case");
+  assert.ok(html.includes("none"), "expected the explicit \"none\" marker to render");
+});
+
+test("renderChecklistPanel renders no Test Data line at all for dataStatus \"unknown\" (silence is not a claim of \"not needed\")", async () => {
+  const mod = await loadModule();
+  const html = mod.renderChecklistPanel({
+    tcs: [tc("TC-001", "Unknown data need")], // default dataStatus: "unknown", requiredData: []
+    looseSections: [],
+  });
+  assert.ok(!html.includes("Test Data"), "an unknown data need must not render as though it were declared \"none\"");
+});
+
 // A role switch never routes through resolveActiveTab (TC-003 step 3) — the
 // module-level check that `selectRole`'s body never names the function,
 // while `loadRoleContents` (which both `selectIssue` and the initial load go

@@ -173,6 +173,60 @@ body {
   background: color-mix(in srgb, var(--surface) 85%, var(--accent));
 }
 
+/* `looseSections` → "Дополнительные заметки" (specs.md §2.4, AC-07b):
+   deliberately NOT `.panel` — a dashed border instead of `.panel`'s solid
+   one, and a background tinted from `--warn` (not `--accent`, the tint
+   `.panel-table` itself uses) so this never reads as an accented header of
+   an ordinary TC panel, but as its own, visually distinct "not a test case"
+   block. */
+.loose-sections {
+  margin-bottom: 20px;
+  border: 1px dashed var(--border);
+  padding: 12px;
+  background: color-mix(in srgb, var(--surface) 92%, var(--warn));
+}
+
+.loose-sections-title {
+  color: var(--warn);
+  font-weight: 600;
+  font-size: 15px;
+  margin: 0 0 4px;
+}
+
+.loose-sections-caption {
+  color: var(--muted);
+  font-size: 12px;
+  margin: 0 0 10px;
+}
+
+.loose-group {
+  margin-bottom: 10px;
+}
+
+.loose-group:last-child {
+  margin-bottom: 0;
+}
+
+.loose-group-heading {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--muted);
+  margin: 0 0 4px;
+}
+
+.loose-items {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.loose-item {
+  font-size: 13px;
+  padding: 2px 0;
+  white-space: pre-wrap;
+}
+
 /* ----------------------------------------------------------------- lists */
 
 .list {

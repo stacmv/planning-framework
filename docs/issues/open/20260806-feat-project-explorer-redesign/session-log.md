@@ -92,3 +92,12 @@ h1 1.3–1.8× body §5.3) подтверждена владельцем по д
 Prerequisite (implementation_plan.md) выполнен полностью — /pf-execute для
 этой issue разблокирован.
 @ 2026-08-17T15:50:14Z
+
+[/pf-execute wave 10] Задача 26 (`looseSections` → «Дополнительные заметки»)
+обнаружила предсуществующий баг в `lib/checklist.js`'s `parseChecklist()`
+(ветки Prerequisites/Test Data/Steps-таблицы не продвигают внешний цикл —
+те же строки повторно попадают в `looseSections`). `specs.md` §1 выводит
+`lib/checklist.js` за скоуп этой issue, поэтому баг не фикшен здесь —
+зафиксирован в `test_plan.md`'s Known Issues и требует отдельной issue/bug.
+TC-030 проходит по своему буквальному контракту (рендерер корректно
+показывает то, что отдал парсер).

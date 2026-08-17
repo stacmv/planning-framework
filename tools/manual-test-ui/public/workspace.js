@@ -32,10 +32,11 @@
 //
 // "Дела" (human tasks) is a new tab in every role's tab set, present from
 // Task 24 onward so later tasks have somewhere to attach to: its counter
-// logic (`countProjectTodos`, exported below) is Task 25's job — done in
-// this file — and the richer content of `manual_test_checklist.md`'s
-// `looseSections` block is Task 26's job. This file's tab-set model already
-// has room for both — it is not a fixed list of document tabs only.
+// logic (`countProjectTodos`, exported below) is Task 25's job, and the
+// richer content of `manual_test_checklist.md`'s `looseSections` block
+// (`renderChecklistPanel`, exported below) is Task 26's — both done in this
+// file. This file's tab-set model already has room for both — it is not a
+// fixed list of document tabs only.
 
 // Same storage key `public/launcher.js` writes on level 1 (tech spec §2.1:
 // "role switch on the launcher stores its choice in localStorage (`pf.role`),
@@ -165,6 +166,206 @@ export function countProjectTodos(inboxResponse, projectName) {
   return countOf(manualTests) + countOf(humanTasks);
 }
 
+// The checklist document's own tab id (`tabIdFor("manual_test_checklist.md")`
+// — ".md" stripped, same rule every tab id follows). This is the one doc tab
+// `renderDocPanel` routes through the structured `GET .../checklist` fetch
+// and `renderChecklistPanel` below, instead of the generic raw-markdown path
+// every other doc tab uses (specs.md §2.4).
+//
+// This one name IS written down as a literal — the single, explicit
+// carve-out specs.md §2.4 asks for, not a violation of the "no hardcoded
+// document list" rule above `buildTabSet` states: that rule is about never
+// writing down the *set* of documents a role shows (still true — the tab
+// set itself always comes from the server), not about a single document
+// this file is allowed to know by name because it renders it differently.
+export const CHECKLIST_DOC_ID = "manual_test_checklist";
+
+// Minimal HTML escaping — this module's own copy rather than
+// `window.PFMarkdown.escapeHtml` (`lib/markdown.js`, loaded as a classic
+// script in the browser, tech spec §2.3): `renderChecklistPanel` below is a
+// *pure* function (test_plan.md TC-030's Preconditions — no DOM, no
+// `window`), and under `node --test`'s dynamic `import()` of this file
+// there is no `window` at all, so a dependency on `window.PFMarkdown` here
+// would make the function untestable rather than merely undesirable.
+function escapeHtml(value) {
+  return String(value)
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
+}
+
+// Prerequisites / Test Data, as a read-only `<ul>` under a small label — the
+// same shape both blocks take in the source markdown (a label line plus
+// bullets), reused for either.
+function renderBulletBlockHtml(label, items) {
+  if (!items || !items.length) return "";
+  const itemsHtml = items.map((item) => `<li class="loose-item">${escapeHtml(item)}</li>`).join("");
+  return `<div class="doc-description"><strong>${escapeHtml(label)}:</strong><ul class="loose-items">${itemsHtml}</ul></div>`;
+}
+
+// `tc.dataStatus`/`tc.requiredData` (`lib/checklist.js`): "declared" (a real
+// list), "none" (explicitly marked as not needed) or "unknown" (the label is
+// absent or empty — silence, not a claim of "not needed"). Rendering all
+// three distinctly matters here for the same reason it matters to
+// `prepareActionState` server-side — "unknown" and "none" are not the same
+// fact, and collapsing them would misinform the reader.
+function renderTestDataHtml(tc) {
+  if (tc.dataStatus === "declared") return renderBulletBlockHtml("Test Data", tc.requiredData);
+  if (tc.dataStatus === "none") return `<p class="doc-description"><strong>Test Data:</strong> none</p>`;
+  return "";
+}
+
+// One TC's own body as a `.panel` block — the same panel convention every
+// other document uses (implementation_plan.md Task 20's `.panel`/
+// `.panel-table`). Read-only (Non-Goals: no manual editing of pipeline
+// documents through this UI) but otherwise carries the same information the
+// generic raw-markdown render this tab used before this task would have
+// shown — prerequisites, declared test data, parse warnings, notes — not
+// only the steps table, so switching to the structured render (needed for
+// `.loose-sections` below to have a real "after the last TC `.panel`" to
+// come after, TC-030 step 2) does not narrow what the reader can see.
+function renderTcPanelHtml(tc) {
+  const steps = Array.isArray(tc.steps) ? tc.steps : [];
+  const stepsRows = steps
+    .map(
+      (step) =>
+        `<tr><td>${escapeHtml(step.step)}</td><td>${escapeHtml(step.action)}</td>` +
+        `<td>${escapeHtml(step.expected)}</td>` +
+        `<td>${step.checked ? "☑" : "☐"} ${escapeHtml(step.note || "")}</td></tr>`
+    )
+    .join("");
+  const stepsTable = steps.length
+    ? `<table class="panel-table"><thead><tr><th>Step</th><th>Action</th><th>Expected</th><th>Result</th></tr></thead>` +
+      `<tbody>${stepsRows}</tbody></table>`
+    : "";
+  const prerequisites = renderBulletBlockHtml("Prerequisites", tc.prerequisites);
+  const testData = renderTestDataHtml(tc);
+  const notes = tc.notesText ? `<p class="doc-description"><strong>Notes:</strong> ${escapeHtml(tc.notesText)}</p>` : "";
+  const warnings =
+    Array.isArray(tc.parseWarnings) && tc.parseWarnings.length
+      ? `<p class="notice warn">${escapeHtml(tc.parseWarnings.join("; "))}</p>`
+      : "";
+  return (
+    `<div class="panel" data-tc-id="${escapeHtml(tc.id)}">` +
+    `<h2 class="panel-header">${escapeHtml(tc.id)}: ${escapeHtml(tc.name || "")}</h2>` +
+    `${prerequisites}${testData}${stepsTable}${notes}${warnings}</div>`
+  );
+}
+
+// The checklist's own header metadata (`parsed.meta` — `lib/checklist.js`,
+// everything before the first TC heading, e.g. "Feature Name"/"Issue ID"/
+// "Date"): whatever labels the document actually declares, never a
+// hardcoded list of expected keys, mirroring `buildTabSet`'s own rule of
+// never writing down a document's structure as a constant in this file.
+function renderChecklistMetaHtml(meta) {
+  if (!meta || typeof meta !== "object") return "";
+  const entries = Object.entries(meta);
+  if (!entries.length) return "";
+  const rows = entries
+    .map(([key, value]) => `<p class="doc-description"><strong>${escapeHtml(key)}:</strong> ${escapeHtml(value)}</p>`)
+    .join("");
+  return `<div class="checklist-meta">${rows}</div>`;
+}
+
+// Groups a (already lineIndex-sorted) list of loose-section items by
+// `afterTc`, preserving the order each distinct `afterTc` first appears in
+// (which is file order, since the input is sorted). Used twice by
+// `renderLooseSectionsHtml` below: once for items that name a TC actually
+// rendered above, once for orphans (specs.md §2.4's defensive case) — kept
+// as two separate group lists rather than one, in different groups, so the
+// caller can render all "real" groups before all orphan groups.
+function groupByAfterTc(items) {
+  const groups = [];
+  const indexOf = new Map();
+  for (const item of items) {
+    if (!indexOf.has(item.afterTc)) {
+      indexOf.set(item.afterTc, groups.length);
+      groups.push({ afterTc: item.afterTc, items: [] });
+    }
+    groups[indexOf.get(item.afterTc)].items.push(item);
+  }
+  return groups;
+}
+
+// `parsed.looseSections` (`lib/checklist.js`'s `{ afterTc, lineIndex, text }`)
+// rendered as `.loose-sections` — visually distinct from `.panel` (AC-07b):
+// a dashed border and a `--warn`-tinted background, never `.panel`'s own
+// class, so it never reads as an accented header of a normal TC panel.
+// Grouped by `afterTc`, each group's items in ascending `lineIndex` order
+// (file order); an item whose `afterTc` matches no rendered TC still
+// renders, in its own group appended after every real group — never
+// dropped (`lib/checklist.js`'s own "don't let it vanish silently"
+// principle, carried into the UI per specs.md §2.4). Each `text` line is
+// escaped but not markdown-parsed — read-only, like the rest of `.doc-panel`.
+function renderLooseSectionsHtml(looseSections, tcs) {
+  if (!Array.isArray(looseSections) || !looseSections.length) return "";
+
+  const knownIds = new Set((tcs || []).map((tc) => tc.id));
+  const sorted = [...looseSections].sort((a, b) => (a.lineIndex ?? 0) - (b.lineIndex ?? 0));
+  const known = sorted.filter((item) => knownIds.has(item.afterTc));
+  const orphan = sorted.filter((item) => !knownIds.has(item.afterTc));
+
+  const groups = [
+    ...groupByAfterTc(known),
+    ...groupByAfterTc(orphan).map((group) => ({ ...group, orphan: true })),
+  ];
+
+  const groupsHtml = groups
+    .map((group) => {
+      const heading = group.orphan
+        ? `Не найдено соответствие TC (${escapeHtml(group.afterTc)})`
+        : `После ${escapeHtml(group.afterTc)}`;
+      const itemsHtml = group.items.map((item) => `<li class="loose-item">${escapeHtml(item.text)}</li>`).join("");
+      return (
+        `<div class="loose-group"${group.orphan ? ' data-orphan="true"' : ""}>` +
+        `<p class="loose-group-heading">${heading}</p>` +
+        `<ul class="loose-items">${itemsHtml}</ul></div>`
+      );
+    })
+    .join("");
+
+  return (
+    `<div class="loose-sections">` +
+    `<h2 class="loose-sections-title">Дополнительные заметки</h2>` +
+    `<p class="loose-sections-caption">нераспознанный текст между блоками чек-листа — не тест-кейс</p>` +
+    `${groupsHtml}</div>`
+  );
+}
+
+/**
+ * The full render of `manual_test_checklist.md` inside the Tester role's
+ * `.doc-panel` (specs.md §2.4, test_plan.md TC-030): every TC as a
+ * `.panel` block, then — after the last one, never inside any TC block —
+ * `.loose-sections` ("Дополнительные заметки") built from
+ * `parsedChecklist.looseSections`, the field `GET .../issues/:id/checklist`
+ * (`parseChecklist()`, `lib/checklist.js`) already returns today but this
+ * screen previously never read.
+ *
+ * Pure by contract (TC-030's Preconditions): returns an HTML **string**
+ * (or, for a falsy/malformed input, still a string) and only that — never
+ * DOM nodes. Under `node --test` in this zero-dependency project there is
+ * no `document.createElement`/DOM API at all, so a contract requiring built
+ * nodes would be untestable here in principle; order within the returned
+ * string is asserted by substring index of occurrence, not via DOM.
+ *
+ * @param {{meta?: Record<string, string>,
+ *   tcs?: Array<{id: string, name?: string, prerequisites?: string[], requiredData?: string[],
+ *     dataStatus?: string, steps?: Array, notesText?: string, parseWarnings?: string[]}>,
+ *   looseSections?: Array<{afterTc: string, lineIndex: number, text: string}>}|null} parsedChecklist
+ *   A `GET .../issues/:id/checklist` response.
+ * @returns {string}
+ */
+export function renderChecklistPanel(parsedChecklist) {
+  const tcs = Array.isArray(parsedChecklist && parsedChecklist.tcs) ? parsedChecklist.tcs : [];
+  const looseSections = Array.isArray(parsedChecklist && parsedChecklist.looseSections) ? parsedChecklist.looseSections : [];
+  const metaHtml = renderChecklistMetaHtml(parsedChecklist && parsedChecklist.meta);
+  const tcPanelsHtml = tcs.map(renderTcPanelHtml).join("");
+  const looseSectionsHtml = renderLooseSectionsHtml(looseSections, tcs);
+  return metaHtml + tcPanelsHtml + looseSectionsHtml;
+}
+
 // ---------------------------------------------------------------------------
 // localStorage helpers — best effort, mirroring the pattern this issue's
 // other new screens already use: storage unavailable or full just means a
@@ -229,6 +430,13 @@ function projectBase(project) {
 
 function issueBase(project, issueId) {
   return `${projectBase(project)}/issues/${encodeURIComponent(issueId)}`;
+}
+
+// `GET .../issues/:id/checklist` — the structured `parseChecklist()` result
+// (`server.js`), including `looseSections`, fed to `renderChecklistPanel`
+// for the `manual_test_checklist` tab specifically (specs.md §2.4).
+function checklistEndpointFor(project, issueId) {
+  return `${issueBase(project, issueId)}/checklist`;
 }
 
 async function fetchRoles(fetchImpl) {
@@ -380,6 +588,31 @@ function renderDocPanel(tab, runtime) {
   if (item.description) panel.appendChild(h("p", "doc-description", item.description));
   if (item.message) panel.appendChild(h("p", "notice", item.message));
 
+  // manual_test_checklist.md gets the structured render (`renderChecklistPanel`
+  // above), not the generic raw-markdown path below: `GET .../checklist`
+  // instead of `item.endpoint`, so `looseSections` — a field that endpoint
+  // already returns but this screen never read before this task — actually
+  // reaches the reader (specs.md §2.4).
+  if (tab.id === CHECKLIST_DOC_ID && item.status === "present" && runtime.checklistEndpoint) {
+    const body = h("div", "checklist-body");
+    body.appendChild(h("p", "muted", "Загрузка…"));
+    panel.appendChild(body);
+
+    const endpoint = runtime.checklistEndpoint;
+    runtime
+      .fetchDoc(endpoint)
+      .then((data) => {
+        if (runtime.getActiveEndpoint() !== endpoint) return; // reader moved on while it loaded
+        body.innerHTML = renderChecklistPanel(data);
+      })
+      .catch((err) => {
+        if (runtime.getActiveEndpoint() !== endpoint) return;
+        body.innerHTML = "";
+        body.appendChild(h("p", "notice error", err.message));
+      });
+    return panel;
+  }
+
   const readableKind = item.kind === "issue_doc" || item.kind === "project_doc";
   if (readableKind && item.status === "present" && item.endpoint) {
     const body = h("div", "md-body");
@@ -480,7 +713,12 @@ export function mount(container, options = {}) {
   }
   function activeEndpoint() {
     const tab = state.tabs.find((t) => t.id === state.activeTabId);
-    return tab && tab.item ? tab.item.endpoint : null;
+    if (!tab || !tab.item) return null;
+    // manual_test_checklist's "endpoint" is the structured checklist route,
+    // not `item.endpoint` (the raw-markdown fetch every other doc tab uses)
+    // — see the checklist branch in `renderDocPanel`.
+    if (tab.id === CHECKLIST_DOC_ID) return checklistEndpointFor(state.project, state.issueId);
+    return tab.item.endpoint;
   }
 
   // `/api/inbox` has exactly one call site in this whole module: this
@@ -535,7 +773,9 @@ export function mount(container, options = {}) {
 
     const activeTab = state.tabs.find((t) => t.id === state.activeTabId) || null;
     if (activeTab) {
-      root.appendChild(renderDocPanel(activeTab, { fetchDoc, getActiveEndpoint: activeEndpoint }));
+      const checklistEndpoint =
+        activeTab.id === CHECKLIST_DOC_ID ? checklistEndpointFor(state.project, state.issueId) : null;
+      root.appendChild(renderDocPanel(activeTab, { fetchDoc, getActiveEndpoint: activeEndpoint, checklistEndpoint }));
     } else {
       root.appendChild(h("p", "muted", state.project ? "Загрузка…" : "Проект не выбран."));
     }
