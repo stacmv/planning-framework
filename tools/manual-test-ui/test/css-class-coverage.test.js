@@ -31,7 +31,7 @@ const CSS_PATH = path.join(PUBLIC_DIR, 'style.css');
 // text would let a mention in prose falsely satisfy the coverage check.
 const cssText = fs.readFileSync(CSS_PATH, 'utf8').replace(/\/\*[\s\S]*?\*\//g, ' ');
 
-const SOURCE_FILES = ['launcher.js', 'inbox.js', 'workspace.js'];
+const SOURCE_FILES = ['launcher.js', 'inbox.js', 'workspace.js', 'project-inbox.js', 'project-picker.js'];
 
 // Matches `h("tag", <arg2>` — `<arg2>` is a single-quoted, double-quoted or
 // backtick-quoted string, possibly containing `${...}` interpolation.

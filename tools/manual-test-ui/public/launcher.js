@@ -10,18 +10,32 @@
 // TC-019/TC-004 document for this file).
 //
 // One module, three blocks, per specs.md's wireframe:
-//   .role-switch  — role picker, persisted to localStorage under `pf.role`,
-//                   read by level 2 as its default (AC-01a: "role is picked
-//                   right here").
+//   .role-switch  — now a **multi-select filter** (dogfooding round 2), not
+//                   a single-role picker: 0, 1, or several roles at once.
+//                   Empty selection = unfiltered (show everything) — the
+//                   default on first visit too, replacing "auto-pick the
+//                   first role". Persisted to localStorage under `pf.role`
+//                   as a JSON array (`'["tester","developer"]'`), read by
+//                   level 2 as its own default.
 //   .inbox-card   — the single global inbox entry point (AC-04d), click ->
 //                   `#/inbox`.
-//   .project-grid — project cards from the existing `GET /api/projects`
-//                   (response shape unchanged — specs.md §2.1).
+//   .project-grid — now three labeled sections (dogfooding round 2,
+//                   replacing the bare "N требует внимания", which was
+//                   both wrong — see attention.js's own history — and
+//                   uninformative even when correct): "Есть открытые
+//                   issue" (lists them, with stage + link — not a count),
+//                   "Есть проблемы с документами" (names the specific
+//                   problem), "Не требующие внимания" (name only).
+//                   Priority order, first match wins per project
+//                   (`status.js`'s `projectCategory`).
 //
 // Two pure functions are exported separately from DOM rendering, mirroring
 // the split `public/inbox.js` already uses for its view-model builders:
 //   resolveLandingRoute()   — TC-004, gives <=2 clicks project -> document.
 //   formatInboxCardLabel()  — TC-019, the `.inbox-card` label text.
+
+import { renderProjectSections } from "./project-picker.js";
+import { totalAttentionForRoles } from "./attention.js";
 
 export const ROLE_STORAGE_KEY = "pf.role";
 
@@ -68,7 +82,7 @@ export function formatInboxCardLabel(totalCount) {
 
 // ---------------------------------------------------------------------------
 // localStorage helpers — best-effort, mirroring app.js's existing pattern
-// (storage unavailable or full just means navigation/role choice doesn't
+// (storage unavailable or full just means the filter/navigation doesn't
 // persist, it still works for the current visit).
 // ---------------------------------------------------------------------------
 
@@ -81,23 +95,37 @@ function safeStorage(storage) {
   }
 }
 
-export function readStoredRole(storage) {
+/**
+ * The multi-select role filter's persisted selection — a JSON array of
+ * role ids (`'["tester","developer"]'`), replacing the single-string
+ * format the single-select switcher used. Malformed/legacy-format content
+ * (e.g. a leftover bare `"tester"` string from before this change) parses
+ * to `[]` rather than throwing — the same safe "falls back to unfiltered"
+ * behavior a missing key already had.
+ *
+ * @param {Storage} [storage]
+ * @returns {string[]}
+ */
+export function readStoredRoles(storage) {
   const store = safeStorage(storage);
-  if (!store) return null;
+  if (!store) return [];
   try {
-    return store.getItem(ROLE_STORAGE_KEY);
+    const raw = store.getItem(ROLE_STORAGE_KEY);
+    if (!raw) return [];
+    const parsed = JSON.parse(raw);
+    return Array.isArray(parsed) ? parsed.filter((r) => typeof r === "string") : [];
   } catch {
-    return null;
+    return [];
   }
 }
 
-export function storeRole(roleId, storage) {
+export function storeRoles(roleIds, storage) {
   const store = safeStorage(storage);
   if (!store) return;
   try {
-    store.setItem(ROLE_STORAGE_KEY, roleId);
+    store.setItem(ROLE_STORAGE_KEY, JSON.stringify(Array.isArray(roleIds) ? roleIds : []));
   } catch {
-    /* storage unavailable or full — role choice just won't persist */
+    /* storage unavailable or full — selection just won't persist */
   }
 }
 
@@ -143,12 +171,17 @@ async function fetchProjects(fetchImpl) {
   return Array.isArray(data) ? data : [];
 }
 
-async function fetchInboxTotal(fetchImpl) {
+async function fetchInbox(fetchImpl) {
   const data = await fetchJson("/api/inbox", fetchImpl);
-  if (typeof data.totalCount === "number") return data.totalCount;
-  const manualTests = Array.isArray(data.manualTests) ? data.manualTests.length : 0;
-  const humanTasks = Array.isArray(data.humanTasks) ? data.humanTasks.length : 0;
-  return manualTests + humanTasks;
+  const manualTests = Array.isArray(data.manualTests) ? data.manualTests : [];
+  const humanTasks = Array.isArray(data.humanTasks) ? data.humanTasks : [];
+  const totalCount = typeof data.totalCount === "number" ? data.totalCount : manualTests.length + humanTasks.length;
+  return { manualTests, humanTasks, totalCount };
+}
+
+async function fetchProjectIssues(projectName, fetchImpl) {
+  const data = await fetchJson(`/api/projects/${encodeURIComponent(projectName)}/issues`, fetchImpl);
+  return Array.isArray(data.issues) ? data.issues : [];
 }
 
 // ---------------------------------------------------------------------------
@@ -162,16 +195,18 @@ function h(tag, className, text) {
   return node;
 }
 
-function renderRoleSwitch(state, onSelectRole) {
+function renderRoleSwitch(state, onToggleRole) {
   const wrap = h("div", "role-switch");
+  wrap.setAttribute("role", "group");
+  wrap.setAttribute("aria-label", "Фильтр по роли");
   for (const role of state.roles) {
-    const active = role.id === state.roleId;
+    const active = state.roleIds.includes(role.id);
     const btn = h("button", `role-btn${active ? " active" : ""}`, role.title);
     btn.type = "button";
     btn.dataset.roleId = role.id;
     btn.title = role.description || "";
     btn.setAttribute("aria-pressed", String(active));
-    btn.addEventListener("click", () => onSelectRole(role.id));
+    btn.addEventListener("click", () => onToggleRole(role.id));
     wrap.appendChild(btn);
   }
   return wrap;
@@ -180,8 +215,11 @@ function renderRoleSwitch(state, onSelectRole) {
 function renderInboxCard(state, onOpenInbox) {
   const card = h("a", "inbox-card");
   card.href = "#/inbox";
-  const count = state.inboxTotal === null ? null : state.inboxTotal;
-  card.appendChild(h("span", "inbox-card-label", formatInboxCardLabel(count === null ? 0 : count)));
+  // Role-filtered, same as the project sections (dogfooding fix: this
+  // count used to ignore the filter entirely, always showing the raw
+  // unfiltered total).
+  const count = state.inbox ? totalAttentionForRoles(state.inbox, state.roleIds) : 0;
+  card.appendChild(h("span", "inbox-card-label", formatInboxCardLabel(count)));
   card.addEventListener("click", (event) => {
     event.preventDefault();
     onOpenInbox();
@@ -189,27 +227,15 @@ function renderInboxCard(state, onOpenInbox) {
   return card;
 }
 
-function renderProjectGrid(state, onOpenProject) {
-  const grid = h("div", "project-grid");
-  if (!state.projects || state.projects.length === 0) {
-    grid.appendChild(h("p", "muted", state.projects === null ? "Загрузка…" : "Нет настроенных проектов."));
-    return grid;
-  }
-  for (const project of state.projects) {
-    const card = h("a", "project-card");
-    const route = resolveLandingRoute(project.name, state.lastIssueByProject);
-    card.href = route;
-    card.dataset.project = project.name;
-    card.appendChild(h("div", "project-card-name", project.name));
-    card.appendChild(h("div", "project-card-meta", `${project.issueCount} issue`));
-    if (project.currentBranch) card.title = `checked out: ${project.currentBranch}`;
-    card.addEventListener("click", (event) => {
-      event.preventDefault();
-      onOpenProject(project.name);
-    });
-    grid.appendChild(card);
-  }
-  return grid;
+function renderLauncherProjectSections(state, onOpenProject) {
+  return renderProjectSections({
+    projects: state.projects,
+    projectIssuesByName: state.projectIssues,
+    roleIds: state.roleIds,
+    inbox: state.inbox,
+    hrefFor: (name) => resolveLandingRoute(name, state.lastIssueByProject),
+    onOpenProject,
+  });
 }
 
 /**
@@ -218,16 +244,17 @@ function renderProjectGrid(state, onOpenProject) {
  *
  * @param {Element} container
  * @param {{fetchImpl?: typeof fetch, storage?: Storage,
- *   onNavigate?: (hash: string) => void, initialRole?: string}} [options]
+ *   onNavigate?: (hash: string) => void, initialRoles?: string[]}} [options]
  * @returns {{refresh: () => Promise<void>, getState: () => object, ready: Promise<void>}}
  */
 export function mount(container, options = {}) {
   const state = {
     roles: [],
-    roleId: options.initialRole || readStoredRole(options.storage) || null,
+    roleIds: Array.isArray(options.initialRoles) ? options.initialRoles : readStoredRoles(options.storage),
     projects: null,
+    projectIssues: {},
     lastIssueByProject: {},
-    inboxTotal: null,
+    inbox: null,
     error: null,
   };
 
@@ -239,10 +266,9 @@ export function mount(container, options = {}) {
     if (typeof location !== "undefined") location.hash = hash;
   }
 
-  function selectRole(roleId) {
-    if (state.roleId === roleId) return;
-    state.roleId = roleId;
-    storeRole(roleId, options.storage);
+  function toggleRole(roleId) {
+    state.roleIds = state.roleIds.includes(roleId) ? state.roleIds.filter((r) => r !== roleId) : [...state.roleIds, roleId];
+    storeRoles(state.roleIds, options.storage);
     render();
   }
 
@@ -256,6 +282,7 @@ export function mount(container, options = {}) {
 
   function render() {
     container.innerHTML = "";
+    if (typeof document !== "undefined") document.title = "Project Explorer";
 
     if (state.error) {
       container.appendChild(h("p", "notice error", `Не удалось загрузить лаунчер: ${state.error.message}`));
@@ -263,35 +290,52 @@ export function mount(container, options = {}) {
     }
 
     const root = h("div", "launcher");
-    root.appendChild(renderRoleSwitch(state, selectRole));
+    root.appendChild(renderRoleSwitch(state, toggleRole));
     root.appendChild(renderInboxCard(state, openInbox));
-    root.appendChild(renderProjectGrid(state, openProject));
+    root.appendChild(renderLauncherProjectSections(state, openProject));
     container.appendChild(root);
+  }
+
+  async function loadProjectIssues(projectNames) {
+    const results = await Promise.all(
+      projectNames.map((name) =>
+        fetchProjectIssues(name, options.fetchImpl)
+          .then((issues) => ({ name, issues }))
+          .catch(() => ({ name, issues: [] }))
+      )
+    );
+    for (const { name, issues } of results) state.projectIssues[name] = issues;
+    render();
   }
 
   async function refresh() {
     state.error = null;
     try {
-      const [roles, projects, inboxTotal] = await Promise.all([
+      const [roles, projects, inbox] = await Promise.all([
         fetchRoles(options.fetchImpl),
         fetchProjects(options.fetchImpl),
-        fetchInboxTotal(options.fetchImpl),
+        fetchInbox(options.fetchImpl),
       ]);
       state.roles = roles;
-      if (!state.roleId && roles.length) state.roleId = roles[0].id;
       state.projects = projects;
       state.lastIssueByProject = readLastIssueByProject(
         projects.map((p) => p.name),
         options.storage
       );
-      state.inboxTotal = inboxTotal;
+      state.inbox = inbox;
+      render();
+      // Fanned out after the initial render so the page paints project
+      // cards immediately (as "loading") rather than blocking on N extra
+      // requests, one per configured project.
+      await loadProjectIssues(projects.map((p) => p.name));
+      return;
     } catch (err) {
       state.error = err;
     }
     render();
   }
 
-  render(); // paint immediately (role switch may already have a stored role)
+  render(); // paint immediately (role filter may already be stored)
   const ready = refresh();
 
   return {

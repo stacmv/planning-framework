@@ -10,33 +10,45 @@
 // dynamic `import()` (the pattern test_plan.md TC-003 documents for this
 // exact file).
 //
-// Scope of this task (test_plan.md TC-002/TC-003):
+// Scope of this task (test_plan.md TC-002/TC-003), as revised by dogfooding
+// round 2 (role became a multi-select filter everywhere, superseding
+// AC-01b's original single `[Роль ▾]` dropdown — brd.md/specs.md/
+// test_plan.md were updated to match this file, not the other way around):
 //   * `.workspace-header` — "← Проекты" back link (level 1), an `[Issue ▾]`
 //     dropdown of the current project's issues (replaces the old
-//     `#issue-list` sidebar list), and a `[Роль ▾]` dropdown — the same role
-//     switcher level 1 has. There is no persistent `.sidebar` container at
-//     all (AC-01b) — everything here lives in one header row.
-//   * `.doc-tabs` — built from the current role's own `GET .../roles/:role`
-//     response (`buildRoleContents`, server.js) for the *current* role only.
-//     No document name is ever written down in this file as a literal list
-//     — the tab set is always whatever the server just answered, plus one
-//     client-added "Дела" tab (see below). `lib/roles.js` needs no changes:
-//     the data source is unchanged, only the visual container is (tabs
-//     instead of three sidebar lists).
+//     `#issue-list` sidebar list), and a `.role-switch` multi-select filter
+//     — the same component every other screen in this tool uses. There is
+//     no persistent `.sidebar` container at all (AC-01b) — everything here
+//     lives in one header row.
+//   * `.doc-tabs` — built from the UNION of every selected role's own
+//     `GET .../roles/:role` response (`buildRoleContents`, server.js),
+//     deduped by tab id. Empty selection = union of every role's items —
+//     the same "empty = everything" rule the filter uses on every other
+//     screen. No document name is ever written down in this file as a
+//     literal list — the tab set is always whatever the server just
+//     answered, plus one client-added "Дела" tab (see below). `lib/roles.js`
+//     needs no changes: the data source is unchanged, only how many of its
+//     responses get merged into one tab set.
 //   * `resolveActiveTab(prevTabId, docsOfNewIssue)` — the pure function that
-//     keeps the active document tab when `[Issue ▾]` changes, even into a
-//     `missing` document (fixes a P0 `/pf-check` finding: switching issue
-//     must never silently switch documents). This rule is scoped to one
-//     role — switching `[Роль ▾]` always takes a fresh tab set instead, and
-//     never goes through this function.
+//     keeps the active document tab when `[Issue ▾]` changes (or a role is
+//     toggled), even into a `missing` document (fixes a P0 `/pf-check`
+//     finding: switching issue must never silently switch documents).
+//     `selectRole(roleId)` — the "view exactly this one role" convenience
+//     method (still used by the "Дела" tab's manual-tests click-through) —
+//     is the one case that still takes a wholly fresh tab set instead, since
+//     it deliberately replaces the whole selection rather than toggling one
+//     role within it.
 //
 // "Дела" (human tasks) is a new tab in every role's tab set, present from
 // Task 24 onward so later tasks have somewhere to attach to: its counter
-// logic (`countProjectTodos`, exported below) is Task 25's job, and the
-// richer content of `manual_test_checklist.md`'s `looseSections` block
-// (`renderChecklistPanel`, exported below) is Task 26's — both done in this
-// file. This file's tab-set model already has room for both — it is not a
-// fixed list of document tabs only.
+// logic (`countIssueTodos`, exported below) is Task 25's job (revised in
+// round 2 from project-wide to issue-scoped — see that function's own
+// comment), and the richer content of `manual_test_checklist.md`'s
+// `looseSections` block (`renderChecklistPanel`, exported below) is Task
+// 26's — both done in this file. This file's tab-set model already has room
+// for both — it is not a fixed list of document tabs only.
+
+import { renderManualTestsSection } from "./inbox.js";
 
 // Same storage key `public/launcher.js` writes on level 1 (tech spec §2.1:
 // "role switch on the launcher stores its choice in localStorage (`pf.role`),
@@ -76,30 +88,43 @@ function tabIdFor(item) {
 }
 
 /**
- * The full `.doc-tabs` tab set for one role's contents: one tab per entry of
- * `roleContents.items` (in the order the server sent them), plus exactly one
- * client-added "Дела" tab at the end. Never reads a document name from a
- * constant in this file — every doc tab's id/label/state comes straight from
- * `roleContents.items` (test_plan.md TC-002 step 4).
+ * The full `.doc-tabs` tab set for one OR SEVERAL roles' contents (dogfooding
+ * round 2: role became a multi-select filter — `.doc-tabs` now shows the
+ * UNION of every selected role's own documents, deduped by tab id, instead
+ * of one role's fixed set). One tab per distinct item across every response
+ * given (first occurrence wins the id, in the order responses/items were
+ * given), plus exactly one client-added "Дела" tab at the end. Never reads a
+ * document name from a constant in this file — every doc tab's id/label/
+ * state comes straight from the response(s) (test_plan.md TC-002 step 4).
  *
- * @param {{items?: Array<{id: string, name?: string, label?: string}>}|null} roleContents
- *   A `GET .../issues/:id/roles/:role` response (`buildRoleContents`), or
- *   anything shaped like one.
+ * Accepts a single `GET .../issues/:id/roles/:role` response (the original,
+ * single-role shape — every existing pure-function test call keeps working
+ * unchanged) OR an array of them (the union case `mount()` now uses,
+ * fetching one response per selected role, or every role when none is
+ * selected — same "empty = everything" rule the multi-select filter uses
+ * everywhere else).
+ *
+ * @param {object|Array<object>|null} roleContentsOrList
+ *   A `GET .../issues/:id/roles/:role` response (`buildRoleContents`), an
+ *   array of them, or anything shaped like one/either.
  * @returns {Array<{id: string, kind: "doc"|"human-tasks", label: string, item: object|null}>}
  */
-export function buildTabSet(roleContents) {
-  const items = roleContents && Array.isArray(roleContents.items) ? roleContents.items : [];
-  const tabs = items.map((item) => ({
-    id: tabIdFor(item),
-    kind: "doc",
-    label: tabIdFor(item),
-    item,
-  }));
+export function buildTabSet(roleContentsOrList) {
+  const list = Array.isArray(roleContentsOrList) ? roleContentsOrList : [roleContentsOrList];
+  const seen = new Map();
+  for (const roleContents of list) {
+    const items = roleContents && Array.isArray(roleContents.items) ? roleContents.items : [];
+    for (const item of items) {
+      const id = tabIdFor(item);
+      if (!seen.has(id)) seen.set(id, { id, kind: "doc", label: id, item });
+    }
+  }
+  const tabs = [...seen.values()];
   tabs.push({
     id: HUMAN_TASKS_TAB_ID,
     kind: "human-tasks",
     // Counter suffix (tech spec §2.2's "Дела ③") is Task 25's job
-    // (`countProjectTodos`) — this task only reserves the tab itself.
+    // (`countIssueTodos`) — this task only reserves the tab itself.
     label: "Дела",
     item: null,
   });
@@ -117,14 +142,19 @@ export function buildTabSet(roleContents) {
  * `lib/roles.js` partitions items by role, not by issue) does this fall back
  * to the first tab — never to nothing.
  *
- * Switching `[Роль ▾]` does **not** go through this function at all: a role
- * switch takes a wholly fresh tab set (`buildTabSet` of the new role's own
- * response), because a role's tab set is a different set of documents by
- * construction, not a continuation of the previous one.
+ * A role TOGGLE (dogfooding round 2's multi-select filter) also goes
+ * through this function, same as an issue switch: adding/removing one role
+ * from the selection only changes which documents are in the union, so
+ * keeping the active tab when it's still present is the right default —
+ * unlike `selectRole(roleId)`, the "view exactly this one role" convenience
+ * method, which still takes a wholly fresh tab set (a full replacement of
+ * the selection, not a toggle), because that IS a different set of
+ * documents by construction, not a continuation of the previous one.
  *
- * @param {string|null} prevTabId — the tab id that was active before the issue changed.
- * @param {object|null} docsOfNewIssue — the new issue's `GET .../roles/:role`
- *   response, for the *same* role the reader was already on.
+ * @param {string|null} prevTabId — the tab id that was active before the issue/role selection changed.
+ * @param {object|Array<object>|null} docsOfNewIssue — the new issue's (or
+ *   role selection's) `GET .../roles/:role` response(s) — single or array,
+ *   same shape `buildTabSet` itself accepts.
  * @returns {string|null}
  */
 export function resolveActiveTab(prevTabId, docsOfNewIssue) {
@@ -134,35 +164,40 @@ export function resolveActiveTab(prevTabId, docsOfNewIssue) {
 }
 
 /**
- * The "Дела" tab's counter (specs.md §3.4, US-06, AC-06a/AC-06b, TC-029):
- * the sum of unclosed todos across ALL roles and ALL open issues of one
- * project — never scoped to the currently-selected issue/role. An earlier
- * draft of specs.md §2.2 scoped this to "all roles of *this* issue"; §3.4
- * corrected that to project-wide during `/pf-check`, and this function is
- * that corrected computation.
+ * The "Дела" tab's counter (dogfooding round 2, revising AC-06a/US-06): the
+ * sum of unclosed todos across ALL roles of ONE issue — the currently
+ * selected issue, not the whole project. specs.md §3.4 had previously
+ * corrected an earlier draft's issue-scoped reading back to project-wide
+ * during this issue's own `/pf-check`; round-2 dogfooding revisited that
+ * call (the counter's own rendered content — `loadAndRenderIssueManualTests`
+ * below — was already issue-scoped, so a project-wide number next to
+ * issue-scoped content was the actual inconsistency) and settled on
+ * issue-scoped instead — specs.md §3.4/brd.md AC-06a/test_plan.md TC-029
+ * were updated to match this function, not the other way around.
  *
- * Deliberately takes NO role parameter — that absence is the structural
- * half of AC-06b (TC-029 step 2): a function that cannot see the role
- * cannot make the counter depend on it, so switching `[Роль ▾]` is
- * physically incapable of changing the result. Neither `manualTests[]` nor
- * `humanTasks[]` carries a "role" field at all (a manual TC is always the
- * tester's business by construction; a human task is tied to `stageKey`,
- * not to a viewing role) — filtering by project alone already yields the
- * "across all roles" sum, no separate role-union step needed.
+ * Still takes NO role parameter — that absence remains the structural half
+ * of AC-06b: a function that cannot see the role cannot make the counter
+ * depend on it, so switching the role filter is physically incapable of
+ * changing the result. Neither `manualTests[]` nor `humanTasks[]` carries a
+ * "role" field at all (a manual TC is always the tester's business by
+ * construction; a human task is tied to `stageKey`, not to a viewing role)
+ * — filtering by project+issue alone already yields the "across all roles"
+ * sum, no separate role-union step needed.
  *
- * @param {{manualTests?: Array<{project?: string}>, humanTasks?: Array<{project?: string}>}|null} inboxResponse
+ * @param {{manualTests?: Array<{project?: string, issueId?: string}>, humanTasks?: Array<{project?: string, issueId?: string}>}|null} inboxResponse
  *   A `GET /api/inbox` response (`server.js`, `lib/inbox.js`'s
  *   `collectManualTests`/`collectHumanTasks`) — the same one
  *   `public/inbox.js`'s global inbox screen fetches, reused here rather
  *   than refetched (see `fetchInbox`/`mount()` below).
  * @param {string} projectName
+ * @param {string} issueId
  * @returns {number}
  */
-export function countProjectTodos(inboxResponse, projectName) {
-  if (!inboxResponse || !projectName) return 0;
+export function countIssueTodos(inboxResponse, projectName, issueId) {
+  if (!inboxResponse || !projectName || !issueId) return 0;
   const manualTests = Array.isArray(inboxResponse.manualTests) ? inboxResponse.manualTests : [];
   const humanTasks = Array.isArray(inboxResponse.humanTasks) ? inboxResponse.humanTasks : [];
-  const countOf = (items) => items.filter((item) => item && item.project === projectName).length;
+  const countOf = (items) => items.filter((item) => item && item.project === projectName && item.issueId === issueId).length;
   return countOf(manualTests) + countOf(humanTasks);
 }
 
@@ -431,23 +466,26 @@ function safeStorage(storage) {
   }
 }
 
-export function readStoredRole(storage) {
+export function readStoredRoles(storage) {
   const store = safeStorage(storage);
-  if (!store) return null;
+  if (!store) return [];
   try {
-    return store.getItem(ROLE_STORAGE_KEY);
+    const raw = store.getItem(ROLE_STORAGE_KEY);
+    if (!raw) return [];
+    const parsed = JSON.parse(raw);
+    return Array.isArray(parsed) ? parsed.filter((r) => typeof r === "string") : [];
   } catch {
-    return null;
+    return [];
   }
 }
 
-export function storeRole(roleId, storage) {
+export function storeRoles(roleIds, storage) {
   const store = safeStorage(storage);
   if (!store) return;
   try {
-    store.setItem(ROLE_STORAGE_KEY, roleId);
+    store.setItem(ROLE_STORAGE_KEY, JSON.stringify(Array.isArray(roleIds) ? roleIds : []));
   } catch {
-    /* storage unavailable or full — role choice just won't persist */
+    /* storage unavailable or full — selection just won't persist */
   }
 }
 
@@ -650,16 +688,26 @@ async function fetchIssues(project, fetchImpl) {
 
 // The single call site of `GET .../issues/:id/roles/:role` in this module
 // (test_plan.md TC-002 step 2/3) — every doc tab and its state comes from
-// this one response, for whichever (issue, role) pair is currently selected.
+// these responses, for whichever (issue, role-selection) pair is currently
+// active.
 async function fetchRoleContents(project, issueId, roleId, fetchImpl) {
   return fetchJson(`${issueBase(project, issueId)}/roles/${encodeURIComponent(roleId)}`, fetchImpl);
+}
+
+// Fetches one `GET .../roles/:role` response per selected role, in
+// parallel, for `buildTabSet`'s union (dogfooding round 2). `roleIds` empty
+// = fetch every role the project has (`allRoles`) — same "empty = fetch/
+// show everything" rule the multi-select filter uses everywhere else.
+async function fetchRoleContentsForRoles(project, issueId, roleIds, allRoles, fetchImpl) {
+  const targets = roleIds && roleIds.length ? roleIds : (allRoles || []).map((r) => r.id);
+  return Promise.all(targets.map((roleId) => fetchRoleContents(project, issueId, roleId, fetchImpl)));
 }
 
 // GET /api/inbox — the same project-independent endpoint
 // `public/inbox.js`'s global inbox screen calls (specs.md §3.4). Its own
 // URL carries no project/issue/role — `mount()` below fetches it exactly
 // once per mount (`fetchInboxOnce`) and reuses the response for
-// `countProjectTodos` across every `[Роль ▾]`/`[Issue ▾]` switch (AC-06b,
+// `countIssueTodos` across every role-filter/`[Issue ▾]` switch (AC-06b,
 // TC-029 step 4).
 async function fetchInbox(fetchImpl) {
   return fetchJson("/api/inbox", fetchImpl);
@@ -682,6 +730,24 @@ async function fetchInbox(fetchImpl) {
 // must never be read as "go ahead".
 function defaultConfirm(message) {
   return typeof window !== "undefined" && typeof window.confirm === "function" ? window.confirm(message) : false;
+}
+
+// `[Issue ▾]`'s open/closed distinction (dogfooding feedback: open and
+// closed issues looked identical in the picker). A native `<option>` has
+// almost no styling surface — text and list order are the only two things
+// that reliably render across browsers, so that is what this uses: closed
+// issues sort after every open one (stable within each group — this never
+// reorders two issues on the same side of that split), and a closed
+// issue's label gets a `"closed · "` prefix. No `<optgroup>`: it would add
+// a second visual separator on top of the sort for no real gain here.
+export function sortedIssueOptions(issues) {
+  const list = Array.isArray(issues) ? issues : [];
+  const open = list.filter((i) => i.status !== "closed");
+  const closed = list.filter((i) => i.status === "closed");
+  return [...open, ...closed].map((issue) => ({
+    issueId: issue.issueId,
+    label: issue.status === "closed" ? `closed · ${issue.issueId}` : issue.issueId,
+  }));
 }
 
 function h(tag, className, text) {
@@ -709,11 +775,11 @@ function renderHeader(state, handlers) {
   const issueSelect = document.createElement("select");
   issueSelect.className = "issue-select";
   issueSelect.setAttribute("aria-label", "Issue ▾");
-  for (const issue of state.issues) {
+  for (const option of sortedIssueOptions(state.issues)) {
     const opt = document.createElement("option");
-    opt.value = issue.issueId;
-    opt.textContent = issue.issueId;
-    if (issue.issueId === state.issueId) opt.selected = true;
+    opt.value = option.issueId;
+    opt.textContent = option.label;
+    if (option.issueId === state.issueId) opt.selected = true;
     issueSelect.appendChild(opt);
   }
   issueSelect.disabled = state.issues.length === 0;
@@ -721,40 +787,108 @@ function renderHeader(state, handlers) {
   issueField.appendChild(issueSelect);
   header.appendChild(issueField);
 
-  const roleField = h("label", "workspace-field workspace-field--role");
-  roleField.appendChild(h("span", "field-label", "Роль"));
-  const roleSelect = document.createElement("select");
-  roleSelect.className = "role-select";
-  roleSelect.setAttribute("aria-label", "Роль ▾");
-  for (const role of state.roles) {
-    const opt = document.createElement("option");
-    opt.value = role.id;
-    opt.textContent = role.title;
-    if (role.id === state.roleId) opt.selected = true;
-    roleSelect.appendChild(opt);
-  }
-  roleSelect.disabled = state.roles.length === 0;
-  roleSelect.addEventListener("change", () => handlers.onSelectRole(roleSelect.value));
-  roleField.appendChild(roleSelect);
-  header.appendChild(roleField);
+  header.appendChild(renderRoleSwitch(state, handlers.onToggleRole));
 
   return header;
 }
 
-function renderTabs(state, handlers) {
-  const tabs = h("nav", "doc-tabs");
-  tabs.setAttribute("aria-label", "Документы роли");
-  for (const tab of state.tabs) {
-    const active = tab.id === state.activeTabId;
-    const btn = h("button", `doc-tab${active ? " doc-tab--active" : ""}`, tab.label);
+// Multi-select role filter (dogfooding round 2, replacing the single
+// `[Роль ▾]` dropdown) — own copy of the exact component every other screen
+// in this tool uses, same "same well-known key/markup, not a shared
+// implementation" convention this file's own header comment already
+// explains for `ROLE_STORAGE_KEY`.
+function renderRoleSwitch(state, onToggleRole) {
+  const wrap = h("div", "role-switch");
+  wrap.setAttribute("role", "group");
+  wrap.setAttribute("aria-label", "Фильтр по роли");
+  for (const role of state.roles) {
+    const active = state.roleIds.includes(role.id);
+    const btn = h("button", `role-btn${active ? " active" : ""}`, role.title);
     btn.type = "button";
-    btn.dataset.tabId = tab.id;
-    btn.dataset.tabKind = tab.kind;
+    btn.dataset.roleId = role.id;
+    btn.title = role.description || "";
     btn.setAttribute("aria-pressed", String(active));
-    btn.addEventListener("click", () => handlers.onSelectTab(tab.id));
-    tabs.appendChild(btn);
+    btn.addEventListener("click", () => onToggleRole(role.id));
+    wrap.appendChild(btn);
   }
-  return tabs;
+  return wrap;
+}
+
+// Which group a tab belongs to (mockup Variant A, chosen by the user over
+// a color-tint-only alternative): "Issue" for `kind: "issue_doc"` items —
+// documents that live inside this specific issue — "Проект" for every
+// other doc kind (`project_doc`/`instructions`/`memory`/`action`, all
+// things this project has regardless of which issue is open), and the
+// "Дела" tab (`kind: "human-tasks"`) stands alone, unlabeled, since it is
+// neither — dogfooding feedback: issue vs. project documents used to be
+// one undifferentiated row of pills.
+function tabGroupFor(tab) {
+  if (tab.kind === "human-tasks") return "dela";
+  return tab.item && tab.item.kind === "issue_doc" ? "issue" : "project";
+}
+
+// `n/a` tabs are removed from the row entirely (dogfooding feedback: a tab
+// for a document that does not apply to this issue type looked identical
+// to a real one). `resolveActiveTab`'s stability guarantee is untouched by
+// this — it is a *rendering* filter only, `state.tabs`/`state.activeTabId`
+// still carry the n/a tab underneath, so if it is (or becomes, after an
+// issue switch) the active tab, `renderDocPanel` still renders it — title,
+// "n/a" badge, `item.message` — instead of silently reassigning the
+// active tab to something else. See the comment above `resolveActiveTab`
+// for the P0 this preserves.
+function isHiddenFromRow(tab) {
+  return tab.item && tab.item.status === "not_applicable";
+}
+
+function buildTabButton(tab, state, handlers) {
+  const active = tab.id === state.activeTabId;
+  const missing = tab.item && tab.item.status === "missing";
+  const classes = ["doc-tab", active && "doc-tab--active", missing && "doc-tab--missing"].filter(Boolean).join(" ");
+  const btn = h("button", classes, tab.label);
+  btn.type = "button";
+  btn.dataset.tabId = tab.id;
+  btn.dataset.tabKind = tab.kind;
+  btn.setAttribute("aria-pressed", String(active));
+  btn.addEventListener("click", () => handlers.onSelectTab(tab.id));
+  return btn;
+}
+
+function renderTabs(state, handlers) {
+  const wrap = h("nav", "doc-tabs-groups");
+  wrap.setAttribute("aria-label", "Документы");
+
+  const groups = { issue: [], project: [], dela: [] };
+  for (const tab of state.tabs) {
+    if (isHiddenFromRow(tab)) continue;
+    groups[tabGroupFor(tab)].push(tab);
+  }
+
+  // The "Дела" group originally had no label at all (`null`) — besides
+  // being unclear on its own, `.tab-group` is a column with the label as
+  // its first child, so a labelless group's single row started higher than
+  // its labeled siblings, visibly misaligned (dogfooding feedback). Giving
+  // it "Входящие" fixes both at once.
+  const groupOrder = [
+    ["issue", "Issue"],
+    ["project", "Проект"],
+    ["dela", "Входящие"],
+  ];
+  let firstNonEmpty = true;
+  for (const [key, label] of groupOrder) {
+    const tabsInGroup = groups[key];
+    if (tabsInGroup.length === 0) continue;
+    if (!firstNonEmpty) wrap.appendChild(h("div", "group-divider"));
+    firstNonEmpty = false;
+
+    const group = h("div", "tab-group");
+    if (label) group.appendChild(h("span", "group-label", label));
+    const row = h("div", "doc-tabs");
+    for (const tab of tabsInGroup) row.appendChild(buildTabButton(tab, state, handlers));
+    group.appendChild(row);
+    wrap.appendChild(group);
+  }
+
+  return wrap;
 }
 
 // The short status word next to a doc tab's title, straight from what the
@@ -1412,6 +1546,40 @@ function renderHumanTasksBody(body, tasks, actorNames, runtime, reload) {
   body.appendChild(list);
 }
 
+// The "Дела" tab's manual-tests half — one already-fetched project-wide
+// `GET /api/inbox` response (`runtime.fetchInboxOnce()`, memoized once per
+// mount, same call this tab's own counter already relies on), filtered to
+// this one issue. A click switches to the tester role's own checklist tab
+// — the same tab a click from the global inbox lands on — rather than
+// attempting a scroll-to-ptcId in place: the product-level `PTC-NNNN`
+// format `manualTests[]` carries never matches an issue-local `TC-NNN`
+// (code_review.md CR-015, deferred), so a precise scroll here would be a
+// no-op dressed up as a feature; landing on the right tab is the honest,
+// working part.
+function loadAndRenderIssueManualTests(body, runtime) {
+  if (typeof runtime.fetchInboxOnce !== "function") return;
+
+  runtime
+    .fetchInboxOnce()
+    .then((inboxResponse) => {
+      if (runtime.getActiveEndpoint() !== humanTasksListEndpoint(runtime.project, runtime.issueId)) return;
+      const items = (Array.isArray(inboxResponse && inboxResponse.manualTests) ? inboxResponse.manualTests : []).filter(
+        (item) => item && item.issueId === runtime.issueId && item.project === runtime.project
+      );
+      body.innerHTML = "";
+      body.appendChild(
+        renderManualTestsSection(items, () => {
+          if (typeof runtime.onSelectRole !== "function" || typeof runtime.onSelectTab !== "function") return;
+          Promise.resolve(runtime.onSelectRole("tester")).then(() => runtime.onSelectTab(CHECKLIST_DOC_ID));
+        })
+      );
+    })
+    .catch((err) => {
+      body.innerHTML = "";
+      body.appendChild(h("p", "notice error", err.message));
+    });
+}
+
 // The "Дела" tab's async load + (re)render — the counterpart of the doc-tab
 // `fetchDoc().then(...)` pattern below, but fetching TWO things in parallel
 // (the task list itself, and `agents.yml`'s raw text for the hand-off
@@ -1471,6 +1639,21 @@ function renderDocPanel(tab, runtime) {
 
   if (tab.kind === "human-tasks") {
     panel.appendChild(h("h2", null, tab.label));
+
+    // Manual tests due on *this* issue (dogfooding fix, CR-5a: the "Дела"
+    // counter already sums manualTests+humanTasks project-wide per
+    // specs.md §3.4/AC-06a, but the tab body used to render humanTasks
+    // only — a project with pending manual tests and zero human tasks
+    // showed a nonzero counter next to "Нет задач для этой issue."). Read-
+    // only rows, same convention `public/inbox.js`'s global inbox already
+    // uses for manual tests there — the interactive part (below) is
+    // reserved for human tasks, which alone have a complete/reassign
+    // action.
+    const manualTestsBody = h("div", "manual-tests-body");
+    manualTestsBody.appendChild(h("p", "muted", "Загрузка…"));
+    panel.appendChild(manualTestsBody);
+    loadAndRenderIssueManualTests(manualTestsBody, runtime);
+
     const body = h("div", "human-tasks-body");
     body.appendChild(h("p", "muted", "Загрузка…"));
     panel.appendChild(body);
@@ -1607,12 +1790,13 @@ function maybeScrollToPtcId(container, ptcId) {
  * DOM node — this module never inserts itself into `document.body`, matching
  * every other screen in this tool).
  *
- * `options.roleId` is intentionally not required: `public/app.js`'s router
- * only ever hands this screen `{project, issueId, onNavigate}` plus,
+ * `options.initialRoles` is intentionally not required: `public/app.js`'s
+ * router only ever hands this screen `{project, issueId, onNavigate}` plus,
  * starting with the CR-005 fix (Task 33), the initial-landing extras below —
- * so the initial role comes from `options.initialRole`, then `localStorage`'s
- * `pf.role`, then the first role the server lists — the same fallback chain
- * `public/launcher.js` uses. `options.initialTab`/`options.initialPtcId`
+ * so the initial selection comes from `options.initialRoles`, then
+ * `localStorage`'s `pf.role`, then (if still empty) every role at once —
+ * the same fallback chain `public/launcher.js` uses. `options.initialTab`/
+ * `options.initialPtcId`
  * come from an inbox item's `where` (`public/inbox.js`), forwarded through
  * `app.js`'s hash query string: `initialTab` is applied once the FIRST
  * `buildTabSet()` of this mount resolves (a manual-TC click's `where.doc` or
@@ -1621,10 +1805,10 @@ function maybeScrollToPtcId(container, ptcId) {
  * checklist tab's matching `.panel[data-tc-id]` into view once that tab has
  * actually rendered (`maybeScrollToPtcId` above) — both apply ONLY on this
  * mount's initial landing, never on a later role/issue switch within the
- * same mount (`selectRole`/`selectIssue` never re-consult them).
+ * same mount (`selectRole`/`toggleRole`/`selectIssue` never re-consult them).
  *
  * @param {Element} container
- * @param {{project: string, issueId?: string|null, initialRole?: string,
+ * @param {{project: string, issueId?: string|null, initialRoles?: string[],
  *   initialTab?: string, initialPtcId?: string,
  *   fetchImpl?: typeof fetch, storage?: Storage,
  *   confirmImpl?: (message: string) => boolean,
@@ -1634,6 +1818,7 @@ function maybeScrollToPtcId(container, ptcId) {
  *   when reachable, declining otherwise (see `defaultConfirm` above).
  * @returns {{selectIssue: (issueId: string) => Promise<void>,
  *   selectRole: (roleId: string) => Promise<void>,
+ *   toggleRole: (roleId: string) => Promise<void>,
  *   selectTab: (tabId: string) => void,
  *   refresh: () => Promise<void>, getState: () => object, ready: Promise<void>}}
  */
@@ -1641,20 +1826,22 @@ export function mount(container, options = {}) {
   const state = {
     project: options.project || null,
     issueId: options.issueId || null,
-    roleId: options.initialRole || readStoredRole(options.storage) || null,
+    // Multi-select filter (dogfooding round 2) — empty = union of every
+    // role's documents, same "empty = everything" rule as elsewhere.
+    roleIds: Array.isArray(options.initialRoles) ? options.initialRoles : readStoredRoles(options.storage),
     roles: [],
     issues: [],
     tabs: [],
     activeTabId: null,
     error: null,
-    // The "Дела" tab's project-wide counter (`countProjectTodos`, AC-06a) —
-    // `null` until `/api/inbox` first resolves, then a number for the rest
-    // of this mount's lifetime (a project never changes within one mount).
-    projectTodoCount: null,
+    // The "Дела" tab's issue-scoped counter (`countIssueTodos`, revised
+    // AC-06a) — `null` until `/api/inbox` first resolves, recomputed on
+    // every issue switch (see `selectIssue`/`loadIssueTodoCount` below).
+    issueTodoCount: null,
   };
 
   // CR-005 fix (Task 33) — both one-shot, applied only on this mount's
-  // initial landing (never on a later `selectRole`/`selectIssue`):
+  // initial landing (never on a later `selectRole`/`toggleRole`/`selectIssue`):
   //   * `initialTabApplied` flips true the first time `loadRoleContents()`
   //     actually resolves a tab set (its success path only — see
   //     `loadRoleContents` below), so a first-load fetch failure does not
@@ -1742,37 +1929,39 @@ export function mount(container, options = {}) {
 
   // `/api/inbox` has exactly one call site in this whole module: this
   // memoized promise (AC-06b, TC-029 step 4). It is created at most once per
-  // mount and never invalidated by `selectRole`/`selectIssue` — a project
-  // never changes within one mount, and the endpoint carries no project/
-  // issue/role of its own, so the first response is valid for the rest of
-  // this mount's lifetime.
+  // mount and never invalidated by `selectRole`/`toggleRole`/`selectIssue` —
+  // a project never changes within one mount, and the endpoint carries no
+  // project/issue/role of its own, so the first response is valid for the
+  // rest of this mount's lifetime (only its per-issue FILTERING,
+  // `countIssueTodos`, needs recomputing on an issue switch).
   let inboxPromise = null;
   function fetchInboxOnce() {
     if (!inboxPromise) inboxPromise = fetchInbox(options.fetchImpl);
     return inboxPromise;
   }
 
-  // Bakes `state.projectTodoCount` into the "Дела" tab's own label (kept out
-  // of `buildTabSet` itself, which stays a pure function of one role's
-  // response and knows nothing of `/api/inbox`). Called every time
-  // `state.tabs` is rebuilt, so a role/issue switch's fresh tab set still
-  // carries the already-known count instead of losing it.
+  // Bakes `state.issueTodoCount` into the "Дела" tab's own label (kept out
+  // of `buildTabSet` itself, which stays a pure function of the selected
+  // role(s)' response(s) and knows nothing of `/api/inbox`). Called every
+  // time `state.tabs` is rebuilt, so a role/issue switch's fresh tab set
+  // still carries the already-known count instead of losing it.
   function decorateHumanTasksTab() {
     const tab = state.tabs.find((t) => t.id === HUMAN_TASKS_TAB_ID);
     if (!tab) return;
-    tab.label = state.projectTodoCount === null ? "Дела" : `Дела (${state.projectTodoCount})`;
+    tab.label = state.issueTodoCount === null ? "Дела" : `Дела (${state.issueTodoCount})`;
   }
 
-  // Fetches (once) and computes the project-wide "Дела" counter, independent
-  // of `loadShell()`/`loadRoleContents()` — it does not need roles, issues
-  // or role contents to resolve, only `state.project` (AC-06a/AC-06b).
-  async function loadProjectTodoCount() {
-    if (!state.project) return;
+  // Fetches (once, memoized via `fetchInboxOnce`) and computes the
+  // issue-scoped "Дела" counter (revised AC-06a) — recomputed on every
+  // `selectIssue` (the count changes with the issue now), but never on a
+  // role switch (still role-independent, AC-06b).
+  async function loadIssueTodoCount() {
+    if (!state.project || !state.issueId) return;
     try {
       const inboxResponse = await fetchInboxOnce();
-      state.projectTodoCount = countProjectTodos(inboxResponse, state.project);
+      state.issueTodoCount = countIssueTodos(inboxResponse, state.project, state.issueId);
     } catch {
-      state.projectTodoCount = null; // Дела tab just renders without a count
+      state.issueTodoCount = null; // Дела tab just renders without a count
     }
     decorateHumanTasksTab();
     render();
@@ -1780,6 +1969,13 @@ export function mount(container, options = {}) {
 
   function render() {
     container.innerHTML = "";
+    if (typeof document !== "undefined") {
+      document.title = state.project
+        ? state.issueId
+          ? `${state.project}: ${state.issueId} | Project Explorer`
+          : `${state.project} | Project Explorer`
+        : "Project Explorer";
+    }
 
     if (state.error) {
       container.appendChild(h("p", "notice error", `Не удалось загрузить рабочее пространство: ${state.error.message}`));
@@ -1787,8 +1983,15 @@ export function mount(container, options = {}) {
     }
 
     const root = h("div", "workspace");
-    root.appendChild(renderHeader(state, { onBack, onSelectIssue: selectIssue, onSelectRole: selectRole }));
-    root.appendChild(renderTabs(state, { onSelectTab: selectTab }));
+    // `.workspace-header` and `.doc-tabs` stick together as one unit (CSS:
+    // `.workspace-sticky`) — sharing one sticky ancestor avoids having to
+    // hardcode a `top` offset for the tabs equal to the header's own
+    // height, which varies (the header wraps onto two lines on a narrow
+    // viewport, `flex-wrap: wrap`).
+    const sticky = h("div", "workspace-sticky");
+    sticky.appendChild(renderHeader(state, { onBack, onSelectIssue: selectIssue, onToggleRole: toggleRole }));
+    sticky.appendChild(renderTabs(state, { onSelectTab: selectTab }));
+    root.appendChild(sticky);
 
     const activeTab = state.tabs.find((t) => t.id === state.activeTabId) || null;
     if (activeTab) {
@@ -1806,6 +2009,9 @@ export function mount(container, options = {}) {
           invalidateDoc,
           tryScrollToInitialPtcId,
           afterCheckout,
+          fetchInboxOnce,
+          onSelectRole: selectRole,
+          onSelectTab: selectTab,
         })
       );
     } else {
@@ -1815,13 +2021,16 @@ export function mount(container, options = {}) {
     container.appendChild(root);
   }
 
-  // Re-fetches `.../roles/:role` for the current (project, issue, role) and
-  // rebuilds `.doc-tabs` from that one response. `preserveActiveTab` decides
-  // whether the previous tab id is carried through `resolveActiveTab()`
-  // (an issue switch, within the same role) or dropped for a fresh first tab
-  // (a role switch, or the very first load — no previous tab to keep).
+  // Re-fetches `.../roles/:role` for the current (project, issue) and every
+  // SELECTED role (or every role at all, when none is selected — same
+  // "empty = everything" rule as elsewhere), then rebuilds `.doc-tabs` as
+  // the union of all of them. `preserveActiveTab` decides whether the
+  // previous tab id is carried through `resolveActiveTab()` (an issue
+  // switch, or a role TOGGLE — both keep the previous selection wherever it
+  // still exists) or dropped for a fresh first tab (`selectRole`'s full
+  // replacement, or the very first load — no previous tab to keep).
   async function loadRoleContents(preserveActiveTab) {
-    if (!state.project || !state.issueId || !state.roleId) {
+    if (!state.project || !state.issueId) {
       state.tabs = [];
       state.activeTabId = null;
       render();
@@ -1829,11 +2038,11 @@ export function mount(container, options = {}) {
     }
     const prevTabId = state.activeTabId;
     try {
-      const contents = await fetchRoleContents(state.project, state.issueId, state.roleId, options.fetchImpl);
-      state.tabs = buildTabSet(contents);
-      decorateHumanTasksTab(); // carry the already-known project-wide count into the fresh tab set
+      const contentsList = await fetchRoleContentsForRoles(state.project, state.issueId, state.roleIds, state.roles, options.fetchImpl);
+      state.tabs = buildTabSet(contentsList);
+      decorateHumanTasksTab(); // carry the already-known issue-scoped count into the fresh tab set
       if (preserveActiveTab) {
-        state.activeTabId = resolveActiveTab(prevTabId, contents);
+        state.activeTabId = resolveActiveTab(prevTabId, contentsList);
       } else if (!initialTabApplied && options.initialTab) {
         // CR-005 fix (Task 33): an inbox item's `where.doc`/`where.tab`,
         // forwarded through `app.js` as `options.initialTab`, applied to
@@ -1873,17 +2082,36 @@ export function mount(container, options = {}) {
     state.issueId = issueId;
     storeLastIssue(state.project, issueId, options.storage);
     render(); // reflect the dropdown's new value immediately, tabs catch up async
+    // The "Дела" counter is issue-scoped (revised AC-06a) — must recompute
+    // on every issue switch, alongside the fresh tab set.
+    await Promise.all([loadRoleContents(true), loadIssueTodoCount()]);
+  }
+
+  // The header's role filter (dogfooding round 2, multi-select) — adds or
+  // removes one role from the selection and rebuilds `.doc-tabs` as the
+  // union of whatever remains selected (or every role, if that empties the
+  // selection). Unlike `selectRole` below, this keeps the active tab where
+  // it still exists (`preserveActiveTab: true`) — toggling one more role on
+  // or off only changes which documents are IN the union, not a wholesale
+  // switch to an unrelated set.
+  async function toggleRole(roleId) {
+    if (!roleId) return;
+    state.roleIds = state.roleIds.includes(roleId) ? state.roleIds.filter((r) => r !== roleId) : [...state.roleIds, roleId];
+    storeRoles(state.roleIds, options.storage);
+    render();
     await loadRoleContents(true);
   }
 
-  // [Роль ▾] — replaces the ENTIRE tab set (test_plan.md TC-002 step 3): a
+  // "View exactly this one role" — the "Дела" tab's manual-tests
+  // click-through still uses this (jump straight to the tester role's
+  // checklist), and it remains a full replacement of the selection: a
   // fresh `GET .../roles/:newRole` call, never routed through
-  // `resolveActiveTab()`. Documents of different roles are never shown at
-  // the same time.
+  // `resolveActiveTab()`. The header's role filter itself no longer calls
+  // this — see `toggleRole` above for the multi-select add/remove case.
   async function selectRole(roleId) {
-    if (!roleId || roleId === state.roleId) return;
-    state.roleId = roleId;
-    storeRole(roleId, options.storage);
+    if (!roleId || (state.roleIds.length === 1 && state.roleIds[0] === roleId)) return;
+    state.roleIds = [roleId];
+    storeRoles(state.roleIds, options.storage);
     state.activeTabId = null;
     state.tabs = [];
     render();
@@ -1905,43 +2133,47 @@ export function mount(container, options = {}) {
       ]);
       state.roles = roles;
       state.issues = issues;
-      // CR-005 fix (Task 33): `state.roleId` may already be set here from
-      // `options.initialRole` — an inbox click's `where.roleId`, reachable
+      // CR-005 fix (Task 33): `state.roleIds` may already be set here from
+      // `options.initialRoles` — an inbox click's `where.roleId`, reachable
       // via a bookmarkable/garbled hash a user can edit by hand. A role id
       // that doesn't actually exist in this project's own role list must not
-      // stick (it would 404 `fetchRoleContents` into `state.error` and leave
-      // `[Роль ▾]` with no selected option — the exact "garbled hash leaves
-      // the page blank" failure `app.js`'s own routing comment promises
-      // never happens) — fall back the same way an absent `roleId` already
-      // does: stored role, then the server's first role.
-      if (state.roleId && roles.length && !roles.some((r) => r.id === state.roleId)) {
-        state.roleId = readStoredRole(options.storage) || roles[0].id;
-      }
-      if (!state.roleId && roles.length) state.roleId = roles[0].id;
+      // stick (it would 404 its own `GET .../roles/:role` call) — dropped
+      // silently, not substituted for a fallback: an empty selection
+      // afterward is itself a valid, meaningful state now (union of every
+      // role), not an error state that needs a default (the "garbled hash
+      // leaves the page blank" failure `app.js`'s own routing comment
+      // promises never happens — a garbled role just falls out of the
+      // filter, the screen still shows every role's documents).
+      state.roleIds = state.roleIds.filter((id) => roles.some((r) => r.id === id));
       if (!state.issueId && issues.length) state.issueId = issues[0].issueId;
     } catch (err) {
       state.error = err;
       render();
       return;
     }
+    // Fire-and-forget, deliberately NOT awaited (unlike `loadRoleContents`
+    // below): `loadIssueTodoCount` needs `state.issueId`, which may only
+    // just have been resolved above (the `issues[0]` fallback), so it can't
+    // start any earlier than this — but `ready` (this function's own
+    // promise) must not be made to depend on `/api/inbox` actually
+    // RESOLVING, only on it being attempted, the same guarantee the old
+    // project-wide counter's independent top-of-`mount()` call gave. A test
+    // that deliberately leaves `/api/inbox` pending (to assert "no count
+    // yet") would otherwise hang `ready` forever.
+    loadIssueTodoCount();
     await loadRoleContents(false);
   }
 
   render(); // paint immediately (role/issue may already be known)
   const ready = loadShell();
-  // Independent of `loadShell()`/`loadRoleContents()`: the "Дела" counter
-  // needs only `state.project` (AC-06a/AC-06b), not roles/issues/role
-  // contents, so it starts in parallel rather than waiting its turn — and is
-  // not folded into `ready`, so a test/caller awaiting `ready` is not made
-  // to depend on `/api/inbox` succeeding.
-  loadProjectTodoCount();
 
   return {
     selectIssue,
     selectRole,
+    toggleRole,
     selectTab,
     refresh: () => loadRoleContents(true),
-    getState: () => ({ ...state, tabs: [...state.tabs], roles: [...state.roles], issues: [...state.issues] }),
+    getState: () => ({ ...state, roleIds: [...state.roleIds], tabs: [...state.tabs], roles: [...state.roles], issues: [...state.issues] }),
     ready,
   };
 }

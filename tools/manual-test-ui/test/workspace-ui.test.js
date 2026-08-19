@@ -75,6 +75,9 @@ class FakeElement {
   setAttribute(name, value) {
     this.attributes[name] = String(value);
   }
+  getAttribute(name) {
+    return Object.prototype.hasOwnProperty.call(this.attributes, name) ? this.attributes[name] : null;
+  }
   addEventListener(type, fn) {
     (this._listeners[type] || (this._listeners[type] = [])).push(fn);
   }
@@ -214,6 +217,44 @@ function routedFetch(routes) {
     return { ok: true, status: 200, json: async () => routes[url] };
   };
 }
+
+// ---------------------------------------------------------------------------
+// sortedIssueOptions — [Issue ▾]'s open/closed distinction (dogfooding
+// feedback: open and closed issues were visually identical in the picker).
+// ---------------------------------------------------------------------------
+
+test("sortedIssueOptions: closed issues sort after every open one, each group keeping its original relative order", async () => {
+  const mod = await loadModule();
+  const issues = [
+    { issueId: "20260101-closed-a", status: "closed" },
+    { issueId: "20260102-open-a", status: "open" },
+    { issueId: "20260103-closed-b", status: "closed" },
+    { issueId: "20260104-open-b", status: "open" },
+  ];
+  const result = mod.sortedIssueOptions(issues);
+  assert.deepStrictEqual(
+    result.map((o) => o.issueId),
+    ["20260102-open-a", "20260104-open-b", "20260101-closed-a", "20260103-closed-b"]
+  );
+});
+
+test("sortedIssueOptions: closed issues get a \"closed · \" label prefix, open issues get their bare id", async () => {
+  const mod = await loadModule();
+  const result = mod.sortedIssueOptions([
+    { issueId: "20260101-open-a", status: "open" },
+    { issueId: "20260102-closed-a", status: "closed" },
+  ]);
+  assert.deepStrictEqual(result, [
+    { issueId: "20260101-open-a", label: "20260101-open-a" },
+    { issueId: "20260102-closed-a", label: "closed · 20260102-closed-a" },
+  ]);
+});
+
+test("sortedIssueOptions: tolerates a missing/non-array input", async () => {
+  const mod = await loadModule();
+  assert.deepStrictEqual(mod.sortedIssueOptions(null), []);
+  assert.deepStrictEqual(mod.sortedIssueOptions(undefined), []);
+});
 
 // ---------------------------------------------------------------------------
 // resolveActiveTab — TC-003 steps 1-2 (pure, no DOM).
@@ -489,12 +530,18 @@ test("source: selectRole's body never calls resolveActiveTab; loadRoleContents d
 });
 
 // ---------------------------------------------------------------------------
-// countProjectTodos — TC-029 (pure, no DOM, no fetch).
+// countIssueTodos — TC-029 (pure, no DOM, no fetch). Dogfooding round 2
+// revised AC-06a/specs.md §3.4/this test's own TC-029 from project-wide to
+// issue-scoped — the counter's own rendered content
+// (`loadAndRenderIssueManualTests`) was already issue-scoped, so a
+// project-wide number next to issue-scoped content was the real
+// inconsistency.
 // ---------------------------------------------------------------------------
 
 // TC-029 step 1, literally: 2 pending manual TC on issue A + 1 human task on
-// issue B, both project "main" -> 3, project-wide, not per-issue.
-test("countProjectTodos sums manualTests + humanTasks across all issues of one project (TC-029 step 1)", async () => {
+// issue B, both project "main" -> counting issue A alone is 2, not 3 — the
+// human task on issue B must not leak into issue A's own count.
+test("countIssueTodos sums manualTests + humanTasks of ONE issue, ignoring other issues of the same project (TC-029 step 1)", async () => {
   const mod = await loadModule();
   const inboxResponse = {
     manualTests: [
@@ -503,27 +550,29 @@ test("countProjectTodos sums manualTests + humanTasks across all issues of one p
     ],
     humanTasks: [{ project: "main", issueId: "20260102-feat-b", stageKey: "specs" }],
   };
-  assert.strictEqual(mod.countProjectTodos(inboxResponse, "main"), 3);
+  assert.strictEqual(mod.countIssueTodos(inboxResponse, "main", "20260101-feat-a"), 2);
+  assert.strictEqual(mod.countIssueTodos(inboxResponse, "main", "20260102-feat-b"), 1);
 });
 
-// TC-029 step 2: exactly two parameters — no role parameter at all. This is
-// the structural half of AC-06b: the function is physically incapable of
-// depending on role because it cannot see one.
-test("countProjectTodos takes exactly two parameters — no role parameter (TC-029 step 2, AC-06b)", async () => {
+// TC-029 step 2: exactly three parameters — project AND issue, but still no
+// role parameter at all. This remains the structural half of AC-06b: the
+// function is physically incapable of depending on role because it cannot
+// see one.
+test("countIssueTodos takes exactly three parameters — project + issue, no role parameter (TC-029 step 2, AC-06b)", async () => {
   const mod = await loadModule();
-  assert.strictEqual(mod.countProjectTodos.length, 2);
+  assert.strictEqual(mod.countIssueTodos.length, 3);
 });
 
-test("countProjectTodos returns 0, not undefined/throw, for a project with no todos (TC-029 step 3)", async () => {
+test("countIssueTodos returns 0, not undefined/throw, for an issue with no todos (TC-029 step 3)", async () => {
   const mod = await loadModule();
   const inboxResponse = {
     manualTests: [{ project: "other-project", issueId: "20260101-feat-a", ptcId: "PTC-001" }],
     humanTasks: [{ project: "other-project", issueId: "20260101-feat-a", stageKey: "specs" }],
   };
-  assert.strictEqual(mod.countProjectTodos(inboxResponse, "main"), 0);
+  assert.strictEqual(mod.countIssueTodos(inboxResponse, "main", "20260101-feat-a"), 0);
 });
 
-test("countProjectTodos ignores items of other projects and never counts by role", async () => {
+test("countIssueTodos ignores items of other projects/issues and never counts by role", async () => {
   const mod = await loadModule();
   const inboxResponse = {
     manualTests: [
@@ -532,22 +581,22 @@ test("countProjectTodos ignores items of other projects and never counts by role
     ],
     humanTasks: [
       { project: "main", issueId: "20260102-feat-b", stageKey: "specs" },
-      { project: "main", issueId: "20260102-feat-b", stageKey: "code" },
+      { project: "main", issueId: "20260101-feat-a", stageKey: "code" },
     ],
   };
-  // No item carries a "role" field at all — filtering by project alone
-  // already yields the "across all roles" sum (specs.md §3.4).
+  // No item carries a "role" field at all — filtering by project+issue
+  // alone already yields the "across all roles" sum (specs.md §3.4).
   for (const item of [...inboxResponse.manualTests, ...inboxResponse.humanTasks]) {
     assert.ok(!("role" in item), "fixture items must not carry a role field, mirroring the real endpoint's shape");
   }
-  assert.strictEqual(mod.countProjectTodos(inboxResponse, "main"), 3);
+  assert.strictEqual(mod.countIssueTodos(inboxResponse, "main", "20260101-feat-a"), 2);
 });
 
-test("countProjectTodos handles null/empty inboxResponse without throwing", async () => {
+test("countIssueTodos handles null/empty inboxResponse without throwing", async () => {
   const mod = await loadModule();
-  assert.strictEqual(mod.countProjectTodos(null, "main"), 0);
-  assert.strictEqual(mod.countProjectTodos({}, "main"), 0);
-  assert.strictEqual(mod.countProjectTodos({ manualTests: [], humanTasks: [] }, "main"), 0);
+  assert.strictEqual(mod.countIssueTodos(null, "main", "20260101-feat-a"), 0);
+  assert.strictEqual(mod.countIssueTodos({}, "main", "20260101-feat-a"), 0);
+  assert.strictEqual(mod.countIssueTodos({ manualTests: [], humanTasks: [] }, "main", "20260101-feat-a"), 0);
 });
 
 // ---------------------------------------------------------------------------
@@ -576,6 +625,39 @@ test("buildTabSet on an empty/null response still returns just the Дела tab,
   assert.deepStrictEqual(mod.buildTabSet({}).map((t) => t.id), [mod.HUMAN_TASKS_TAB_ID]);
 });
 
+// Dogfooding round 2: buildTabSet also accepts an ARRAY of role-contents
+// responses — the union case mount() now uses for its multi-select role
+// filter (empty selection = every role, several selected = their union).
+test("buildTabSet([...]) unions several roles' documents, deduped by tab id, still exactly one Дела tab", async () => {
+  const mod = await loadModule();
+  const tester = testerContents("20260101-feat-a", { qaReportPresent: true });
+  const developer = developerContents("20260101-feat-a");
+  const tabs = mod.buildTabSet([tester, developer]);
+
+  const ids = tabs.map((t) => t.id);
+  assert.deepStrictEqual(ids, ["test_plan", "manual_test_checklist", "qa_report", "specs", "implementation_plan", mod.HUMAN_TASKS_TAB_ID]);
+  assert.strictEqual(ids.filter((id) => id === mod.HUMAN_TASKS_TAB_ID).length, 1, "exactly one Дела tab, not one per role");
+});
+
+test("buildTabSet([...]) keeps the first occurrence of a tab id two roles both declare, not a duplicate", async () => {
+  const mod = await loadModule();
+  const testerA = testerContents("20260101-feat-a", { qaReportPresent: true });
+  const testerAgain = testerContents("20260101-feat-a", { qaReportPresent: false }); // same ids, different status
+  const tabs = mod.buildTabSet([testerA, testerAgain]);
+
+  const qaTabs = tabs.filter((t) => t.id === "qa_report");
+  assert.strictEqual(qaTabs.length, 1, "one tab per distinct id, even across several role responses");
+  assert.strictEqual(qaTabs[0].item.status, "present", "the FIRST response's item wins, not a later one silently overwriting it");
+});
+
+// A bare (non-array) response still works exactly as before — the single-
+// role shape every existing pure-function test above already relies on.
+test("buildTabSet(singleResponse) is equivalent to buildTabSet([singleResponse])", async () => {
+  const mod = await loadModule();
+  const contents = testerContents("20260101-feat-a", { qaReportPresent: true });
+  assert.deepStrictEqual(mod.buildTabSet(contents), mod.buildTabSet([contents]));
+});
+
 // TC-002 step 4's grep check: no literal array in this module simultaneously
 // names several role-declared documents — the tab set must come from the
 // server response, never from a constant here.
@@ -588,6 +670,133 @@ test("source: no hardcoded literal array of role document names (TC-002 step 4)"
     const hits = suspiciousNames.filter((name) => literal.includes(`"${name}"`) || literal.includes(`'${name}'`));
     assert.ok(hits.length < 2, `found a literal array combining role document names: ${literal}`);
   }
+});
+
+// ---------------------------------------------------------------------------
+// renderTabs — n/a hidden from the row, missing visually distinct, issue vs.
+// project grouping (dogfooding feedback on 20260806-feat-project-explorer-
+// redesign: n/a/missing tabs were indistinguishable from present ones, and
+// issue/project documents were one undifferentiated pill row).
+// ---------------------------------------------------------------------------
+
+function mixedKindContents(issueId) {
+  return {
+    project: "proj-a",
+    issueId,
+    issueStatus: "open",
+    role: { id: "tester", title: "Тестировщик", description: "" },
+    items: [
+      { id: "test_plan.md", kind: "issue_doc", name: "test_plan.md", label: "Test plan", status: "present" },
+      { id: "qa_report.md", kind: "issue_doc", name: "qa_report.md", label: "QA report", status: "missing" },
+      {
+        id: "manual_test_checklist.md",
+        kind: "issue_doc",
+        name: "manual_test_checklist.md",
+        label: "Manual test checklist",
+        status: "not_applicable",
+        message: "manual_test_checklist.md не относится к этому типу issue.",
+      },
+      { id: ".qa-workflow.md", kind: "project_doc", name: ".qa-workflow.md", label: "QA workflow", status: "present" },
+    ],
+  };
+}
+
+test("mount(): n/a items get no button in the row at all, missing items get .doc-tab--missing, present items get neither", async () => {
+  installFakeDocument();
+  const container = new FakeElement("div");
+  const routes = {
+    "/api/roles": ROLES_RESPONSE,
+    "/api/projects/proj-a/issues": ISSUES_RESPONSE,
+    "/api/projects/proj-a/issues/20260101-feat-a/roles/tester": mixedKindContents("20260101-feat-a"),
+    "/api/inbox": EMPTY_INBOX_RESPONSE,
+  };
+  const fetchImpl = routedFetch(routes);
+
+  const mod = await loadModule();
+  const handle = mod.mount(container, { project: "proj-a", issueId: "20260101-feat-a", initialRoles: ["tester"], fetchImpl });
+  await handle.ready;
+
+  const buttons = container.findAll((n) => n.tagName === "BUTTON" && n.dataset.tabId);
+  const byId = new Map(buttons.map((b) => [b.dataset.tabId, b]));
+
+  assert.ok(byId.has("test_plan"), "present item keeps its button");
+  assert.ok(!String(byId.get("test_plan").className).includes("doc-tab--missing"));
+
+  assert.ok(byId.has("qa_report"), "missing item keeps its button");
+  assert.ok(String(byId.get("qa_report").className).includes("doc-tab--missing"));
+
+  assert.ok(!byId.has("manual_test_checklist"), "not_applicable item gets no button in the row at all");
+
+  assert.ok(byId.has(".qa-workflow"), "project doc keeps its button");
+  assert.ok(!String(byId.get(".qa-workflow").className).includes("doc-tab--missing"));
+});
+
+test("mount(): doc-tabs are grouped — issue_doc items under an \"Issue\" label, other kinds under a \"Проект\" label", async () => {
+  installFakeDocument();
+  const container = new FakeElement("div");
+  const routes = {
+    "/api/roles": ROLES_RESPONSE,
+    "/api/projects/proj-a/issues": ISSUES_RESPONSE,
+    "/api/projects/proj-a/issues/20260101-feat-a/roles/tester": mixedKindContents("20260101-feat-a"),
+    "/api/inbox": EMPTY_INBOX_RESPONSE,
+  };
+  const fetchImpl = routedFetch(routes);
+
+  const mod = await loadModule();
+  const handle = mod.mount(container, { project: "proj-a", issueId: "20260101-feat-a", initialRoles: ["tester"], fetchImpl });
+  await handle.ready;
+
+  const groups = container.findAll((n) => n.className === "tab-group");
+  assert.strictEqual(groups.length, 3, "Issue group, Проект group, and the unlabeled Дела group");
+
+  const labels = groups.map((g) => {
+    const label = g.findAll((n) => n.className === "group-label")[0];
+    return label ? label.textContent : null;
+  });
+  assert.deepStrictEqual(labels, ["Issue", "Проект", "Входящие"]);
+
+  const issueGroupIds = groups[0].findAll((n) => n.tagName === "BUTTON").map((b) => b.dataset.tabId);
+  assert.deepStrictEqual(issueGroupIds, ["test_plan", "qa_report"]); // manual_test_checklist is n/a, hidden
+
+  const projectGroupIds = groups[1].findAll((n) => n.tagName === "BUTTON").map((b) => b.dataset.tabId);
+  assert.deepStrictEqual(projectGroupIds, [".qa-workflow"]);
+
+  const delaGroupIds = groups[2].findAll((n) => n.tagName === "BUTTON").map((b) => b.dataset.tabId);
+  assert.deepStrictEqual(delaGroupIds, [mod.HUMAN_TASKS_TAB_ID]);
+});
+
+test("mount(): an n/a tab that is (or becomes) the active tab still renders its panel/message, even though it has no button in the row — resolveActiveTab's stability guarantee is preserved", async () => {
+  installFakeDocument();
+  const container = new FakeElement("div");
+  const routes = {
+    "/api/roles": ROLES_RESPONSE,
+    "/api/projects/proj-a/issues": ISSUES_RESPONSE,
+    "/api/projects/proj-a/issues/20260101-feat-a/roles/tester": mixedKindContents("20260101-feat-a"),
+    "/api/inbox": EMPTY_INBOX_RESPONSE,
+  };
+  const fetchImpl = routedFetch(routes);
+
+  const mod = await loadModule();
+  const handle = mod.mount(container, {
+    project: "proj-a",
+    issueId: "20260101-feat-a",
+    initialRoles: ["tester"],
+    initialTab: "manual_test_checklist",
+    fetchImpl,
+  });
+  await handle.ready;
+
+  assert.ok(
+    !container.findAll((n) => n.tagName === "BUTTON" && n.dataset.tabId === "manual_test_checklist").length,
+    "the n/a tab still has no button"
+  );
+  const panel = container.findAll((n) => n.className === "doc-panel")[0];
+  assert.ok(panel, "the panel still renders for the hidden-but-active tab");
+  assert.strictEqual(panel.dataset.tabId, "manual_test_checklist");
+  assert.ok(
+    panel.findAll((n) => n.className === "notice" && n.textContent.includes("не относится к этому типу issue")).length,
+    "the item's own message is shown, not a blank panel"
+  );
 });
 
 // ---------------------------------------------------------------------------
@@ -609,19 +818,49 @@ function baseRoutes(overrides = {}) {
 }
 
 // A microtask-queue flush, for tests that need to wait for a `mount()`-level
-// async chain (e.g. `loadProjectTodoCount()`) that is deliberately NOT part
+// async chain (e.g. `loadIssueTodoCount()`) that is deliberately NOT part
 // of `handle.ready` to settle before asserting on rendered output.
 function flush() {
   return new Promise((resolve) => setTimeout(resolve, 0));
 }
 
-test("mount() renders a header with a back link and no persistent sidebar container, plus Issue/Роль selects", async () => {
+test("mount(): [Issue ▾] renders closed issues after open ones with a \"closed · \" prefix", async () => {
+  installFakeDocument();
+  const container = new FakeElement("div");
+  const routes = {
+    "/api/roles": ROLES_RESPONSE,
+    "/api/projects/proj-a/issues": {
+      currentBranch: "develop",
+      defaultBranch: "develop",
+      issues: [
+        { issueId: "20260099-old-closed", status: "closed", checklistStatus: "here", summary: { passedSteps: 0, totalSteps: 0 } },
+        { issueId: "20260101-feat-a", status: "open", checklistStatus: "here", summary: { passedSteps: 0, totalSteps: 0 } },
+      ],
+    },
+    "/api/projects/proj-a/issues/20260101-feat-a/roles/tester": testerContents("20260101-feat-a", { qaReportPresent: true }),
+    "/api/inbox": EMPTY_INBOX_RESPONSE,
+  };
+  const fetchImpl = routedFetch(routes);
+
+  const mod = await loadModule();
+  const handle = mod.mount(container, { project: "proj-a", issueId: "20260101-feat-a", initialRoles: ["tester"], fetchImpl });
+  await handle.ready;
+
+  const issueSelect = container.findAll((n) => n.className === "issue-select")[0];
+  const options = issueSelect.findAll((n) => n.tagName === "OPTION");
+  assert.deepStrictEqual(
+    options.map((o) => o.textContent),
+    ["20260101-feat-a", "closed · 20260099-old-closed"]
+  );
+});
+
+test("mount() renders a header with a back link, an Issue select, and a multi-select role filter, no persistent sidebar", async () => {
   installFakeDocument();
   const container = new FakeElement("div");
   const fetchImpl = routedFetch(baseRoutes());
 
   const mod = await loadModule();
-  const handle = mod.mount(container, { project: "proj-a", issueId: "20260101-feat-a", initialRole: "tester", fetchImpl });
+  const handle = mod.mount(container, { project: "proj-a", issueId: "20260101-feat-a", initialRoles: ["tester"], fetchImpl });
   await handle.ready;
 
   const headers = container.findAll((n) => n.className === "workspace-header");
@@ -631,8 +870,14 @@ test("mount() renders a header with a back link and no persistent sidebar contai
   assert.ok(back, "expected a back link in the workspace header");
   assert.strictEqual(back.href, "#/");
 
+  // Issue is still a native <select>; role became a multi-select filter
+  // (dogfooding round 2) — the same `.role-switch` component every other
+  // screen in this tool uses, not a second <select>.
   const selects = headers[0].findAll((n) => n.tagName === "SELECT");
-  assert.strictEqual(selects.length, 2, "expected exactly one Issue select and one Роль select");
+  assert.strictEqual(selects.length, 1, "expected exactly one Issue select");
+  const roleSwitches = headers[0].findAll((n) => n.className === "role-switch");
+  assert.strictEqual(roleSwitches.length, 1, "expected one .role-switch block");
+  assert.strictEqual(roleSwitches[0].findAll((n) => n.tagName === "BUTTON").length, ROLES_RESPONSE.roles.length);
 
   // No `.sidebar` container anywhere — AC-01b.
   const sidebars = container.findAll((n) => n.className && String(n.className).split(/\s+/).includes("sidebar"));
@@ -645,7 +890,7 @@ test("mount() builds .doc-tabs from GET .../roles/:role for the current role onl
   const fetchImpl = routedFetch(baseRoutes());
 
   const mod = await loadModule();
-  const handle = mod.mount(container, { project: "proj-a", issueId: "20260101-feat-a", initialRole: "tester", fetchImpl });
+  const handle = mod.mount(container, { project: "proj-a", issueId: "20260101-feat-a", initialRoles: ["tester"], fetchImpl });
   await handle.ready;
 
   let tabButtons = container.findAll((n) => n.tagName === "BUTTON" && n.dataset.tabId);
@@ -667,13 +912,104 @@ test("mount() builds .doc-tabs from GET .../roles/:role for the current role onl
   }
 });
 
+// ---------------------------------------------------------------------------
+// The header's role filter (dogfooding round 2, multi-select) — clicking a
+// role button TOGGLES it (add/remove), and .doc-tabs becomes the UNION of
+// every selected role's own documents, unlike selectRole()'s full replace.
+// ---------------------------------------------------------------------------
+
+test("mount(): clicking a second role button in the header ADDS its documents to the union, keeping the first role's tabs too", async () => {
+  installFakeDocument();
+  const container = new FakeElement("div");
+  let developerCalls = 0;
+  const routes = baseRoutes();
+  const fetchImpl = async (url) => {
+    if (url === "/api/projects/proj-a/issues/20260101-feat-a/roles/developer") developerCalls++;
+    return routedFetch(routes)(url);
+  };
+
+  const mod = await loadModule();
+  const handle = mod.mount(container, { project: "proj-a", issueId: "20260101-feat-a", initialRoles: ["tester"], fetchImpl });
+  await handle.ready;
+
+  const developerBtn = container.findAll((n) => n.tagName === "BUTTON" && n.dataset.roleId === "developer")[0];
+  assert.strictEqual(developerBtn.getAttribute("aria-pressed"), "false");
+  developerBtn.dispatchClick();
+  await flush();
+
+  assert.deepStrictEqual(handle.getState().roleIds, ["tester", "developer"]);
+  // Re-query: render() rebuilds the DOM from scratch on every toggle.
+  const tabIds = container.findAll((n) => n.tagName === "BUTTON" && n.dataset.tabId).map((b) => b.dataset.tabId);
+  assert.deepStrictEqual(tabIds, ["test_plan", "manual_test_checklist", "qa_report", "specs", "implementation_plan", mod.HUMAN_TASKS_TAB_ID]);
+  assert.strictEqual(developerCalls, 1, "developer's own GET .../roles/developer must be fetched exactly once");
+});
+
+test("mount(): toggling a role keeps the active tab where it still exists in the new union (unlike selectRole's full replace)", async () => {
+  installFakeDocument();
+  const container = new FakeElement("div");
+  const fetchImpl = routedFetch(baseRoutes());
+
+  const mod = await loadModule();
+  const handle = mod.mount(container, { project: "proj-a", issueId: "20260101-feat-a", initialRoles: ["tester"], fetchImpl });
+  await handle.ready;
+
+  handle.selectTab("qa_report");
+  assert.strictEqual(handle.getState().activeTabId, "qa_report");
+
+  await handle.toggleRole("developer"); // adds developer's docs — qa_report is still in the union
+  assert.strictEqual(handle.getState().activeTabId, "qa_report", "toggling a role ON must not reset the active tab away from a still-present one");
+});
+
+test("mount(): toggling a role OFF that was the only one contributing the active tab falls back to the first tab", async () => {
+  installFakeDocument();
+  const container = new FakeElement("div");
+  const fetchImpl = routedFetch(baseRoutes());
+
+  const mod = await loadModule();
+  const handle = mod.mount(container, {
+    project: "proj-a",
+    issueId: "20260101-feat-a",
+    initialRoles: ["tester", "developer"],
+    fetchImpl,
+  });
+  await handle.ready;
+
+  handle.selectTab("specs"); // developer-only document
+  assert.strictEqual(handle.getState().activeTabId, "specs");
+
+  await handle.toggleRole("developer"); // removes developer -> specs no longer in the union
+  assert.notStrictEqual(handle.getState().activeTabId, "specs");
+  assert.deepStrictEqual(handle.getState().roleIds, ["tester"]);
+});
+
+test("mount(): empty role selection fetches and unions EVERY role's documents, not one arbitrary default", async () => {
+  installFakeDocument();
+  const container = new FakeElement("div");
+  const fetchImpl = routedFetch(
+    baseRoutes({
+      "/api/projects/proj-a/issues/20260101-feat-a/roles/analyst": analystContents("20260101-feat-a", { brdPresent: true }),
+    })
+  );
+
+  const mod = await loadModule();
+  // No initialRoles, no stored roles — the empty-selection default.
+  const handle = mod.mount(container, { project: "proj-a", issueId: "20260101-feat-a", fetchImpl });
+  await handle.ready;
+
+  assert.deepStrictEqual(handle.getState().roleIds, []);
+  const tabIds = handle.getState().tabs.map((t) => t.id);
+  assert.ok(tabIds.includes("brd"), "expected the analyst role's own document");
+  assert.ok(tabIds.includes("specs"), "expected the developer role's own document");
+  assert.ok(tabIds.includes("test_plan"), "expected the tester role's own document");
+});
+
 test("mount(): switching Issue keeps the active tab, even into a missing document (TC-003)", async () => {
   installFakeDocument();
   const container = new FakeElement("div");
   const fetchImpl = routedFetch(baseRoutes());
 
   const mod = await loadModule();
-  const handle = mod.mount(container, { project: "proj-a", issueId: "20260101-feat-a", initialRole: "tester", fetchImpl });
+  const handle = mod.mount(container, { project: "proj-a", issueId: "20260101-feat-a", initialRoles: ["tester"], fetchImpl });
   await handle.ready;
 
   handle.selectTab("qa_report");
@@ -696,7 +1032,7 @@ test("mount(): selectTab only accepts a tab id from the current tab set", async 
   const fetchImpl = routedFetch(baseRoutes());
 
   const mod = await loadModule();
-  const handle = mod.mount(container, { project: "proj-a", issueId: "20260101-feat-a", initialRole: "tester", fetchImpl });
+  const handle = mod.mount(container, { project: "proj-a", issueId: "20260101-feat-a", initialRoles: ["tester"], fetchImpl });
   await handle.ready;
 
   const before = handle.getState().activeTabId;
@@ -711,10 +1047,10 @@ test("mount(): selectTab only accepts a tab id from the current tab set", async 
 // these tests cover the consuming side: mount() actually landing there).
 // ---------------------------------------------------------------------------
 
-test("mount(): a manual-TC inbox click's initialRole/initialTab (unnormalized, \".md\"-suffixed) lands on the tester role's manual_test_checklist tab (TC-020 step 3)", async () => {
+test("mount(): a manual-TC inbox click's initialRoles/initialTab (unnormalized, \".md\"-suffixed) lands on the tester role's manual_test_checklist tab (TC-020 step 3)", async () => {
   installFakeDocument();
   const container = new FakeElement("div");
-  // No initialRole stored/default — proves initialRole, not the fallback
+  // No initialRoles stored/default — proves initialRoles, not the fallback
   // chain, is what selects "tester" here (ROLES_RESPONSE's own first role
   // is "analyst").
   const fetchImpl = routedFetch(baseRoutes());
@@ -725,14 +1061,14 @@ test("mount(): a manual-TC inbox click's initialRole/initialTab (unnormalized, \
     issueId: "20260101-feat-a",
     // Exactly what app.js's inboxTargetHash forwards for a manual TC click
     // (`where.roleId`, `where.doc` verbatim, not pre-stripped of ".md").
-    initialRole: "tester",
+    initialRoles: ["tester"],
     initialTab: "manual_test_checklist.md",
     fetchImpl,
   });
   await handle.ready;
 
   const state = handle.getState();
-  assert.strictEqual(state.roleId, "tester");
+  assert.deepStrictEqual(state.roleIds, ["tester"]);
   assert.strictEqual(state.activeTabId, "manual_test_checklist");
 });
 
@@ -775,7 +1111,7 @@ test("mount(): initialTab only applies to the initial landing — a later select
   const handle = mod.mount(container, {
     project: "proj-a",
     issueId: "20260101-feat-a",
-    initialRole: "tester",
+    initialRoles: ["tester"],
     initialTab: "qa_report",
     fetchImpl,
   });
@@ -788,11 +1124,12 @@ test("mount(): initialTab only applies to the initial landing — a later select
   assert.strictEqual(handle.getState().activeTabId, "specs");
 });
 
-test("mount(): a garbled/stale initialRole not in this project's role list falls back to the server's first role, not a blank/broken screen", async () => {
+test("mount(): a garbled/stale initialRoles entry not in this project's role list is dropped silently — empty selection shows every role's union, not a blank/broken screen", async () => {
   installFakeDocument();
   const container = new FakeElement("div");
-  // The fallback role ("analyst", ROLES_RESPONSE's first) needs its own
-  // fixture — see the identical note on the human-task initialTab test above.
+  // Dropping to an empty selection means EVERY role gets fetched (the same
+  // "empty = everything" rule the filter uses elsewhere) — "analyst" needs
+  // its own fixture here (baseRoutes() already covers developer/tester).
   const fetchImpl = routedFetch(
     baseRoutes({
       "/api/projects/proj-a/issues/20260101-feat-a/roles/analyst": analystContents("20260101-feat-a", { brdPresent: true }),
@@ -803,14 +1140,24 @@ test("mount(): a garbled/stale initialRole not in this project's role list falls
   const handle = mod.mount(container, {
     project: "proj-a",
     issueId: "20260101-feat-a",
-    initialRole: "no-such-role",
+    initialRoles: ["no-such-role"],
     fetchImpl,
   });
   await handle.ready;
 
   assert.strictEqual(handle.getState().error, null);
-  assert.strictEqual(handle.getState().roleId, ROLES_RESPONSE.roles[0].id);
-  assert.ok(handle.getState().tabs.length > 0, "expected a real tab set, not an empty/broken one");
+  // The garbled id is gone; nothing else took its place — an empty
+  // selection is itself a valid, meaningful state now, not an error.
+  assert.deepStrictEqual(handle.getState().roleIds, []);
+  // And the tab set is the union of every role's documents (prompt/brd from
+  // analyst, specs/implementation_plan from developer, test_plan/
+  // manual_test_checklist/qa_report from tester) — a real, rich tab set,
+  // not an empty/broken one.
+  assert.ok(handle.getState().tabs.length > 1, "expected a real tab set, not an empty/broken one");
+  const tabIds = handle.getState().tabs.map((t) => t.id);
+  assert.ok(tabIds.includes("brd"), "expected the analyst role's own document in the union");
+  assert.ok(tabIds.includes("specs"), "expected the developer role's own document in the union");
+  assert.ok(tabIds.includes("test_plan"), "expected the tester role's own document in the union");
 });
 
 test("mount(): document content is fetched by endpoint (not tab.id), deduped, and an A->B issue switch never paints A's content into B's panel", async () => {
@@ -854,7 +1201,7 @@ test("mount(): document content is fetched by endpoint (not tab.id), deduped, an
   };
 
   const mod = await loadModule();
-  const handle = mod.mount(container, { project: "proj-a", issueId: "20260101-feat-a", initialRole: "tester", fetchImpl });
+  const handle = mod.mount(container, { project: "proj-a", issueId: "20260101-feat-a", initialRoles: ["tester"], fetchImpl });
   await handle.ready;
   // `render()` runs twice for the initial load's own state settling
   // (paint-immediately, then loadShell's own render) — still only one fetch
@@ -881,7 +1228,7 @@ test("mount(): back link navigates to level 1 via onNavigate when provided", asy
   const handle = mod.mount(container, {
     project: "proj-a",
     issueId: "20260101-feat-a",
-    initialRole: "tester",
+    initialRoles: ["tester"],
     fetchImpl,
     onNavigate: (hash) => navigated.push(hash),
   });
@@ -893,11 +1240,13 @@ test("mount(): back link navigates to level 1 via onNavigate when provided", asy
 });
 
 // ---------------------------------------------------------------------------
-// mount(): "Дела" counter — GET /api/inbox fetched once, reused across
-// [Роль ▾]/[Issue ▾] switches (TC-029 step 4, AC-06b).
+// mount(): "Дела" counter — GET /api/inbox fetched once, reused across role/
+// [Issue ▾] switches, but recomputed (client-side, no new fetch) whenever
+// the issue changes (revised AC-06a: issue-scoped, not project-wide;
+// AC-06b: still role-independent — TC-029 step 4).
 // ---------------------------------------------------------------------------
 
-test("mount(): fetches /api/inbox exactly once, even after switching Role and Issue (TC-029 step 4, AC-06b)", async () => {
+test("mount(): fetches /api/inbox exactly once — role switch keeps the count, issue switch recomputes it from the same response (TC-029 step 4, AC-06b)", async () => {
   installFakeDocument();
   const container = new FakeElement("div");
 
@@ -920,25 +1269,31 @@ test("mount(): fetches /api/inbox exactly once, even after switching Role and Is
   };
 
   const mod = await loadModule();
-  const handle = mod.mount(container, { project: "proj-a", issueId: "20260101-feat-a", initialRole: "tester", fetchImpl });
+  const handle = mod.mount(container, { project: "proj-a", issueId: "20260101-feat-a", initialRoles: ["tester"], fetchImpl });
   await handle.ready;
-  await flush(); // let loadProjectTodoCount (started in parallel with loadShell) settle
+  await flush(); // let loadIssueTodoCount (fire-and-forget from loadShell) settle
 
   assert.strictEqual(inboxCalls, 1, "expected exactly one GET /api/inbox on initial mount");
 
+  function delaLabel() {
+    return container.findAll((n) => n.tagName === "BUTTON" && n.dataset.tabId === mod.HUMAN_TASKS_TAB_ID)[0].textContent;
+  }
+
+  // Issue A's own 2 manualTests — the humanTask belongs to issue B, excluded.
+  assert.strictEqual(delaLabel(), "Дела (2)");
+
   await handle.selectRole("developer");
   await flush();
+  assert.strictEqual(inboxCalls, 1, "switching Role must not trigger a repeat GET /api/inbox");
+  // Still issue A — role switch does not change the (issue-scoped) count.
+  assert.strictEqual(delaLabel(), "Дела (2)");
+
   await handle.selectIssue("20260102-feat-b");
   await flush();
 
-  assert.strictEqual(inboxCalls, 1, "switching Role/Issue must not trigger a repeat GET /api/inbox");
-
-  // The counter is visible on the Дела tab's own label (project-wide: 2
-  // manualTests + 1 humanTask = 3), unaffected by the role/issue it just
-  // switched through.
-  const tabButtons = container.findAll((n) => n.tagName === "BUTTON" && n.dataset.tabId === mod.HUMAN_TASKS_TAB_ID);
-  assert.strictEqual(tabButtons.length, 1);
-  assert.strictEqual(tabButtons[0].textContent, "Дела (3)");
+  assert.strictEqual(inboxCalls, 1, "switching Issue must not trigger a repeat GET /api/inbox — recomputed from the same response");
+  // Issue B's own 1 humanTask now, not issue A's manualTests.
+  assert.strictEqual(delaLabel(), "Дела (1)");
 });
 
 test("mount(): Дела tab label shows no count until /api/inbox resolves, then updates in place", async () => {
@@ -953,13 +1308,17 @@ test("mount(): Дела tab label shows no count until /api/inbox resolves, then
   const fetchImpl = async (url) => {
     if (url === "/api/inbox") {
       await inboxPromise;
-      return { ok: true, status: 200, json: async () => ({ manualTests: [{ project: "proj-a", issueId: "x", ptcId: "PTC-1" }], humanTasks: [] }) };
+      return {
+        ok: true,
+        status: 200,
+        json: async () => ({ manualTests: [{ project: "proj-a", issueId: "20260101-feat-a", ptcId: "PTC-1" }], humanTasks: [] }),
+      };
     }
     return routedFetch(routes)(url);
   };
 
   const mod = await loadModule();
-  const handle = mod.mount(container, { project: "proj-a", issueId: "20260101-feat-a", initialRole: "tester", fetchImpl });
+  const handle = mod.mount(container, { project: "proj-a", issueId: "20260101-feat-a", initialRoles: ["tester"], fetchImpl });
   await handle.ready;
 
   let tabButtons = container.findAll((n) => n.tagName === "BUTTON" && n.dataset.tabId === mod.HUMAN_TASKS_TAB_ID);
@@ -1039,7 +1398,7 @@ async function mountOnChecklistTab(fetchImpl) {
   installFakeDocument();
   const container = new FakeElement("div");
   const mod = await loadModule();
-  const handle = mod.mount(container, { project: "proj-a", issueId: "20260101-feat-a", initialRole: "tester", fetchImpl });
+  const handle = mod.mount(container, { project: "proj-a", issueId: "20260101-feat-a", initialRoles: ["tester"], fetchImpl });
   await handle.ready;
   handle.selectTab("manual_test_checklist");
   await flush();
@@ -1063,7 +1422,7 @@ test("mount(): initialPtcId scrolls the matching TC panel into view once the che
   const handle = mod.mount(container, {
     project: "proj-a",
     issueId: "20260101-feat-a",
-    initialRole: "tester",
+    initialRoles: ["tester"],
     initialTab: "manual_test_checklist.md",
     initialPtcId: "TC-001",
     fetchImpl,
@@ -1087,7 +1446,7 @@ test("mount(): initialPtcId is a one-shot — revisiting the checklist tab later
   const handle = mod.mount(container, {
     project: "proj-a",
     issueId: "20260101-feat-a",
-    initialRole: "tester",
+    initialRoles: ["tester"],
     initialTab: "manual_test_checklist.md",
     initialPtcId: "TC-001",
     fetchImpl,
@@ -1280,12 +1639,15 @@ function humanTask(overrides = {}) {
 // a 200 success shape matching server.js's real ones. `tasksData` re-fetched
 // on every GET (a function, not a fixed value), so a test can hand back a
 // different list after a reload without hand-rolling its own fetch impl.
-function humanTasksFetchMock({ tasks, completeResponse, reassignResponse, agentsYamlText } = {}) {
+function humanTasksFetchMock({ tasks, completeResponse, reassignResponse, agentsYamlText, manualTests } = {}) {
   const tasksList = tasks || [humanTask()];
   const tasksEndpoint = "/api/projects/proj-a/issues/20260101-feat-a/human-tasks";
   const calls = []; // { url, method, body }
   const tasksGetCalls = [];
-  const routes = baseRoutes({ [AGENTS_YAML_ROUTE]: { content: agentsYamlText === undefined ? AGENTS_YAML_TEXT : agentsYamlText } });
+  const routes = baseRoutes({
+    [AGENTS_YAML_ROUTE]: { content: agentsYamlText === undefined ? AGENTS_YAML_TEXT : agentsYamlText },
+    ...(manualTests ? { "/api/inbox": { manualTests, humanTasks: [], totalCount: manualTests.length } } : {}),
+  });
 
   const fetchImpl = async (url, init) => {
     if (url === tasksEndpoint && (!init || !init.method)) {
@@ -1310,7 +1672,7 @@ async function mountOnHumanTasksTab(fetchImpl) {
   installFakeDocument();
   const container = new FakeElement("div");
   const mod = await loadModule();
-  const handle = mod.mount(container, { project: "proj-a", issueId: "20260101-feat-a", initialRole: "tester", fetchImpl });
+  const handle = mod.mount(container, { project: "proj-a", issueId: "20260101-feat-a", initialRoles: ["tester"], fetchImpl });
   await handle.ready;
   handle.selectTab(mod.HUMAN_TASKS_TAB_ID);
   await flush();
@@ -1348,6 +1710,67 @@ test("Дела tab: an empty queue renders a message, not a blank pane", async (
   assert.strictEqual(empty.length, 1);
   assert.ok(empty[0].textContent.length > 0);
   assert.strictEqual(container.findAll((n) => n.className === "human-task-row").length, 0);
+});
+
+// ---------------------------------------------------------------------------
+// Дела tab's manual-tests half (dogfooding fix, CR-5a) — the counter
+// already summed manualTests+humanTasks project-wide (specs.md §3.4), but
+// the tab body used to render only humanTasks; a project with pending
+// manual tests and zero human tasks showed a nonzero count next to
+// "Нет задач для этой issue."
+// ---------------------------------------------------------------------------
+
+test("Дела tab: renders this issue's own manual tests from the already-fetched /api/inbox response, filtered by issueId", async () => {
+  const { fetchImpl } = humanTasksFetchMock({
+    tasks: [],
+    manualTests: [
+      { project: "proj-a", issueId: "20260101-feat-a", ptcId: "PTC-0001", area: "Checklist", testCase: "Проверить шаг 1" },
+      { project: "proj-a", issueId: "20260102-feat-b", ptcId: "PTC-0002", area: "Checklist", testCase: "Другая issue — не должна попасть" },
+      { project: "proj-b", issueId: "20260101-feat-a", ptcId: "PTC-0003", area: "Checklist", testCase: "Другой проект — не должна попасть" },
+    ],
+  });
+  const { container } = await mountOnHumanTasksTab(fetchImpl);
+
+  const labels = container.findAll((n) => n.className === "inbox-item-label");
+  assert.strictEqual(labels.length, 1, "only this project's this-issue manual test");
+  assert.ok(labels[0].textContent.includes("Проверить шаг 1"));
+
+  // The human-tasks empty state still renders independently — the two
+  // sections are not conflated into one condition.
+  assert.ok(container.findAll((n) => n.className && n.className.split(" ").includes("human-tasks-empty")).length);
+});
+
+test("Дела tab: no manual tests for this issue renders the section's own empty state, not a blank pane", async () => {
+  const { fetchImpl } = humanTasksFetchMock({ tasks: [humanTask()], manualTests: [] });
+  const { container } = await mountOnHumanTasksTab(fetchImpl);
+
+  const manualTestsBody = container.findAll((n) => n.className === "manual-tests-body")[0];
+  assert.ok(manualTestsBody);
+  assert.ok(manualTestsBody.findAll((n) => n.className === "inbox-empty" && n.textContent.length > 0).length);
+});
+
+test("Дела tab: clicking a manual test switches to the tester role's manual_test_checklist tab", async () => {
+  const { fetchImpl } = humanTasksFetchMock({
+    tasks: [],
+    manualTests: [{ project: "proj-a", issueId: "20260101-feat-a", ptcId: "PTC-0001", area: "Checklist", testCase: "Проверить шаг 1" }],
+  });
+  installFakeDocument();
+  const container = new FakeElement("div");
+  const mod = await loadModule();
+  const handle = mod.mount(container, { project: "proj-a", issueId: "20260101-feat-a", initialRoles: ["developer"], fetchImpl });
+  await handle.ready;
+  handle.selectTab(mod.HUMAN_TASKS_TAB_ID);
+  await flush();
+  await flush();
+
+  const link = container.findAll((n) => n.className === "inbox-item inbox-item--manualTest")[0];
+  assert.ok(link, "expected the manual test row to render even though the mount started on the developer role");
+  link.dispatchClick();
+  await flush();
+  await flush();
+
+  assert.deepStrictEqual(handle.getState().roleIds, ["tester"]);
+  assert.strictEqual(handle.getState().activeTabId, mod.CHECKLIST_DOC_ID);
 });
 
 test("Дела tab: operation \"review\" shows a verdict input; complete sends {verdict} to POST .../complete (TC-024 step 1-2 shape)", async () => {
@@ -1618,7 +2041,7 @@ test("checkout banner renders for an item with item.checkout, regardless of item
   const handle = mod.mount(container, {
     project: "proj-a",
     issueId: ISSUE_A,
-    initialRole: "tester",
+    initialRoles: ["tester"],
     fetchImpl,
     confirmImpl: () => false,
   });
@@ -1662,7 +2085,7 @@ test("checkout banner: confirming calls POST checkout.endpoint, then reloads iss
   const handle = mod.mount(container, {
     project: "proj-a",
     issueId: ISSUE_A,
-    initialRole: "tester",
+    initialRoles: ["tester"],
     fetchImpl,
     confirmImpl: () => true,
   });
@@ -1713,7 +2136,7 @@ test("checkout banner: a failed checkout surfaces the server's error message and
   const handle = mod.mount(container, {
     project: "proj-a",
     issueId: ISSUE_A,
-    initialRole: "tester",
+    initialRoles: ["tester"],
     fetchImpl,
     confirmImpl: () => true,
   });
@@ -1740,7 +2163,7 @@ test("prepare action: item.kind \"action\" not offered renders no action-row/pre
   const { fetchImpl } = countingFetch(extrasRoutes(ISSUE_A, contents));
 
   const mod = await loadModule();
-  const handle = mod.mount(container, { project: "proj-a", issueId: ISSUE_A, initialRole: "tester", fetchImpl });
+  const handle = mod.mount(container, { project: "proj-a", issueId: ISSUE_A, initialRoles: ["tester"], fetchImpl });
   await handle.ready;
   handle.selectTab("prepare");
   await flush();
@@ -1765,7 +2188,7 @@ test("prepare action: offered but not enabled renders a disabled button and the 
   const { fetchImpl } = countingFetch(extrasRoutes(ISSUE_A, contents));
 
   const mod = await loadModule();
-  const handle = mod.mount(container, { project: "proj-a", issueId: ISSUE_A, initialRole: "tester", fetchImpl });
+  const handle = mod.mount(container, { project: "proj-a", issueId: ISSUE_A, initialRoles: ["tester"], fetchImpl });
   await handle.ready;
   handle.selectTab("prepare");
   await flush();
@@ -1811,7 +2234,7 @@ test("prepare action: offered and enabled — click (after confirmation) POSTs {
   const handle = mod.mount(container, {
     project: "proj-a",
     issueId: ISSUE_A,
-    initialRole: "tester",
+    initialRoles: ["tester"],
     fetchImpl,
     confirmImpl: () => true,
   });
@@ -1871,7 +2294,7 @@ test("prepare action: a refused run (non-2xx, ok:false body) renders \"Not prepa
   const handle = mod.mount(container, {
     project: "proj-a",
     issueId: ISSUE_A,
-    initialRole: "tester",
+    initialRoles: ["tester"],
     fetchImpl,
     confirmImpl: () => true,
   });
@@ -1907,7 +2330,7 @@ test("prepare action: declining the confirmation sends no request", async () => 
   const handle = mod.mount(container, {
     project: "proj-a",
     issueId: ISSUE_A,
-    initialRole: "tester",
+    initialRoles: ["tester"],
     fetchImpl,
     confirmImpl: () => false,
   });
@@ -1939,7 +2362,7 @@ test("prepare action: a rejected fetch (network failure) re-enables the button a
   const handle = mod.mount(container, {
     project: "proj-a",
     issueId: ISSUE_A,
-    initialRole: "tester",
+    initialRoles: ["tester"],
     fetchImpl,
     confirmImpl: () => true,
   });
@@ -1970,7 +2393,7 @@ test("defaultConfirm: declines when no real window.confirm is reachable (safe de
 
   installFakeDocument();
   const container = new FakeElement("div");
-  const handle = mod.mount(container, { project: "proj-a", issueId: ISSUE_A, initialRole: "tester", fetchImpl });
+  const handle = mod.mount(container, { project: "proj-a", issueId: ISSUE_A, initialRoles: ["tester"], fetchImpl });
   // No confirmImpl passed — falls back to defaultConfirm(), which must not
   // throw even without a `window` at all, and must not proceed.
   await handle.ready;
@@ -2032,7 +2455,7 @@ test("checklist tab: renders a per-case \"Prepare test data for TC-001\" button 
   );
 
   const mod = await loadModule();
-  const handle = mod.mount(container, { project: "proj-a", issueId: ISSUE_A, initialRole: "tester", fetchImpl });
+  const handle = mod.mount(container, { project: "proj-a", issueId: ISSUE_A, initialRoles: ["tester"], fetchImpl });
   await handle.ready;
   handle.selectTab("manual_test_checklist");
   await flush();
@@ -2078,7 +2501,7 @@ test("checklist tab: clicking the per-case prepare button POSTs {confirm:true, t
   const handle = mod.mount(container, {
     project: "proj-a",
     issueId: ISSUE_A,
-    initialRole: "tester",
+    initialRoles: ["tester"],
     fetchImpl,
     confirmImpl: () => true,
   });
@@ -2113,7 +2536,7 @@ test("checklist tab: a case whose prepare is not offered renders no per-case pre
   );
 
   const mod = await loadModule();
-  const handle = mod.mount(container, { project: "proj-a", issueId: ISSUE_A, initialRole: "tester", fetchImpl });
+  const handle = mod.mount(container, { project: "proj-a", issueId: ISSUE_A, initialRoles: ["tester"], fetchImpl });
   await handle.ready;
   handle.selectTab("manual_test_checklist");
   await flush();

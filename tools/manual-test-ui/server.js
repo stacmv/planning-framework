@@ -245,9 +245,64 @@ function readChecklistContent(entry) {
   return null;
 }
 
-function issueSummary(entry) {
+// A simplified stand-in for /pf's own stage-completion judgment
+// (skills/pf-size-tiers/SKILL.md: stub-marker detection, tier-based skip
+// resolution for user_docs/dev_docs, notes.md standing in for brd/specs/
+// implementation_plan at `size_tier: trivial`) — deliberately not
+// replicated here. This is "does the file exist" (`classifyIssueDoc`,
+// already used for doc-tabs — status "present"/"on_branch" both read as
+// done, "missing"/"not_applicable" as not done), nothing more nuanced.
+// Flagged as a scope simplification in the project-inbox screen's plan,
+// not a silent gap: a trivial-tier issue (no brd.md/specs.md/
+// implementation_plan.md by design, notes.md instead) will show those
+// three as not-done here rather than "not applicable at this tier".
+const STAGE_DOCS = [
+  { key: "brd", doc: "brd.md" },
+  { key: "specs", doc: "specs.md" },
+  { key: "test_plan", doc: "test_plan.md" },
+  { key: "implementation_plan", doc: "implementation_plan.md" },
+  { key: "code_review", doc: "code_review.md" },
+  { key: "testing", doc: "manual_test_checklist.md" },
+  { key: "user_docs", doc: "user_docs.md" },
+  { key: "dev_docs", doc: "dev_docs.md" },
+  { key: "qa", doc: "qa_report.md" },
+];
+
+function issueStages(ctx) {
+  return STAGE_DOCS.map(({ key, doc }) => {
+    const state = docstate.classifyIssueDoc(ctx, doc);
+    return { key, done: state.status === "present" || state.status === "on_branch" };
+  });
+}
+
+// The standalone `**PASS**`/`**FAIL**` line `/pf-codereview`/`/pf-qa` always
+// write under a document's `## Verdict` heading (confirmed against this
+// repo's own code_review.md/qa_report.md files) — the same convention
+// those skills' own text requires so `/pf-close` can find it with a plain
+// text search. Deliberately disk-only: a doc that exists only on the
+// issue's own branch (`classifyIssueDoc`'s `location: "branch"`, `path:
+// null`) is skipped rather than read via `git show` — a minor scope
+// simplification, matching `issueStages`' own "simplified stand-in, not a
+// full replica" note above.
+const VERDICT_RE = /^\*\*(PASS|FAIL)\*\*\s*$/m;
+
+function docVerdict(ctx, docName) {
+  const state = docstate.classifyIssueDoc(ctx, docName);
+  if (state.status !== "present" || !state.path) return null;
+  let content;
+  try {
+    content = fs.readFileSync(state.path, "utf8");
+  } catch {
+    return null;
+  }
+  const match = VERDICT_RE.exec(content);
+  return match ? match[1] : null;
+}
+
+function issueSummary(entry, projectRoot) {
   const content = readChecklistContent(entry);
   const parsed = content ? parseChecklist(content) : null;
+  const ctx = projectRoot ? docstate.buildIssueContext(projectRoot, entry.issueId, entry.status) : null;
   return {
     issueId: entry.issueId,
     status: entry.status,
@@ -256,6 +311,9 @@ function issueSummary(entry) {
     feature: parsed ? parsed.meta["Feature Name"] || "" : "",
     date: parsed ? parsed.meta["Date"] || "" : "",
     summary: parsed ? summarize(parsed) : { totalSteps: 0, passedSteps: 0, totalTcs: 0 },
+    stages: ctx ? issueStages(ctx) : [],
+    codeReviewVerdict: ctx ? docVerdict(ctx, "code_review.md") : null,
+    qaVerdict: ctx ? docVerdict(ctx, "qa_report.md") : null,
   };
 }
 
@@ -1222,11 +1280,20 @@ async function handleApi(req, res, parts, projects, query) {
   if (parts.length === 2 && parts[1] === "projects" && req.method === "GET") {
     const list = [...projects.entries()].map(([name, p]) => {
       const defaultBranch = git.resolveDefaultBranch(p.root, p.configuredDefaultBranch);
+      // `openIssueCount`/`totalIssueCount` — every issue dir under
+      // docs/issues/{open,closed} (`findIssueDirs`), not "has a
+      // manual_test_checklist.md yet" (the previous `issueCount` here,
+      // `findChecklists(...).filter(checklistStatus !== "missing").length`
+      // — that undercounts to 0 for a project with real open issues that
+      // simply haven't reached `/pf-test` yet, reading as "nothing here"
+      // when there is). Dogfooding feedback, 20260806 issue.
+      const issueDirs = findIssueDirs(p.root, defaultBranch);
       return {
         name,
         currentBranch: git.getCurrentBranch(p.root),
         defaultBranch,
-        issueCount: findChecklists(p.root, defaultBranch).filter((e) => e.checklistStatus !== "missing").length,
+        openIssueCount: issueDirs.filter((e) => e.status === "open").length,
+        totalIssueCount: issueDirs.length,
       };
     });
     return sendJson(res, 200, list);
@@ -1288,7 +1355,7 @@ async function handleApi(req, res, parts, projects, query) {
   const defaultBranch = git.resolveDefaultBranch(projectRoot, project.configuredDefaultBranch);
 
   if (parts.length === 4 && parts[3] === "issues" && req.method === "GET") {
-    const list = findChecklists(projectRoot, defaultBranch).map(issueSummary);
+    const list = findChecklists(projectRoot, defaultBranch).map((entry) => issueSummary(entry, projectRoot));
     return sendJson(res, 200, { currentBranch: git.getCurrentBranch(projectRoot), defaultBranch, issues: list });
   }
 

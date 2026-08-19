@@ -50,6 +50,38 @@ test("public/style.css's :root palette clears every AC-02a-02c threshold (TC-007
   assert.ok(textSurfaceRatio < 15, `--text/--surface ratio ${textSurfaceRatio} is in the "too harsh" 15-21:1 band AC-02a warns against`);
 });
 
+// `--accent`/`--accent-ink` — the pairing every filled-accent surface uses
+// as its own text color (`.role-btn.active`, `.doc-tab--active`,
+// `.inbox-tab--active`): the step-1 sweep above never checked it before
+// this pair existed (it only knew about --text/--surface, --border/--bg,
+// and literal white/black), which is exactly how `color: var(--text)` on
+// `background: var(--accent)` shipped unnoticed through two code-review
+// rounds and QA — caught only by a human actually looking at the running
+// UI. `checkPalette`'s step-1 sweep already re-asserts zero violations on
+// the real file, which now includes this pairing (`surface-ink-minimum`);
+// this test is the negative case proving that rule actually fires, the
+// same convention step 2/3 above use for the other rules.
+test("checkPalette flags a bad surface-ink pair below 4.5:1 (surface-ink-minimum)", () => {
+  const parsed = {
+    tokens: { accent: "#5cc4d4", "accent-ink": "#4a9aa6" }, // too close to --accent itself
+    textLiterals: [],
+  };
+  const violations = checkPalette(parsed);
+  const hit = violations.find((v) => v.rule === "surface-ink-minimum");
+  assert.ok(hit, `expected a surface-ink-minimum violation, got ${JSON.stringify(violations)}`);
+  assert.strictEqual(hit.a, "accent-ink");
+  assert.strictEqual(hit.b, "accent");
+
+  // A surface-ink pair must never also be swept into the generic
+  // text-background-minimum check against --bg/--surface — it isn't
+  // text-on-page, it's ink-on-its-own-surface (that's the whole point of
+  // excluding it from `textTokenNames`).
+  assert.ok(
+    !violations.some((v) => v.rule === "text-background-minimum" && v.a === "accent-ink"),
+    "accent-ink must not be swept into the generic text-background-minimum check"
+  );
+});
+
 // --------------------------------------------------------------- step 2
 
 test("contrastRatio flags a text/surface-like pair below 7:1, and checkPalette catches it (TC-006 step 2)", () => {

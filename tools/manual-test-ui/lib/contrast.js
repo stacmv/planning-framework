@@ -132,6 +132,20 @@
   var BACKGROUND_TOKEN_NAMES = ["bg", "surface"];
   var BORDER_TOKEN_NAMES = ["border"];
 
+  // Ink tokens dedicated to one non-bg/surface filled surface (a pill/button
+  // background, e.g. `--accent`) — never used as body text against
+  // `--bg`/`--surface`, so sweeping them into the generic AC-02b check below
+  // would fail on a color that was deliberately chosen to be dark, like the
+  // page background, specifically *because* it sits on a light fill instead.
+  // `--accent-ink` is the first of these (`.doc-tab--active`,
+  // `.role-btn.active`, `.inbox-tab--active`) — a real bug (`color:
+  // var(--text)` on `background: var(--accent)`) that shipped through two
+  // code-review rounds and QA because nothing checked this exact pairing.
+  // Each is checked against its own surface only, by `checkPalette` below —
+  // excluded here so it isn't double-counted (or wrongly flagged) against
+  // `--bg`/`--surface`, which it was never meant to sit on.
+  var SURFACE_INK_PAIRS = { "accent-ink": "accent" };
+
   // Every other token (the main text color, status colors, the accent used
   // for panel-header text — AC-02f) is treated as a potential text color for
   // AC-02b/AC-02c. Deliberately a denylist, not an allowlist: a palette
@@ -143,6 +157,7 @@
       if (!Object.prototype.hasOwnProperty.call(tokens, name)) continue;
       if (BACKGROUND_TOKEN_NAMES.indexOf(name) !== -1) continue;
       if (BORDER_TOKEN_NAMES.indexOf(name) !== -1) continue;
+      if (Object.prototype.hasOwnProperty.call(SURFACE_INK_PAIRS, name)) continue;
       names.push(name);
     }
     return names;
@@ -228,6 +243,29 @@
     // AC-02c: borders to neighboring backgrounds, >= 1.5:1.
     if (border) {
       checkAgainstBackgrounds(violations, "border-background-minimum", 1.5, "border", border, bg, surface);
+    }
+
+    // Each surface-ink pair (e.g. --accent-ink on --accent) against its own
+    // dedicated surface, >= 4.5:1 (WCAG AA for UI text) — the check
+    // `textTokenNames`'s exclusion above defers to here instead of the
+    // generic bg/surface sweep.
+    for (var inkName in SURFACE_INK_PAIRS) {
+      if (!Object.prototype.hasOwnProperty.call(SURFACE_INK_PAIRS, inkName)) continue;
+      var surfaceName = SURFACE_INK_PAIRS[inkName];
+      var inkHex = tokens[inkName];
+      var surfaceHex = tokens[surfaceName];
+      if (!inkHex || !surfaceHex) continue;
+      var inkRatio = contrastRatio(inkHex, surfaceHex);
+      if (inkRatio !== null && inkRatio < 4.5) {
+        addViolation(violations, "surface-ink-minimum", {
+          a: inkName,
+          b: surfaceName,
+          hexA: inkHex,
+          hexB: surfaceHex,
+          ratio: inkRatio,
+          threshold: 4.5,
+        });
+      }
     }
 
     // AC-02c: no pure black background, on either background token.

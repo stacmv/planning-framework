@@ -90,6 +90,83 @@ test("TC-014 step 2: here / on_branch / missing are told apart, and missing name
 });
 
 // ---------------------------------------------------------------------------
+// `GET .../issues`'s `stages` field — the project-inbox screen's per-issue
+// status strip (dogfooding feedback point 7). Deliberately not a full
+// replica of /pf's own stage-completion judgment — see server.js's
+// `STAGE_DOCS` comment — just "does the file exist" per `classifyIssueDoc`,
+// the same classifier doc-tabs already use.
+// ---------------------------------------------------------------------------
+
+test("GET .../issues: each issue carries a stages[] built from classifyIssueDoc, present docs read done", async (t) => {
+  const { config } = setUp(t, { issues: [FULL], name: "stages" });
+  const server = await startServerFor(t, { configPath: config.configPath });
+
+  const res = await server.get("/api/projects/main/issues");
+  assert.strictEqual(res.status, 200, res.text);
+  const full = res.json.issues.find((i) => i.issueId === FULL);
+  assert.ok(full, "expected the FULL fixture issue in the list");
+
+  const byKey = Object.fromEntries(full.stages.map((s) => [s.key, s.done]));
+  // FULL declares brd/specs/implementation_plan/test_plan/manual_test_checklist/qa_report.md,
+  // but no code_review.md/user_docs.md/dev_docs.md.
+  assert.deepStrictEqual(byKey, {
+    brd: true,
+    specs: true,
+    test_plan: true,
+    implementation_plan: true,
+    code_review: false,
+    testing: true,
+    user_docs: false,
+    dev_docs: false,
+    qa: true,
+  });
+});
+
+// ---------------------------------------------------------------------------
+// `GET .../issues`'s `codeReviewVerdict`/`qaVerdict` — the issue-card status
+// message's priority 2/3 (dogfooding round 2). Reads the standalone
+// `**PASS**`/`**FAIL**` line every real code_review.md/qa_report.md carries
+// under its `## Verdict` heading (the exact convention /pf-codereview/
+// /pf-qa write — confirmed against this repo's own files, e.g.
+// docs/issues/closed/20260806-bug-test-plan-tc-untracked/qa_report.md).
+// ---------------------------------------------------------------------------
+
+test("GET .../issues: codeReviewVerdict/qaVerdict read the standalone PASS/FAIL line under ## Verdict", async (t) => {
+  const { repo, config } = setUp(t, { issues: [FULL], name: "verdicts" });
+  fs.writeFileSync(
+    path.join(repo.issuePath(FULL), "code_review.md"),
+    ["# Code Review Report", "", "## Verdict", "", "**FAIL**", ""].join("\n")
+  );
+  // FULL's own fixture qa_report.md uses the simplified "**Verdict:** PASS"
+  // shape (predates this feature) — overwrite with the real, standalone-line
+  // shape so this test exercises the actual production format.
+  fs.writeFileSync(
+    path.join(repo.issuePath(FULL), "qa_report.md"),
+    ["# QA Report", "", "## Verdict", "", "**PASS**", ""].join("\n")
+  );
+
+  const server = await startServerFor(t, { configPath: config.configPath });
+  const res = await server.get("/api/projects/main/issues");
+  assert.strictEqual(res.status, 200, res.text);
+  const full = res.json.issues.find((i) => i.issueId === FULL);
+
+  assert.strictEqual(full.codeReviewVerdict, "FAIL");
+  assert.strictEqual(full.qaVerdict, "PASS");
+});
+
+test("GET .../issues: codeReviewVerdict/qaVerdict are null when the doc doesn't exist or has no standalone verdict line", async (t) => {
+  const { config } = setUp(t, { issues: [NOQA], name: "verdicts-missing" });
+  const server = await startServerFor(t, { configPath: config.configPath });
+  const res = await server.get("/api/projects/main/issues");
+  const noqa = res.json.issues.find((i) => i.issueId === NOQA);
+
+  // NOQA declares no code_review.md/qa_report.md at all (its own fixture
+  // note: "no qa_report.md" — see the const's own comment above).
+  assert.strictEqual(noqa.codeReviewVerdict, null);
+  assert.strictEqual(noqa.qaVerdict, null);
+});
+
+// ---------------------------------------------------------------------------
 // Step 3 — writing into an on_branch checklist is refused, with the branch
 // ---------------------------------------------------------------------------
 

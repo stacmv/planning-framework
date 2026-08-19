@@ -6,13 +6,23 @@
 // external router library, keeping "one command, it works" (G7/AC-08a).
 //
 // Routing table (tech spec §2.3):
-//   "#/"                       -> launcher.js   (level 1)
-//   "#/inbox"                  -> inbox.js       (global inbox, AC-04d)
-//   "#/p/<project>"            -> workspace.js, issueId: null
-//                                  (no `pf.lastIssue.<project>` entry yet —
-//                                  the project's issue list, not a full
-//                                  level-2 workspace: there is no active
-//                                  issue yet, so no active role/`.doc-tabs`)
+//   "#/"                       -> launcher.js       (level 1)
+//   "#/inbox"                  -> inbox.js           (global inbox, AC-04d)
+//   "#/p/<project>"            -> project-inbox.js  (no `pf.lastIssue.<project>`
+//                                  entry yet — the project's own issue list +
+//                                  inbox, not a full level-2 workspace: there
+//                                  is no active issue yet, so no active
+//                                  role/`.doc-tabs`. Dogfooding fix: this used
+//                                  to silently route to workspace.js, which
+//                                  auto-picked `issues[0]` instead of ever
+//                                  showing a list — the tech spec §2.3
+//                                  described a list here from the start.)
+//   "#/p/<project>/inbox"      -> project-inbox.js's `mountInbox` (dogfooding
+//                                  round 2, Task 61: the project screen's
+//                                  full per-issue inbox breakdown promoted to
+//                                  its own screen — the project screen itself
+//                                  now shows only a collapsed summary card
+//                                  linking here).
 //   "#/p/<project>/i/<issue>"  -> workspace.js, issueId: <issue> (level 2)
 // Anything unrecognized falls back to the launcher, so a garbled/stale hash
 // never leaves the page blank.
@@ -31,10 +41,17 @@
 // concurrently-running task and may not be present yet when this file is
 // first loaded — a route that never resolves to "workspace" never imports
 // it, and a static import would instead fail the whole module graph.
+// Each entry names its loader plus which of the module's exports mounts it
+// (`entry`, default `"mount"`) — `projectInbox` shares its module and
+// data-fetching with `project`, but mounts via `mountInbox` instead
+// (dogfooding round 2, Task 61: one module, two screens, one more route,
+// not a fifth top-level file — see project-inbox.js's own header comment).
 const SCREENS = {
-  launcher: () => import("./launcher.js"),
-  inbox: () => import("./inbox.js"),
-  workspace: () => import("./workspace.js"),
+  launcher: { load: () => import("./launcher.js") },
+  inbox: { load: () => import("./inbox.js") },
+  project: { load: () => import("./project-inbox.js") },
+  projectInbox: { load: () => import("./project-inbox.js"), entry: "mountInbox" },
+  workspace: { load: () => import("./workspace.js") },
 };
 
 // ---------------------------------------------------------------------------
@@ -47,7 +64,7 @@ const SCREENS = {
  * Parse `location.hash` into which screen to mount and its route params.
  *
  * @param {string} hash — e.g. `location.hash`, may be `""`/`"#"`/`"#/"`/etc.
- * @returns {{screen: "launcher"|"inbox"|"workspace", project: string|null, issueId: string|null}}
+ * @returns {{screen: "launcher"|"inbox"|"project"|"projectInbox"|"workspace", project: string|null, issueId: string|null}}
  */
 // Query portion of the hash (e.g. `#/p/foo/i/bar?role=tester&tab=manual_test_checklist&ptcId=TC-01`)
 // carries an inbox click's initial-landing state (CR-005 fix, this issue's
@@ -60,7 +77,7 @@ const SCREENS = {
 // `location.hash` again (the rule Tasks 15/24 established) — this file
 // still never writes a query string of its own, `inbox.js` does, once, for
 // the initial navigation only.
-const NULL_ROUTE_EXTRAS = { initialRole: null, initialTab: null, initialPtcId: null };
+const NULL_ROUTE_EXTRAS = { initialRole: null, initialTab: null, initialPtcId: null, initialIssueId: null };
 
 export function parseRoute(hash) {
   const full = String(hash || "").replace(/^#/, "");
@@ -74,6 +91,13 @@ export function parseRoute(hash) {
     initialRole: query.get("role") || null,
     initialTab: query.get("tab") || null,
     initialPtcId: query.get("ptcId") || null,
+    // `?issue=<id>` — the global inbox's per-project issue summary table
+    // links to `#/p/<project>/inbox?issue=<id>` to jump straight to that
+    // issue's own group on the dedicated inbox screen
+    // (`project-inbox.js`'s `initialIssueId`). Read generically here (not
+    // gated to the "projectInbox" path branch) since it's just a query
+    // param — the same extraction already applies uniformly to every route.
+    initialIssueId: query.get("issue") || null,
   };
 
   if (segments.length === 0) {
@@ -87,7 +111,10 @@ export function parseRoute(hash) {
     if (segments.length >= 4 && segments[2] === "i" && segments[3]) {
       return { screen: "workspace", project, issueId: decodeURIComponent(segments[3]), ...extras };
     }
-    return { screen: "workspace", project, issueId: null, ...extras };
+    if (segments.length === 3 && segments[2] === "inbox") {
+      return { screen: "projectInbox", project, issueId: null, ...extras };
+    }
+    return { screen: "project", project, issueId: null, ...extras };
   }
 
   return { screen: "launcher", project: null, issueId: null, ...NULL_ROUTE_EXTRAS };
@@ -139,11 +166,26 @@ function optionsFor(route) {
       return { onNavigate: navigate };
     case "inbox":
       return { onNavigate: (target) => navigate(inboxTargetHash(target)) };
+    case "project":
+    case "projectInbox":
+      return {
+        project: route.project,
+        // A manual-test-item click carries a single `role=` (the item's own
+        // role, e.g. "tester") — landing pre-filtered to just that role is
+        // the useful default; the multi-select filter itself still lives in
+        // localStorage for every subsequent visit.
+        initialRoles: route.initialRole ? [route.initialRole] : undefined,
+        initialIssueId: route.initialIssueId || undefined,
+        onNavigate: (target) => navigate(inboxTargetHash(target)),
+      };
     case "workspace":
       return {
         project: route.project,
         issueId: route.issueId,
-        initialRole: route.initialRole || undefined,
+        // A manual-test-item click carries a single `role=` (the item's own
+        // role) — landing pre-filtered to just that role is the useful
+        // default, same as the "project"/"projectInbox" cases above.
+        initialRoles: route.initialRole ? [route.initialRole] : undefined,
         initialTab: route.initialTab || undefined,
         initialPtcId: route.initialPtcId || undefined,
         onNavigate: navigate,
@@ -160,15 +202,16 @@ async function renderRoute() {
   if (!container) return;
 
   const route = parseRoute(location.hash);
-  const loadScreen = SCREENS[route.screen] || SCREENS.launcher;
+  const screen = SCREENS[route.screen] || SCREENS.launcher;
 
   if (current && typeof current.unmount === "function") current.unmount();
   current = null;
   container.innerHTML = "";
 
   try {
-    const mod = await loadScreen();
-    current = mod.mount(container, optionsFor(route));
+    const mod = await screen.load();
+    const mountFn = mod[screen.entry || "mount"];
+    current = mountFn(container, optionsFor(route));
   } catch (err) {
     container.innerHTML = "";
     const p = document.createElement("p");

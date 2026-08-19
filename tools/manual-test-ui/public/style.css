@@ -9,6 +9,7 @@
   --warn: #e0b95c;
   --held: #b6a0ef;
   --accent: #5cc4d4;
+  --accent-ink: #16241b;
   font-family: -apple-system, "Segoe UI", Roboto, sans-serif;
 }
 
@@ -25,7 +26,7 @@ body {
 
 /* Minimal element reset, same spirit as the `*{box-sizing}`/`body` rules
    above: every `<button>`/`<select>` in this tool (`.role-btn`, `.doc-tab`,
-   `.issue-select`, `.role-select`, …) inherits the interface font/size/color
+   `.issue-select`, …) inherits the interface font/size/color
    instead of the browser's native control chrome, and `<a>` (`.inbox-card`,
    `.project-card`, `.workspace-back`, …) reads in the accent color by
    default. Each of those classes still sets its own colors/borders/padding —
@@ -831,7 +832,7 @@ table.steps tr:last-child td { border-bottom: none; }
 .role-btn.active {
   background: var(--accent);
   border-color: var(--accent);
-  color: var(--text);
+  color: var(--accent-ink);
   font-weight: 600;
 }
 
@@ -851,6 +852,20 @@ table.steps tr:last-child td { border-bottom: none; }
   color: var(--accent);
   font-weight: 600;
   font-size: 15px;
+}
+
+/* Three labeled sections (`status.js`'s `projectCategory`, dogfooding round
+   2) replacing the old bare "N требует внимания" — same `.project-grid`
+   layout repeated per section, not a new grid concept. */
+.project-sections { display: flex; flex-direction: column; gap: 24px; }
+
+.project-section { display: flex; flex-direction: column; }
+
+.project-section-title {
+  color: var(--text);
+  font-weight: 600;
+  font-size: 14px;
+  margin: 0 0 10px;
 }
 
 .project-grid {
@@ -879,44 +894,97 @@ table.steps tr:last-child td { border-bottom: none; }
   overflow-wrap: anywhere;
 }
 
-.project-card-meta {
+.project-card-issues {
+  list-style: none;
+  margin: 0;
+  padding: 0;
   color: var(--muted);
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+}
+.project-card-issues li + li { margin-top: 4px; }
+.project-card-issue-id { color: var(--text); font-weight: 600; }
+.project-card-issue-meta { color: var(--muted); }
+
+.project-card-problem {
+  color: var(--warn);
   font-size: 12px;
 }
 
 /* --------------------------------------------------------------- inbox */
 /* Global inbox screen (`public/inbox.js`, test_plan.md TC-018/TC-019/TC-020):
-   `.inbox-tabs` switches which of the two `.inbox-panels` sections is
-   visible; each section is its own `.panel`-style block of `.inbox-item`
-   rows. */
+   grouped by project (`groupByProject`) — `.inbox-project` is one project's
+   heading + issue-summary table (dogfooding decision, replacing the
+   original flat two-section/tab-switch list across every project at once —
+   the earlier `.inbox-tabs`/`.inbox-panels` rules for that are gone with
+   it, not left as dead CSS). Each section within an issue's own group is
+   still the same `.panel`-style block of `.inbox-item` rows this screen
+   always used. */
 
-.inbox-tabs {
-  display: flex;
-  gap: 6px;
-  flex-wrap: wrap;
-  margin-bottom: 16px;
-}
+.inbox-projects { display: flex; flex-direction: column; gap: 28px; }
 
-.inbox-tab {
-  background: transparent;
+.inbox-project {
+  background: var(--surface);
   border: 1px solid var(--border);
-  border-radius: 999px;
-  color: var(--text);
-  padding: 7px 16px;
-  cursor: pointer;
-  white-space: nowrap;
+  border-radius: 10px;
+  padding: 14px 18px;
 }
 
-.inbox-tab:hover { background: color-mix(in srgb, var(--surface) 80%, var(--accent)); }
+.inbox-project-heading { margin-bottom: 10px; }
 
-.inbox-tab--active {
-  background: var(--accent);
-  border-color: var(--accent);
+.inbox-project-link {
+  color: var(--accent);
+  font-weight: 600;
+  font-size: 16px;
+  text-decoration: none;
+}
+.inbox-project-link:hover { text-decoration: underline; }
+
+.inbox-project-table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.inbox-project-table th {
+  text-align: left;
+  color: var(--muted);
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  font-weight: 600;
+  padding: 6px 10px;
+  border-bottom: 1px solid var(--border);
+}
+
+.inbox-project-table td {
+  padding: 8px 10px;
+  border-bottom: 1px solid var(--border);
+  font-variant-numeric: tabular-nums;
+}
+
+.inbox-project-issue-link {
   color: var(--text);
+  text-decoration: none;
   font-weight: 600;
 }
+.inbox-project-issue-link:hover { color: var(--accent); text-decoration: underline; }
 
-.inbox-panels { display: flex; flex-direction: column; gap: 20px; }
+/* `renderIssueGroup` (`public/inbox.js`) — one issue's own block: heading
+   + the same two `.inbox-section`-style panels, reused by the project-
+   inbox screen (one block per issue) and the workspace "Дела" tab (one
+   block, this issue only). Deliberately a plain heading + gap, not another
+   `.panel`-style border — it already sits inside a bordered panel on both
+   call sites, and a border-in-a-border reads as visual noise. */
+.issue-group + .issue-group { margin-top: 24px; }
+
+.issue-group-title {
+  color: var(--text);
+  font-weight: 600;
+  font-size: 14px;
+  margin: 0 0 10px;
+}
+
+.issue-group-panels { display: flex; flex-direction: column; gap: 14px; }
 
 .inbox-section {
   background: var(--surface);
@@ -988,6 +1056,21 @@ table.steps tr:last-child td { border-bottom: none; }
   gap: 16px;
 }
 
+/* `.workspace-header` + `.doc-tabs` stick together as one unit while the
+   active document/checklist scrolls underneath — the page still scrolls as
+   a whole (no `overflow: hidden` reintroduced, TC-005), only this wrapper
+   pins. `background: var(--bg)` matters here: without an opaque background
+   the scrolling content would show through behind the sticky header. */
+.workspace-sticky {
+  position: sticky;
+  top: 0;
+  z-index: 5;
+  background: var(--bg);
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
 .workspace-header {
   display: flex;
   align-items: center;
@@ -1015,16 +1098,54 @@ table.steps tr:last-child td { border-bottom: none; }
   text-overflow: ellipsis;
 }
 
+/* `project-picker.js`'s `renderProjectSelector` — the unified header's
+   project control (dogfooding round 2). The trigger looks like
+   `.workspace-project` (same role, now also clickable); the panel opens
+   as a dropdown *over* the current screen, not a navigation, so it needs
+   its own scroll/elevation — `.project-selector` is the positioning
+   context the absolutely-positioned panel anchors to. */
+.project-selector { position: relative; }
+
+.project-selector-trigger {
+  background: transparent;
+  border: none;
+  color: var(--text);
+  font-weight: 600;
+  font-size: 15px;
+  cursor: pointer;
+  padding: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 240px;
+}
+.project-selector-trigger:hover { color: var(--accent); }
+
+.project-selector-panel {
+  position: absolute;
+  top: calc(100% + 8px);
+  left: 0;
+  z-index: 10;
+  width: min(480px, 90vw);
+  max-height: 70vh;
+  overflow-y: auto;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 16px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35);
+}
+
 .workspace-field {
   display: flex;
   align-items: center;
   gap: 8px;
 }
 
-/* Both dropdowns sit together at the header's trailing edge, Issue before
-   Role — `--issue`/`--role` only need to say which `<select>` they wrap for
-   `.issue-select`/`.role-select` sizing below, not a different layout. */
-.workspace-field--role { margin-left: auto; }
+/* The role filter (`.role-switch`, dogfooding round 2 — replacing the old
+   single `[Роль ▾]` dropdown) sits at the header's trailing edge, after the
+   Issue select. */
+.workspace-header .role-switch { margin-left: auto; }
 
 .field-label {
   color: var(--muted);
@@ -1034,8 +1155,7 @@ table.steps tr:last-child td { border-bottom: none; }
   white-space: nowrap;
 }
 
-.issue-select,
-.role-select {
+.issue-select {
   background: var(--bg);
   border: 1px solid var(--border);
   border-radius: 6px;
@@ -1043,16 +1163,49 @@ table.steps tr:last-child td { border-bottom: none; }
   padding: 5px 8px;
 }
 
-.issue-select:disabled,
-.role-select:disabled { opacity: 0.6; cursor: default; }
+.issue-select:disabled { opacity: 0.6; cursor: default; }
 
 .workspace-field--issue .issue-select { min-width: 160px; }
-.workspace-field--role .role-select { min-width: 140px; }
+
+/* Issue vs. project document groups (mockup Variant A) — one flex row of
+   `.tab-group`s, each its own labeled `.doc-tabs` pill row, separated by a
+   thin `.group-divider`. */
+.doc-tabs-groups {
+  display: flex;
+  align-items: flex-start;
+  gap: 14px;
+  flex-wrap: wrap;
+}
+
+.tab-group {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.group-label {
+  color: var(--muted);
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.group-divider {
+  width: 1px;
+  align-self: stretch;
+  background: var(--border);
+  margin: 0 2px;
+}
 
 .doc-tabs {
   display: flex;
   gap: 6px;
   flex-wrap: wrap;
+}
+
+.doc-tab--missing {
+  color: var(--muted);
+  border-style: dashed;
 }
 
 .doc-tab {
@@ -1070,7 +1223,7 @@ table.steps tr:last-child td { border-bottom: none; }
 .doc-tab--active {
   background: var(--accent);
   border-color: var(--accent);
-  color: var(--text);
+  color: var(--accent-ink);
   font-weight: 600;
 }
 
@@ -1253,8 +1406,10 @@ table.steps tr:last-child td { border-bottom: none; }
 /* `.human-tasks-body` is the tab's whole content wrapper (loading text, the
    error `.notice`, or the list below) — no layout of its own, just a hook
    the coverage guard and `loadAndRenderHumanTasks` share for "this is the
-   pane that gets cleared and re-rendered". */
+   pane that gets cleared and re-rendered". `.manual-tests-body` is the same
+   pattern for this issue's manual-tests half, above it. */
 .human-tasks-body { margin-top: 4px; }
+.manual-tests-body { margin-bottom: 18px; }
 
 .human-tasks-list { display: flex; flex-direction: column; gap: 10px; margin-top: 10px; }
 
@@ -1360,6 +1515,82 @@ table.steps tr:last-child td { border-bottom: none; }
 .human-task-complete-status.error,
 .human-task-reassign-status.error {
   color: var(--fail);
+}
+
+/* ------------------------------------------------------- project inbox */
+/* `public/project-inbox.js` — `#/p/<project>` (mount(), the project screen)
+   and `#/p/<project>/inbox` (mountInbox(), the dedicated inbox screen —
+   dogfooding round 2, Task 61). Both reuse `.workspace-header` (unified
+   header) and `.project-section`/`.project-section-title` (issue sections);
+   `.project-inbox-section` is the dedicated inbox screen's own single
+   breakdown block, reusing `.issue-group`/`.inbox-section` from the inbox
+   styles above; `.issue-card-grid`/`.issue-card*` are the project screen's
+   per-issue cards. */
+
+.project-inbox { display: flex; flex-direction: column; gap: 24px; }
+
+.project-inbox-section { display: flex; flex-direction: column; gap: 12px; }
+
+.issue-card-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 12px;
+}
+
+.issue-card {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 14px 16px;
+  color: var(--text);
+  text-decoration: none;
+}
+
+.issue-card:hover { border-color: var(--accent); }
+
+.issue-card-title-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.issue-card-id {
+  color: var(--accent);
+  font-weight: 600;
+  font-size: 13px;
+  overflow-wrap: anywhere;
+}
+
+.issue-card-feature { color: var(--muted); font-size: 12px; }
+
+.issue-stage-strip {
+  display: flex;
+  gap: 4px;
+  flex-wrap: wrap;
+}
+
+.issue-stage {
+  font-size: 10px;
+  padding: 2px 6px;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+  color: var(--muted);
+  white-space: nowrap;
+}
+
+.issue-stage--done {
+  border-color: var(--ok);
+  color: var(--ok);
+}
+
+.issue-card-attention {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text);
+  margin-top: auto;
 }
 
 /* ----------------------------------------------------------- narrow view */

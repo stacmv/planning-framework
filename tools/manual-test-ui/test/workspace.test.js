@@ -20,7 +20,7 @@
 //     tab sets (server-side, not client-mocked).
 //   * TC-003 — `resolveActiveTab` fed a real `GET .../roles/analyst`
 //     response for two issues (one with `brd.md`, one without).
-//   * TC-029 — `countProjectTodos` fed a real `GET /api/inbox` response
+//   * TC-029 — `countIssueTodos` fed a real `GET /api/inbox` response
 //     spanning two issues of one project (and a second, unrelated project,
 //     to prove no cross-project leakage); a source-level check that
 //     `/api/inbox` is fetched from exactly one call site (TC-029 step 4's
@@ -199,7 +199,7 @@ test("mount(): a real server round trip builds .doc-tabs for the current role on
   const container = new FakeElement("div");
   const fetchImpl = (pathname) => fetch(server.baseUrl + pathname);
 
-  const handle = mod.mount(container, { project: "main", issueId: FULL, initialRole: "tester", fetchImpl });
+  const handle = mod.mount(container, { project: "main", issueId: FULL, initialRoles: ["tester"], fetchImpl });
   await handle.ready;
 
   let tabButtons = container.findAll((n) => n.tagName === "BUTTON" && n.dataset.tabId);
@@ -269,7 +269,7 @@ test("mount(): switching Issue against a real server keeps the active tab, even 
   const container = new FakeElement("div");
   const fetchImpl = (pathname) => fetch(server.baseUrl + pathname);
 
-  const handle = mod.mount(container, { project: "main", issueId: FULL, initialRole: "analyst", fetchImpl });
+  const handle = mod.mount(container, { project: "main", issueId: FULL, initialRoles: ["analyst"], fetchImpl });
   await handle.ready;
 
   handle.selectTab("brd");
@@ -286,8 +286,10 @@ test("mount(): switching Issue against a real server keeps the active tab, even 
 });
 
 // ---------------------------------------------------------------------------
-// TC-029: countProjectTodos, fed a real GET /api/inbox response spanning two
-// issues of one project, plus an unrelated second project.
+// TC-029: countIssueTodos (dogfooding round 2: issue-scoped, not
+// project-wide — see workspace.js's own comment on the function), fed a
+// real GET /api/inbox response spanning two issues of one project, plus an
+// unrelated second project.
 // ---------------------------------------------------------------------------
 
 const TASKS_ISSUE_A = "20260201-feat-fixture-todos-a";
@@ -339,7 +341,7 @@ function buildTodosFixture(t) {
     },
   });
   // A second, unrelated project with its own human task — proves
-  // countProjectTodos() does not leak another project's items into "main"'s
+  // countIssueTodos() does not leak another project's items into "main"'s
   // count (real cross-project data, not a hand-built single-project fixture).
   const other = makeTempRepo({
     name: "other",
@@ -358,7 +360,7 @@ function buildTodosFixture(t) {
   return { main, other, configPath: config.configPath };
 }
 
-test("TC-029 step 1: countProjectTodos(inboxResponse, \"main\"), fed a real GET /api/inbox, sums 2 manual TC (issue A) + 1 human task (issue B) = 3", async (t) => {
+test("TC-029 step 1: countIssueTodos(inboxResponse, \"main\", issueId), fed a real GET /api/inbox, scopes to one issue at a time", async (t) => {
   const fx = buildTodosFixture(t);
   const server = await startServerFor(t, { configPath: fx.configPath });
   const mod = await loadModule();
@@ -371,14 +373,17 @@ test("TC-029 step 1: countProjectTodos(inboxResponse, \"main\"), fed a real GET 
   assert.ok(inboxResponse.humanTasks.some((h) => h.project === "main" && h.issueId === TASKS_ISSUE_B));
   assert.ok(inboxResponse.humanTasks.some((h) => h.project === "other"));
 
-  assert.strictEqual(mod.countProjectTodos(inboxResponse, "main"), 3);
+  // Issue A's own 2 manual TC; issue B's own 1 human task — neither leaks
+  // into the other, even though both belong to the same project.
+  assert.strictEqual(mod.countIssueTodos(inboxResponse, "main", TASKS_ISSUE_A), 2);
+  assert.strictEqual(mod.countIssueTodos(inboxResponse, "main", TASKS_ISSUE_B), 1);
   // The "other" project's own real human task must count for "other", not
-  // leak into (or out of) "main"'s sum.
-  assert.strictEqual(mod.countProjectTodos(inboxResponse, "other"), 1);
-  assert.strictEqual(mod.countProjectTodos(inboxResponse, "nonexistent-project"), 0);
+  // leak into (or out of) "main"'s issues.
+  assert.strictEqual(mod.countIssueTodos(inboxResponse, "other", OTHER_HUMAN_ISSUE), 1);
+  assert.strictEqual(mod.countIssueTodos(inboxResponse, "nonexistent-project", "nonexistent-issue"), 0);
 });
 
-test("mount(): Дела tab shows the real project-wide count from GET /api/inbox, unaffected by which issue/role is active", async (t) => {
+test("mount(): Дела tab shows the real issue-scoped count from GET /api/inbox, unaffected by which role is active", async (t) => {
   const fx = buildTodosFixture(t);
   const server = await startServerFor(t, { configPath: fx.configPath });
   const mod = await loadModule();
@@ -387,13 +392,13 @@ test("mount(): Дела tab shows the real project-wide count from GET /api/inbo
   const container = new FakeElement("div");
   const fetchImpl = (pathname) => fetch(server.baseUrl + pathname);
 
-  const handle = mod.mount(container, { project: "main", issueId: TASKS_ISSUE_B, initialRole: "analyst", fetchImpl });
+  const handle = mod.mount(container, { project: "main", issueId: TASKS_ISSUE_B, initialRoles: ["analyst"], fetchImpl });
   await handle.ready;
-  await new Promise((resolve) => setTimeout(resolve, 0)); // let loadProjectTodoCount settle
+  await new Promise((resolve) => setTimeout(resolve, 0)); // let loadIssueTodoCount settle
 
   const tabButtons = container.findAll((n) => n.tagName === "BUTTON" && n.dataset.tabId === mod.HUMAN_TASKS_TAB_ID);
   assert.strictEqual(tabButtons.length, 1);
-  assert.strictEqual(tabButtons[0].textContent, "Дела (3)", "real project-wide count: 2 manual TC + 1 human task = 3");
+  assert.strictEqual(tabButtons[0].textContent, "Дела (1)", "real issue-scoped count: issue B's own 1 human task, not issue A's manual TCs");
 });
 
 // TC-029 step 4's grep: no repeat fetch("/api/inbox") when Role/Issue
@@ -504,7 +509,7 @@ test("mount(): checklist step Save PATCHes the real server and the write actuall
   const container = new FakeElement("div");
   const fetchImpl = (pathname, init) => fetch(server.baseUrl + pathname, init);
 
-  const handle = mod.mount(container, { project: "main", issueId: FULL, initialRole: "tester", fetchImpl });
+  const handle = mod.mount(container, { project: "main", issueId: FULL, initialRoles: ["tester"], fetchImpl });
   await handle.ready;
   handle.selectTab("manual_test_checklist");
   await waitFor(() => container.findAll((n) => n.className === "step-checkbox").length > 0);
@@ -543,7 +548,7 @@ test("mount(): checklist step Save against the real server surfaces the real 422
   const container = new FakeElement("div");
   const fetchImpl = (pathname, init) => fetch(server.baseUrl + pathname, init);
 
-  const handle = mod.mount(container, { project: "main", issueId: FULL, initialRole: "tester", fetchImpl });
+  const handle = mod.mount(container, { project: "main", issueId: FULL, initialRoles: ["tester"], fetchImpl });
   await handle.ready;
   handle.selectTab("manual_test_checklist");
   await waitFor(() => container.findAll((n) => n.className === "step-checkbox").length > 0);
@@ -601,7 +606,7 @@ test("mount(): the checkout banner's real POST .../checklist/checkout actually s
   const handle = mod.mount(container, {
     project: "main",
     issueId: ONBRANCH,
-    initialRole: "tester",
+    initialRoles: ["tester"],
     fetchImpl,
     confirmImpl: () => true,
   });
@@ -647,7 +652,7 @@ test("mount(): the prepare action's real POST .../prepare with {confirm:true} ru
   const handle = mod.mount(container, {
     project: "main",
     issueId: TWOCASES,
-    initialRole: "tester",
+    initialRoles: ["tester"],
     fetchImpl,
     confirmImpl: () => true,
   });
