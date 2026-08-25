@@ -818,7 +818,9 @@ printf '=== @pf-issue attribution: both write paths require the marker, Check 4 
 # creates/modifies, and the Phase 3.5 completeness gate must enforce it
 # mechanically (Check 4) before this stage can hand off to /pf-codereview.
 
+# shellcheck disable=SC2016  # literal backticks in the heading, no expansion intended
 subagent_hdr_ln="$(grep -n -F -- '### For Each Task — `write: claude` (Sub-Agent Instructions)' "$EXEC_SKILL" 2>/dev/null | head -1 | cut -d: -f1)"
+# shellcheck disable=SC2016
 delegated_hdr_ln="$(grep -n -F -- '### For Each Task — `write != claude` (delegated actor)' "$EXEC_SKILL" 2>/dev/null | head -1 | cut -d: -f1)"
 issues_hdr_ln="$(grep -n -F -- '### If Issues Are Discovered' "$EXEC_SKILL" 2>/dev/null | head -1 | cut -d: -f1)"
 
