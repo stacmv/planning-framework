@@ -2,7 +2,7 @@
 
 **Project:** MyProject
 **Started:** 2025-11-06
-**Last Updated:** 2026-07-10
+**Last Updated:** 2026-08-25
 
 ---
 
@@ -41,6 +41,7 @@ Quick reference to all decisions:
 | [ADR-001](#adr-001-decision-title) | [Decision Title] | Accepted | 2025-11-06 |
 | [ADR-002](#adr-002-release-branch-model--develop-trunk--main-release-installed-via-main) | Release branch model — `develop` (trunk) + `main` (release), installed via `main` | Accepted | 2026-07-10 |
 | [ADR-003](#adr-003-decision-title) | [Decision Title] | Superseded | 2025-11-06 |
+| [ADR-004](#adr-004-document-review-is-path-based--no-issue-branch-required-branch-only-for-code-review) | Document review is path-based — no issue branch required; branch only for code review | Accepted | 2026-08-25 |
 
 ---
 
@@ -200,6 +201,38 @@ The `curl|sh` payload is the project's most visible artifact to a first-time use
 
 - Relates to issue [20260706-improve-onboarding-tui](../issues/closed/20260706-improve-onboarding-tui/) (Tasks 6–9: installer + shim + README).
 - Conflicts with a hypothetical "Option 3" future where `main` becomes the default branch — explicitly rejected above.
+
+---
+
+### ADR-004: Document review is path-based — no issue branch required; branch only for code review
+
+**Date:** 2026-08-25
+**Status:** Accepted (direct skill edit, no pipeline issue)
+
+#### Context
+`pf-check`'s Codex invocation chain reviewed documents through the plugin's diff-based reviewer (`codex-companion.mjs review --scope branch --base <base-ref>`). Planning documents (`brd.md`, `specs.md`, `test_plan.md`, `implementation_plan.md`) are written on the parent branch *before* `/pf-execute` creates `issue/<ID>`, so that diff was always empty. The "Off-branch TARGET (AC-5.2)" rule handled this by silently switching the reviewer to `claude`. Net effect: a configured `codex` reviewer never reviewed a single planning document, and agents in consumer projects reported the framework as "cannot send documents to Codex before the branch exists".
+
+#### Options Considered
+1. **Path-based Codex invocation for documents** — `codex-companion.mjs task "<brief>" --json` (read-only sandbox, Codex reads the named files), asking Codex for a `review-output.schema.json`-shaped JSON reply; unstructured fallback if it doesn't parse. Small change confined to `pf-check`; reviewer choice is honored. Con: structure depends on Codex following the output instruction.
+2. **Create the issue branch at issue creation** so the diff-based reviewer works for documents. Con: changes the branch model across `pf`, `pf-brd`, `pf-execute`, `pf-close`, docs and every open issue.
+3. **Leave as is**, document the fallback. Con: `review: [codex]` on document stages stays a no-op.
+
+#### Decision
+Option 1. A review target that is a *document* is reviewed by its path on disk, with no branch check and no diff — for every reviewer (`invoke: agent` actors already worked this way). A branch and a diff are required only where the target genuinely *is* a set of changes: `pf-codereview`. The Codex invocation chain in `pf-check` now has two invocation forms — document (`task`, path-based) and code-diff (`review --scope branch`) — and `pf-codereview` references the code-diff form explicitly.
+
+#### Rationale
+- The reviewer the user configured must be the reviewer that runs; the branch state may change *how* Codex is called, never *who* reviews.
+- Documents have no "changes" to review before the branch exists — reviewing their content is the whole point of `/pf-check`.
+- Keeps the branch model untouched.
+
+#### Consequences
+**Positive:**
+- `review: [codex]` / `claude-writes-codex-reviews` become effective for BRD/spec/test-plan/impl-plan stages.
+- One chain, two forms; empty-diff guard stays exactly where it is meaningful (code review).
+
+**Negative:**
+- Document-form structure is best-effort: a non-JSON Codex reply is shown unstructured (no P0/P1/P2 mapping), same as the existing raw `codex exec` fallback.
+- AC-5.2's "off-branch → Claude" behavior is retired; issues relying on it get a Codex review instead.
 
 ---
 
@@ -376,4 +409,4 @@ Create an ADR when deciding:
 ---
 
 **Log Started:** 2025-11-06
-**Last Updated:** 2026-07-10
+**Last Updated:** 2026-08-25
