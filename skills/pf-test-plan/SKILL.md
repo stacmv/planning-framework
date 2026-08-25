@@ -102,7 +102,7 @@ Group test cases:
 
 Each row must include a **Type** column: `Auto` if the test case is verified by running an automated test suite (e.g. a unit/integration test asserting behavior of executable code), or `Manual` if it can only be verified by a human following steps by hand (e.g. inspecting a generated document, running a CLI/skill interactively, checking prose content). `/pf-test` uses this column to decide which TCs gate on the automated test suite and which go into the manual test checklist — every TC must be marked one or the other, there is no unmarked/blank state.
 
-A TC marked `Auto` must be discoverable by `/pf-test`'s TC-ID scanning (Phase 3.2/3.3 in `skills/pf-test/SKILL.md`) — written using a convention that phase recognizes. If it cannot be, mark it `Manual` instead.
+A TC marked `Auto` must be discoverable by `/pf-test`'s TC-ID scanning (Phase 3.2/3.3 in `skills/pf-test/SKILL.md`) — written using a convention that phase recognizes. If it cannot be, mark it `Manual` instead. Since TC-IDs restart at TC-001 in every issue, the test file itself must also say *which issue* each test belongs to — via the `@pf-issue` marker convention (a per-test comment marker, or a file-level header marker) `/pf-test` 3.2 resolves attribution from; see that section for the exact syntax.
 
 ```markdown
 ## Status Tracker

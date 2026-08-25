@@ -243,6 +243,8 @@ All issue types follow the same end-to-end stages, differing only in their plann
 
 **TESTING stage** — `/pf-test` runs the automated test suite, updates the Status Tracker in `test_plan.md`, and generates `manual_test_checklist.md` for scenarios that require human verification.
 
+**Test attribution.** TC-IDs restart at TC-001 in every issue, so a test's TC-ID alone does not say which issue it belongs to — test files carry an `@pf-issue` marker to make that explicit. A per-test marker, written as a comment directly above the test, names the issue and (optionally) the TC-IDs it covers: `// @pf-issue 20260825-feat-modeleval TC-001, TC-002`. A file-level header marker, in the file's first ~10 lines, sets the default issue for every test in the file that has no marker of its own: `# @pf-issue 20260825-feat-modeleval`. A per-test marker always wins over the file header. `/pf-test` resolves each test's owning issue this way before mapping it to a TC (see `skills/pf-test/SKILL.md` Phase 3.2).
+
 **QA stage** — `/pf-qa` executes every check defined in `.qa-workflow.md` and writes `qa_report.md` with a PASS or FAIL verdict. The issue cannot be closed until this report shows PASS. Use `/pf-qa-setup` to create or update `.qa-workflow.md` for the project.
 
 **CLOSE stage** — `/pf-close` merges the issue branch to the parent, moves the issue folder from `open/` to `closed/`, appends a one-line entry to `docs/planning/session-log.md`, promotes significant decisions, and commits everything.

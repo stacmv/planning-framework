@@ -358,4 +358,57 @@ else
   fi
 fi
 
+# ══════════════════════════════════════════════════════════════════════════════
+printf '=== Test attribution: @pf-issue marker convention (no TC-ID — backing task is this week'"'"'s plan item, not a pf-issue)\n'
+# ══════════════════════════════════════════════════════════════════════════════
+# The problem this covers: TC-IDs restart at TC-001 in every issue, so a bare
+# TC-ID label does not say which issue a test belongs to, and the old
+# file-level heuristic (ISSUE-ID in path/file, or the branch diff) misattributes
+# any test file merely touched on the branch. skills/pf-test/SKILL.md 3.2 now
+# resolves attribution per test via a comment marker, marker-first, falling
+# back to the old heuristic only for a file with no marker at all — and warns
+# when it does. Paragraphs in this skill wrap at less than 80 columns, so
+# phrases spanning a source line break are matched against a paragraph-joined
+# copy (RS="" collapses each blank-line-separated block to one line), the same
+# technique test/pf-execute-task-dispatch.sh's TC-026 step 3 already uses for
+# the same reason.
+
+if [ ! -f "$PF_TEST" ]; then
+  pf_fail "@pf-issue step 1-4: skills/pf-test/SKILL.md does not exist"
+else
+  pf_test_flat="$(awk 'BEGIN{RS=""} {gsub(/\n/," "); print}' "$PF_TEST")"
+
+  if printf '%s\n' "$pf_test_flat" | grep -qF '@pf-issue'; then
+    pf_pass "@pf-issue step 1: 3.2 documents the @pf-issue marker convention"
+  else
+    pf_fail "@pf-issue step 1: 3.2 does not mention @pf-issue"
+  fi
+
+  if printf '%s\n' "$pf_test_flat" | grep -qiE 'resolve its owning issue in this order'; then
+    pf_pass "@pf-issue step 2: 3.2 states a marker-first resolution order (own marker before file header)"
+  else
+    pf_fail "@pf-issue step 2: 3.2 does not state a marker-first resolution order"
+  fi
+
+  if printf '%s\n' "$pf_test_flat" | grep -qF 'legacy mapping (no @pf-issue marker):'; then
+    pf_pass "@pf-issue step 3: 3.2 defines the 'legacy mapping (no @pf-issue marker): <path>' warning line"
+  else
+    pf_fail "@pf-issue step 3: 3.2 does not define the legacy-mapping warning line"
+  fi
+
+  if printf '%s\n' "$pf_test_flat" | grep -qiE 'gets no legacy fallback'; then
+    pf_pass "@pf-issue step 4: 3.2 states a file naming only other issues gets no legacy fallback"
+  else
+    pf_fail "@pf-issue step 4: 3.2 does not state the other-issues-no-fallback rule"
+  fi
+fi
+
+if [ ! -f "$PF_TEST_PLAN" ]; then
+  pf_fail "@pf-issue step 5: skills/pf-test-plan/SKILL.md does not exist"
+elif grep -qF '@pf-issue' "$PF_TEST_PLAN"; then
+  pf_pass "@pf-issue step 5: pf-test-plan/SKILL.md points at the @pf-issue convention"
+else
+  pf_fail "@pf-issue step 5: pf-test-plan/SKILL.md does not mention @pf-issue"
+fi
+
 pf_summary
