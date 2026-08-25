@@ -36,21 +36,64 @@ Scan the entire test suite for test-looking files, regardless of whether they we
 
 ### 3.2 Scan for TC-ID patterns
 
-A file found in 3.1 contributes TC-IDs to the **active issue's** map only if
-it identifies itself as belonging to that issue: the active ISSUE-ID appears
-somewhere in the file **or its path** — this repo's existing convention, e.g.
+#### Attribution: `@pf-issue` markers (marker-first)
+
+Attribution is per **test**, not per file: a single file can legitimately
+accumulate tests written for several issues over its life, and a test's own
+TC-ID label alone does not say which issue it belongs to — TC-IDs restart at
+TC-001 in every issue. Two comment markers, written in the file's own comment
+syntax (`//`, `#`, `--`, or inside `/* */`/a docblock), carry that
+attribution:
+
+- **Per-test marker** — a comment line directly above a test: `@pf-issue
+  <ISSUE-ID> <TC-IDs>`, e.g. `// @pf-issue 20260825-feat-modeleval TC-001,
+  TC-002` (the TC-ID list is optional but recommended).
+- **File-level default** — a header comment within the first ~10 lines of the
+  file: `@pf-issue <ISSUE-ID>` (no TC-IDs). Applies to every test in the file
+  that carries no per-test marker of its own.
+
+For each test in a file found in 3.1, resolve its owning issue in this
+order: its own per-test marker if present, else the file's header marker if
+present, else it has no marker-based attribution (see the legacy fallback
+below). A test contributes TC-IDs to the **active issue's** map iff its
+resolved issue equals the active ISSUE-ID. A file whose markers name only
+**other** issues is not mapped to this issue and gets no legacy fallback —
+the presence of any `@pf-issue` marker anywhere in the file, even one naming
+a different issue, opts the whole file out of the legacy heuristic below.
+
+**Legacy fallback — files with no `@pf-issue` marker at all.** Only for a
+file that carries zero `@pf-issue` markers (no per-test marker and no file
+header) does the old, file-level rule still apply: the file qualifies for
+the active issue if the active ISSUE-ID appears somewhere in the file **or
+its path** — this repo's older convention, e.g.
 `test/skills-role-matrix-static.sh:2`, whose header names its issue — or the
 file appears in `git diff --name-only develop...HEAD` (it is this issue's own
-work, changed on this branch). A file scanned in 3.1 that qualifies under
-neither test is not mapped to this issue: do not record any TC-ID found in it
-here, even where a pattern below matches literally.
+work, changed on this branch). When a file is mapped through this fallback,
+print one warning line in this run's report: `legacy mapping (no @pf-issue
+marker): <path>` — one line per such file — so the gap stays visible instead
+of silently reusing the old heuristic. A file scanned in 3.1 that qualifies
+under neither the marker rule nor (for a marker-less file) the legacy
+fallback is not mapped to this issue at all: do not record any TC-ID found in
+it here, even where a pattern below matches literally.
 
-For each qualifying file, scan its content for any of these patterns:
+For each file holding at least one test attributed to the active issue (per
+the resolution above — either a marker match, or, for a marker-less file,
+the legacy fallback), scan its content for any of these patterns, counting
+only matches belonging to a test actually attributed to this issue — a match
+inside a test whose own marker names a different issue does not count, even
+in a file that also holds tests attributed to this one:
 
 - Function or method name contains a TC-ID: `test_TC001_`, `it_TC001_`, or the literal `TC001` (zero-padded or not) anywhere in a function name, `it(...)`, `describe(...)`, or `test(...)` call
 - Comment directly above a test: `# TC-001` or `// TC-001`
 - Describe block title starting with the TC-ID: `describe('TC-001:` or `describe("TC-001:`
 - A TC-ID inside a string literal that is the test's own **label** — the argument by which a test-registration or result-reporting helper names the case: the shell convention `pf_pass "TC-009 step 1: ..."` / `pf_fail "TC-009 ..."`, or the JS `test(...)` / `describe(...)` / `it(...)` title argument. What decides a match is the string's *role* — does it name/register this case to a test helper or reporter? — not where inside the string the TC-ID sits.
+- A TC-ID listed on the test's own `@pf-issue` marker line (e.g. `TC-001,
+  TC-002` in `// @pf-issue 20260825-feat-modeleval TC-001, TC-002`) counts as
+  a label for that test, in addition to any pattern above. The marker line
+  itself is a comment — never printed by the runner — so it is handled like
+  any other "comment directly above a test" match: see "When the matched
+  text is not itself something the runner prints" below, which records the
+  adjacent test's own printed name/title as the candidate instead.
 
 A TC-ID counts as a match only under that role. It does not count, and must
 be ignored, in any of these forms even though each is a string literal
@@ -281,6 +324,8 @@ Where:
 
 If there were no Auto-type TCs, replace the auto tests sentence with: "No automated tests in this issue."
 
+Immediately before this summary line, print any `legacy mapping (no @pf-issue marker): <path>` warning lines 3.2 collected — one per file mapped through the legacy fallback (empty if none).
+
 ---
 
 ## Phase 7: Commit & Push
@@ -298,4 +343,5 @@ This matters more here than anywhere else in the pipeline: `manual_test_checklis
 - **Never skip the failure gate** — a partial pass is a failure. All Auto TCs must be `✓` before the checklist is generated.
 - **Do not invent pass/fail status** — only update Status Tracker rows where you found a matching test in the runner output. Leave unmatched rows as `[ ]`.
 - **TC-ID format in test_plan.md is `TC-NNN`** (hyphen, three digits). When scanning test files, match both `TC-001` (with hyphen) and `TC001` (without) as the same TC.
-- **If the branch diff errors** (`git diff --name-only develop...HEAD` returns an error), do not skip TC-ID mapping — Phase 3.1's scan of the entire test suite is unaffected. In 3.2's qualifying-file test, the diff limb is simply unavailable: qualify files by the active-ISSUE-ID limb alone (the ID appears in the file or its path) until the diff can be computed again.
+- **Test attribution uses `@pf-issue` markers, marker-first** — a per-test marker (`@pf-issue <ISSUE-ID> <TC-IDs>`) beats a file-level header marker (`@pf-issue <ISSUE-ID>`), which beats the legacy file-level heuristic. The legacy heuristic only ever applies to a file carrying **no** `@pf-issue` marker at all, and using it prints a `legacy mapping (no @pf-issue marker): <path>` warning line — see 3.2.
+- **If the branch diff errors** (`git diff --name-only develop...HEAD` returns an error), do not skip TC-ID mapping — Phase 3.1's scan of the entire test suite is unaffected, and `@pf-issue` marker resolution (own marker → file header) does not depend on the diff at all. Only the **legacy fallback**'s diff limb (files with no `@pf-issue` marker at all) is affected: qualify those marker-less files by the active-ISSUE-ID-in-path/file limb alone until the diff can be computed again.

@@ -809,6 +809,54 @@ else
 fi
 
 # ══════════════════════════════════════════════════════════════════════════════
+printf '=== @pf-issue attribution: both write paths require the marker, Check 4 enforces it (no TC-ID — backing task is this week'"'"'s plan item, not a pf-issue)\n'
+# ══════════════════════════════════════════════════════════════════════════════
+# TC-IDs restart at TC-001 in every issue, so a bare TC-ID label does not say
+# which issue a test belongs to. The @pf-issue marker convention (see
+# skills/pf-test/SKILL.md 3.2) fixes that at the point tests are written:
+# both /pf-execute write paths must ask the actor to mark tests it
+# creates/modifies, and the Phase 3.5 completeness gate must enforce it
+# mechanically (Check 4) before this stage can hand off to /pf-codereview.
+
+subagent_hdr_ln="$(grep -n -F -- '### For Each Task — `write: claude` (Sub-Agent Instructions)' "$EXEC_SKILL" 2>/dev/null | head -1 | cut -d: -f1)"
+delegated_hdr_ln="$(grep -n -F -- '### For Each Task — `write != claude` (delegated actor)' "$EXEC_SKILL" 2>/dev/null | head -1 | cut -d: -f1)"
+issues_hdr_ln="$(grep -n -F -- '### If Issues Are Discovered' "$EXEC_SKILL" 2>/dev/null | head -1 | cut -d: -f1)"
+
+if [ -z "$subagent_hdr_ln" ] || [ -z "$delegated_hdr_ln" ] || [ -z "$issues_hdr_ln" ]; then
+  pf_fail "@pf-issue step 1: could not locate the write:claude / write!=claude / 'If Issues Are Discovered' anchors"
+  pf_fail "@pf-issue step 2: skipped — anchors not located (see step 1)"
+else
+  subagent_block="$(sed -n "${subagent_hdr_ln},$((delegated_hdr_ln - 1))p" "$EXEC_SKILL")"
+  delegated_block="$(sed -n "${delegated_hdr_ln},$((issues_hdr_ln - 1))p" "$EXEC_SKILL")"
+
+  if printf '%s\n' "$subagent_block" | grep -qF '@pf-issue'; then
+    pf_pass "@pf-issue step 1: the write:claude sub-agent instructions require the @pf-issue marker on tests it creates/modifies"
+  else
+    pf_fail "@pf-issue step 1: the write:claude sub-agent instructions do not mention @pf-issue"
+  fi
+
+  if printf '%s\n' "$delegated_block" | grep -qF '@pf-issue'; then
+    pf_pass "@pf-issue step 2: the write!=claude delegated-actor instructions require the @pf-issue marker on tests it creates/modifies"
+  else
+    pf_fail "@pf-issue step 2: the write!=claude delegated-actor instructions do not mention @pf-issue"
+  fi
+fi
+
+if block="$(_pf_anchor_slice "$EXEC_SKILL" 'Check 4' 12)" &&
+  printf '%s' "$block" | grep -qiE 'block|blocking|hard stop|блокир|останавлив'; then
+  pf_pass "@pf-issue step 3: Check 4 (every test file touched carries @pf-issue) is documented and marked blocking in skills/pf-execute/SKILL.md"
+else
+  pf_fail "@pf-issue step 3: Check 4 not documented/blocking in skills/pf-execute/SKILL.md"
+fi
+
+if block="$(_pf_anchor_slice "$EXEC_SKILL" 'Check 4' 12)" &&
+  printf '%s' "$block" | grep -qF '@pf-issue'; then
+  pf_pass "@pf-issue step 4: Check 4 names the @pf-issue marker it scans test files for"
+else
+  pf_fail "@pf-issue step 4: Check 4 does not name @pf-issue"
+fi
+
+# ══════════════════════════════════════════════════════════════════════════════
 
 assert_repo_untouched
 
