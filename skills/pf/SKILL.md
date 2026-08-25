@@ -65,9 +65,9 @@ Before proceeding to Step 5, check the active issue's `prompt.md` frontmatter. I
 
 ## Reviewer-assignment guard (before Step 5)
 
-**Skip this entire guard if `prompt.md` already has a `profile:` field, or already has a `roles:` block (with or without `profile:`)** — either one means the new schema is already in play (a `profile:` resolves both write and review for every stage via `~/.claude/skills/pf-roles/SKILL.md` §4; a `roles:` block, even a partial one left by automigration, is itself the new schema), so asking this guard's old per-document reviewer question and writing a `reviewers:` block would be redundant — and would violate `~/.claude/skills/pf-roles/SKILL.md` §5's invariant that `reviewers:` is never re-added alongside `roles:`. This guard's text below remains the sole automigration path for issues that have **neither** `profile:` **nor** `roles:` at all — genuinely old issues created before this feature. Issues created after this feature always get `profile:` from the mandatory question in "Creating prompt.md" above, so in practice this guard only ever fires for such legacy issues.
+**Skip this entire guard if `prompt.md` already has a `profile:` field, or already has a `roles:` block (with or without `profile:`)** — either one means the new schema is already in play (a `profile:` resolves both write and review for every stage via `~/.claude/skills/pf-roles/SKILL.md` §4; a `roles:` block, even a partial one left by automigration, is itself the new schema), so asking this guard's old per-document reviewer question and writing a `reviewers:` block would be redundant — and would violate `~/.claude/skills/pf-roles/SKILL.md` §5's invariant that `reviewers:` is never re-added alongside `roles:`. This guard's text below remains the sole automigration path for issues that have **neither** `profile:` **nor** `roles:` at all — genuinely old issues created before this feature. Issues created after this feature always get `roles:` (and, if a profile was chosen, `profile:`) from the role-assignment step in "Creating prompt.md" below, so in practice this guard only ever fires for such legacy issues.
 
-Before proceeding to Step 5, and only for a **bug**-type issue whose `size_tier` is not `trivial` (a trivial-tier bug issue never writes `analysis.md` — per the precedence rule in Step 6 it is routed to `/pf-brd` instead, which carries its own copy of this guard for that case): check the active issue's `prompt.md` frontmatter. If it has no `reviewers` field, ask the user via `AskUserQuestion` — one question per key, "Who should review `<key>`?" with the three options **claude** / **codex** / **both**, recommending **claude** for every key ("matches today's default behavior") — for the keys `analysis`, `test_plan`, `implementation_plan`, `code`. Write the answers into `prompt.md`'s frontmatter as a `reviewers:` block, next to `size_tier`, e.g.:
+Before proceeding to Step 5, and only for a **bug**-type issue whose `size_tier` is not `trivial` (a trivial-tier bug issue never writes `analysis.md` — per the precedence rule in Step 6 it is routed to `/pf-brd` instead, which carries its own copy of this guard for that case): check the active issue's `prompt.md` frontmatter. If it has no `reviewers` field, ask the user via `AskUserQuestion` — one question per key, "Who should review `<key>`?" with the three options **claude** / **codex** / **both**, for the keys `analysis`, `test_plan`, `implementation_plan`, `code`. **The recommended option is not hardcoded** — for each key, run the Recommendation procedure in `~/.claude/skills/pf-roles/SKILL.md` §10 for kind `review`, and recommend whichever of `claude`/`codex`/`both` its top-ranked `actor:tier` maps to (`both` is recommended only when §10 step 5's two-provider combo condition holds and both actors rank near the top; otherwise recommend the single top-ranked actor), with its `why`/level as the reason. When `aibudget` is unavailable, §10 step 3 applies and the recommendation falls back to `claude` ("matches today's default behavior") — this legacy guard only ever writes bare actor names (no tier — `reviewers:` predates the `actor:tier` grammar), so a tiered recommendation from §10 is collapsed to its actor for the option label. Write the answers into `prompt.md`'s frontmatter as a `reviewers:` block, next to `size_tier`, e.g.:
 
 ```yaml
 reviewers:
@@ -246,7 +246,10 @@ Planning Framework v<VERSION>
 Active issue: <ISSUE-ID>  (type: feat/improve/bug, tier: trivial/small/medium/large)
 Completed stages: <STAGE1>, <STAGE2>, ...
 Next step: /<next-command>
+Roles for next stage: write=<actor:tier>, review=<actor:tier[, actor:tier]> (mode: parallel|sequential)
 ```
+
+**"Roles for next stage" line.** Map `Next step`'s command back to its role key (e.g. `/pf-spec` → `specs`, `/pf-execute` → `code` — the same TARGET-to-key mapping `~/.claude/skills/pf-check/SKILL.md`'s "Reviewer selection" table uses, or, for `/pf-execute`, the `code`/`tests` split `~/.claude/skills/pf-execute/SKILL.md` Phase 2 resolves per task) and resolve it per `~/.claude/skills/pf-roles/SKILL.md` §4, tier filled in per §4's "Resolution output". Render `write` and each `review.by` entry as `actor:tier` (always with the tier shown explicitly, even when it is just the actor's `default_tier` — e.g. `claude:sonnet`, not bare `claude`), and the review `mode`. Omit this line entirely when `Next step` is not a role-resolvable stage (`/pf-check`, `/pf-qa`, `/pf-close`, or the zero-stages "just created" block below). This is a display-only read — it does not run the Availability check (`~/.claude/skills/pf-roles/SKILL.md` §11); that runs only at actual dispatch time, inside the stage skill itself.
 
 **USER_DOCS/DEV_DOCS on the Completed stages line.** If `roles.user_docs`/`roles.dev_docs` resolved to `skip` (per Step 5's note), that stage is included on the Completed stages line using the literal pattern `skipped (roles.user_docs: skip)` (respectively `skipped (roles.dev_docs: skip)`) — not the plain stage name `USER_DOCS`/`DEV_DOCS`, and never as `Next step`. If the stage's document is genuinely complete instead, it appears as the plain stage name `USER_DOCS`/`DEV_DOCS` like any other completed stage. If the stage is neither complete nor `skip`-resolved, it is omitted from the line entirely, same as any other incomplete stage. Example: `Completed stages: CREATE, BRD, SPEC, TEST_PLAN, IMPL_PLAN, CODE_REVIEW, TESTING, skipped (roles.user_docs: skip), skipped (roles.dev_docs: skip)`.
 
@@ -271,15 +274,58 @@ Immediately after, use AskUserQuestion to ask a second question: **"How big is t
 - **medium** (recommended) — Today's framework default. 4-6 user stories.
 - **large** — Multi-subsystem or 7+ user stories.
 
-Immediately after, use AskUserQuestion to ask a third question: **"Which role profile should this issue use?"** with options listing the profile names found in `docs/planning/role-profiles.yml` (see `~/.claude/skills/pf-roles/SKILL.md` §3 for the file's schema and auto-creation rule), recommending **solo-claude** ("matches today's behavior").
+Immediately after, run the **role-assignment step** below — it replaces the old single "Which role profile?" question with per-stage assignment, applying a profile being one option among others rather than the only path.
 
-Write `prompt.md` with a YAML frontmatter block recording all three answers, followed by the task description:
+### Role assignment
+
+**Question 1 — "How should roles be assigned for this issue?"** Options:
+- **Individually per stage (recommended)** — assign write/review per stage group below, using availability-based recommendations.
+- **Apply profile `<name>`** — one option per profile name found in `docs/planning/role-profiles.yml` (`~/.claude/skills/pf-roles/SKILL.md` §3), up to the 4-option limit combined with "Individually". With the three shipped profiles this already fills all 4 slots; if a project's `role-profiles.yml` carries more, replace the overflow with a single **"a profile…"** option that opens a second `AskUserQuestion` listing every profile name.
+
+**If a profile was chosen:** record it as `profile:` (no `roles:` block is written — resolution falls through to the profile via `~/.claude/skills/pf-roles/SKILL.md` §4). Skip straight to the `on_unavailable` question below.
+
+**If "Individually per stage":** determine this issue's applicable stage keys from its type and `size_tier`, using the same key sets `~/.claude/skills/pf-brd/SKILL.md`'s reviewer-assignment guard already enumerates (`notes`/`test_plan`/`code` for `trivial`; `brd`/`specs`/`test_plan`/`implementation_plan`/`code` for `feat`; `brd`/`test_plan`/`implementation_plan`/`code` for `improve`; `analysis`/`test_plan`/`implementation_plan`/`code` for non-trivial `bug`), plus `tests` whenever `code` applies and `size_tier` is not `trivial` (trivial-tier tasks always resolve `code`, never `tests` — `~/.claude/skills/pf-execute/SKILL.md` Phase 1), plus `user_docs`/`dev_docs` only when `size_tier` is `medium` or `large` (for `trivial`/`small` these tier-default to `skip` — per `~/.claude/skills/pf-roles/SKILL.md` §4 level 3 — asking would be pointless noise; a project that genuinely wants them forced on every tier still can, via a custom profile, per §3).
+
+Group these keys into up to three groups, and ask **write** then **review** for each group that has at least one applicable key:
+- **(a) Planning documents** — whichever of `notes`/`brd`/`specs`/`analysis`/`test_plan`/`implementation_plan` apply.
+- **(b) Code & tests** — `code`, and `tests` if applicable.
+- **(c) Documentation** — `user_docs`, `dev_docs` (only asked at all when applicable per above).
+
+For each group's **write** question ("Who should write `<group>`?") and **review** question ("Who should review `<group>`?"), build options via the Recommendation procedure in `~/.claude/skills/pf-roles/SKILL.md` §10 (kind derived from the group: planning documents → `planning`, code & tests write → `code`, any review → `review`) — the top-ranked `actor:tier` is the recommended option, with its `why`/level as the reason; the 2nd/3rd ranked results are the next options. Review questions may additionally offer the two-provider parallel combo (§10 step 5) when its condition holds. The **last option in every group question is "Set per stage…"**, which expands that group into one write question and one review question per individual key in it, each built the same way via §10 — for a user who wants finer control than the group-level default. Free-text `actor:tier` entry is always available via `AskUserQuestion`'s built-in "Other".
+
+Once every group (or its expanded per-key questions) is answered, expand the answers into a fully **per-key** `roles:` block — never a group-level shorthand; `prompt.md` always records one `roles.<key>` entry per applicable key, whether the user answered at group granularity or asked for "Set per stage…" on some groups and not others.
+
+**Question 2 (after role assignment, either path) — "If the assigned model is unavailable when a stage runs?"** Options: **degrade-tier** (recommended — keeps autopilot moving, same provider, cheaper tier), **switch-provider**, **wait**. Record the answer as `on_unavailable:` — see `~/.claude/skills/pf-roles/SKILL.md` §11 for what each value does at dispatch time. This is asked exactly once per issue, regardless of which role-assignment path was taken, since it governs every later stage's dispatch, run unattended by autopilot.
+
+Write `prompt.md` with a YAML frontmatter block recording every answer, followed by the task description. Example, "Individually per stage" path, medium-tier feat issue:
 
 ```
 ---
 doc_language: English
 size_tier: medium
-profile: solo-claude
+on_unavailable: degrade-tier
+roles:
+  brd:                  { write: claude, review: [claude] }
+  specs:                { write: claude, review: [claude] }
+  test_plan:             { write: claude:opus, review: [codex:sol] }
+  implementation_plan:   { write: claude, review: [claude] }
+  code:                  { write: codex:sol, review: [claude] }
+  tests:                 { write: codex:sol, review: [claude] }
+  user_docs:             { write: claude, review: [claude] }
+  dev_docs:              { write: claude, review: [claude] }
+---
+
+<task description as given by the user>
+```
+
+Or, "Apply profile" path:
+
+```
+---
+doc_language: English
+size_tier: medium
+profile: claude-writes-codex-reviews
+on_unavailable: degrade-tier
 ---
 
 <task description as given by the user>
@@ -289,4 +335,4 @@ Use the exact language name the user gave (e.g. `Russian`, or whatever they type
 
 Record the chosen tier (`trivial`, `small`, `medium`, or `large`) as `size_tier`, next to `doc_language`. Every downstream pf-* skill reads this field and scales document length/sections/routing accordingly — see `~/.claude/skills/pf-size-tiers/SKILL.md` for the full tables and each skill's own instructions for specifics.
 
-Record the chosen profile name as `profile:`, next to `size_tier`. Every downstream pf-* skill that resolves a stage's write/review role reads this field as part of the fallback order — see `~/.claude/skills/pf-roles/SKILL.md` §4. Once `profile:` is set, the Reviewer-assignment guard earlier in this file no longer fires for this issue.
+Record the role-assignment answers as `roles:` and/or `profile:`, and the `on_unavailable` answer as `on_unavailable:`, next to `size_tier`. Every downstream pf-* skill that resolves a stage's write/review role reads these fields as part of the fallback order — see `~/.claude/skills/pf-roles/SKILL.md` §4 and §11. Note that `profile:` plus a partial `roles:` still works, via §4's level ordering — nothing about this flow forbids hand-adding point-specific `roles.<key>` overrides on top of a chosen profile later. Once `profile:` and/or `roles:` is set (from either path above), the Reviewer-assignment guard earlier in this file no longer fires for this issue.

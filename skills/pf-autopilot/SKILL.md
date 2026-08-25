@@ -44,6 +44,7 @@ Repeat until the issue is closed:
 3. After each completed stage — commit and push per `~/.claude/skills/pf-git/SKILL.md` ("Stage commit & push"). The stage skills already do this themselves; this line stays as the backstop for a stage that ended without it. An interruption must not lose work.
 4. If a sub-agent dies with "API Error: Connection closed mid-response" — immediately retry that same task once; don't wait for the cron resume.
 5. Honor the environment's global conventions (e.g. cheaper models for sub-agents, verify-before-claim: a stage isn't "done" without a real run).
+6. **`on_unavailable: wait` stops on its own, not a run failure.** When a stage's dispatch hits the Availability check (`~/.claude/skills/pf-roles/SKILL.md` §11) and the issue's `on_unavailable` policy resolves to `wait` (explicitly, or `degrade-tier`/`switch-provider` falling through with no alternative), that stage stops itself with a clear message — do not treat this as an autopilot error or retry it in a loop. It is simply undone until the next scheduled resume (Step 1's `CronCreate` interval) finds the actor's window recovered and `/pf` re-enters the same stage. Report the wait in the run's next status line the same way an `[autopilot default]` assumption is reported.
 
 ## Step 3. Completion
 

@@ -35,9 +35,10 @@ overrides, per pipeline-stage key). Example, for a `feat`/`improve` issue:
 
 ```yaml
 profile: claude-writes-codex-reviews   # optional — a profile name from role-profiles.yml
+on_unavailable: degrade-tier           # optional — see §11; defaults to degrade-tier when absent
 roles:
-  brd:                  { write: claude, review: [codex] }
-  specs:                { write: claude, review: { mode: sequential, by: [haiku, codex] } }
+  brd:                  { write: claude:opus, review: [codex:sol] }
+  specs:                { write: claude, review: { mode: sequential, by: [claude:haiku, codex] } }
   test_plan:             { write: claude, review: [codex] }
   implementation_plan:   { write: claude, review: [codex] }
   code:                  { write: codex,  review: [claude] }
@@ -45,6 +46,29 @@ roles:
   user_docs:             { write: codex,  review: [claude] }
   dev_docs:              skip
 ```
+
+### `actor[:tier]` grammar
+
+Every place an actor name appears — `write`, each entry of a `review.by` list
+(both the short-list shorthand and the long `{ mode, by }` form), and `run` —
+accepts either a bare actor name (`claude`, `codex`, `haiku`, ...) or
+`actor:tier` (`claude:opus`, `codex:sol`, `claude:haiku`). The actor names a
+provider-level entry in `agents.yml`'s `actors:` map (§2); the tier, when
+given, must be one of that actor's `tiers:` keys (§2) — an unrecognized tier
+name for a known actor is an explicit resolution error (§2's "explicit-error
+rule"), never a silent fallback to `default_tier`.
+
+**Tier omitted → the actor's `default_tier`.** `write: claude` and
+`write: claude:sonnet` resolve identically whenever `claude`'s
+`default_tier` is `sonnet` (the shipped default, §2) — the bare form is not a
+different code path, just the tier left unspecified. `review: [codex]` is
+shorthand for `review: [codex:sol]` under the shipped default the same way.
+
+**Backward compatibility.** Every `roles:`/`profile:` value written before
+tiers existed — `write: claude`, `review: [codex]`, `review: { mode:
+parallel, by: [claude, codex] }` — stays valid, completely unchanged, and
+resolves to that actor's `default_tier`. Tiers are additive: nothing that
+worked before this section existed stops working or changes behavior.
 
 Known stage keys: `brd`, `specs`, `test_plan`, `implementation_plan`, `code`,
 `tests`, `user_docs`, `dev_docs` — plus two keys that belong to alternate paths,
@@ -107,10 +131,28 @@ Per-project file. Default content:
 
 ```yaml
 actors:
-  claude: { kind: llm, invoke: agent,  model: claude-sonnet-5 }
-  haiku:  { kind: llm, invoke: agent,  model: claude-haiku-4-5-20251001 }
-  codex:  { kind: llm, invoke: codex-companion }
-  gemini: { kind: llm, invoke: cli,    command: "gemini -p {prompt}" }
+  claude:
+    kind: llm
+    invoke: agent
+    tiers: { fable: claude-fable-5, opus: claude-opus-4-8, sonnet: claude-sonnet-5, haiku: claude-haiku-4-5-20251001 }
+    default_tier: sonnet
+    degrade: [fable, opus, sonnet, haiku]    # highest -> lowest; degrade-tier moves right
+  codex:
+    kind: llm
+    invoke: codex-companion
+    tiers: { sol: gpt-5.6-sol, terra: gpt-5.6-terra, luna: gpt-5.6-luna }
+    default_tier: sol
+    degrade: [sol, terra, luna]              # highest -> lowest; degrade-tier moves right
+  haiku:  { kind: llm, invoke: agent, alias: "claude:haiku" }   # legacy alias, resolves to claude:haiku
+  gemini: { kind: llm, invoke: cli, command: "gemini -p {prompt}" }
+executors:   # aibudget executor name -> actor:tier; optional, used only when `aibudget` is on PATH
+  fable: claude:fable
+  opus: claude:opus
+  sonnet: claude:sonnet
+  haiku: claude:haiku
+  codex-sol: codex:sol
+  codex-terra: codex:terra
+  codex-luna: codex:luna
 ```
 
 `invoke` tells a consumer skill how to actually call the actor:
@@ -123,6 +165,52 @@ actors:
   actors outside Claude/Codex. Not implemented or tested for any real actor in
   this issue — the `gemini` entry above documents the shape only (see
   `specs.md` §12, Out of scope).
+
+### Tiers, `default_tier`, `degrade`, `alias`, legacy `model:`
+
+- **`tiers:`** — a map of tier name → full model id for this actor. Tier names
+  are chosen deliberately: for `claude` they equal the `Agent` tool's `model`
+  parameter's own accepted aliases (`fable | opus | sonnet | haiku` — see §9),
+  so the tier name itself is what gets passed for a Claude dispatch; the full
+  ids in `tiers:` exist for other tooling/documentation, not because the
+  dispatch needs to look them up. For `codex` there is no such tool-level
+  alias constraint, so tier names are free (`sol`/`terra`/`luna`, ordered
+  loosely by "size" the way the user names their own Codex tiers) and the
+  full model id in `tiers:` is exactly what gets passed on the command line.
+- **`default_tier:`** — which of `tiers:`'s keys a bare actor name (no `:tier`
+  suffix) resolves to.
+- **`degrade:`** — the actor's tiers ordered highest → lowest capability.
+  `on_unavailable: degrade-tier` (§11) moves one step to the right in this
+  list from whichever tier was assigned; there is no assumption that
+  `default_tier` sits at either end of it (in the shipped default it sits in
+  the middle, so `degrade-tier` never reaches `fable`/`opus` — this is
+  intentional: degrading is a cost-down move, never a cost-up one).
+- **`alias:`** — a whole actor entry that is nothing but a pointer to
+  `other-actor:tier`. The shipped `haiku` entry is this: `write: haiku`
+  resolves exactly as `write: claude:haiku` would, kept only so a `roles:`
+  block written before this feature (`write: haiku`) does not break. An
+  aliased entry carries no `tiers:`/`default_tier:`/`degrade:` of its own —
+  those all come from the actor it points to.
+- **Legacy `model:` (no `tiers:`) — single-tier actor.** An actor entry with a
+  flat `model:` field and no `tiers:` at all (a hand-edited `agents.yml` that
+  predates this feature, or a custom `gemini`-shaped entry) is a **single-tier
+  actor**: its only tier is named `default`, its `default_tier` is implicitly
+  `default`, and it has no `degrade:` list (a single-tier actor cannot
+  degrade — `on_unavailable: degrade-tier` for it falls straight through to
+  `wait`, per §11). `write: gemini` and `write: gemini:default` are
+  equivalent for such an actor.
+
+**Explicit-error rule.** An unknown actor name, an unknown tier suffix for a
+known actor, or a tier suffix on an actor that has no matching `tiers:` key
+(including a single-tier legacy actor given any suffix other than `default`)
+is a resolution error the resolver stops on — never a silent fallback to
+`default_tier`, and never an unhandled exception. Name the file and the exact
+key that failed to resolve, e.g.:
+
+```
+roles.code.write: actor 'claude' has no tier 'ultra' — known tiers for 'claude' in docs/planning/agents.yml: fable, opus, sonnet, haiku
+roles.brd.review[1]: actor 'gpt4' is not registered in docs/planning/agents.yml
+```
 
 ### `kind: human` — not supported yet, and must fail explicitly
 
@@ -168,6 +256,14 @@ profiles:
     tests:     { write: codex, review: [claude], run: claude }
 ```
 
+**Profiles may carry tiers** (`review: [codex:sol]`, `write: claude:opus`) —
+the grammar is identical to `roles:` (§1's "`actor[:tier]` grammar"). The
+three shipped profiles above deliberately do not: every actor mention in them
+is bare, so each resolves to that actor's `default_tier` — keeping the
+shipped defaults tier-agnostic is a deliberate minimalism, not an oversight;
+a project that wants a profile pinned to a specific tier defines its own
+custom profile with `actor:tier` values.
+
 **Deliberately no point-specific `user_docs`/`dev_docs` entry in any shipped profile.** A point-specific entry for either of these two keys wins at level 2 — *before* the tier-default `skip` at level 3 (see "Why level 3 must come before level 4" below) — so it would force that stage on every tier, including `trivial`/`small`, defeating the tier-budget philosophy `pf-size-tiers` sets out for exactly those tiers. An earlier revision of `codex-implements` did carry `user_docs: { write: codex, review: [claude] }` for this reason (Codex writes the code, so the profile wanted Codex to write the user docs too) — removed once this consequence was recognized. A project that genuinely wants a profile to force `user_docs`/`dev_docs` on every tier can still do so: add the point-specific entry to a **custom** profile in its own `role-profiles.yml`, with the tier trade-off understood, rather than have it baked into a shipped default.
 
 `default` applies to every stage key the profile does not point-override.
@@ -178,15 +274,18 @@ account for the tier-default `skip` behavior for `user_docs`/`dev_docs`, which
 sits *between* "point-specific profile entry" and "profile `default`" in the
 full order.
 
-**Choosing a profile** happens once, at issue creation: `/pf`'s "Creating
-prompt.md" step asks a third question, right after `size_tier` — "Which role
-profile?" — listing the names found in `role-profiles.yml`, recommending
-`solo-claude` ("matches today's behavior"). The answer is written as `profile:`
-in `prompt.md`'s frontmatter. There is no dedicated skill for changing the
-profile or `roles:` mid-pipeline — a hand-edit to `prompt.md` is the only path
-(deliberate decision, see `specs.md` §4.1/§12). Because resolution is never
-cached (§8), the edit takes effect on the very next `pf-*` invocation, without
-touching stages already completed.
+**Choosing a profile** happens once, at issue creation, as one option among
+several in `/pf`'s "Creating prompt.md" role-assignment step (§10, the
+Recommendation procedure — applying a profile is one branch of it, not the
+only path; the default path assigns per stage, individually, using
+availability-based recommendations). Whichever path is taken, the result is
+written as `profile:` and/or `roles:` in `prompt.md`'s frontmatter — see
+`~/.claude/skills/pf/SKILL.md`'s "Creating prompt.md" for the exact flow.
+There is no dedicated skill for changing the profile or `roles:`
+mid-pipeline — a hand-edit to `prompt.md` is the only path (deliberate
+decision, see `specs.md` §4.1/§12). Because resolution is never cached (§8),
+the edit takes effect on the very next `pf-*` invocation, without touching
+stages already completed.
 
 ### Auto-creation
 
@@ -249,12 +348,53 @@ step into "point-specific profile entry" and "profile `default`"), it would
 point-specific `skip` entry for `user_docs`/`dev_docs` — only the generic
 `default`, which for `trivial`/`small` would then win first and silently
 violate the BRD's acceptance criterion ("for trivial/small tier, `user_docs`/
-`dev_docs` default to `skip`"). Choosing a `profile:` is a mandatory question at
-issue creation (§3), so every issue has one, and its `default` would always
-match ahead of any tier logic checked afterward. Only a profile's own
-**point-specific** entry for `user_docs`/`dev_docs` (level 2) can override the
-tier-default `skip`; the profile's generic `default` (level 4) cannot — because
-level 3 is checked first.
+`dev_docs` default to `skip`"). This ordering matters whenever a `profile:`
+is in play — its `default` would always match ahead of any tier logic checked
+afterward if levels 3/4 were not split. Only a profile's own **point-specific**
+entry for `user_docs`/`dev_docs` (level 2) can override the tier-default
+`skip`; the profile's generic `default` (level 4) cannot — because level 3 is
+checked first. (Since §10's per-stage individual assignment became one of two
+paths at issue creation, `profile:` is no longer mandatory — the individual
+path writes each key's `roles.<key>` explicitly, including `skip` for
+`user_docs`/`dev_docs` where the tier default applies, so level 1 resolves
+those keys directly and level 3 is never reached for an issue created that
+way. Level 3 remains load-bearing for any issue that does carry a `profile:`
+without its own point-specific `user_docs`/`dev_docs` override — every
+shipped profile, and most custom ones.)
+
+### Resolution output: `(actor, tier, model)`
+
+Levels 1-5 above resolve a stage's `write` to one `actor[:tier]` token (and
+each `review.by` entry to the same). Once that token is in hand, filling in
+the **tier** — and from it, the model/id actually passed to the dispatch — is
+a separate, final step, always in this order: **(a)** an explicit `:tier`
+suffix on the token itself, wherever level 1-5 found it; **(b)** if the token
+was bare (no suffix) and came from a profile's `actor:tier`-carrying entry,
+that profile's tier; **(c)** otherwise the actor's `default_tier` (§2). The
+result is the triple `(actor, tier, model)` — `model` being `tiers[tier]`
+from `agents.yml` (or, for a legacy single-tier actor, its flat `model:`
+value). §9 defines how this triple is actually passed to the actor's
+`invoke` mechanism.
+
+**Alias resolution happens first, before any `write == claude`-style
+comparison.** If the resolved actor name is itself an `alias:` entry (§2 —
+`haiku` in the shipped default), resolve it to the actor:tier it points to
+(`claude:haiku`) *before* anything downstream compares the actor against a
+literal name. Consequences: `write: haiku` is `write == claude` (true) with
+tier `haiku` — not a separate non-Claude actor — so every consumer's
+`write == claude` / `write != claude` branching (§7, and each consumer's own
+"If `write == claude` ... If `write != claude`" text) evaluates against the
+**post-alias** actor. A stage assigned `write: haiku` therefore takes the
+`write == claude` path (in-session or `Agent`-tool dispatch, per §9), not the
+delegated-actor path — this is a genuine behavior change from the flat
+`agents.yml` this issue replaces, where `haiku` was its own actor with
+`invoke: agent` and no delegation distinction existed for it either way, so
+no consumer's routing actually changes as a result; only the internal
+reasoning for *why* it routes that way does. Source-tagging in `pf-check`'s
+"`both`-mode aggregation" (`[Claude]`/`[Codex]`) uses the pre-alias name when
+it differs from the resolved tier's default (e.g. `[Claude:haiku]`) so the
+user can tell which tier actually ran — this is a labeling detail only, not a
+routing one.
 
 ### `kind: human` and `code: skip` during resolution
 
@@ -366,10 +506,13 @@ by name instead of restating the invocation form.
 For an actor with `invoke: codex-companion`, a **write** operation means:
 
 ```
-node "${CLAUDE_PLUGIN_ROOT}/scripts/codex-companion.mjs" task "<prompt>" --write
+node "${CLAUDE_PLUGIN_ROOT}/scripts/codex-companion.mjs" task "<prompt>" --write --model <resolved model>
 ```
 
-Same script, same `task ... --write` form that
+`<resolved model>` is the resolved tier's model id per §9 (`tiers[tier]` from
+`agents.yml`, resolved per §4's "Resolution output" step) — not restated here,
+just always present on this and every other `codex-companion.mjs` call this
+section and §6 document. Same script, same `task ... --write` form that
 `codex-cli-runtime/SKILL.md` (the `codex` plugin) documents for
 `codex:codex-rescue` — but called directly via `Bash` from the consumer skill
 itself, **not** through `codex:codex-rescue`. That subagent is a pure forwarder
@@ -478,7 +621,7 @@ on a large generation. Choose based on expected output size:
   (a full BRD/specs/test-plan/impl-plan written from nothing, or a task that
   creates several files) — use the **asynchronous** path instead:
   ```
-  node "${CLAUDE_PLUGIN_ROOT}/scripts/codex-companion.mjs" task "<prompt>" --write --background
+  node "${CLAUDE_PLUGIN_ROOT}/scripts/codex-companion.mjs" task "<prompt>" --write --background --model <resolved model>
   ```
   then poll for completion via the script's existing `status`/`result`
   subcommands (the same subcommands `codex-cli-runtime/SKILL.md` already lists
@@ -506,6 +649,166 @@ already completed under the old role.
 
 ---
 
+## 9. Tiers & dispatch mapping
+
+**This is the single canonical definition of how a resolved `(actor, tier,
+model)` triple (§4's "Resolution output") is actually passed to that actor's
+`invoke` mechanism.** Every consumer that dispatches a write or a review
+references this section by name (`with the resolved model per §9`) instead of
+restating which flag or parameter carries it — this is what keeps `pf-check`'s
+"Claude review path"/"Codex invocation chain", `pf-codereview`'s reviewer
+paths, `pf-execute`'s per-task dispatch, and §6/§7 above from drifting apart
+on this one mechanical detail.
+
+| `invoke` | How the tier's model reaches the actor |
+|---|---|
+| `agent` | Pass the **tier name itself** (not the full model id) as the `Agent` tool's `model` parameter. The tool accepts only `sonnet \| opus \| haiku \| fable` — which is exactly why `claude`'s `tiers:` keys in `agents.yml` (§2) are named to match. A dispatch with no `model` override at all is equivalent to `model: sonnet` (the shipped `default_tier`). For a legacy single-tier actor (§2) with a custom tier name that doesn't match one of those four aliases, the dispatch mechanism cannot accept it — surface this as an actor-registry configuration mismatch (the same error class `pf-check`'s "Claude review path" already names), never a silent fallback to the tool's own default. |
+| `codex-companion` | Pass the **full model id** (`tiers[tier]` from `agents.yml`) as `--model <id>` on the `codex-companion.mjs` command line — both subcommands: `task ... --write --model <id>` (§7, sync and async) and `review --wait --scope branch --base <base-ref> --model <id>` (`pf-check`'s "Codex invocation chain", code-diff form). The document-review form (`task "<brief>" --json`, no `--write`) takes the same `--model <id>` flag. |
+| `cli` | Not implemented for any real actor in this issue (§2) — no dispatch mapping defined. |
+
+**Legacy single-tier actor (no `tiers:`, flat `model:`).** Its one tier
+(`default`) resolves to that `model:` value directly — for `invoke: agent`
+this only works if the value happens to be one of the four `Agent`-tool
+aliases (rare — the shipped `claude`/`haiku` entries are not single-tier); for
+`invoke: codex-companion` or `cli` the flat value is passed exactly as
+before this issue (`--model` for the former, or folded into `command:`'s
+`{prompt}` shape for the latter).
+
+---
+
+## 10. Recommendation procedure
+
+**Canonical — referenced by `/pf`'s "Creating prompt.md" role-assignment step
+and by the reviewer-assignment guards in `pf`/`pf-brd`.** Given a stage key
+and an operation (`write` or `review`), produces a small ordered list of
+recommended `actor:tier` options plus the recommended one, for
+`AskUserQuestion` to present.
+
+1. **Map stage key + operation → `aibudget` kind:**
+   - Any **write** of a planning/documentation stage (`brd`, `specs`,
+     `test_plan`, `implementation_plan`, `notes`, `analysis`, `user_docs`,
+     `dev_docs`) → kind `planning`.
+   - Write of `code`/`tests` → kind `code`.
+   - Any **review** (any key) → kind `review`.
+2. **If `aibudget` is on `PATH`** (`command -v aibudget` succeeds): run
+   `aibudget rank --kind <kind> --top 3 --json`. Map each result's
+   `executor` field through `agents.yml`'s `executors:` table (§2) to an
+   `actor:tier` — skip any result whose `executor` has no entry in
+   `executors:` (an aibudget-known executor this project's `agents.yml`
+   doesn't map to any configured actor). The **top mapped result** is the
+   recommended `actor:tier` for the `AskUserQuestion` option; its `why` and
+   `weekly_level`/`five_level` go into that option's one-line description
+   (e.g. "sonnet — недельное окно ok, без потолка"). The 2nd and 3rd mapped
+   results become the next options, in order. If `aibudget rank` exits 10
+   (nobody available): fall back to the static default below and additionally
+   surface the `wait_until`/`retry_after_s` it reports, in one line.
+3. **If `aibudget` is not on `PATH`, or every ranked result was unmapped:**
+   recommend the stage's currently-configured actor's `default_tier` (or, if
+   nothing is configured yet for this stage, `claude`'s `default_tier`) —
+   the same static default this framework used before `aibudget` support
+   existed. The question text carries exactly one extra line, verbatim
+   (translated per `doc_language` when it is set to something other than
+   English): "aibudget unavailable — no availability data."
+4. **Always include profile options.** Regardless of steps 2-3's outcome, add
+   one `AskUserQuestion` option per profile name in `role-profiles.yml`
+   ("apply profile `<name>` to all stages"), up to the tool's 4-option limit
+   combined with the per-actor options above. With the three shipped profiles
+   and no aibudget-derived options this already fills all 4 slots for a
+   from-scratch project; when a project's `role-profiles.yml` carries more
+   profiles than fit alongside at least one recommended actor option, offer a
+   single **"a profile…"** option instead of enumerating them all, which then
+   opens a second `AskUserQuestion` listing every profile name. Free-text
+   `actor:tier` entry (any actor/tier not offered as a button) relies on
+   `AskUserQuestion`'s built-in "Other" — this procedure does not add a
+   redundant explicit option for it.
+5. **Two-reviewer combo, review only.** When resolving a **review** operation
+   and step 2 ran successfully (aibudget available) and both `anthropic` and
+   `openai` providers report `weekly` and `5h` level `ok` (`aibudget status
+   --json`, §11's status shape), one additional option may offer the
+   parallel two-reviewer combo of the top-ranked actor from each provider
+   (`[<claude-side>, <codex-side>]`, `mode: parallel`) — a caller may omit
+   this option if it would not fit within the 4-option limit alongside the
+   single-actor and profile options.
+
+This procedure never calls `AskUserQuestion` itself — it only produces the
+options and recommendation; the calling skill (`/pf`, or a reviewer-assignment
+guard) is the one that actually asks.
+
+---
+
+## 11. Availability check & on_unavailable
+
+**Canonical — referenced by every dispatching skill immediately before it
+dispatches a write or a review** (`pf-brd`, `pf-spec`, `pf-test-plan`,
+`pf-impl-plan`, `pf-execute`, `pf-user-docs`, `pf-dev-docs`, `pf-check`,
+`pf-codereview`). Runs once per dispatch, right before the actual `Agent`
+tool call or `codex-companion.mjs` invocation — after role resolution (§4),
+after tier fill-in (§4's "Resolution output"), immediately before §9's
+dispatch step.
+
+**This is additive to `pf-check`'s Codex invocation chain step 5** ("Codex
+genuinely unavailable" — CLI not installed/not authenticated). The two checks
+answer different questions and both run: step 5 asks "does the Codex CLI
+exist and work at all on this machine"; this section asks "is the assigned
+actor's *provider* currently rate/quota-limited, right now, per `aibudget`."
+A machine with a perfectly working Codex CLI can still fail this section's
+check (OpenAI's weekly window is low); a machine that fails chain step 5 has
+already failed before this section would even run for a `codex` actor (no
+CLI to check quota through). Run chain step 5 (or the `write`-side
+equivalent, §7's "Availability check before writing") first; run this
+section's check only once that has already established the actor is
+reachable at all.
+
+1. **If `aibudget` is not on `PATH`:** skip this pre-check entirely — no
+   availability data exists to check against. If the dispatch itself then
+   fails with a rate-limit/quota error from the provider, apply the policy
+   below exactly once for that failure, then stop (do not retry in a loop).
+2. **If `aibudget` is on `PATH`:** run `aibudget status --json`. Look up the
+   assigned actor's provider (`claude` → `anthropic`, `codex` → `openai`) in
+   `providers.<provider>.windows.{5h,weekly}`. The actor is **unavailable
+   now** if either window's `level` is `low`, or the `5h` window's
+   `used_pct` is `>= 95`.
+3. **If unavailable, apply `prompt.md`'s `on_unavailable`** (§1's frontmatter
+   field; **default `degrade-tier` when the field is absent** — this is the
+   default for every issue created before this field existed, and it is
+   never asked mid-pipeline: `on_unavailable` is a once-per-issue,
+   creation-time question, §10/`/pf`'s "Creating prompt.md", precisely so
+   autopilot can apply it unattended at every later stage without stopping to
+   ask):
+   - **`degrade-tier`** — move one step to the right in the actor's
+     `degrade:` list (§2) from the currently assigned tier. If the assigned
+     tier is already the last entry in `degrade:` (or the actor has no
+     `degrade:` at all — a legacy single-tier actor), fall through to `wait`
+     below instead.
+   - **`switch-provider`** — run `aibudget rank --kind <kind> --top 3 --json`
+     (same kind mapping as §10 step 1, derived from this stage's key and
+     operation) and take the first result whose mapped `actor:tier` (via
+     `executors:`, §2) belongs to a **different** actor than the one
+     currently assigned. Use it for this one dispatch — same `mode`,
+     replacing only the unavailable actor's entry in `review.by` (or `write`
+     itself), not the rest of the role record.
+   - **`wait`** (or `degrade-tier`/`switch-provider` falling through with no
+     alternative) — stop this stage's dispatch here, with a clear message
+     naming the actor, the provider/window that's low, and
+     `reset_in_s`/`wait_until` from the status/rank output. In `pf-autopilot`
+     runs, this is not a hard failure of the run: the existing self-resume
+     schedule (`~/.claude/skills/pf-autopilot/SKILL.md` Step 1) already
+     retries the whole pipeline later, so a `wait` stop here simply leaves
+     this stage undone until the next scheduled resume finds the window
+     recovered — `pf-autopilot`'s own text says so.
+4. **Record every substitution.** Whenever step 3 actually changes what gets
+   dispatched (`degrade-tier` or `switch-provider` fired — not `wait`, which
+   dispatches nothing), append one line to the issue's `session-log.md`:
+
+   `[availability] <key> <write|review>: <assigned> → <used> (<provider> <window> <level>; on_unavailable: <policy>)`
+   — marker: `session-log.md` — records an availability-driven substitution
+   at dispatch time, written by whichever `pf-*` stage dispatched, read by
+   nothing downstream (informational only).
+
+   e.g. `[availability] code write: claude:opus → claude:sonnet (anthropic 5h low; on_unavailable: degrade-tier)`.
+
+---
+
 ## Summary — the resolution pipeline
 
 ```
@@ -520,12 +823,19 @@ resolve through role-profiles.yml (§3) with the tier-default skip
 inserted between levels 2 and 4 of the full order (§4)
    │
    ▼
-write = exactly one actor         review = [actor, ...] + mode: parallel|sequential (§6)
+write = exactly one actor[:tier]  review = [actor[:tier], ...] + mode: parallel|sequential (§1, §6)
    │
    ▼
-resolve the actor(s) against agents.yml (§2) → kind / invoke / model|command
+resolve the actor(s) against agents.yml (§2) → kind / invoke / tiers / default_tier / degrade
    │
    ▼
-invoke per §7 (agent = Agent tool; codex-companion = task ... --write,
-sync or async per output size; cli = not implemented in this issue)
+fill in tier -> (actor, tier, model) triple (§4 "Resolution output")
+   │
+   ▼
+availability check against aibudget status, apply on_unavailable if low (§11)
+   │
+   ▼
+invoke per §7/§9 (agent = Agent tool, model: <tier name>; codex-companion =
+task ... --write --model <id>, sync or async per output size; cli = not
+implemented in this issue)
 ```
