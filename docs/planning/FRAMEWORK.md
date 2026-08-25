@@ -241,6 +241,8 @@ All issue types follow the same end-to-end stages, differing only in their plann
 | QA | QA | QA | QA | `/pf-qa` |
 | Close | CLOSED | CLOSED | CLOSED | `/pf-close` |
 
+**Task tools are optional in the IMPLEMENT stage.** `/pf-execute` uses Claude Code's task-tracking tools (`TaskCreate`/`TaskList`/`TaskGet`/`TaskUpdate`) only as a progress mirror. Since Claude Code 2.1.233 those tools are disabled by default on the newer models, and `/pf-execute` detects that and carries on: the `- [ ]`/`- [x]` checkboxes in the issue's `implementation_plan.md` are the completion ledger the stage and its completeness gate actually read. To get the progress display back, start the CLI with `CLAUDE_CODE_ENABLE_TODO_TOOLS=1` in its environment (e.g. the `env` block of `settings.json`) and restart — nothing about the pipeline changes either way.
+
 **TESTING stage** — `/pf-test` runs the automated test suite, updates the Status Tracker in `test_plan.md`, and generates `manual_test_checklist.md` for scenarios that require human verification.
 
 **Test attribution.** TC-IDs restart at TC-001 in every issue, so a test's TC-ID alone does not say which issue it belongs to — test files carry an `@pf-issue` marker to make that explicit. A per-test marker, written as a comment directly above the test, names the issue and (optionally) the TC-IDs it covers: `// @pf-issue 20260825-feat-modeleval TC-001, TC-002`. A file-level header marker, in the file's first ~10 lines, sets the default issue for every test in the file that has no marker of its own: `# @pf-issue 20260825-feat-modeleval`. A per-test marker always wins over the file header. `/pf-test` resolves each test's owning issue this way before mapping it to a TC (see `skills/pf-test/SKILL.md` Phase 3.2).
