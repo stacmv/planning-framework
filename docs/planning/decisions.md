@@ -42,6 +42,8 @@ Quick reference to all decisions:
 | [ADR-002](#adr-002-release-branch-model--develop-trunk--main-release-installed-via-main) | Release branch model — `develop` (trunk) + `main` (release), installed via `main` | Accepted | 2026-07-10 |
 | [ADR-003](#adr-003-decision-title) | [Decision Title] | Superseded | 2025-11-06 |
 | [ADR-004](#adr-004-document-review-is-path-based--no-issue-branch-required-branch-only-for-code-review) | Document review is path-based — no issue branch required; branch only for code review | Accepted | 2026-08-25 |
+| [ADR-005](#adr-005-per-stage-actortier-roles-individual-assignment-at-issue-creation-on_unavailable-policy-aibudget-backed-recommendations) | Per-stage `actor:tier` roles, individual assignment, `on_unavailable`, aibudget recommendations | Accepted | 2026-08-25 |
+| [ADR-006](#adr-006-tests-declare-their-issue-with-pf-issue-markers) | Tests declare their issue with `@pf-issue` markers | Accepted | 2026-08-25 |
 
 ---
 
@@ -233,6 +235,59 @@ Option 1. A review target that is a *document* is reviewed by its path on disk, 
 **Negative:**
 - Document-form structure is best-effort: a non-JSON Codex reply is shown unstructured (no P0/P1/P2 mapping), same as the existing raw `codex exec` fallback.
 - AC-5.2's "off-branch → Claude" behavior is retired; issues relying on it get a Codex review instead.
+
+---
+
+### ADR-005: Per-stage `actor:tier` roles, individual assignment at issue creation, `on_unavailable` policy, aibudget-backed recommendations
+
+**Date:** 2026-08-25
+**Status:** Accepted (direct skill edit, no pipeline issue)
+
+#### Context
+Agents in consumer projects (a) forgot to assign reviewers or defaulted to Claude — `/pf`'s only role question was "Which role profile?" recommending `solo-claude` — and (b) had no way to say *which model tier* (fable/opus/sonnet/haiku, or a Codex model) runs a given stage. Separately, `D:/dev/toolbox/aibudget` now knows provider limits (`aibudget status`/`rank`), and the user wants that to drive the recommendation: when Claude or Codex is near its limit, prefer the other. Autopilot runs stages unattended, so anything needing a human answer must be asked at creation.
+
+#### Options Considered
+1. **Actor = aibudget executor** (`fable`, `opus`, `codex-sol`… as separate `agents.yml` actors). One namespace with aibudget, but 7+ actors, the `both`/profile/automigration logic (built on one `invoke: agent` + one `codex-companion` actor) would be rewritten, and `codex-sol/terra/luna` are local `models.json` aliases meaningless to other PF users.
+2. **`claude`/`codex` + per-stage `write_model`/`review_model` fields.** Minimal migration but two namespaces, 16 extra fields across the role keys, and model ids that the `Agent` tool cannot take as given.
+3. **Hybrid `actor:tier`** — actor stays provider-level (`claude`/`codex`), tier is an optional suffix (`claude:opus`, `codex:sol`); `tiers`/`default_tier`/`degrade` live on the actor in `agents.yml`; an optional `executors:` table maps aibudget names. Provider switch and tier degradation become two orthogonal operations; old `roles:` stay valid; aibudget and Codex tiers are optional layers.
+
+#### Decision
+Option 3, plus: `/pf` asks role assignment **individually per stage group** (planning docs / code & tests / documentation) with "apply profile X" as one option among the recommendations; recommendations come from `aibudget rank` when `aibudget` is on PATH (static `default_tier` plus an explicit "aibudget unavailable" line otherwise); one per-issue field `on_unavailable: degrade-tier | switch-provider | wait` in `prompt.md`; every dispatching skill runs an availability check (pf-roles, canonical) right before a write/review and records substitutions in the issue `session-log.md`.
+
+#### Rationale
+- Backward compatible for free: a bare actor name means `default_tier`.
+- Other PF users need only Anthropic tiers; `aibudget`, `models.json`, Codex tiers are opt-in.
+- Tier names for `claude` equal the `Agent` tool's model aliases, closing a latent gap where `agents.yml` stored full model ids the tool cannot accept.
+- Asking at creation keeps `/pf-autopilot` unattended; the policy field tells it what to do when a model is out of budget.
+
+#### Consequences
+**Positive:** explicit per-stage models; Codex actually gets assigned; budget-aware routing; no migration of open issues.
+**Negative:** `actor[:tier]` parsing in pf-roles §4 is one more thing consumers must not restate; `aibudget` kinds (`planning` is a placeholder) make document-write recommendations coarser than review/code ones; the availability check adds one `aibudget status` call per dispatch.
+
+---
+
+### ADR-006: Tests declare their issue with `@pf-issue` markers
+
+**Date:** 2026-08-25
+**Status:** Accepted (direct skill edit, no pipeline issue)
+
+#### Context
+TC numbers restart in every issue (`TC-001`…), so a test's label alone does not identify its issue. `pf-test` attributed a test file to the active issue by heuristic — ISSUE-ID in path/file, or the file being in `git diff develop...HEAD` — which misattributes any test file merely touched on the branch and cannot express a file holding tests from several issues.
+
+#### Options Considered
+1. **Per-test `@pf-issue <ID> <TCs>` comment + file-level `@pf-issue <ID>` header as default.** Explicit, handles mixed files, readable by grep.
+2. **File header only.** One line per file; cannot express mixed files.
+3. **Issue id inside the test name** (`it('TC-001 [id]: …')`). No comments needed, but noisy runner output.
+
+#### Decision
+Option 1. `pf-execute` requires the markers on every test the actor writes for the issue and gates on them in Phase 3.5 (Check 4); `pf-test` resolves a test's issue marker-first (own marker → file header) and uses the legacy heuristic only for files with no marker at all, printing `legacy mapping (no @pf-issue marker): <path>` when it does.
+
+#### Rationale
+- The marker is written by the same actor that writes the test, at the moment it knows the issue and TCs.
+- Legacy files keep working, but the fallback is visible rather than silent.
+
+#### Consequences
+**Positive:** unambiguous test → issue → TC attribution; mixed files supported. **Negative:** one comment line per test; existing tests are not back-filled.
 
 ---
 

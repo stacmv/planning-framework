@@ -124,20 +124,20 @@ else
     fi
   fi
 
-  # ─── Step 3: NEW — off-branch -> review-by-path anchors, anywhere in the
-  # file (pf-check is the only one of the two stages with a legitimate "no
-  # issue branch yet" case — pf-codereview hard-stops off-branch in Phase 1
-  # before this scenario could ever arise, per implementation_plan.md Task 9
-  # note, so pf-codereview is never checked for it). ─────────────────────────
+  # ─── Step 3: document review is path-based, no issue branch required
+  # (ADR-004, 2026-08-25 — supersedes the earlier "off-branch -> fall back to
+  # claude" rule: pf-check must state that documents are reviewed by path and
+  # that it does NOT check for / diff against the issue branch; the branch
+  # requirement lives only in pf-codereview, step 1a above). ─────────────────
   whole_text="$(cat "$CHECK")"
-  b1='issue branch[^.]{0,80}(does not exist|not exist|missing|absent)'
-  b2='(review|reviewing|switch(ing)? to)[^.]{0,40}\bby (its |the (document'"'"'s )?)?path\b'
-  b3='(no|missing|absent)[^.]{0,40}issue branch[^.]{0,120}(report|state|note|reason)'
+  b1='no issue branch required|(does|do) not require[^.]{0,40}issue branch'
+  b2='(review|reviewing|reviews)[^.]{0,40}\bby (its |the (document'"'"'s )?)?path\b'
+  b3='(do|does) \*{0,2}not\*{0,2} (check|compute)[^.]{0,80}(issue branch|diff)'
   found="$(count_anchors "$whole_text" "$b1" "$b2" "$b3")"
   if [ "$found" -ge 2 ]; then
-    pf_pass "TC-018 step 3: pf-check off-branch -> review-by-path anchors found ($found/3)"
+    pf_pass "TC-018 step 3: pf-check path-based document review (no issue branch required, ADR-004) anchors found ($found/3)"
   else
-    pf_fail "TC-018 step 3: pf-check off-branch -> review-by-path anchors found only $found/3 (need >=2) — rule not documented in SKILL.md"
+    pf_fail "TC-018 step 3: pf-check path-based document review anchors found only $found/3 (need >=2) — ADR-004 rule not documented in SKILL.md"
   fi
 fi
 
