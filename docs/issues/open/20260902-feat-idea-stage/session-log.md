@@ -7,3 +7,4 @@
 [Claude Code] 2026-09-02: /pf-check test_plan.md — Codex unavailable (OpenAI usage limit until 20:40) — review performed by Claude (claude:sonnet) on the user's explicit choice: 2 P0 / 5 P1 / 6 P2.
 [autopilot default] pf-check auto-applied Fix now — 7 P0/P1 addressed (+4 cheap P2); fix actor claude:sonnet; 33 TC, 28 Auto / 5 Manual unchanged
 [pf-check PASSED] test_plan.md @ 2026-09-02T16:02:46Z
+[Claude Code] 2026-09-02: implementation_plan.md written (23 tasks: 18 code / 5 tests; phases A idea/spike → B front-loaded core hooks → C install + dogfood). Autopilot stopped by the user; cron schedules removed. HANDOFF to another machine — next step: /pf-check implementation_plan.md (reviewer codex; OpenAI limit resets 20:40 MSK), then /pf-execute.
