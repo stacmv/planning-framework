@@ -134,12 +134,12 @@ feat/improve/bug; и требование к ревью — отдельное �
 | 4 | В существующем PF-проекте без открытых issue выполнить `/pf`, выбрать «Describe an idea», пройти intake. | idea-issue создан. |
 | 5 | Запустить `/pf` повторно в том же проекте. | Идея-issue распознан в списке открытых issue, показан статус-блок той же формы, что для feat/improve/bug, с корректным Next step. |
 
-**Test Data:** нет — сессия работает с реальным `/pf`, без подготовленных файлов.
+**Требуемые данные:** не требуются — сессия работает с реальным `/pf`, без подготовленных файлов.
 **Expected Outcome:** Оба сценария проходят end-to-end без ошибок и без нарушения AC-01b (ничего лишнего в bare-папке).
 **Priority:** Critical
 
-### TC-004: Not-a-repo guard и «не закоммичено» на каждой стадии без git
-**Description:** `/pf`'s Step 2 пропускает git-синк целиком, когда `has_git` ложно (вместо каскада `fatal: not a git repository`), и каждая стадия idea/spike-пайплайна (включая CREATE) печатает «Git: not committed — no git repository» вместо обычной git-строки в этом случае — единая точка определения текста в `pf-git`.
+### TC-004: Not-a-repo guard, «не закоммичено» на каждой стадии без git, семь строк `pf-git`'s Step 1
+**Description:** `/pf`'s Step 2 пропускает git-синк целиком, когда `has_git` ложно (вместо каскада `fatal: not a git repository`), и каждая стадия idea/spike-пайплайна (включая CREATE) печатает «Git: not committed — no git repository» вместо обычной git-строки в этом случае — единая точка определения текста в `pf-git`; таблица `pf-git`'s "Step 1: Stage the artifact" несёт семь новых строк (пять пишущих idea/spike-скиллов, но `pf-idea-verdict` считается дважды — режим 1 и режим 2 несут разные пути).
 **Type:** Auto (**Test file:** `test/pf-idea-stage-static.sh`)
 **Preconditions:** —
 **Steps:**
@@ -149,9 +149,10 @@ feat/improve/bug; и требование к ревью — отдельное �
 | 1 | В `skills/pf/SKILL.md`, Step 2, найти предваряющую оговорку про пропуск git-синка при `has_git` ложном. | Присутствует, до п.1 существующего Step 2. |
 | 2 | В `skills/pf-git/SKILL.md` найти новый раздел "Step 0: No-repository guard", до "Step 1: Stage the artifact". | Присутствует, содержит литерал `not committed — no git repository`. |
 | 3 | В `skills/pf/SKILL.md`, в ветке "Creating prompt.md — idea", найти ту же строку, печатаемую инлайново для CREATE. | Присутствует. |
+| 4 | В `skills/pf-git/SKILL.md`, таблице "Step 1: Stage the artifact", посчитать строки для `/pf-idea`, `/pf-idea-research`, `/pf-idea-critique`, `/pf-idea-verdict` [режим 1], `/pf-idea-verdict` [режим 2], `/pf-idea-spike` [режим 1], `/pf-idea-spike` [режим 2]. | Ровно семь строк присутствуют (не шесть) — `pf-idea-verdict` и `pf-idea-spike` дают по две строки каждый. |
 
 **Test Data:** `skills/pf/SKILL.md`, `skills/pf-git/SKILL.md`.
-**Expected Outcome:** Все три assert проходят; единая формулировка используется во всех местах.
+**Expected Outcome:** Все четыре assert проходят; единая формулировка используется во всех местах; таблица Step 1 несёт полный набор из семи строк.
 **Priority:** Critical
 
 ### TC-005: Существующий проект без открытых issue — четыре варианта
@@ -169,8 +170,8 @@ feat/improve/bug; и требование к ревью — отдельное �
 **Expected Outcome:** Оба assert проходят.
 **Priority:** High
 
-### TC-006: Таблица завершённых стадий, статус-блок и `pf-help`
-**Description:** Step 5's таблица завершённых стадий несёт шесть новых строк документ→стадия (и явно не включает `open_questions.md`); Step 7's статус-блок использует ту же форму, что у feat/improve/bug, и показывает `/pf-idea-verdict (decision session)` вместо обычной команды в задокументированном состоянии; `pf-help/SKILL.md` описывает оба новых воркфлоу одним абзацем каждый и добавляет две строки в «Issue folder contents» — без требования знать внутренние скиллы заранее.
+### TC-006: Таблица завершённых стадий, маршрутизация Step 6, статус-блок и `pf-help`
+**Description:** Step 5's таблица завершённых стадий несёт шесть новых строк документ→стадия (и явно не включает `open_questions.md`); новый абзац Step 6 маршрутизирует idea/spike исключительно на таблицу стадий `pf-idea-lenses/SKILL.md` (решение (A) — таблицы стадий не дублируются в `/pf`) и явно называет исключение "verdict.md content read" (различение VERDICT vs. VERDICT+"## Decision" требует прочитать тело документа, не только его существование/маркер); Step 7's статус-блок использует ту же форму, что у feat/improve/bug, и показывает `/pf-idea-verdict (decision session)` вместо обычной команды в задокументированном состоянии; `pf-help/SKILL.md` описывает оба новых воркфлоу одним абзацем каждый и добавляет две строки в «Issue folder contents» — без требования знать внутренние скиллы заранее.
 **Type:** Auto (**Test file:** `test/pf-idea-stage-static.sh`)
 **Preconditions:** —
 **Steps:**
@@ -178,12 +179,14 @@ feat/improve/bug; и требование к ревью — отдельное �
 | Step | Action | Expected Result |
 |------|--------|-----------------|
 | 1 | В `skills/pf/SKILL.md`, Step 5, найти шесть строк `idea.md`→IDEA, `research.md`→RESEARCH, …, `findings.md`→FINDINGS. | Все шесть присутствуют; `open_questions.md` не встречается в этой таблице. |
-| 2 | В Step 7 найти литерал `/pf-idea-verdict (decision session)`. | Присутствует. |
-| 3 | В `skills/pf-help/SKILL.md` найти блоки `Idea`/`Spike` workflow-диаграмм после "## Workflow by issue type". | Присутствуют, по одному абзацу на тип. |
-| 4 | В той же таблице «Issue folder contents» найти две новые строки (`idea`, `spike`). | Присутствуют. |
+| 2 | В `skills/pf/SKILL.md`, Step 6, перед существующими таблицами найти абзац «idea/spike-пайплайн», ссылающийся на `pf-idea-lenses` по имени («Stage tables»), и явно исключающий feat/improve/bug/trivial-таблицы этого файла для `idea`/`spike`. | Присутствует, синтаксически предшествует остальным таблицам Step 6. |
+| 3 | В том же абзаце найти оговорку о том, что различение `VERDICT` vs. `VERDICT` с непустой `## Decision` требует прочитать содержимое `verdict.md`, а не только факт существования файла/маркер `[pf-check ...]`. | Присутствует. |
+| 4 | В Step 7 найти литерал `/pf-idea-verdict (decision session)`. | Присутствует. |
+| 5 | В `skills/pf-help/SKILL.md` найти блоки `Idea`/`Spike` workflow-диаграмм после "## Workflow by issue type". | Присутствуют, по одному абзацу на тип. |
+| 6 | В той же таблице «Issue folder contents» найти две новые строки (`idea`, `spike`). | Присутствуют. |
 
 **Test Data:** `skills/pf/SKILL.md`, `skills/pf-help/SKILL.md`.
-**Expected Outcome:** Все четыре assert проходят.
+**Expected Outcome:** Все шесть assert проходят.
 **Priority:** Medium
 
 ### TC-007: Intake-батч — переиспользование `doc_language`, лимит вопросов, carve-out для голой папки
@@ -291,9 +294,10 @@ feat/improve/bug; и требование к ревью — отдельное �
 | 1 | В `skills/pf-idea-lenses/SKILL.md` найти словарь вердиктов. | Ровно `project`, `spike-first`, `defer`, `archive`; строка `incubate-until` отсутствует. |
 | 2 | В скелете `verdict.md` (Режим 1) убедиться, что заголовок `## Decision` отсутствует, документ заканчивается на "## Unverified Facts Summary". | Подтверждено. |
 | 3 | В `skills/pf-idea-verdict/SKILL.md`, Режим 2, найти формулировку батча с тремя вариантами (подтвердить / другой вердикт / переопределить допущение). | Присутствует, ровно три варианта. |
+| 4 | В том же батче найти три отдельные фразы «полный список» — допущений, открытых вопросов, непроверенных фактов (рядом с обоснованием рекомендованного вердикта). | Все три «полный список ...»-упоминания присутствуют, отдельно от простого перечисления вариантов ответа. |
 
 **Test Data:** `skills/pf-idea-lenses/SKILL.md`, `skills/pf-idea-verdict/SKILL.md`.
-**Expected Outcome:** Все три assert проходят.
+**Expected Outcome:** Все четыре assert проходят.
 **Priority:** Critical
 
 ### TC-014: Живой прогон — переопределение допущения в сессии решения
@@ -347,8 +351,8 @@ feat/improve/bug; и требование к ревью — отдельное �
 **Expected Outcome:** Оба assert проходят.
 **Priority:** Medium
 
-### TC-017: `pf-close` — прерогатив idea = подтверждённый `## Decision`, Phase 1 пропущена
-**Description:** Для `TYPE: idea` prerequisite-проверка «на правильной ветке» заменена проверкой присутствия `## Decision` в `verdict.md`; Phase 1 («Confirm with User») пропускается целиком для idea — подтверждённая `## Decision` уже и есть подтверждение закрытия, не второй гейт.
+### TC-017: `pf-close` — прерогатив idea = подтверждённый `## Decision`, Phase 1 пропущена, Phase 4.5 пропущена, `size_tier`-таблица, Phase 9 schedule cleanup
+**Description:** Для `TYPE: idea` prerequisite-проверка «на правильной ветке» заменена проверкой присутствия `## Decision` в `verdict.md`; Phase 1 («Confirm with User») пропускается целиком для idea — подтверждённая `## Decision` уже и есть подтверждение закрытия, не второй гейт; Phase 4.5 несёт явную оговорку о полном пропуске для `TYPE: idea`/`spike` (без неё Phase 4.5 ошибочно блокирует каждое такое закрытие, отсутствующим `test_plan.md`); Phase 4.6 п.3.i несёт таблицу вывода `size_tier` (`idea_tier` × сигнал длительности); Phase 9 несёт предваряющий пункт `CronList`/`CronDelete`-очистки schedule `pf-autopilot-<project>` для `TYPE: idea`/`spike`.
 **Type:** Auto (**Test file:** `test/pf-idea-stage-static.sh`)
 **Preconditions:** —
 **Steps:**
@@ -357,9 +361,12 @@ feat/improve/bug; и требование к ревью — отдельное �
 |------|--------|-----------------|
 | 1 | В `skills/pf-close/SKILL.md`, Phase 0, найти таблицу типов с строкой `idea` → «"## Decision" присутствует в verdict.md». | Присутствует. |
 | 2 | Найти оговорку «Phase 1 пропускается целиком для TYPE: idea» рядом с "## Phase 1: Confirm with User". | Присутствует. |
+| 3 | Рядом с "## Phase 4.5" найти предваряющую оговорку «Skip this entire phase for TYPE: idea or TYPE: spike» (или согласованный русский эквивалент). | Присутствует, до п.1 существующего Phase 4.5. |
+| 4 | В Phase 4.6 найти таблицу вывода `size_tier` (`idea_tier` × сигнал длительности из "Cost (Effort)" → выведенный `size_tier`, 6 строк). | Присутствует. |
+| 5 | Рядом с "## Phase 9: Report" найти предваряющий пункт: проверка `CronList` на существование schedule `pf-autopilot-<project>`, и, если существует, `CronDelete` + строка отчёта «Autopilot schedule removed» — только для `TYPE: idea`/`spike`. | Присутствует, синтаксически предшествует остальному телу Phase 9. |
 
 **Test Data:** `skills/pf-close/SKILL.md`.
-**Expected Outcome:** Оба assert проходят.
+**Expected Outcome:** Все пять assert проходят.
 **Priority:** Medium
 
 ### TC-018: `hypothesis.md`/`findings.md` — скелеты и гейт записи
@@ -495,7 +502,7 @@ feat/improve/bug; и требование к ревью — отдельное �
 **Priority:** Medium
 
 ### TC-026: Зеркало каркаса и счётчик скиллов в документации
-**Description:** `skills/pf/templates/project/` побайтово идентичен `docs/planning/templates/`; `CLAUDE.md`/`README.md`/`docs/planning/FRAMEWORK.md`/`docs/planning/QUICKSTART.md`/`skills/pf-update/SKILL.md`/`tools/onboarding-tui/lib/tutorial.js` сообщают «28» и называют все семь новых скиллов (кроме случая, где старая historical release-note «7 skills» намеренно не трогается — README.md строка ~319).
+**Description:** `skills/pf/templates/project/` побайтово идентичен `docs/planning/templates/`; `CLAUDE.md`/`README.md`/`docs/planning/FRAMEWORK.md`/`docs/planning/QUICKSTART.md`/`skills/pf-update/SKILL.md`/`tools/onboarding-tui/lib/tutorial.js` сообщают «28» и называют все семь новых скиллов (кроме случая, где старая historical release-note «7 skills» намеренно не трогается — README.md строка 437).
 **Type:** Auto (**Test file:** `test/pf-idea-templates-mirror.sh` для зеркала; `test/pf-idea-stage-static.sh` для счётчиков)
 **Preconditions:** —
 **Steps:**
@@ -504,7 +511,7 @@ feat/improve/bug; и требование к ревью — отдельное �
 |------|--------|-----------------|
 | 1 | `diff -r docs/planning/templates skills/pf/templates/project`. | Пустой diff. |
 | 2 | В каждом из шести документационных файлов найти "28" (или "28 skills"/"28 Claude Code skills", в зависимости от файла) и хотя бы одно из семи новых имён. | Присутствуют в каждом файле. |
-| 3 | В `README.md` убедиться, что historical release-note «3.0.0 release — 7 Claude Code skills» (строка ~319) осталась нетронутой. | Строка присутствует без изменений. |
+| 3 | В `README.md` убедиться, что historical release-note «3.0.0 release — 7 Claude Code skills» (строка 437) осталась нетронутой. | Строка присутствует без изменений. |
 
 **Test Data:** `docs/planning/templates/`, `skills/pf/templates/project/`, шесть документационных файлов.
 **Expected Outcome:** Все три группы assert проходят.
@@ -551,9 +558,9 @@ feat/improve/bug; и требование к ревью — отдельное �
 | Step | Action | Expected Result |
 |------|--------|-----------------|
 | 1 | Отправить документы/скиллы issue на Codex-ревью с явным дополнительным запросом «совместимость с Codex». | Запрос содержит это измерение отдельно от обычного P0/P1-ревью. |
-| 2 | Сверить ответ Codex с таблицей §9 specs-part3.md (5 строк: `AskUserQuestion`, `Agent` tool, абсолютные пути скиллов, `WebSearch`/`WebFetch`, `CronCreate`/`CronList`/`CronDelete`, `Skill` tool/slash-команды, session-log-атрибуция — 7 строк по факту). | Каждая строка отражена ответом ревьюера — переносимая альтернатива или «принято как ограничение», ни одна не пропущена. |
+| 2 | Сверить ответ Codex с таблицей §9 specs-part3.md (7 строк: `AskUserQuestion`, `Agent` tool, абсолютные пути скиллов, `WebSearch`/`WebFetch`, `CronCreate`/`CronList`/`CronDelete`, `Skill` tool/slash-команды, session-log-атрибуция). | Каждая строка отражена ответом ревьюера — переносимая альтернатива или «принято как ограничение», ни одна не пропущена. |
 
-**Test Data:** нет — реальный прогон Codex-ревью на текущем состоянии ветки issue.
+**Требуемые данные:** не требуются — реальный прогон Codex-ревью на текущем состоянии ветки issue.
 **Expected Outcome:** Оба AC (13a/13b) подтверждены на живом ревью, не только текстом спека.
 **Priority:** Medium
 
@@ -575,10 +582,10 @@ feat/improve/bug; и требование к ревью — отдельное �
 **Expected Outcome:** `pf_pass`, если множество путей точно совпадает с ожидаемым; иначе `pf_fail` с diff.
 **Priority:** Critical
 
-### TC-031: `project`/`spike-first`-вердикт — bootstrap + git init + follow-up в правильном порядке, до архивации
-**Description:** Fixture — bare-folder idea-issue с `verdict.md`'s "## Decision" = `project` (и отдельно — `spike-first`) уже на месте. Транскрипция Phase 4.6: `git init`, копирование каркаса, initial scaffold commit, создание follow-up-папки, **затем** Phase 5's `mv` идеи в `closed/`. Assert, в этом порядке: репозиторий существует после Phase 4.6 и до Phase 5; initial scaffold commit существует и **не** содержит `docs/issues/`-путей (scoped `git add`); follow-up-папка существует под `open/` **до** архивации idea; после полного прогона `git status --porcelain` пуст. Обе ветки вердикта (`project`, `spike-first`) проходят один и тот же bootstrap.
+### TC-031: `project`/`spike-first`-вердикт — bootstrap + git init + follow-up в правильном порядке, до архивации; вывод `size_tier`; PARENT-BRANCH для idea в существующем проекте
+**Description:** Fixture — bare-folder idea-issue с `verdict.md`'s "## Decision" = `project` (и отдельно — `spike-first`) уже на месте. Транскрипция Phase 4.6: `git init`, копирование каркаса, initial scaffold commit, создание follow-up-папки, **затем** Phase 5's `mv` идеи в `closed/`. Assert, в этом порядке: репозиторий существует после Phase 4.6 и до Phase 5; initial scaffold commit существует и **не** содержит `docs/issues/`-путей (scoped `git add`); follow-up-папка существует под `open/` **до** архивации idea; выведенный `size_tier` follow-up `prompt.md` соответствует таблице Phase 4.6 п.3.i; после полного прогона `git status --porcelain` пуст. Обе ветки вердикта (`project`, `spike-first`) проходят один и тот же bootstrap. Отдельная фикстура (`idea-verdict-project-existing`) проверяет второй путь вычисления PARENT-BRANCH — «idea в уже существующем PF-проекте» (п.3.d): используется значение, уже вычисленное Phase 3 (включая checkout §7.3.1), bootstrap-шаги п.b/c — no-op, поскольку `has_full_scaffold` уже истинно.
 **Type:** Auto — fixture-based (**Test file:** `test/pf-idea-stage-static.sh`)
-**Preconditions:** Новые фикстуры `test/fixtures/idea-verdict-project-bare` (создаётся при реализации, `verdict.md` с `## Decision: project`) и её вариант с `## Decision: spike-first`.
+**Preconditions:** Новые фикстуры `test/fixtures/idea-verdict-project-bare` (создаётся при реализации, `verdict.md` с `## Decision: project`; `idea.md` несёт `idea_tier: product` и "Cost (Effort)" с сигналом «около недели» — однозначно выводит `size_tier: medium` по таблице) и её вариант с `## Decision: spike-first`; отдельная фикстура `test/fixtures/idea-verdict-project-existing` — idea-issue внутри уже развёрнутого PF-проекта (`PLANNING.md` уже существует, `has_full_scaffold: true`), с PARENT-BRANCH, уже вычисленным и checkout-нутым на Phase 3 этого же прогона.
 **Steps:**
 
 | Step | Action | Expected Result |
@@ -586,12 +593,14 @@ feat/improve/bug; и требование к ревью — отдельное �
 | 1 | `pf_setup_case idea-verdict-project-bare` (без `--git`). | Bare-папка с idea-issue, чей `verdict.md` несёт `## Decision: project`. |
 | 2 | Транскрибировать Phase 4.6: `git init`, развернуть каркас, `git add PLANNING.md CLAUDE.md .pf-version docs/planning && git commit`, создать `docs/issues/open/<...>-feat-<slug>/prompt.md` с `idea_ref`. | Каждый шаг выполнен в этом порядке. |
 | 3 | Проверить: репозиторий существует; commit не содержит `docs/issues/`-путей (`git show --stat`); follow-up-папка существует под `open/`. | Все три assert проходят, ДО следующего шага. |
-| 4 | Транскрибировать Phase 5: `mv docs/issues/open/<idea-id> docs/issues/closed/<idea-id>`, коммит архивации. | Idea перемещена. |
-| 5 | `git status --porcelain`. | Пусто. |
-| 6 | Повторить п.1-5 для `## Decision: spike-first`. | Follow-up — git-backed `spike`-папка с `idea_ref`, тот же bootstrap отработал. |
+| 4 | Проверить выведенное значение `size_tier` в follow-up `prompt.md` и обосновывающую запись в его `open_questions.md`. | `size_tier: medium` (по таблице п.3.i для `idea_tier: product` + сигнал «неделя или короче»); `open_questions.md` несёт `[assumed]`-запись с этим обоснованием. |
+| 5 | Транскрибировать Phase 5: `mv docs/issues/open/<idea-id> docs/issues/closed/<idea-id>`, коммит архивации. | Idea перемещена. |
+| 6 | `git status --porcelain`. | Пусто. |
+| 7 | Повторить п.1-6 для `## Decision: spike-first`. | Follow-up — git-backed `spike`-папка с `idea_ref`, тот же bootstrap отработал. |
+| 8 | `pf_setup_case idea-verdict-project-existing` (`--git`). Транскрибировать Phase 4.6 п.3.a-d: вычислить `has_git`/`has_full_scaffold` раздельно (оба истинны), убедиться, что п.b (`git init`) и п.c (развернуть каркас) — no-op, и что PARENT-BRANCH берётся из значения, уже вычисленного Phase 3 (не из `git branch --show-current` после нового `git init`, которого в этом прогоне не было). | П.b/c ничего не делают; follow-up issue создаётся на той же ветке, что Phase 3; initial scaffold commit (п.e) не создаётся (идемпотентность — п.b/c ничего не сделали в этом прогоне). |
 
-**Test Data:** `test/fixtures/idea-verdict-project-bare` (и её `spike-first`-вариант).
-**Expected Outcome:** Порядок и содержимое каждого шага совпадают с ожиданиями для обеих веток вердикта.
+**Test Data:** `test/fixtures/idea-verdict-project-bare` (и её `spike-first`-вариант), `test/fixtures/idea-verdict-project-existing`.
+**Expected Outcome:** Порядок и содержимое каждого шага совпадают с ожиданиями для обеих веток вердикта и для обоих путей вычисления PARENT-BRANCH.
 **Priority:** Critical
 
 ### TC-032: Spike close — гейт пустого Run Evidence и ветка без merge
@@ -653,7 +662,7 @@ feat/improve/bug; и требование к ревью — отдельное �
 | AC-05a | TC-010 |
 | AC-05b | TC-010 |
 | AC-05c | TC-010 |
-| AC-05d | TC-010 |
+| AC-05d | TC-013 |
 | AC-06a | TC-011, TC-012 |
 | AC-06b | TC-011, TC-012 |
 | AC-06c | TC-011 |
@@ -663,9 +672,9 @@ feat/improve/bug; и требование к ревью — отдельное �
 | AC-07c | TC-013 |
 | AC-07d | TC-014 |
 | AC-07e | TC-017 |
-| AC-08a | TC-031 |
+| AC-08a | TC-031, TC-017 |
 | AC-08b | TC-022 |
-| AC-08c | TC-022 |
+| AC-08c | TC-022, TC-031, TC-017 |
 | AC-08d | TC-031 |
 | AC-09a | TC-018 |
 | AC-09b | TC-005, TC-028 |
@@ -673,7 +682,7 @@ feat/improve/bug; и требование к ревью — отдельное �
 | AC-09d | TC-028, TC-032 |
 | AC-09e | TC-023 |
 | AC-10a | TC-023 |
-| AC-10b | TC-023 |
+| AC-10b | TC-023, TC-017 |
 | AC-10c | TC-023 |
 | AC-11a | TC-006 |
 | AC-11b | TC-003, TC-006 |
@@ -719,7 +728,7 @@ feat/improve/bug; и требование к ревью — отдельное �
 | TC-025 | `converge-to-v3.sh` — ветки `idea`/`spike` | Auto | Medium | [ ] | |
 | TC-026 | Зеркало каркаса и счётчик скиллов в документации | Auto | Medium | [ ] | |
 | TC-027 | Неизменность feat/improve/bug и единственный источник порядка стадий | Auto | Critical | [ ] | |
-| TC-028 | Живой прогон — спайк, требующий кода | Manual | High | [ ] | Manual reason: environment |
+| TC-028 | Живой прогон — спайк, требующий кода | Manual | High | [ ] | Manual reason: interactive-agent — требуется живая агентная сессия, принимающая решения по ветке/эксперименту, а не просто окружение, недоступное в CI |
 | TC-029 | Реальное ревью в Codex — измерение «совместимость с Codex» | Manual | Medium | [ ] | Manual reason: external-system |
 | TC-030 | Bare-folder idea создаёт только папку issue — и ничего больше | Auto | Critical | [ ] | |
 | TC-031 | `project`/`spike-first`-вердикт — bootstrap + git init + follow-up до архивации | Auto | Critical | [ ] | |
