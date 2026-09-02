@@ -58,9 +58,14 @@ idea_ref: 20260815-idea-example    # ID уже ЗАКРЫТОГО idea-issue, и
 
 Присутствует только когда issue создан автоматически из вердикта `project`
 (в первом `feat`-issue) или `spike-first` (в `spike`-issue) — см. §7.3.1.
-Отсутствует у issue, созданного вручную/напрямую. Значение — ID папки под
-`docs/issues/closed/` (идея к этому моменту уже заархивирована — Phase 5.5
-идёт после Phase 5, §4.4 в part1).
+Отсутствует у issue, созданного вручную/напрямую. Значение — ID папки,
+которая на момент записи (Phase 4.6, part1 §4.4) физически всё ещё лежит
+под `docs/issues/open/` (Phase 4.6 идёт **до** Phase 5 — bootstrap-порядок
+findings #2-5/#19 этого ревью), но к моменту, когда что-либо иное впервые
+читает этот `prompt.md` (следующая сессия, следующий вызов `/pf-brd`),
+`/pf-close`'s Phase 5 того же прогона уже переместила её под
+`docs/issues/closed/` — значение поля трактуется как ID под `closed/`
+везде за пределами самого Phase 4.6.
 
 ### 6.2 `idea.md`
 
@@ -154,6 +159,14 @@ product ≤300 (6 персон) строк.
 
 ### 6.5 `verdict.md`
 
+**Режим 1 (запись) skeleton — намеренно не содержит заголовка `##
+Decision` вовсе** (finding #13 — черновик показывал этот заголовок в
+skeleton'е самого документа, притом что соседний текст и routing считают
+именно отсутствие заголовка единственным признаком неподтверждённого
+вердикта; реализация, буквально следующая skeleton'у ниже, никогда не
+рискует принять placeholder-заголовок за подтверждение, потому что
+заголовка в написанном Режимом 1 файле физически нет):
+
 ```markdown
 # Verdict: <краткое имя>
 
@@ -171,21 +184,27 @@ product ≤300 (6 персон) строк.
 
 ## Unverified Facts Summary
 <построчный пересказ каждой unverified-fact-записи>
-
-## Decision
-<ДОПИСЫВАЕТСЯ ТОЛЬКО ПОСЛЕ сессии решения — отсутствие этой секции есть
-признак "ещё не подтверждено", см. §3.5.3 part1>
 ```
 
-`## Decision`, будучи дописанной, имеет фиксированную форму:
+Файл, записанный Режимом 1, заканчивается на "## Unverified Facts
+Summary" — ничего после неё. "## Decision" появляется **только** как
+append-блок Режима 2 (§3.5.3 part1), никогда не как часть исходного
+skeleton'а — это единственное место во всём файле, где заголовок
+дописывается:
 
 ```markdown
 ## Decision
 
 **Confirmed verdict:** <project | spike-first | defer | archive>
+**Confirmed by:** <пользователь-инициатор сессии>
 **Date:** <YYYY-MM-DD>
 **Timestamp:** <UTC ISO-8601>
 ```
+
+`Confirmed by` — поле, которое §3.5.3 part1's прозаическое описание уже
+требует ("пользователь-инициатор"), но более ранняя редакция этой
+фиксированной формы его не несла (finding #32) — добавлено для
+соответствия собственному требованию аудируемости этого спека.
 
 Бюджет: personal ≤60, остальные ≤100 строк (без секции `## Decision`,
 которая добавляется поверх этого бюджета — сама секция короткая и не
@@ -362,6 +381,23 @@ interaction: front-loaded    # опционально; отсутствует п
 
 ### 7.2 `skills/pf-check/SKILL.md`
 
+**Опening `size_tier` guard (finding #1) — структурная правка, не
+текстовая.** Сегодняшний первый абзац файла ("Before checking any other
+prerequisite, read `prompt.md`'s frontmatter. If it has no `size_tier`
+field, ask the user...") выполняется **до** определения TARGET/TYPE и
+безусловно. В отличие от `pf-brd`/`pf-spec`/… (§1.1(B) part1 — их guard
+физически недостижим для `idea`/`spike`, поскольку эти скиллы для таких
+issue не вызываются вовсе), `pf-check` **вызывается** на документах
+`idea`/`spike` (US-11d) — этот guard достигается и без правки задал бы
+запрещённый вопрос посреди front-loaded пайплайна. Правка: этот абзац
+получает предваряющее условие: *"First, determine TYPE from the active
+issue's folder-name prefix (the same way `~/.claude/skills/pf/SKILL.md`
+Step 4 does). If TYPE is `idea` or `spike`, skip this entire `size_tier`
+paragraph — these issue types never carry `size_tier` and are never asked
+for it (`~/.claude/skills/pf-idea-lenses/SKILL.md`'s `idea_tier` instead,
+handled separately below). Only for any other TYPE does the rest of this
+paragraph apply, unchanged."*
+
 **"Determine the active issue..." (вводный абзац, предшественники по
 TARGET)** — шесть новых строк:
 
@@ -373,6 +409,22 @@ TARGET)** — шесть новых строк:
 | `verdict.md` | `idea.md`, `research.md`, `critique.md` |
 | `hypothesis.md` | нет |
 | `findings.md` | `hypothesis.md` |
+
+**Дополнительный context, не предшественник (finding #29).** Сразу после
+этой таблицы — отдельное предложение, явно не смешиваемое со списком
+предшественников (предшественники управляют conjunct 3 критерия
+completeness; этот список — нет): *"For every `idea`/`spike` TARGET above,
+also read `docs/issues/open/[ISSUE-ID]/prompt.md`'s intake body (not just
+its `size_tier`/`idea_tier` frontmatter) as required context — the review
+must be able to compare TARGET against what the user actually said at
+intake, not only against TARGET's own predecessor documents. For
+`critique.md`, `verdict.md`, and `findings.md` specifically, also read
+`open_questions.md` if it exists — without it, the reviewer cannot verify
+that every `[assumed]`/`unverified-fact` entry the document claims to
+summarize is actually reflected (AC-05d/AC-06c/AC-07b depend on this
+cross-check). `open_questions.md` is a side ledger, not a pipeline-stage
+predecessor (§5.6 part1) — it does not gate completeness, it is read
+purely as reviewer context."*
 
 **"## Reviewer selection", таблица TARGET → key** — шесть новых строк:
 
@@ -406,7 +458,7 @@ predecessor list + tier-budget check... brief", так что правка од�
 
 ### 7.3 `skills/pf-close/SKILL.md`
 
-#### 7.3.1 Определение TYPE и три варианта Phase 0
+#### 7.3.1 Определение TYPE, Phase 0, и единственный человеческий гейт (finding #9)
 
 В начало файла, сразу после "Read ISSUE-ID from the active folder name",
 добавить: *"Extract TYPE from ISSUE-ID the same way `~/.claude/skills/pf/
@@ -425,26 +477,77 @@ produces qa_report.md)."** Пункт 3 ("On correct branch") заменяетс
 | idea | Не проверяется вообще — idea-пайплайн никогда не создаёт `issue/<id>`-ветку (нет кода). Проверяется вместо этого новое условие: **"## Decision" присутствует в `verdict.md`** — если нет, стоп: *"Verdict not confirmed. Run /pf-idea-verdict (decision session) first."* (AC-07e). |
 | spike | Не требует нахождения именно на `issue/<id>` — допустимо быть на родительской ветке **или** на `issue/<spike-id>`, если она существует (§3.6 part1 — ветка создаётся, только если эксперимент требовал кода). |
 
-**Новый пункт 4 (idea only) — `has_git`.** Вычислить `has_git` (§Phase 0
-`pf/SKILL.md`). Если ложно (единственный достижимый случай — `idea`-issue,
-созданный в изначально пустой не-git-папке, §3.1.1 part1's ветка "Идея",
-и ни разу не превратившийся в проект) — установить флаг `NO-REPO` на весь
-остаток прогона `pf-close` для этого issue. Этот флаг перекраивает
-поведение сразу нескольких последующих Phase, перечисленных ниже по
-отдельности (§7.3.2's Phase 3.5/4, §7.3.5) — фиксируется здесь один раз,
-не пересчитывается на каждой Phase заново, поскольку git-репозиторий не
-может появиться сам по себе между Phase 0 и Phase 5.5 (единственное место,
-где он может быть создан этим же прогоном — Phase 5.5, п.2a, **после**
-этой точки).
+**Новый пункт 4 (spike only) — Run Evidence gate (AC-09c, finding #6).**
+Это единственное место во всём `pf-close`, где сам гейт закрытия — не
+дисциплина генератора документа — механически проверяет содержимое:
+1. `hypothesis.md` и `findings.md` оба завершены по общему критерию
+   `pf-size-tiers` ("Stage completion") — если нет, стоп: *"Spike is not
+   ready to close: <missing document>. Run /pf-idea-spike first."*
+2. `findings.md`'s секция `## Run Evidence` непуста **и не является
+   заглушкой** — тот же принцип, что стадия "не пишет `## Conclusion` без
+   непустой `## Run Evidence`" (§3.6 part1, п.4) уже применяет к самой
+   себе на запись; здесь та же проверка применяется **на чтение**, к тому,
+   что реально оказалось на диске (ручное редактирование, сбой генерации
+   или галлюцинация могли обойти дисциплину записи). Механическая
+   проверка: секция существует, и после заголовка есть непустой текст,
+   отличный от плейсхолдера `<конкретное свидетельство...>` из шаблона
+   §6.7. Если пусто/отсутствует/осталась плейсхолдером — стоп: *"findings.md's
+   Run Evidence is empty or a template placeholder — spike close requires
+   evidence of an actual run. Fix findings.md (or re-run /pf-idea-spike
+   Mode 2), then re-run /pf-close."*
+3. `## Result vs. Success Criterion` ссылается на конкретный пункт из
+   `## Run Evidence` (не пустая секция) — та же полнота-проверка, что и
+   выше, применённая ко второй обязательной секции.
+
+Это дополняет, не заменяет, дисциплину записи из §3.6 part1 п.4 — та
+предотвращает запись невалидного `findings.md`, эта ловит уже записанный
+невалидный файл (ручная правка, старая версия и т.п.) на входе в закрытие,
+ровно там, где AC-09c требует, чтобы "гейт закрытия" (не только генератор)
+это проверял.
+
+**Новый пункт 5 — `has_git`.** Вычислить `has_git` (§Phase 0 `pf/SKILL.md`).
+Если ложно (единственный достижимый случай — `idea`-issue, созданный в
+изначально пустой не-git-папке, §3.1.1 part1's ветка "Идея", и ни разу не
+превратившийся в проект до этого момента) — установить флаг `NO-REPO` на
+весь остаток прогона `pf-close` для этого issue, **если только Phase 4.6
+ниже не снимет его** (единственное место, где репозиторий может появиться
+в рамках одного прогона).
 
 **`NO-REPO`-ветка (idea only) — Phase 2, 3, 3.5/4 пропускаются целиком.**
-Если пункт 4 выше установил `NO-REPO` — Phase 2 ("Pre-Close Cleanup",
+Если пункт 5 выше установил `NO-REPO` — Phase 2 ("Pre-Close Cleanup",
 `git status --porcelain`), Phase 3 ("Detect Parent Branch", `git config`/
 `git branch --list`) и Phase 4/3.5 (merge или spike-копирование, оба
-требуют git) **не выполняются вообще** — переход сразу к Phase 5 (Archive
-Issue Folder, обычный `mv`, не git-операция). Это единственный путь,
-которым `pf-close` доходит до Phase 5 без единого git-вызова — обоснование
-и последствия для Phase 6-8 см. §7.3.5.
+требуют git) **не выполняются вообще** — переход прямо к Phase 4.6 (§7.3.4
+ниже), которая для этого случая либо создаёт репозиторий (`project`/
+`spike-first`), либо остаётся no-op (`defer`/`archive`, и `NO-REPO`
+доживает до конца прогона — §7.3.5).
+
+**Checkout PARENT-BRANCH для `idea` без `NO-REPO` (finding #5).** Когда
+`idea` закрывается в уже существующем PF-проекте (has_git истинно с
+самого начала — обычный случай US-02, не bare-folder), Phase 4 ("Merge")
+для `TYPE: idea` не выполняется (idea никогда не мерджится — §7.3.2 ниже),
+но текущая ветка на момент Phase 5 (`mv`) и Phase 8 (archive commit)
+обязана быть PARENT-BRANCH, а не произвольной веткой, на которой
+случайно стоит сессия. Поэтому Phase 3 ("Detect Parent Branch") для
+`TYPE: idea` получает один добавленный шаг сразу после определения
+PARENT-BRANCH: **`git checkout PARENT-BRANCH`** — тот же чекаут, что Phase
+4's шаг 1 делает для feat/improve/bug, без последующего `git merge`
+(idea не мерджит ничего). Для `spike` чекаут на PARENT-BRANCH уже
+выполняет Phase 3.5 (§7.3.2) как часть своей собственной процедуры —
+дублирующего шага здесь не требуется.
+
+**Phase 1 (Confirm with User) — единственный человеческий гейт, не
+второй.** Для `TYPE: idea` Phase 1 **пропускается целиком** — подтверждённая
+"## Decision" в `verdict.md` (только что проверенная Phase 0's п.3) уже и
+есть подтверждение закрытия (AC-07e; §3.8 part1, "один финальный
+человеческий гейт на issue"). Требовать здесь ещё одно "Proceed? (yes/no)"
+означало бы два подтверждения за одну сессию решения. Для `TYPE: spike`
+Phase 1 **сохраняется без изменений по смыслу** (текст резюме — §7.3.2
+ниже) — у spike нет отдельной decision session, поэтому Phase 1 и есть
+единственный финальный гейт "человек в конце" (US-09e). Для
+feat/improve/bug Phase 1 не меняется здесь — front-loaded-расширение этого
+же Phase 1 (показ ledger'а перед подтверждением) специфицировано отдельно,
+§7.13.1 ниже ("Final decision gate"), не в этом разделе.
 
 #### 7.3.2 Spike — копирование документов без merge (AC-09d)
 
@@ -452,7 +555,9 @@ Issue Folder, обычный `mv`, не git-операция). Это единс
 недостижим, см. §7.3.1's таблицу типов)**, между "Phase 3: Detect Parent
 Branch" и "Phase 4: Merge" — **заменяет** Phase 4 целиком для `TYPE:
 spike` (Phase 4 "Merge" в её сегодняшнем виде выполняется только для
-feat/improve/bug):
+feat/improve/bug; для `TYPE: idea` Phase 4 тоже не выполняется — см.
+checkout-шаг, добавленный в §7.3.1 выше, который покрывает то немногое,
+что idea всё же требует от текущей ветки, без самого `git merge`):
 
 1. Если текущая ветка — `issue/<spike-id>`: переключиться на PARENT-BRANCH
    (Phase 3 уже определила её), **без** `git merge`.
@@ -471,8 +576,8 @@ feat/improve/bug):
 **Phase 1: Confirm with User** для `TYPE: spike` получает изменённый текст
 резюме (не "Merge issue/ISSUE-ID into <parent-branch>", а "Copy
 docs/issues/open/ISSUE-ID/ from issue/ISSUE-ID to <parent-branch> — code
-stays on issue/ISSUE-ID, never merged or deleted"). Для `TYPE: idea` резюме
-не упоминает merge/branch вовсе (idea никогда не создаёт ветку).
+stays on issue/ISSUE-ID, never merged or deleted"). Для `TYPE: idea` этот
+пункт не наблюдаем — Phase 1 для idea не выполняется вовсе (§7.3.1).
 
 #### 7.3.3 Phase 4.5 — пропускается для idea/spike
 
@@ -484,62 +589,178 @@ in step 2 below."* Это не косметика — без явного про
 ошибочно блокирует каждое закрытие idea/spike-issue (см. gap, найденный
 до написания этого спека).
 
-#### 7.3.4 Phase 5.5 (новая) — вердикт `project`/`spike-first`
+#### 7.3.4 Phase 4.6 (новая) — bootstrap + follow-up ДО архивации (findings #2/#3/#4/#5/#19)
 
-Между "Phase 5: Archive Issue Folder" и "Phase 6: Compute LLM Usage &
-Cost", применяется только для `TYPE: idea`:
+**Порядок исправлен относительно более ранней редакции этого спека.**
+Черновик размещал этот шаг после Phase 5 ("Phase 5.5") и обуславливал
+bootstrap непригодным для голой idea-папки условием (`has_pf`, уже
+истинным из-за одного только `docs/issues/open/`), не разворачивал
+scaffold для `spike-first`, не фиксировал initial-scaffold-commit
+атомарно и не давал recovery path при частичном сбое — пять отдельных
+находок ревью (#2/#3/#4/#5/#19), общая причина которых одна: шаг шёл
+**после** необратимого `mv`. Исправление — тот же принцип, которым уже
+обоснована сегодняшняя Phase 4.5 ("a failure here leaves the issue folder
+in `docs/issues/open/`, so the issue is still discoverable and nothing is
+lost", `pf-close/SKILL.md` текущий текст Phase 4.5): **Phase 4.6 идёт
+между Phase 4.5 и Phase 5**, то есть **до** архивации, применяется только
+для `TYPE: idea`.
 
-1. Прочитать подтверждённый вердикт из
-   `docs/issues/closed/ISSUE-ID/verdict.md`'s "## Decision" (issue уже
-   перемещён туда предыдущей Phase).
-2. **`project`:**
-   a. Если `has_pf`/`has_git` (§3.1.1 part1, вычислено заново для CWD)
-      ложны — развернуть каркас + `git init`, тем же путём, что §3.1.1
-      п.2-8 (ссылка на процедуру по имени, не копирование текста).
-   b. Определить `<slug>` из `idea.md`'s заголовка/темы.
-   c. Создать `docs/issues/open/<YYYYMMDD>-feat-<slug>/prompt.md`,
-      предзаполненный: `doc_language`/`idea_tier`→нет прямого маппинга в
-      `size_tier` (оставить `size_tier` неустановленным — обычный
-      legacy-tier guard `/pf` спросит его при первом визите, как для
-      любого нового feat-issue), `idea_ref: <closed-idea-id>`, тело —
-      идея/MVP/ограничения, скомпонованные из `idea.md`+`verdict.md`+
-      исходного intake текста `prompt.md` (тот, что уже в архиве).
-   d. Отчёт Phase 9 дополняется строкой: *"Created follow-up issue:
-      <feat-id> (idea_ref: <idea-id>). Next: /pf-brd."*
-3. **`spike-first`:**
-   a. Аналогично создать `docs/issues/open/<YYYYMMDD>-spike-<slug>/
-      prompt.md`, `idea_ref: <closed-idea-id>`, поля `## Question`/
+1. Прочитать подтверждённый вердикт из **`docs/issues/open/ISSUE-ID/
+   verdict.md`'s "## Decision"** — issue **ещё не перемещён** в `closed/`
+   на этом шаге (в отличие от черновика, читавшего из `closed/`).
+2. **`defer`/`archive`:** эта Phase — no-op. Не трогать `has_git`/`NO-REPO`,
+   не создавать ничего. Перейти к Phase 5.
+3. **`project`/`spike-first`** (обе ветки проходят один и тот же bootstrap
+   — исправление finding #19: черновик разворачивал каркас+`git init`
+   только для `project`, из-за чего `spike-first`, рождённый из голой
+   idea-папки, создавал spike без репозитория, для которого `pf-idea-spike`
+   Режим 2 не может выполнить `git checkout -b issue/<spike-id>`):
+   a. Вычислить **раздельно** (finding #2 — не единым `has_pf`,
+      допускающим bare-idea за полноценный scaffold):
+      - `has_git` — как обычно (`git rev-parse --is-inside-work-tree`).
+      - `has_full_scaffold := PLANNING.md` существует в CWD. **Не**
+        `has_pf`'s дизъюнкция (`PLANNING.md` ИЛИ `docs/issues/` ИЛИ
+        `.pf-version`) — эта дизъюнкция уже истинна для голой idea-папки
+        просто потому, что `docs/issues/open/<idea-id>/` существует, хотя
+        каркаса нет вовсе; `has_full_scaffold` требует именно
+        `PLANNING.md`, который bare-idea никогда не создаёт (AC-01b).
+   b. Если `!has_git` — `git init`.
+   c. Если `!has_full_scaffold` — развернуть каркас: те же действия, что
+      §3.1.1 part1 п.2, 4-7 (создать `docs/issues/{open,closed}` там, где
+      их ещё нет — для in-project idea они уже есть; записать
+      `.pf-version`; скопировать `PLANNING.md`/`CLAUDE.md`; скопировать
+      `docs/planning/*.md`, не переписывая существующее; зеркалировать
+      `docs/planning/templates/`) — ссылка на процедуру по имени, не
+      копирование текста; шаг 1 (git init) и шаг 3 (`.pf-version`, часть
+      той же процедуры) выполняются здесь как часть п.b/п.c, шаги 8-9
+      (skip shim, "3-variant question") не применяются — эта Phase не
+      ведёт в intake, она ведёт в follow-up issue creation ниже.
+   d. **PARENT-BRANCH.** Если Phase 3 уже вычислила его в этом прогоне
+      (случай "idea в существующем проекте", `NO-REPO` не было установлено
+      на Phase 0) — используется то же значение, включая checkout,
+      выполненный §7.3.1's добавленным шагом. Если Phase 3 была пропущена
+      (bare-folder случай, `NO-REPO` было установлено) — PARENT-BRANCH :=
+      ветка, на которой сессия оказалась сразу после `git init` в п.b
+      (`git branch --show-current`) — без обращения к Phase 3's
+      develop/main-fallback: сравнивать не с чем, ветка только что создана
+      этим самым `git init` (finding #5 — устраняет "произвольную текущую
+      ветку" для этого случая по построению: другой ветки physически не
+      существует).
+   e. **Атомарный initial scaffold commit (finding #3).** Только если п.b
+      или п.c реально что-то сделали в этом прогоне (идемпотентность —
+      повторный `/pf-close` после частичного сбоя не должен ни падать, ни
+      создавать пустой коммит, если каркас/репозиторий уже на месте):
+      `git add PLANNING.md CLAUDE.md .pf-version docs/planning` (scoped,
+      **не** `-A`, и **не** `docs/issues/` — архивация issue-папки
+      коммитится отдельно, обычной Phase 8) и
+      `git commit -m "chore: bootstrap PF scaffold for ISSUE-ID (verdict: <verdict>)"`.
+      Это отдельный коммит, до архивного коммита Phase 8 — без него
+      сценарий "новый scaffold остаётся untracked до первого `pf-qa`
+      follow-up issue" (finding #3) воспроизводится буквально.
+   f. Снять `NO-REPO` (гарантированно ложно с этой точки для
+      `project`/`spike-first` — используется §7.3.5's таблицей для
+      `defer`/`archive`-случая, единственного, где флаг доживает дальше).
+   g. Определить `<slug>` из `idea.md`'s заголовка/темы.
+   h. **Идемпотентность follow-up (recovery после частичного сбоя).**
+      Перед созданием новой папки issue — проверить, не существует ли уже
+      под `docs/issues/open/` папка с `idea_ref: ISSUE-ID` в фронтматтере
+      (свидетельство, что предыдущий, прерванный прогон этой самой Phase
+      уже создал follow-up issue, но не дошёл до Phase 5). Если существует
+      — переиспользовать её (не создавать вторую, не затирать), перейти
+      сразу к соответствующему пункту отчёта (i/j ниже) и затем к Phase 5.
+   i. **`project`:** создать `docs/issues/open/<YYYYMMDD>-feat-<slug>/
+      prompt.md`, предзаполненный (finding #16 — выводить, не откладывать
+      на legacy-tier guard, там где вывод возможен):
+      - `doc_language` — унаследован от идеи напрямую.
+      - `roles`/`profile`/`on_unavailable` — если присутствуют в idea's
+        `prompt.md`, копируются как есть (те же значения годятся: ключи
+        `idea`/`research`/`critique`/`verdict` резолвятся тем же
+        алгоритмом `pf-roles` §4, что и `code`/`tests`/…, §7.12 — явных
+        значений для `code`/`brd`/`specs`/… у идеи нет, поэтому копируется
+        только то, что действительно присутствует; отсутствующее остаётся
+        отсутствующим — обычный fallback §4 level 4/5 применится как для
+        любого нового issue).
+      - `size_tier` — выводится из `idea.md`'s "Cost (Effort)" + `idea_tier`
+        по таблице ниже, **записывается сразу**, с обоснованием, залогированным
+        как `[assumed]` в новом `open_questions.md` этого feat-issue (не
+        оставляется пустым "на усмотрение guard'а"):
+
+        | `idea_tier` | Сигнал из "Cost (Effort)" | Выведенный `size_tier` |
+        |---|---|---|
+        | `personal` | любой | `small` |
+        | `infra` | "несколько часов/один день" или короче | `small` |
+        | `infra` | "несколько дней" или дольше | `medium` |
+        | `content` | любой | `small` |
+        | `product` | "неделя" или короче | `medium` |
+        | `product` | "несколько недель"/"месяц" или дольше | `large` |
+
+        Если "Cost (Effort)" не содержит распознаваемого сигнала длительности
+        (свободный текст без единиц времени) — `size_tier` **не** записывается,
+        оставляется настоящей неоднозначностью: обычный legacy-tier guard
+        `/pf-brd`/`pf-spec`/… спрашивает как для любого issue без tier (это
+        единственный случай, когда финальное правило AC-08c — "спрашивается
+        только если нельзя вывести" — действительно допускает вопрос).
+      - `idea_ref: <idea-id>`; тело — идея/MVP/ограничения, скомпонованные
+        из `idea.md`+`verdict.md`+исходного intake-текста `prompt.md` (issue,
+        из которого он собирается, на этот момент всё ещё физически лежит
+        в `open/` — п.1 выше). Отчёт Phase 9 дополняется строкой: *"Created
+        follow-up issue: <feat-id> (idea_ref:
+      <idea-id>). Next: /pf-brd."*
+   j. **`spike-first`:** аналогично создать `docs/issues/open/<YYYYMMDD>-
+      spike-<slug>/prompt.md`, `idea_ref: <idea-id>`, поля `## Question`/
       `## Success Criterion`/`## Time-box`/`## Method` — best-effort
-      выведены из `verdict.md`'s "## Reasoning" (в частности, из того,
-      какой открытый технический вопрос стал причиной `spike-first`) и
-      `critique.md`'s Summary Table (строки с диспозицией "Идея меняется"
-      или неразрешённые технические возражения техлида/безопасника —
-      естественный источник кандидата в "Question"). Ничего не
-      спрашивается у пользователя — front-loaded правило применяется и
-      здесь: неоднозначность резолвится рекомендацией, логируется как
-      `[assumed]` в **новом** `open_questions.md` только что созданного
-      spike-issue.
-   b. Отчёт дополняется: *"Created follow-up issue: <spike-id> (idea_ref:
-      <idea-id>). Next: /pf-idea-spike."*
-4. **`defer`/`archive`:** ничего не создаётся — переход к Phase 6 как
-   обычно.
+      выведены из `verdict.md`'s "## Reasoning" и `critique.md`'s Summary
+      Table (строки с диспозицией "Идея меняется" или неразрешённые
+      технические возражения техлида/безопасника — естественный источник
+      кандидата в "Question"). Ничего не спрашивается у пользователя —
+      front-loaded правило применяется и здесь: неоднозначность
+      резолвится рекомендацией, логируется как `[assumed]` в **новом**
+      `open_questions.md` только что созданного spike-issue. Этот spike
+      теперь **всегда** git-backed (п.a-f выше уже выполнились для обеих
+      веток `project`/`spike-first` одинаково) — `pf-idea-spike`'s Режим 2
+      может создать `issue/<spike-id>`, если эксперимент требует кода,
+      без риска "нет репозитория" (finding #19). Отчёт дополняется:
+      *"Created follow-up issue: <spike-id> (idea_ref: <idea-id>). Next:
+      /pf-idea-spike."*
+
+4. Перейти к Phase 5.
+
+**Recovery — что делает повторный `/pf-close`, если Phase 4.6 упала
+частично.** Прогон, прерванный внутри этой Phase, оставляет
+`docs/issues/open/` с **двумя** папками: исходной идеей (ISSUE-ID,
+неархивированной) и, если сбой произошёл после п.h/i/j, уже созданным
+follow-up issue. `pf-close`'s определение активного issue ("Read ISSUE-ID
+from the active folder name") в рамках одного непрерывного прогона не
+задето этим вообще — ISSUE-ID зафиксирован переменной один раз в самом
+начале файла и не пересканируется по ходу. Задето только **новое,
+холодное** приглашение `/pf-close` (новая сессия, после сбоя): если
+`docs/issues/open/` содержит больше одной папки, `pf-close` не может
+молча выбрать первую — тот же принцип, что уже действует в `/pf` при
+нескольких открытых issue (не новый механизм): предпочесть папку, чей
+`verdict.md`/`findings.md` уже несёт подтверждающий маркер закрытия
+(idea — "## Decision"; при нескольких подходящих кандидатах — остановиться
+и спросить пользователя, какую закрывать). Follow-up-папка, только что
+созданная этой же Phase, отличима по `idea_ref`, указывающему на
+ISSUE-ID, чья собственная папка **всё ещё** в `open/` — это однозначный
+признак "Phase 4.6 частично отработала, но Phase 5 ещё не переместила
+идею", а не второй независимый активный issue.
 
 #### 7.3.5 Не-git guard в закрытии — все затронутые Phase (AC-01d, продолжение §3.1.4 part1)
 
-`NO-REPO` (§7.3.1, пункт 4), однажды установленный, **не перевычисляется**
-внутри Phase 6-8 — единственное место, где он может смениться на "теперь
-есть репозиторий" в рамках одного прогона `pf-close` — это Phase 5.5, п.2a
-(`project`-вердикт), которая по построению идёт **до** Phase 6. Порядок
-Phase остаётся Phase 5 → Phase 5.5 → Phase 6 → Phase 7 → Phase 8 → Phase
-8.5 → Phase 9 (не меняется этим issue) — поэтому, если Phase 5.5 выполнила
-`git init`, к Phase 6 репозиторий уже существует, и всё, что ниже,
-относится **только** к исходу `defer`/`archive` в изначально голой
-не-git-папке (единственный случай, где `NO-REPO` доживает до Phase 6 и
-дальше):
+`NO-REPO` (§7.3.1), однажды установленный, **не перевычисляется** внутри
+Phase 6-8 — единственное место, где он может смениться на "теперь есть
+репозиторий" в рамках одного прогона `pf-close`, — это Phase 4.6, п.3.f
+(`project`/`spike-first`-вердикт), которая по построению идёт **до** Phase
+5 (а значит, и до Phase 6). Порядок Phase — Phase 4.5 → **Phase 4.6** →
+Phase 5 → Phase 6 → Phase 7 → Phase 8 → Phase 8.5 → Phase 9 — поэтому,
+если Phase 4.6 выполнила `git init`, к Phase 5/6 репозиторий уже
+существует, и всё, что ниже, относится **только** к исходу `defer`/
+`archive` в изначально голой не-git-папке (единственный случай, где
+`NO-REPO` доживает до Phase 5 и дальше):
 
 | Phase | Правка при `NO-REPO`, дожившем до этой точки |
 |---|---|
-| Phase 5.5, конец (после п.4 "`defer`/`archive`: ничего не создаётся") | Явно **перепроверить** `has_git`: для `project`/`spike-first` — истинно (только что создан п.2a); для `defer`/`archive` — по-прежнему ложно. Значение фиксируется как окончательное `NO-REPO` для Phase 6-9. |
+| Phase 5 ("Archive Issue Folder") | Без изменений — `mv`, не git-операция; выполняется независимо от `NO-REPO`. |
 | Phase 6 ("Compute LLM Usage & Cost") | Без структурных изменений — п.1 ("Find the issue's start time", `git log`) уже штатно ловит пустой результат и переходит к шагу 3 с пометкой "window could not be determined"; при `NO-REPO` этот путь и так единственно достижим. Итог — `usage_report.md` пишется с пометкой отсутствия auto-computed данных, как и для любого issue без транзакций в момент старта. |
 | Phase 7 ("Update Session Log") | Получает предваряющую оговорку: *"If `NO-REPO`: `docs/planning/session-log.md` does not exist (no PF scaffold was ever created for this issue) — skip this phase entirely, and note in Phase 9's report: 'session-log.md not updated — no PF scaffold exists in this folder.' Do not create `docs/planning/` just to hold one line."* |
 | Phase 8 ("Archive Commit") | Получает предваряющую оговорку: *"If `NO-REPO`: skip both `git add` and `git commit` — there is no repository to commit to. Report 'not committed — no git repository' in Phase 9 instead of the usual commit-summary lines."* (Тот же принцип, что `pf-git`'s Step 0 guard — здесь неприменим напрямую, поскольку Phase 8 коммитит инлайново, не через `pf-git`, но текст и формулировка идентичны намеренно, единое сообщение по всему фреймворку.) |
@@ -551,11 +772,28 @@ Phase остаётся Phase 5 → Phase 5.5 → Phase 6 → Phase 7 → Phase 8
 исход, реально достигающий этой ветки целиком — `idea`-issue, созданный в
 пустой не-git-папке (§3.1.1 part1) и закрытый с вердиктом `defer`/
 `archive` (§5.9 part1) — `project`/`spike-first` всегда проходят через
-Phase 5.5's `git init` раньше, чем эта ветка вообще проверяется, а `spike`
+Phase 4.6's `git init` раньше, чем эта ветка вообще проверяется, а `spike`
 как тип не может быть создан в не-git-контексте вообще (AC-09b требует
 "любой проект", т.е. уже существующий, а §3.1.5 part1's трёхвариантный
 вопрос, единственный путь создать `spike` напрямую, сам достижим только
 при `has_pf: true`).
+
+#### 7.3.6 Phase 9 — autopilot schedule cleanup (idea/spike, finding #8)
+
+**"## Phase 9: Report"** получает предваряющий пункт, выполняемый **до**
+печати отчёта, только для `TYPE: idea`/`spike`: *"Check whether a
+schedule named `pf-autopilot-<project>` exists (`CronList`). If it does,
+delete it (`CronDelete pf-autopilot-<project>`) and add one line to this
+Phase's report: 'Autopilot schedule removed.' If none exists, say nothing
+extra — this is the common case for an issue that was never driven by
+autopilot."* Обоснование — §3.5.4 part1: единственная гарантированная
+точка, через которую проходит **любое** закрытие `idea`/`spike`-issue
+(человеком напрямую или после `pf-autopilot`'s остановки перед финальным
+гейтом), поэтому это естественное место снять schedule без зависимости от
+того, дойдёт ли автопилот когда-либо до собственного Step 3 снова (finding
+#8 — без этой правки schedule, оставленный автопилотом перед decision
+session/`/pf-close`, не удаляется никогда, если человек завершает issue
+вручную).
 
 ### 7.4 `skills/pf-git/SKILL.md`
 
@@ -573,7 +811,9 @@ Phase 5.5's `git init` раньше, чем эта ветка вообще пр�
 > restates the procedure in its own words").
 
 **"## Step 1: Stage the artifact — scoped, never `-A`", таблица** —
-шесть новых строк:
+**семь** новых строк (пять пишущих стадий, но `pf-idea-verdict` несёт две
+строки — режим 1 и режим 2 у неё сохраняют разные пути, поэтому считаются
+раздельно, как и в самой таблице ниже):
 
 | Stage | Paths to `git add` |
 |---|---|
@@ -599,18 +839,33 @@ automigration ran this same invocation)" — automigration `pf-roles` §5
 `/pf-idea-spike`.
 
 **Новый пункт 7** в конце "## Step 2. Work loop": *"**Stop before the
-decision session, never apply the 3-attempts rule to it.** When the pinned
-issue is `idea`-type and its next step is `/pf-idea-verdict (decision
-session)` (§3.5.4/§7.1 of specs.md, `20260902-feat-idea-stage`) — stop the
-work loop there instead of invoking it. Print the final report (below)
-immediately; do not delete the schedule (Step 3 still requires the issue
-to actually be closed) — the next scheduled resume will find the same
-state and stop again, until a human runs the decision session by hand."*
+final human gate, never apply the 3-attempts rule to it — for both new
+types (finding #7).** When the pinned issue is `idea`-type and its next
+step is `/pf-idea-verdict (decision session)`, OR the pinned issue is
+`spike`-type and its next step is `/pf-close` (spike has no separate
+decision session — `/pf-close`'s Phase 1 confirmation IS its one human
+gate, §7.3.1 of this spec's part2, US-09e) — stop the work loop there
+instead of invoking the next step. Print the final report (below)
+immediately; do not delete the schedule here — deletion is `/pf-close`'s
+job now (Phase 9, see below), not this step's, precisely so that a human
+who completes the close by hand (without autopilot ever resuming again)
+still gets the schedule cleaned up (finding #8). Until `/pf-close` runs,
+the next scheduled resume finds the same state and stops again."*
 
-**"## Step 3. Completion", финальный отчёт** — оговорка: для `idea`-issue,
-остановленного перед сессией решения, отчёт (не "Completion", а
-промежуточный) дополнительно перечисляет полный список `[assumed]`-строк
-и открытых вопросов из `open_questions.md` (US-10c, дословно).
+**"## Step 3. Completion", финальный отчёт** — оговорка: для `idea`/
+`spike`-issue, остановленного перед финальным гейтом, отчёт (не
+"Completion", а промежуточный) дополнительно перечисляет полный список
+`[assumed]`-строк и открытых вопросов из `open_questions.md` (US-10c,
+дословно).
+
+**"## Step 3. Completion", п.1 (`CronDelete`)** получает оговорку:
+*"For `TYPE: idea`/`spike`, this deletion is normally already done by
+`/pf-close`'s own Phase 9 (see `pf-close/SKILL.md` changes, this spec's
+part2 §7.3) by the time this step would run for the closing invocation —
+this step's own `CronDelete` call is therefore usually a no-op
+(idempotent) for these two types, not a duplicate deletion attempt to
+avoid. It remains the primary deletion path for feat/improve/bug, whose
+`/pf-close` does not carry the Phase 9 addition below."*
 
 ### 7.6 `skills/pf-help/SKILL.md`
 
@@ -669,18 +924,19 @@ prompt.md` to understand the project description." и **перед**
 > field already answered there (pain, evidence, MVP, constraints,
 > out-of-scope, differentiation) is **not** asked again in the clarifying-
 > questions loop below — only genuine gaps (US-08b: "задаёт только
-> вопросы, на которые там нет ответа"). If `doc_language`/`size_tier`/
-> `roles`/`profile` are absent from this feat-issue's own `prompt.md` but
-> can be inferred from the closed idea (`doc_language` — carried over
-> directly; `size_tier` — inferred from `idea.md`'s "Cost (Effort)" and
-> `idea_tier`, with the AI's own judgement recommended and confirmed via
-> the ordinary legacy-tier guard rather than silently assumed, since
-> `size_tier` confirmation is not one of front-loaded's exemptions and
-> this issue is not itself `interaction: front-loaded` unless its own
-> `prompt.md` says so), leave the legacy-tier guard's existing question to
-> handle it (AC-08c: "спрашиваются только если их нельзя вывести из
-> intake идеи" — a recommendation the guard already offers, not a new
-> mechanism).
+> вопросы, на которые там нет ответа"). `doc_language`/`size_tier`/
+> `roles`/`profile`/`on_unavailable` are normally **already present** in
+> this feat-issue's own `prompt.md` by the time `pf-brd` ever reads it —
+> `pf-close`'s Phase 4.6 (this spec's part2 §7.3.4) derives and writes
+> them at issue-creation time whenever the closed idea's material supports
+> a confident derivation (finding #16: derive and record, don't merely
+> recommend-and-reconfirm). If `size_tier` is nonetheless absent (Phase
+> 4.6's derivation table found no recognizable duration signal in
+> `idea.md`'s "Cost (Effort)" — a genuine ambiguity, not a shortcut this
+> hook takes), the ordinary legacy-tier guard asks as it would for any
+> other new issue — no special-casing needed here; this is the one case
+> where AC-08c ("спрашиваются только если их нельзя вывести из intake
+> идеи") actually permits the question.
 
 Это единственная правка `pf-brd/SKILL.md`, не считая front-loaded hook'а
 из §7.13 (независимая правка, другая причина).
@@ -751,21 +1007,25 @@ move" — `docs/planning/templates/` остаётся канонической �
 ### 7.11 `skills/pf-size-tiers/SKILL.md`
 
 **"### Pipelines — what 'preceding stage' means", таблица** — две новые
-строки (нужны для конъюнкта 3 критерия completeness, §3.1.7 part1):
+строки, **ссылающиеся**, не копирующие (finding #30 — единственный
+источник порядка стадий idea/spike это `pf-idea-lenses`, §5.7/§3.1.7
+part1; `pf-size-tiers` дублировать список не должен):
 
 | Pipeline | Stage order |
 |---|---|
-| `idea` (типа issue, не `size_tier` — см. оговорка ниже) | CREATE (`prompt.md`) → IDEA (`idea.md`) → RESEARCH (`research.md`) → CRITIQUE (`critique.md`) → VERDICT (`verdict.md`) |
-| `spike` | CREATE (`prompt.md`) → HYPOTHESIS (`hypothesis.md`) → FINDINGS (`findings.md`) |
+| `idea` (типа issue, не `size_tier` — см. оговорка ниже) | See `~/.claude/skills/pf-idea-lenses/SKILL.md`'s "Stage tables" (the `idea` table) — read live from there, not copied here. |
+| `spike` | See the same file's "Stage tables" (the `spike` table). |
 
 Предваряющая оговорка над этими двумя строками: *"These two pipelines are
 keyed on issue TYPE (folder-name prefix `idea`-/`spike`-), not on any
 `size_tier` value — `idea`/`spike` issues never carry `size_tier` at all
-(see `pf-idea-lenses/SKILL.md`'s `idea_tier` instead). They exist here
-purely so conjunct 3 of 'Stage completion' below has a defined pipeline
-order for these two types; the reader-facing routing table with concrete
-next-step commands lives in `pf-idea-lenses/SKILL.md`, not here — see that
-file's 'Stage tables'."*
+(see `pf-idea-lenses/SKILL.md`'s `idea_tier` instead). Unlike every other
+row in this table, these two rows do not restate the stage order inline —
+they point at `pf-idea-lenses/SKILL.md`, the single normative source
+(part1 §1.1 decision (A), applied here to completeness as well as to
+routing, not just routing). Conjunct 3 of 'Stage completion' below, when
+evaluated for an `idea`/`spike` issue, reads the order from that file
+directly at evaluation time."*
 
 **"### Scope", первый пункт (список документов)** — дополняется:
 `idea.md`, `research.md`, `critique.md`, `verdict.md`, `hypothesis.md`,
@@ -809,22 +1069,28 @@ AC-01b буквально.
 оговорка: *"**Exception — bare `idea`/`spike` folder.** Skip auto-creation
 entirely (do not write this file) when the resolving issue's TYPE is
 `idea` or `spike` **and** the project has no PF scaffold at all — no
-`PLANNING.md` and no `docs/planning/` directory. In that case, resolution
-for every key falls straight through to §4 level 5 (`write: claude,
-review: [claude]`) without ever reaching levels 1-4 (there is no
-`prompt.md.roles`/`profile:` to check beyond level 1, and levels 2-4 all
-require a resolved profile, which cannot exist without
-`role-profiles.yml`) — this degrades gracefully to the same static default
-the whole framework used before per-stage roles existed. The moment the
-project gains a PF scaffold (the idea's verdict becomes `project`, §7.3.4
-part2 — Phase 5.5 creates `docs/planning/` as part of scaffolding), normal
-auto-creation resumes on that project's very next role resolution, same as
-any other project."*
+`PLANNING.md` and no `docs/planning/` directory. **Level 1 (an explicit
+`roles.<key>`/`profile:` literally present in this issue's own `prompt.md`)
+is still checked first, exactly as always** (finding #18 — a bare folder
+never suppresses an explicit key the user hand-wrote after the fact,
+§3.1.3 part1's own carve-out text already only withholds the role-assignment
+*question* at intake, not the resolution algorithm itself). What this
+exception actually skips is levels 2-4, which are the ones that need a
+*resolved profile* to exist (`role-profiles.yml`) — **those alone**
+require `docs/planning/`, which a bare folder by construction does not
+have. So: level 1 checked normally; if it doesn't match, resolution falls
+straight through to level 5 (`write: claude, review: [claude]`), skipping
+2-4 only. The moment the project gains a PF scaffold (the idea's verdict
+becomes `project`/`spike-first`, §7.3.4 part2 — Phase 4.6 creates
+`docs/planning/` as part of scaffolding), normal auto-creation resumes on
+that project's very next role resolution, same as any other project."*
 
 **"## 4. Resolving a stage's role — the fallback order", level 5** получает
 уточнение одной фразой: *"(For a bare `idea`/`spike` folder with no PF
-scaffold, level 5 is reached unconditionally per the Auto-creation
-exception above — never levels 1-4.)"*
+scaffold, level 1 is still checked as usual; only levels 2-4 are
+unreachable per the Auto-creation exception above, since they require a
+resolved `role-profiles.yml` that cannot exist there — level 5 is reached
+whenever level 1 does not match, not unconditionally.)"*
 
 #### 7.12.2 Именование третьей формы диспетчеризации — критика-персона (не write, не review)
 
@@ -883,8 +1149,8 @@ form), просто в новом контексте вызова (сборка 
 | `pf-impl-plan` | "Output gate — `implementation_plan.md` already present" | regenerate/keep/cancel | hook |
 | `pf-execute` | Legacy-tier guard (вводный абзац) | "How big is this task?" | hook |
 | `pf-check` | Legacy-tier guard (вводный абзац) | "How big is this task?" | hook |
-| `pf-check` | "### Codex invocation chain", шаг 1/2a (`codex:setup`'s собственный вопрос) | "install Codex CLI?" | **исключение** — устанавливает ПО, всегда спрашивается |
-| `pf-check` | "### Codex invocation chain", шаг 3 | "install the codex plugin now?" | **исключение** — устанавливает ПО |
+| `pf-check` | "### Codex invocation chain", шаг 1/2a (`codex:setup`'s собственный вопрос) | "install Codex CLI?" | **условно hook, finding #12** — см. "Codex readiness moved to intake" ниже: для issue, включившего front-loaded **на CREATE** (новый опциональный intake-вопрос), install-предпочтение уже собрано заранее и здесь применяется как допущение; для issue, включившего front-loaded **вручную после CREATE** (единственный путь, оставшийся из §6.11 для issue, созданных до этой правки, или для тех, кто предпочитает править `prompt.md` напрямую), вопрос остаётся безусловным исключением — intake для него уже прошёл без этого вопроса, спросить заранее было физически нечем |
+| `pf-check` | "### Codex invocation chain", шаг 3 | "install the codex plugin now?" | тот же статус, что и строка выше |
 | `pf-check` | "How would you like to proceed?" (review gate) | Fix now / I'll fix manually / Skip | **не новый hook** — front-loaded переиспользует уже существующий неинтерактивный путь этого файла, "Autopilot mode", вызывая его тем же способом, каким это делает `/pf-check autopilot`: front-loaded issue резолвит этот гейт как если бы был передан аргумент `autopilot`, помечая запись в `session-log.md` префиксом `[assumed]` вместо `[autopilot default]` |
 | `pf-check` | "If 'Fix now'" — fix-сабагент's собственный `AskUserQuestion` | clarifying questions внутри фикса | hook — инструкция сабагенту не спрашивать, брать разумный вариант, фиксировать допущение в своей summary (той же формулировкой, что уже используется для `autopilot`-режима: "picks the most reasonable option and records the assumption") |
 | `pf-user-docs` | Основной Q&A-цикл | условённый Q&A-цикл | hook |
@@ -893,22 +1159,88 @@ form), просто в новом контексте вызова (сборка 
 | `pf-codereview` | Review-gate (после Phase 3, `verdict: FAIL`) | "Apply fix / Stop" (два варианта) | **не новый hook** — front-loaded переиспользует существующий неинтерактивный путь этого скилла тем же способом, что `pf-check` выше (если у `pf-codereview` уже есть собственный autopilot-режим — используется он; иначе резолюция идентична тому, что описывает `pf-check`'s "Autopilot mode": авто-Fix при P0/P1) |
 | `pf-codereview` | Fix-сабагент's собственный `AskUserQuestion` | clarifying questions | hook — та же инструкция, что у `pf-check` |
 | `pf-qa` | "These items require human confirmation" (ручные QA-пункты, plain-text подтверждение, не литеральный `AskUserQuestion`) | "Respond with the item number and PASS or FAIL" | hook, расширенный на не-`AskUserQuestion` формы: front-loaded правило (§3.8 part1) обобщается на "любая точка, где стадия иначе ждала бы ответа человека" — не только вызовы инструмента `AskUserQuestion` буквально; резолюция — допущение PASS для пунктов без противопоказаний в собранных артефактах, с явным `[assumed]` на каждый такой пункт (пункт остаётся видимым в `qa_report.md` как assumed-PASS, не скрывается) |
-| `pf-test` | — | (в файле не найдено ни одного вызова `AskUserQuestion`) | hook не требуется — перечислен для полноты по decision 10 |
-| `pf-close` | "## Phase 1: Confirm with User" | "Proceed? (yes/no)" | **исключение** — финальное подтверждение закрытия всегда задаётся (AC-07e/decision 9 — единственная оставшаяся точка человека "в конце" для front-loaded feat/improve/bug тоже) |
+| `pf-test` | "## Phase 1: Detect Test Runner", п.5 ("None of the above match → ask the user: 'No test runner detected...'") | "What command should I use to run the test suite?" | **hook (finding #11) — не "hook не требуется".** Черновик ошибочно считал, что в файле нет ни одной остановки, потому что искал только литеральный `AskUserQuestion`; этот plain-text вопрос — такая же остановка (то же обобщение, что уже применено к `pf-qa` выше). Резолюция: front-loaded issue пропускает вопрос и **пытается** самый частый в этом фреймворке паттерн, `make test` (тот же приоритет, что и Phase 1's собственный список — `npm test`/`make test`/`pytest`/`phpunit`, ни один не совпал по файлам-маркерам, поэтому используется наиболее общий кросс-языковый вариант), логируя `[assumed] No test runner auto-detected → assumed 'make test'` в `open_questions.md`. Если и эта команда падает с "command not found"/аналогичной ошибкой, а не с обычным тестовым провалом — это не более "допущаемый" вопрос: стадия останавливается с обычной ошибкой ("no usable test command found — even the front-loaded fallback failed"), а не продолжает гадать дальше |
+| `pf-close` | "## Phase 1: Confirm with User" | "Proceed? (yes/no)" | **не исключение — расширенный финальный гейт (finding #10), см. §7.13.1 ниже.** Черновик оставлял этот вопрос безусловным "как есть", не давая front-loaded issue того самого единого финального гейта с полным ledger'ом, override'ом и повторной проверкой, который AC-12d требует буквально ("вопросы существующих стадий заменяются допущениями... с той же сессией решения перед закрытием"); голое "Proceed? (yes/no)" — не эта сессия. Правка — §7.13.1. |
 | `pf` | "Reviewer-assignment guard (before Step 5)" (bug-type) | "Who should review `<key>`?" | hook |
 | `pf` | "`code.review: skip` confirmation guard" | "Code review is disabled — confirm?" | **исключение** |
 | `pf` | Bug workflow, "CREATE only" строка | clarifying dialog + tier reconfirmation | hook |
 
-**"## Creating prompt.md" и "### Role assignment" — сознательно не
-hook-сайты.** `interaction: front-loaded` само по себе — поле **внутри**
-`prompt.md`; на момент, когда задаются вопросы "какой язык"/"какой
-tier"/распределение ролей, этого поля в файле ещё нет (он как раз
-создаётся этим самым шагом) — резолвить hook нечем. Это отличает
-feat/improve/bug от `idea`/`spike`, где сам intake **есть** тот момент,
-где поле устанавливается, и front-loaded действует по определению типа, не
-по чтению уже существующего файла (§6.11). Единственный способ включить
-front-loaded для feat/improve/bug — дописать поле в уже созданный
-`prompt.md` вручную **после** CREATE; оно начинает действовать со
-следующего вызова любой стадии. Поэтому "## Creating prompt.md" и
-"### Role assignment" не попадают ни в эту таблицу, ни в implementation
-plan как hook-сайты.
+**"## Creating prompt.md" и "### Role assignment" — не hook-сайты сами по
+себе, но получают один новый опциональный вопрос (finding #12).**
+`interaction: front-loaded` само по себе — поле **внутри** `prompt.md`; на
+момент, когда задаются вопросы "какой язык"/"какой tier"/распределение
+ролей, этого поля в файле ещё нет для issue, который решает включить
+front-loaded уже сейчас — резолвить hook самим этим вопросам нечем (то же
+рассуждение, что и в черновике). Но "## Creating prompt.md" получает
+**новый, необязательный** вопрос в конце обычной ветки feat/improve/bug
+(после `on_unavailable`, если он задавался): *"Enable front-loaded
+interaction for this issue (human only at intake and at the final decision
+gate before close)? Default: No — today's interactive behavior."* Выбор
+**Да** здесь — не просто пишет `interaction: front-loaded` в `prompt.md`
+(AC-12c, без изменений), это **и есть** intake-момент для этого issue: тут
+же, тем же батчем, задаётся "Do you want Codex to review this issue's
+documents/code? If Codex needs installing later, may I install it
+automatically without asking again?" — тот же вопрос, что иначе задал бы
+`codex:setup`/"Codex invocation chain" посреди пайплайна. Ответ пишется в
+`profile:`/`roles:` (обычная схема §1/§3 pf-roles) **и**, для install-
+предпочтения, в `open_questions.md` как обычное `[assumed]` (finding #12's
+разрешение конфликта с AC-03c/AC-12d — не менять BRD, а перенести
+readiness/install-вопрос в intake, чтобы между двумя точками контакта
+ничего внешнего/деструктивного больше не всплывало). **Ограничение,
+называемое честно, не скрытое:** это закрывает вопрос только для issue,
+включивших front-loaded **на этом самом CREATE-вызове**. Issue, который
+вместо этого дописывает `interaction: front-loaded` в уже существующий
+`prompt.md` вручную (единственный путь, который и раньше был единственным
+— §6.11, всё ещё доступен), не проходит через этот intake-момент заново;
+для такого issue Codex-install-вопрос остаётся безусловным исключением в
+таблице выше — компромисс, который часть finding #12 явно допускает
+("либо... либо"), выбранный здесь как более достижимый без правки BRD, чем
+полный запрет ручного пути. За пределами этого одного нового вопроса
+"## Creating prompt.md" и "### Role assignment" не попадают ни в эту
+таблицу, ни в implementation plan как hook-сайты.
+
+#### 7.13.1 Final decision gate — `pf-close` Phase 1 for front-loaded feat/improve/bug (AC-12d, finding #10)
+
+`skills/pf-close/SKILL.md`'s "## Phase 1: Confirm with User" gets a
+conditional block, checked before printing today's plain summary: *"If
+`prompt.md`'s `interaction` resolves to `front-loaded`
+(`~/.claude/skills/pf-interaction/SKILL.md`) for this feat/improve/bug
+issue, this Phase is the issue's one final human gate (the same role the
+decision session plays for `idea`/`spike`, §3.8 part1 of this issue's
+specs) — extend today's summary instead of replacing it:*
+
+> 1. *Show the full ledger: every `[assumed]` line and every
+>    `unverified-fact`/note recorded in `open_questions.md` across every
+>    stage this issue ran through, one batch, the same shape as
+>    `pf-idea-verdict`'s decision session (§3.5.1 part1) — not merely
+>    counted, each one legible.*
+> 2. *Show today's ordinary summary (merge/archive/usage/session-log
+>    bullets) after the ledger, not instead of it.*
+> 3. *Offer three responses, not two: **Proceed** (close as-is, every
+>    assumption stands); **Override an assumption** (pick one entry, give
+>    a new answer — regenerates only the sections its `Used in` names,
+>    same discipline as §3.5.2 part1's point 3-4, and re-runs `/pf-check`
+>    on every document that regeneration touched before this gate can be
+>    shown again — same invalidation rule as override for `idea`/`spike`,
+>    §3.5.2's points 6-8, reused here by reference, not restated); **Stop**
+>    (cancel close, same as today's "no").*
+> 4. *A confirmed **Proceed** is this issue's recorded final confirmation
+>    — proceed with Phase 2 onward exactly as today.*"
+
+This is a **hook-table exception's replacement, not a new independent
+gate**: it is the same "Proceed? (yes/no)" call site the table above
+marks, extended rather than duplicated — a front-loaded feat/improve/bug
+issue gets exactly one such gate, here, not this plus a second
+decision-session-shaped skill. For an issue **without** `interaction:
+front-loaded`, this Phase is entirely unchanged (today's plain summary and
+yes/no).
+
+**Why `open_questions.md` is read here even though feat/improve/bug never
+had this file before this issue.** `pf-interaction`'s hook resolution
+(§3.8 part1, "Front-loaded rule") already requires every hook site listed
+in §7.13's table to write into `open_questions.md` on assumption — the
+file is created the first time any front-loaded feat/improve/bug stage
+needs it, the same lazy-creation rule that already governs it for
+`idea`/`spike` (§5.6 part1, reused by reference: "the file is created by
+whichever stage first has something to write into it," not a new rule
+invented here for feat/improve/bug).
