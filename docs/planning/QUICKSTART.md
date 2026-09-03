@@ -32,7 +32,7 @@ make converge TARGET=/path/to/your-project
 - `PLANNING.md` - Framework instructions
 - `.pf-version` - Framework version stamp
 - `CLAUDE.md` - With a `<!-- pf:begin -->` / `<!-- pf:end -->` framework section
-- 21 skills in `~/.claude/skills/` (`/pf`, `/pf-help`, `/pf-brd`, `/pf-spec`, `/pf-check`, `/pf-test-plan`, `/pf-impl-plan`, `/pf-execute`, `/pf-codereview`, `/pf-test`, `/pf-manual-test`, `/pf-qa`, `/pf-qa-setup`, `/pf-close`, `/pf-autopilot`, `/pf-update`, `/pf-size-tiers`, `/pf-git`, `/pf-roles`, `/pf-user-docs`, `/pf-dev-docs`) and the `pf` shim in `~/.claude/bin/`
+- 28 skills in `~/.claude/skills/` (`/pf`, `/pf-help`, `/pf-brd`, `/pf-spec`, `/pf-check`, `/pf-test-plan`, `/pf-impl-plan`, `/pf-execute`, `/pf-codereview`, `/pf-test`, `/pf-manual-test`, `/pf-qa`, `/pf-qa-setup`, `/pf-close`, `/pf-autopilot`, `/pf-update`, `/pf-size-tiers`, `/pf-git`, `/pf-roles`, `/pf-user-docs`, `/pf-dev-docs`, `/pf-idea`, `/pf-idea-research`, `/pf-idea-critique`, `/pf-idea-verdict`, `/pf-idea-spike`, `/pf-idea-lenses`, `/pf-interaction`) and the `pf` shim in `~/.claude/bin/`
 - `docs/issues/open/` and `/closed/` - Issue folders
 - `docs/planning/` - Global planning files + templates
 
@@ -430,7 +430,7 @@ The same command as a fresh install — there is no separate migration script. I
 3. Moves your issues and global documents from `planning/` into `docs/`
 4. Renames `implementation-plan.md` → `implementation_plan.md` inside issue folders
 5. Deletes v1/v2 framework artifacts **by whitelist** (never `rm -rf planning/`)
-6. Tops up to the v3 target state: `.pf-version`, `PLANNING.md`, the `CLAUDE.md` section, templates, all 15 skills, the `pf` shim
+6. Tops up to the v3 target state: `.pf-version`, `PLANNING.md`, the `CLAUDE.md` section, templates, all 28 skills, the `pf` shim
 7. Prints a report — including, per issue, which v3 documents are still missing
 
 Run it with `--dry-run` first to see the plan.

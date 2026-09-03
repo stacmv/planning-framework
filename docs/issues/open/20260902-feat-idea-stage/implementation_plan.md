@@ -1157,8 +1157,8 @@ runtime-зависимостей (npm-пакетов, языковых рант�
   `test/pf-idea-templates-mirror.sh`» (Task 18).
 
 **Acceptance Criteria:**
-- [ ] TC-025 passes
-- [ ] TC-026 passes (частично — зеркало и converge-ветки; счётчики документации проверяются Task 16)
+- [x] TC-025 passes
+- [x] TC-026 passes (частично — зеркало и converge-ветки; счётчики документации проверяются Task 16)
 
 ---
 
@@ -1221,8 +1221,8 @@ runtime-зависимостей (npm-пакетов, языковых рант�
   (A), справочные таблицы стадий живут в `pf-idea-lenses`).
 
 **Acceptance Criteria:**
-- [ ] TC-006 passes (частично — pf-help-часть)
-- [ ] TC-026 passes (частично — счётчики/имена; зеркало проверяется Task 15/18)
+- [x] TC-006 passes (частично — pf-help-часть)
+- [x] TC-026 passes (частично — счётчики/имена; зеркало проверяется Task 15/18)
 
 ---
 

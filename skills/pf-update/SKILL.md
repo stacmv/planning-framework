@@ -10,7 +10,7 @@ Update the installed Planning Framework skills to the latest version.
 
 The update script **discovers skills by globbing `skills/*/SKILL.md` in the framework repo** — it never reads the list below, and a new skill is picked up without editing this file. The list is documentation only; keep it in sync, but the script is the source of truth.
 
-All 21 skills:
+All 28 skills:
 
 - `pf` — orchestrator: shows active issue status and next step
 - `pf-help` — framework overview and quick-start
@@ -33,6 +33,13 @@ All 21 skills:
 - `pf-roles` — reference data: the write/review actor-resolution matrix (not directly invoked)
 - `pf-user-docs` — write user-facing documentation (README/CHANGELOG/user guide) for the active issue
 - `pf-dev-docs` — write developer-facing documentation (architecture/ADRs/runbook) for the active issue
+- `pf-idea` — write idea.md via guided intake already captured in prompt.md
+- `pf-idea-research` — write research.md, verified/unverified facts with sources
+- `pf-idea-critique` — write critique.md via independent multi-persona review
+- `pf-idea-verdict` — write verdict.md and run the end-of-pipeline decision session
+- `pf-idea-spike` — write hypothesis.md and findings.md for a technical spike
+- `pf-idea-lenses` — reference data: idea_tier lenses/personas/budgets/stage tables (not directly invoked)
+- `pf-interaction` — reference data: the front-loaded interaction rule (not directly invoked)
 
 ## Step 1: Find the framework source
 

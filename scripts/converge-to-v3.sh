@@ -1034,6 +1034,8 @@ required_docs() {
   type="${id#*-}"
   type="${type%%-*}"
   case "$type" in
+    idea) printf '%s\n' idea.md research.md critique.md verdict.md ;;
+    spike) printf '%s\n' hypothesis.md findings.md ;;
     feat | improve) printf '%s\n' brd.md specs.md test_plan.md implementation_plan.md ;;
     *) printf '%s\n' test_plan.md implementation_plan.md ;;
   esac
@@ -1045,6 +1047,11 @@ skill_for_doc() {
     specs.md) printf '/pf-spec' ;;
     test_plan.md) printf '/pf-test-plan' ;;
     implementation_plan.md) printf '/pf-impl-plan' ;;
+    idea.md) printf '/pf-idea' ;;
+    research.md) printf '/pf-idea-research' ;;
+    critique.md) printf '/pf-idea-critique' ;;
+    verdict.md) printf '/pf-idea-verdict' ;;
+    hypothesis.md | findings.md) printf '/pf-idea-spike' ;;
     *) printf '/pf' ;;
   esac
 }

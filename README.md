@@ -18,7 +18,7 @@
 
 ## Skills
 
-21 Claude Code skills live in `skills/`, one directory per skill (`skills/<name>/SKILL.md`). Converge installs all of them into `~/.claude/skills/`.
+28 Claude Code skills live in `skills/`, one directory per skill (`skills/<name>/SKILL.md`). Converge installs all of them into `~/.claude/skills/`.
 
 | Command | Purpose |
 |---------|---------|
@@ -43,6 +43,13 @@
 | `/pf-roles` | Reference data (actor registry, role profiles, write/review resolution) — read by the other skills |
 | `/pf-user-docs` | Write user-facing documentation for the active issue |
 | `/pf-dev-docs` | Write developer-facing documentation (architecture, ADRs, runbook) for the active issue |
+| `/pf-idea` | Write `idea.md` via guided intake already captured in `prompt.md` |
+| `/pf-idea-research` | Write `research.md`, verified/unverified facts with sources |
+| `/pf-idea-critique` | Write `critique.md` via independent multi-persona review |
+| `/pf-idea-verdict` | Write `verdict.md` and run the end-of-pipeline decision session |
+| `/pf-idea-spike` | Write `hypothesis.md` and `findings.md` for a technical spike |
+| `/pf-idea-lenses` | Reference data (idea_tier lenses, personas, budgets, stage tables) — read by the other skills |
+| `/pf-interaction` | Reference data (the front-loaded interaction rule) — read by the other skills |
 
 ### Upgrading from v2.0?
 Run `make converge TARGET=/path/to/your-project`. See **[MIGRATION-GUIDE-V3.md](docs/planning/MIGRATION-GUIDE-V3.md)** for what it does to your issues, the backup, and `--dry-run`.

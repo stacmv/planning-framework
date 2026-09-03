@@ -377,7 +377,7 @@ git commit -m "Close issue 20240127-feat-add-auth: Added JWT authentication"
 
 ## Skills
 
-21 Claude Code skills live in the `skills/` directory — one directory per skill, each holding a `SKILL.md`. They are installed into `~/.claude/skills/` by `converge-to-v3.sh` and refreshed by `update-skills.sh`.
+28 Claude Code skills live in the `skills/` directory — one directory per skill, each holding a `SKILL.md`. They are installed into `~/.claude/skills/` by `converge-to-v3.sh` and refreshed by `update-skills.sh`.
 
 | Skill | Command | What it does |
 |-------|---------|-------------|
@@ -402,6 +402,13 @@ git commit -m "Close issue 20240127-feat-add-auth: Added JWT authentication"
 | `pf-roles/` | `/pf-roles` | Reference data: the write/review actor-resolution matrix, read by the other skills |
 | `pf-user-docs/` | `/pf-user-docs` | Writes user-facing documentation (README/CHANGELOG/user guide) for the active issue |
 | `pf-dev-docs/` | `/pf-dev-docs` | Writes developer-facing documentation (architecture/ADRs/runbook) for the active issue |
+| `pf-idea/` | `/pf-idea` | Writes `idea.md` via guided intake already captured in `prompt.md` |
+| `pf-idea-research/` | `/pf-idea-research` | Writes `research.md`, verified/unverified facts with sources |
+| `pf-idea-critique/` | `/pf-idea-critique` | Writes `critique.md` via independent multi-persona review |
+| `pf-idea-verdict/` | `/pf-idea-verdict` | Writes `verdict.md` and runs the end-of-pipeline decision session |
+| `pf-idea-spike/` | `/pf-idea-spike` | Writes `hypothesis.md` and `findings.md` for a technical spike |
+| `pf-idea-lenses/` | `/pf-idea-lenses` | Reference data: idea_tier lenses/personas/budgets/stage tables, read by the other skills |
+| `pf-interaction/` | `/pf-interaction` | Reference data: the front-loaded interaction rule, read by the other skills |
 
 ### Updating Skills
 

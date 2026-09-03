@@ -13,7 +13,7 @@ Planning Framework v3.0 uses **`PLANNING.md`** for all AI agents (Claude, Gemini
 **v2.0 → v3.0 Changes:**
 - Skills-based workflow via `/pf` and related commands
 - BRD → spec → test plan → implementation plan pipeline
-- `skills/` directory with 21 Claude Code skills
+- `skills/` directory with 28 Claude Code skills
 - Single entry point: `make converge` (installs, migrates or tops up — from any starting state)
 - See `PLANNING.md` for new workflow
 
@@ -33,7 +33,7 @@ See **[MIGRATION-GUIDE-V3.md](docs/planning/MIGRATION-GUIDE-V3.md)**.
 **Key Files:**
 - `PLANNING.md` - Framework instructions (**READ THIS**)
 - `.qa-workflow.md` - QA requirements
-- `skills/` - 21 Claude Code skills (`/pf`, `/pf-help`, `/pf-brd`, `/pf-spec`, `/pf-check`, `/pf-test-plan`, `/pf-impl-plan`, `/pf-execute`, `/pf-codereview`, `/pf-test`, `/pf-manual-test`, `/pf-qa`, `/pf-qa-setup`, `/pf-close`, `/pf-autopilot`, `/pf-update`, `/pf-size-tiers`, `/pf-git`, `/pf-roles`, `/pf-user-docs`, `/pf-dev-docs`)
+- `skills/` - 28 Claude Code skills (`/pf`, `/pf-help`, `/pf-brd`, `/pf-spec`, `/pf-check`, `/pf-test-plan`, `/pf-impl-plan`, `/pf-execute`, `/pf-codereview`, `/pf-test`, `/pf-manual-test`, `/pf-qa`, `/pf-qa-setup`, `/pf-close`, `/pf-autopilot`, `/pf-update`, `/pf-size-tiers`, `/pf-git`, `/pf-roles`, `/pf-user-docs`, `/pf-dev-docs`, `/pf-idea`, `/pf-idea-research`, `/pf-idea-critique`, `/pf-idea-verdict`, `/pf-idea-spike`, `/pf-idea-lenses`, `/pf-interaction`)
 - `docs/planning/implementation-plan.md` - Roadmap
 - `docs/planning/session-log.md` - Timeline
 - `docs/planning/decisions.md` - Architectural decisions
