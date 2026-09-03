@@ -289,8 +289,8 @@ runtime-зависимостей (npm-пакетов, языковых рант�
   репозитория» (Task 7). Следующий шаг в отчёте — `/pf-check`.
 
 **Acceptance Criteria:**
-- [ ] TC-001 passes (частично)
-- [ ] TC-009 passes
+- [x] TC-001 passes (частично)
+- [x] TC-009 passes
 
 ---
 
@@ -336,8 +336,8 @@ runtime-зависимостей (npm-пакетов, языковых рант�
   (Task 7). Следующий шаг — `/pf-idea-critique`.
 
 **Acceptance Criteria:**
-- [ ] TC-001 passes (частично)
-- [ ] TC-010 passes
+- [x] TC-001 passes (частично)
+- [x] TC-010 passes
 
 ---
 
@@ -425,8 +425,8 @@ runtime-зависимостей (npm-пакетов, языковых рант�
   (Task 7). Следующий шаг — `/pf-idea-verdict`.
 
 **Acceptance Criteria:**
-- [ ] TC-001 passes (частично)
-- [ ] TC-011 passes
+- [x] TC-001 passes (частично)
+- [x] TC-011 passes
 - [ ] TC-012 — manual, per test_plan.md. **Допущение (P0-2):** текущая
       формулировка TC-012 в test_plan.md проверяет наличие секций по
       персонам в `critique.md`, не факт независимого запуска каждой персоны
@@ -512,8 +512,8 @@ runtime-зависимостей (npm-пакетов, языковых рант�
   запускать Режим 2 в автопилот-контексте).
 
 **Acceptance Criteria:**
-- [ ] TC-001 passes (частично)
-- [ ] TC-013 passes
+- [x] TC-001 passes (частично)
+- [x] TC-013 passes
 - [ ] TC-014 — manual, per test_plan.md
 
 ---
@@ -561,8 +561,8 @@ runtime-зависимостей (npm-пакетов, языковых рант�
   Бюджет: personal ≤80, infra/content ≤120, product ≤150 строк.
 
 **Acceptance Criteria:**
-- [ ] TC-001 passes (частично)
-- [ ] TC-018 passes
+- [x] TC-001 passes (частично)
+- [x] TC-018 passes
 - [ ] TC-028 — manual, per test_plan.md
 
 ---
