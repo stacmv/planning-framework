@@ -635,9 +635,9 @@ runtime-зависимостей (npm-пакетов, языковых рант�
   момент завершения intake.
 
 **Acceptance Criteria:**
-- [ ] TC-002 passes
+- [x] TC-002 passes
 - [ ] TC-003 — manual, per test_plan.md (частично — шаги 1-3 сценария)
-- [ ] TC-004 passes (частично — not-a-repo guard + CREATE-строка; полное прохождение требует Task 10)
+- [x] TC-004 passes (частично — not-a-repo guard + CREATE-строка; полное прохождение требует Task 10)
 
 ---
 
@@ -726,9 +726,9 @@ runtime-зависимостей (npm-пакетов, языковых рант�
 
 **Acceptance Criteria:**
 - [ ] TC-003 — manual, per test_plan.md (частично — шаги 4-5 сценария)
-- [ ] TC-005 passes
-- [ ] TC-006 passes
-- [ ] TC-007 passes
+- [x] TC-005 passes
+- [x] TC-006 passes
+- [x] TC-007 passes
 
 ---
 
