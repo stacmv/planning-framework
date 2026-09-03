@@ -18,7 +18,7 @@ Check the project root for the following files in order. Use the first match:
 2. `Makefile` exists AND contains a `test:` target → command is `make test`
 3. `pyproject.toml` or `pytest.ini` exists → command is `pytest`
 4. `composer.json` exists → command is `./vendor/bin/phpunit`
-5. None of the above match → ask the user: "No test runner detected. What command should I use to run the test suite?"
+5. None of the above match → ask the user: "No test runner detected. What command should I use to run the test suite?" Front-loaded check: if `prompt.md`'s `interaction` field resolves to `front-loaded` (`~/.claude/skills/pf-interaction/SKILL.md`, "Front-loaded rule"), apply that rule instead of asking this question interactively. This is a hook site (finding #11) even though it is a plain-text question, not a literal `AskUserQuestion` call: it is the same kind of stop the Front-loaded rule already generalizes to. Resolution: skip the question and try `make test` (the most general cross-language option among this list's own priorities, since none of the file markers above matched), logging `[assumed] No test runner auto-detected → assumed 'make test'` in `open_questions.md`. If `make test` itself fails with a "command not found"-style error rather than an ordinary test failure, this is no longer an assumable question — stop with an ordinary error ("no usable test command found — even the front-loaded fallback failed") instead of guessing further.
 
 ---
 

@@ -4,7 +4,7 @@ description: Write the technical spec (specs.md) for the active issue, based on 
 version: 3.0.0
 ---
 
-Before checking any other prerequisite, read `prompt.md`'s frontmatter. If it has no `size_tier` field, ask the user via `AskUserQuestion` — options **trivial** / **small** / **medium** / **large**, same descriptions as in `~/.claude/skills/pf-size-tiers/SKILL.md` — recommending medium ("matches today's default behavior") — then write the answer into `prompt.md`'s frontmatter before proceeding with the rest of this skill.
+Before checking any other prerequisite, read `prompt.md`'s frontmatter. If it has no `size_tier` field, ask the user via `AskUserQuestion` — options **trivial** / **small** / **medium** / **large**, same descriptions as in `~/.claude/skills/pf-size-tiers/SKILL.md` — recommending medium ("matches today's default behavior"). Front-loaded check: if `prompt.md`'s `interaction` field resolves to `front-loaded` (`~/.claude/skills/pf-interaction/SKILL.md`, "Front-loaded rule"), apply that rule instead of asking this question interactively. Then write the answer into `prompt.md`'s frontmatter before proceeding with the rest of this skill.
 
 Check that `docs/issues/open/[ISSUE-ID]/brd.md` is **complete** per the shared definition of "stage complete" in `~/.claude/skills/pf-size-tiers/SKILL.md` ("Stage completion"). If it does not exist, or exists but is not complete (empty, or carrying the stub marker), stop and tell the user: "BRD is required before writing the spec. Run /pf-brd first."
 
@@ -12,6 +12,8 @@ Check that `docs/issues/open/[ISSUE-ID]/brd.md` is **complete** per the shared d
 - **regenerate** — overwrite it with a freshly written spec (recommend this when it is not complete);
 - **keep** — leave it untouched and stop, reporting that the SPEC stage is already complete (recommend this when it is complete);
 - **cancel** — stop and change nothing.
+
+Front-loaded check: if `prompt.md`'s `interaction` field resolves to `front-loaded` (`~/.claude/skills/pf-interaction/SKILL.md`, "Front-loaded rule"), apply that rule instead of asking this question interactively.
 
 Read `size_tier` from `prompt.md`'s frontmatter.
 
@@ -21,7 +23,7 @@ Read `size_tier` from `prompt.md`'s frontmatter.
 
 **Documentation language:** read the `doc_language` field from `docs/issues/open/[ISSUE-ID]/prompt.md`'s YAML frontmatter (default: English if absent). Write `specs.md`'s prose content in that language. Keep headings and structural labels in English so downstream tooling keeps working.
 
-Based on the BRD, produce the specs at `docs/issues/open/[ISSUE-ID]/specs.md` (place next to BRD file) — who actually writes it is resolved below. Use the AskUserQuestion tool to ask me clarifying questions until you are 95% confident you can complete this task successfully. For each question, add your recommendation (with reason why) below the options. This would help me in making a better decision.
+Based on the BRD, produce the specs at `docs/issues/open/[ISSUE-ID]/specs.md` (place next to BRD file) — who actually writes it is resolved below. Use the AskUserQuestion tool to ask me clarifying questions until you are 95% confident you can complete this task successfully. For each question, add your recommendation (with reason why) below the options. This would help me in making a better decision. Front-loaded check: if `prompt.md`'s `interaction` field resolves to `front-loaded` (`~/.claude/skills/pf-interaction/SKILL.md`, "Front-loaded rule"), apply that rule instead of asking this question interactively. This entire loop is skipped and `specs.md` is written from the BRD alone, gaps recorded as `[assumed]`.
 
 **If `size_tier: small`:** omit ASCII diagrams unless the issue involves UI/UX. Target ≤300 lines total instead of applying the 1500-line split trigger below.
 

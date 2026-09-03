@@ -4,7 +4,7 @@ description: Create the implementation plan (implementation_plan.md) for the act
 version: 3.0.0
 ---
 
-Determine the active issue from `docs/issues/open/`. Before checking any other prerequisite, read `prompt.md`'s frontmatter. If it has no `size_tier` field, ask the user via `AskUserQuestion` — same 4 tier options and descriptions as in `~/.claude/skills/pf-size-tiers/SKILL.md`, recommending medium ("matches today's default behavior") — then write the answer into `prompt.md`'s frontmatter before proceeding with the rest of this skill.
+Determine the active issue from `docs/issues/open/`. Before checking any other prerequisite, read `prompt.md`'s frontmatter. If it has no `size_tier` field, ask the user via `AskUserQuestion` — same 4 tier options and descriptions as in `~/.claude/skills/pf-size-tiers/SKILL.md`, recommending medium ("matches today's default behavior"). Front-loaded check: if `prompt.md`'s `interaction` field resolves to `front-loaded` (`~/.claude/skills/pf-interaction/SKILL.md`, "Front-loaded rule"), apply that rule instead of asking this question interactively. Then write the answer into `prompt.md`'s frontmatter before proceeding with the rest of this skill.
 
 **Input gate — this one stays a hard stop.** Check prerequisites: `test_plan.md` must be **complete** per the shared definition of "stage complete" in `~/.claude/skills/pf-size-tiers/SKILL.md` ("Stage completion") — do not restate the criterion here. If it is missing, or exists but is not complete (empty, carrying the stub marker, or with an incomplete stage behind it), **stop**: "Test plan is required. Run /pf-test-plan first." A stub is not an input.
 
@@ -14,6 +14,8 @@ Determine the active issue from `docs/issues/open/`. Before checking any other p
 - **regenerate** — produce a plan mapped to the current `test_plan.md` via whichever actor `write` resolves to (see the role resolution below) and overwrite the existing file (recommend this when it is not complete, or when it predates the test plan it must map to);
 - **keep** — leave it untouched and stop, reporting that the IMPL_PLAN stage is already complete (recommend this when it is complete);
 - **cancel** — stop and change nothing.
+
+Front-loaded check: if `prompt.md`'s `interaction` field resolves to `front-loaded` (`~/.claude/skills/pf-interaction/SKILL.md`, "Front-loaded rule"), apply that rule instead of asking this question interactively.
 
 **Oversized-predecessor guard.** Before producing `implementation_plan.md`, recompute the oversized-for-tier check against `test_plan.md` (and `specs.md`/`brd.md` where applicable). Do this with a lightweight **mechanical count** only — e.g. `wc -l` on `specs.md`/`brd.md`, or counting `### TC-` headings in `test_plan.md` for its case count — **not** a full semantic `Read` of the document. This is the same "do not read documents yourself" tension pf-test-plan's guard resolves the same way: the mechanical count is not a semantic read, and whichever actor drafts the plan below — the dispatched sub-agent, or the delegated actor — still does the full reading and drafting once it runs. Budget for `test_plan.md`: trivial >4 cases, small >10 cases, medium >20 cases (large has no cap). If oversized, stop with a message naming the offending file, the tier, and the actual count vs. budget, and pointing at "run /pf-check to review, then either trim the document or re-classify the issue's size_tier in prompt.md."
 
