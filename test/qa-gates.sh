@@ -21,6 +21,7 @@ TMP_REPO="$(pf_repo_copy)"
 # necessarily contains the very literals the gates hunt for. Without this
 # pathspec, every edit to a gate's own wording trips that gate, and the QA of
 # the commit that fixes a gate can never go green. It turned `make test` red once.
+# @pf-issue [20260902-feat-idea-stage] TC-027 - scope of this assertion widened by the idea/spike issue
 # ':!skills/pf/templates/' - skills/pf/templates/project/ is a byte-for-byte
 # mirror of docs/planning/templates/ (test/pf-idea-templates-mirror.sh keeps
 # the two in step). Its definition-of-done.md/qa_report.md carry CHECKLIST

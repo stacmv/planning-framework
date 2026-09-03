@@ -105,6 +105,7 @@ fi
 # If a gate had restated the criterion instead of referencing it, the literal
 # would show up in that gate's file too. This is the drift detector.
 
+# @pf-issue [20260902-feat-idea-stage] TC-027 - scope of this assertion widened by the idea/spike issue
 # --exclude-dir=templates: skills/pf/templates/project/ is a byte-for-byte
 # mirror of docs/planning/templates/ (scaffold payload deployed into new
 # projects), not a skill. Its PLANNING.md/CLAUDE.md legitimately carry the
@@ -119,6 +120,7 @@ else
   printf '%s\n' "$marker_files" >&2
 fi
 
+# @pf-issue [20260902-feat-idea-stage] TC-027 - scope of this assertion widened by the idea/spike issue
 def_home="$(grep -rlE --exclude-dir=templates '^## Stage completion' "$SKILLS" 2>/dev/null | LC_ALL=C sort)"
 if [ "$def_home" = "$TIERS" ]; then
   pf_pass "step 3: exactly one skill DEFINES stage completion; the rest reference it"
@@ -368,6 +370,7 @@ fi
 
 # ─── Step 7: 'regenerate' appears only in output-gate skills — never in pf-execute ─
 
+# @pf-issue [20260902-feat-idea-stage] TC-027 - scope of this assertion widened by the idea/spike issue
 # -w (whole word): pf-git says "regenerated" in prose inside a staging-table
 # row, which is not an output gate. --exclude-dir=templates: see step 3.
 regen_files="$(grep -rlw --exclude-dir=templates 'regenerate' "$SKILLS" 2>/dev/null | LC_ALL=C sort)"
