@@ -1369,11 +1369,11 @@ TC-019, TC-021, TC-022, TC-023, TC-024, TC-025, TC-026, TC-027
   напрямую проверяющий decision (C) из specs-part1.md §1.1.
 
 **Acceptance Criteria:**
-- [ ] TC-026 passes
-- [ ] TC-030 passes
-- [ ] TC-031 passes
-- [ ] TC-032 passes
-- [ ] TC-033 passes
+- [x] TC-026 passes
+- [x] TC-030 passes
+- [x] TC-031 passes
+- [x] TC-032 passes
+- [x] TC-033 passes
 
 ---
 

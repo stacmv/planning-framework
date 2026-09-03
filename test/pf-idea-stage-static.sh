@@ -764,4 +764,552 @@ else
   pf_fail "TC-027 step 3: Pipelines row(s) do not reference pf-idea-lenses by name — idea_ok=$idea_ok spike_ok=$spike_ok (found defect: see summary)"
 fi
 
+# ══════════════════════════════════════════════════════════════════════════════
+# §8.1a — fixture-based / behavioral tests (specs-part3.md §8.1a; Task 18;
+# test_plan.md TC-030/031/032/033). The TCs above are drift guards (grep on
+# skill prose) — finding #27 is explicit that a drift guard is not proof of
+# executable behavior. Each scenario below builds a throwaway git repo via
+# pf_setup_case (S-3), transcribes the checked skill logic to bash (same
+# pattern as test/pf-close.sh's resolve_parent_branch / test/converge-fresh.sh),
+# then asserts the real filesystem/git result.
+# ══════════════════════════════════════════════════════════════════════════════
+
+# ─── Shared transcription helpers ──────────────────────────────────────────
+
+# section_body <file> <heading-literal> — body of a "## <heading>" section, up
+# to (not including) the next "## " heading or EOF. Exact-line match on the
+# heading (not a substring search), scoped to one file — a narrower cousin of
+# range_between above, used where the caller needs one section's body only.
+section_body() {
+  local file="$1" heading="$2"
+  awk -v h="## $heading" '
+    $0 == h { flag=1; next }
+    flag && /^## / { exit }
+    flag { print }
+  ' "$file"
+}
+
+# derive_size_tier <idea_tier> <cost_effort_text> — skills/pf-close/SKILL.md's
+# Phase 4.6 п.3.i size_tier table, transcribed. Prints the derived tier and
+# returns 0; returns 1 (prints nothing) when the signal isn't recognized — the
+# "stays a genuine gap" branch the real table also documents.
+derive_size_tier() {
+  local tier="$1" cost="$2"
+  case "$tier" in
+    personal | content)
+      printf 'small'
+      return 0
+      ;;
+  esac
+  case "$tier" in
+    infra)
+      case "$cost" in
+        *"a few hours"* | *"one day"* | *"half a day"* | *"несколько часов"* | *"один день"*)
+          printf 'small'
+          return 0
+          ;;
+        *"a few days"* | *"несколько дней"*)
+          printf 'medium'
+          return 0
+          ;;
+      esac
+      ;;
+    product)
+      case "$cost" in
+        *"a week"* | *"около недели"* | *"неделю"*)
+          printf 'medium'
+          return 0
+          ;;
+        *"a few weeks"* | *"a month"* | *"несколько недель"* | *"месяц"*)
+          printf 'large'
+          return 0
+          ;;
+      esac
+      ;;
+  esac
+  return 1
+}
+
+# resolve_parent_branch_idea <repo> <issue-id> — Phase 3 steps 1-2, transcribed
+# (the same self-tracking-upstream guard as test/pf-close.sh's
+# resolve_parent_branch; an idea/spike issue folder name is never itself an
+# `issue/<id>` branch, so branch.issue/<id>.merge is simply unset in practice —
+# step 1 always falls through to step 2 for this pipeline).
+resolve_parent_branch_idea() {
+  local dir="$1" id="$2" merge
+  merge="$(git -C "$dir" config "branch.issue/$id.merge" 2>/dev/null || true)"
+  if [ -z "$merge" ] || [ "$merge" = "refs/heads/issue/$id" ]; then
+    if git -C "$dir" branch --list develop | grep -q .; then
+      printf 'develop'
+    else
+      printf 'main'
+    fi
+  else
+    printf '%s' "${merge#refs/heads/}"
+  fi
+}
+
+# expand_scaffold <dir> — Phase 4.6 step c / Step 0's "project, right away"
+# steps 2 and 4-7, transcribed: create docs/issues/{open,closed}+docs/planning,
+# write .pf-version, copy PLANNING.md/CLAUDE.md (skip if present), copy
+# docs/planning/*.md without overwriting, mirror docs/planning/templates/.
+expand_scaffold() {
+  local dir="$1" tmpl="$REPO_ROOT/skills/pf/templates/project" f base
+  mkdir -p "$dir/docs/issues/open" "$dir/docs/issues/closed" "$dir/docs/planning"
+  [ -f "$dir/.pf-version" ] || printf '3.0.0\n' >"$dir/.pf-version"
+  [ -f "$dir/PLANNING.md" ] || cp "$tmpl/config/PLANNING.md" "$dir/PLANNING.md"
+  [ -f "$dir/CLAUDE.md" ] || cp "$tmpl/config/CLAUDE.md" "$dir/CLAUDE.md"
+  for f in "$tmpl"/global/*.md; do
+    base="$(basename "$f")"
+    [ -f "$dir/docs/planning/$base" ] || cp "$f" "$dir/docs/planning/$base"
+  done
+  rm -rf "$dir/docs/planning/templates"
+  cp -a "$tmpl" "$dir/docs/planning/templates"
+}
+
+# create_followup_project <dir> <idea-id> <size_tier> <slug> — Phase 4.6 п.3.i,
+# transcribed (feat follow-up, size_tier written immediately + [assumed]
+# reasoning logged to a new open_questions.md when a signal was recognized).
+create_followup_project() {
+  local dir="$1" idea_id="$2" size_tier="$3" slug="$4"
+  local followup_id="20260101-feat-$slug" followup_dir
+  followup_dir="$dir/docs/issues/open/$followup_id"
+  mkdir -p "$followup_dir"
+  {
+    printf -- '---\n'
+    printf 'type: feat\n'
+    printf 'doc_language: English\n'
+    [ -n "$size_tier" ] && printf 'size_tier: %s\n' "$size_tier"
+    printf 'idea_ref: %s\n' "$idea_id"
+    printf -- '---\n\n'
+    printf '## Idea\nCarried over from %s.\n' "$idea_id"
+  } >"$followup_dir/prompt.md"
+  if [ -n "$size_tier" ]; then
+    {
+      printf '# Open Questions — %s\n\n' "$followup_id"
+      printf '| # | Question | Assumed answer | Why | Status | Raised by | Used in |\n'
+      printf '| --- | --- | --- | --- | --- | --- | --- |\n'
+      printf '| 1 | What size_tier applies? | %s | Derived from idea_tier + Cost (Effort) signal per pf-close Phase 4.6 п.3.i table | assumed | pf-close | prompt.md |\n' "$size_tier"
+    } >"$followup_dir/open_questions.md"
+  fi
+  printf '%s' "$followup_id"
+}
+
+# create_followup_spike <dir> <idea-id> <slug> — Phase 4.6 п.3.j, transcribed
+# (spike follow-up, no size_tier, best-effort Question/.../Method logged
+# [assumed] since nothing is asked of the user).
+create_followup_spike() {
+  local dir="$1" idea_id="$2" slug="$3"
+  local followup_id="20260101-spike-$slug" followup_dir
+  followup_dir="$dir/docs/issues/open/$followup_id"
+  mkdir -p "$followup_dir"
+  {
+    printf -- '---\n'
+    printf 'type: spike\n'
+    printf 'doc_language: English\n'
+    printf 'idea_ref: %s\n' "$idea_id"
+    printf -- '---\n\n'
+    printf '## Question\n<best-effort, derived from verdict.md Reasoning + critique.md>\n\n'
+    printf '## Success Criterion\n<best-effort>\n\n'
+    printf '## Time-box\n<best-effort>\n\n'
+    printf '## Method\n<best-effort>\n'
+  } >"$followup_dir/prompt.md"
+  {
+    printf '# Open Questions — %s\n\n' "$followup_id"
+    printf '| # | Question | Assumed answer | Why | Status | Raised by | Used in |\n'
+    printf '| --- | --- | --- | --- | --- | --- | --- |\n'
+    printf '| 1 | What Question/Success Criterion/Time-box/Method apply? | best-effort, derived from verdict.md + critique.md | no user input available (front-loaded) | assumed | pf-close | prompt.md |\n'
+  } >"$followup_dir/open_questions.md"
+  printf '%s' "$followup_id"
+}
+
+PF_TEST_GIT_ID=(-c user.name='PF Test' -c user.email='pf-test@example.invalid')
+
+# ══════════════════════════════════════════════════════════════════════════════
+printf '\n=== TC-030: bare-folder idea creates only the issue folder — nothing else\n'
+# ══════════════════════════════════════════════════════════════════════════════
+
+d="$(pf_setup_case no-pf-bare)"
+before_snapshot="$(find "$d" -mindepth 1 | LC_ALL=C sort)"
+
+# Transcribe specs-part1.md §3.1.1's "Идея" branch: has_pf was false, the user
+# answered "An idea" — per pf/SKILL.md's own note ("the 'idea' answer never
+# touches git at all"), the only effect is writing one prompt.md.
+new_issue_id="20260101-idea-x"
+mkdir -p "$d/docs/issues/open/$new_issue_id"
+cat >"$d/docs/issues/open/$new_issue_id/prompt.md" <<'EOF'
+---
+type: idea
+doc_language: English
+idea_tier: personal
+interaction: front-loaded
+---
+
+## Idea
+<placeholder — this scenario asserts file placement, not document content>
+EOF
+
+expected="$(
+  {
+    printf '%s\n' "$before_snapshot"
+    printf '%s\n' "$d/docs"
+    printf '%s\n' "$d/docs/issues"
+    printf '%s\n' "$d/docs/issues/open"
+    printf '%s\n' "$d/docs/issues/open/$new_issue_id"
+    printf '%s\n' "$d/docs/issues/open/$new_issue_id/prompt.md"
+  } | LC_ALL=C sort
+)"
+actual="$(find "$d" -mindepth 1 | LC_ALL=C sort)"
+
+if [ "$expected" = "$actual" ]; then
+  pf_pass "TC-030: bare-folder idea produced exactly the fixture's files plus the new prompt.md"
+else
+  pf_fail "TC-030: unexpected path set after the bare-folder idea transcription"
+  diff <(printf '%s\n' "$expected") <(printf '%s\n' "$actual") >&2 || true
+fi
+
+for absent in PLANNING.md docs/planning .git .pf-version; do
+  if [ ! -e "$d/$absent" ]; then
+    pf_pass "TC-030: $absent did not appear"
+  else
+    pf_fail "TC-030: $absent unexpectedly appeared"
+  fi
+done
+
+# ══════════════════════════════════════════════════════════════════════════════
+printf '\n=== TC-031: project/spike-first verdict — bootstrap+init+follow-up before archiving; size_tier\n'
+# ══════════════════════════════════════════════════════════════════════════════
+
+# run_tc031_bare <project|spike-first> — Phase 4.6 for a bare-folder idea
+# (NO-REPO was set by Phase 0 — Phase 3 never ran), then Phase 5, transcribed
+# in the fixed order specs-part3.md §8.1a п.2 requires.
+run_tc031_bare() {
+  local verdict_word="$1"
+  local d idea_id="20260101-idea-widget-marketplace" idea_dir slug="widget-marketplace"
+  d="$(pf_setup_case idea-verdict-project-bare)"
+  idea_dir="$d/docs/issues/open/$idea_id"
+
+  if [ "$verdict_word" = "spike-first" ]; then
+    sed -i 's/\*\*Confirmed verdict:\*\* project/**Confirmed verdict:** spike-first/' "$idea_dir/verdict.md"
+  fi
+
+  # Phase 4.6 step b (!has_git -> git init) and step c (!has_full_scaffold ->
+  # expand scaffold) — both true for this bare fixture.
+  git -C "$d" init -q
+  expand_scaffold "$d"
+
+  # Phase 4.6 step d, bullet 2: NO-REPO was set (Phase 3 skipped) -> PARENT-
+  # BRANCH is the branch git init just created — no develop/main fallback.
+  git -C "$d" branch --show-current >/dev/null
+
+  # Phase 4.6 step e: atomic initial scaffold commit, SCOPED git add (never
+  # docs/issues/, which Phase 8 commits separately).
+  git -C "$d" add PLANNING.md CLAUDE.md .pf-version docs/planning
+  git -C "$d" "${PF_TEST_GIT_ID[@]}" commit -q \
+    -m "chore: bootstrap PF scaffold for $idea_id (verdict: $verdict_word)"
+
+  pf_assert "TC-031 ($verdict_word): repository exists after Phase 4.6, before Phase 5" \
+    git -C "$d" rev-parse --is-inside-work-tree
+
+  local commit_files
+  commit_files="$(git -C "$d" diff-tree --no-commit-id --name-only -r HEAD)"
+  if ! printf '%s\n' "$commit_files" | grep -q '^docs/issues/'; then
+    pf_pass "TC-031 ($verdict_word): initial scaffold commit does not contain docs/issues/ paths (scoped git add)"
+  else
+    pf_fail "TC-031 ($verdict_word): initial scaffold commit wrongly contains docs/issues/ paths"
+  fi
+
+  local followup_id
+  if [ "$verdict_word" = "project" ]; then
+    local cost_effort size_tier
+    cost_effort="$(section_body "$idea_dir/idea.md" 'Cost (Effort)')"
+    size_tier="$(derive_size_tier product "$cost_effort")"
+    followup_id="$(create_followup_project "$d" "$idea_id" "$size_tier" "$slug")"
+  else
+    followup_id="$(create_followup_spike "$d" "$idea_id" "$slug")"
+  fi
+
+  if [ -d "$d/docs/issues/open/$followup_id" ]; then
+    pf_pass "TC-031 ($verdict_word): follow-up folder ($followup_id) exists under open/, before archiving the idea"
+  else
+    pf_fail "TC-031 ($verdict_word): follow-up folder not found under open/"
+  fi
+  if [ -d "$idea_dir" ]; then
+    pf_pass "TC-031 ($verdict_word): idea folder is still under open/ at this point (not yet archived)"
+  else
+    pf_fail "TC-031 ($verdict_word): idea folder unexpectedly already archived before Phase 5"
+  fi
+
+  if [ "$verdict_word" = "project" ]; then
+    local got_tier
+    got_tier="$(grep -m1 '^size_tier:' "$d/docs/issues/open/$followup_id/prompt.md" | sed 's/^size_tier: *//')"
+    if [ "$got_tier" = "medium" ]; then
+      pf_pass "TC-031 (project): derived size_tier = medium (idea_tier product + 'a week or shorter' signal)"
+    else
+      pf_fail "TC-031 (project): derived size_tier = '${got_tier:-<none>}', want medium"
+    fi
+    if [ -f "$d/docs/issues/open/$followup_id/open_questions.md" ] && grep -q 'assumed' "$d/docs/issues/open/$followup_id/open_questions.md"; then
+      pf_pass "TC-031 (project): follow-up's open_questions.md carries an assumed row for the size_tier reasoning"
+    else
+      pf_fail "TC-031 (project): follow-up's open_questions.md missing or carries no assumed row"
+    fi
+  else
+    if ! grep -q '^size_tier:' "$d/docs/issues/open/$followup_id/prompt.md"; then
+      pf_pass "TC-031 (spike-first): follow-up prompt.md carries no size_tier (spike branch never derives one)"
+    else
+      pf_fail "TC-031 (spike-first): follow-up prompt.md unexpectedly carries a size_tier"
+    fi
+    if grep -qF "idea_ref: $idea_id" "$d/docs/issues/open/$followup_id/prompt.md"; then
+      pf_pass "TC-031 (spike-first): follow-up prompt.md carries idea_ref: $idea_id"
+    else
+      pf_fail "TC-031 (spike-first): follow-up prompt.md missing idea_ref"
+    fi
+  fi
+
+  # Phase 5 — archive the idea (after the follow-up already exists, per the
+  # order asserted above).
+  mkdir -p "$d/docs/issues/closed"
+  mv "$idea_dir" "$d/docs/issues/closed/$idea_id"
+
+  # Proxy for Phase 6-8's archive commit — out of this task's scope to
+  # transcribe in full; only the resulting clean working tree is asserted.
+  git -C "$d" add -A
+  git -C "$d" "${PF_TEST_GIT_ID[@]}" commit -q -m "close: archive $idea_id"
+
+  local porcelain
+  porcelain="$(git -C "$d" status --porcelain)"
+  if [ -z "$porcelain" ]; then
+    pf_pass "TC-031 ($verdict_word): git status --porcelain is empty after the full run"
+  else
+    pf_fail "TC-031 ($verdict_word): git status --porcelain is not empty after the full run: $porcelain"
+  fi
+}
+
+run_tc031_bare project
+run_tc031_bare spike-first
+
+# ─── TC-031 (existing project): PARENT-BRANCH reused from Phase 3, bootstrap
+# steps b/c no-op (specs-part3.md §8.1a п.2 / test_plan.md TC-031 step 8) ─────
+
+d="$(pf_setup_case idea-verdict-project-existing --git)"
+idea_id="20260102-idea-small-thing"
+slug="small-thing"
+
+git -C "$d" branch develop
+
+# Phase 3 (already-scaffolded project — has_git true, NO-REPO never set):
+# resolve PARENT-BRANCH and checkout, same as the idea path Phase 3 adds.
+parent_branch="$(resolve_parent_branch_idea "$d" "$idea_id")"
+git -C "$d" checkout -q "$parent_branch"
+commits_before="$(git -C "$d" log --oneline | wc -l)"
+
+# Phase 4.6 steps a-d, transcribed: has_git and has_full_scaffold both true.
+has_full_scaffold=0
+[ -f "$d/PLANNING.md" ] && has_full_scaffold=1
+if [ "$has_full_scaffold" -eq 1 ]; then
+  pf_pass "TC-031 (existing): has_full_scaffold is true (PLANNING.md exists) — steps b/c (git init, scaffold expansion) are no-ops"
+else
+  pf_fail "TC-031 (existing): fixture does not exercise the no-op path (PLANNING.md missing)"
+fi
+# Step d, bullet 1: reuse Phase 3's value — no new derivation, no new git init.
+followup_id="$(create_followup_project "$d" "$idea_id" small "$slug")"
+
+commits_after="$(git -C "$d" log --oneline | wc -l)"
+if [ "$commits_after" -eq "$commits_before" ]; then
+  pf_pass "TC-031 (existing): no bootstrap scaffold commit was created (idempotency — steps b/c did nothing)"
+else
+  pf_fail "TC-031 (existing): an unexpected commit appeared (before=$commits_before after=$commits_after)"
+fi
+
+current_branch="$(git -C "$d" branch --show-current)"
+if [ "$current_branch" = "$parent_branch" ] && [ "$current_branch" = "develop" ]; then
+  pf_pass "TC-031 (existing): current branch ($current_branch) is the value Phase 3 already computed/checked out — not a fresh git-init branch"
+else
+  pf_fail "TC-031 (existing): current branch is '$current_branch', want the reused PARENT-BRANCH 'develop'"
+fi
+
+if [ -d "$d/docs/issues/open/$followup_id" ]; then
+  pf_pass "TC-031 (existing): follow-up folder ($followup_id) created on the reused PARENT-BRANCH"
+else
+  pf_fail "TC-031 (existing): follow-up folder not found"
+fi
+
+# ══════════════════════════════════════════════════════════════════════════════
+printf '\n=== TC-032: spike close — Run Evidence gate; branch left untouched, no merge\n'
+# ══════════════════════════════════════════════════════════════════════════════
+
+# run_evidence_gate <findings.md> — Phase 0 п.4.2, transcribed: 0 (pass) iff
+# "## Run Evidence" is non-empty and not pf-idea-spike's skeleton placeholder.
+run_evidence_gate() {
+  local file="$1" body placeholder
+  body="$(pf_trim "$(section_body "$file" 'Run Evidence')")"
+  placeholder='<concrete evidence of an actual run — command+output, path to an
+artifact, or a direct quote with its source — NOT a restatement of
+expectation>'
+  [ -n "$body" ] && [ "$body" != "$placeholder" ]
+}
+
+# ─── Fixture 1: spike-close-no-evidence ──────────────────────────────────────
+d="$(pf_setup_case spike-close-no-evidence --git)"
+spike_id="20260103-spike-noev"
+findings="$d/docs/issues/open/$spike_id/findings.md"
+log_before="$(git -C "$d" log --oneline)"
+
+if run_evidence_gate "$findings"; then
+  pf_fail "TC-032 (no-evidence): gate wrongly passed on a placeholder Run Evidence"
+else
+  pf_pass "TC-032 (no-evidence): gate correctly fails on a placeholder Run Evidence"
+fi
+
+stop_message="findings.md's Run Evidence is empty or a template placeholder — spike close requires evidence of an actual run."
+if printf '%s' "$stop_message" | grep -q 'Run Evidence'; then
+  pf_pass "TC-032 (no-evidence): stop message names Run Evidence"
+else
+  pf_fail "TC-032 (no-evidence): stop message does not name Run Evidence"
+fi
+
+log_after="$(git -C "$d" log --oneline)"
+if [ "$log_before" = "$log_after" ]; then
+  pf_pass "TC-032 (no-evidence): git log unchanged — the gate produced no commit"
+else
+  pf_fail "TC-032 (no-evidence): git log changed despite the gate failing"
+fi
+if [ -d "$d/docs/issues/open/$spike_id" ] && [ ! -d "$d/docs/issues/closed/$spike_id" ]; then
+  pf_pass "TC-032 (no-evidence): issue folder was NOT moved to closed/"
+else
+  pf_fail "TC-032 (no-evidence): issue folder was moved despite the gate failing"
+fi
+
+# ─── Fixture 2: spike-close-branch ───────────────────────────────────────────
+d="$(pf_setup_case spike-close-branch --git)"
+spike_id="20260104-spike-branch"
+
+git -C "$d" branch develop
+git -C "$d" checkout -q -b "issue/$spike_id"
+printf 'console.log("whirl run: 10000 rows processed");\n' >"$d/script.js"
+git -C "$d" add script.js
+git -C "$d" "${PF_TEST_GIT_ID[@]}" commit -q -m "spike: whirl batch experiment"
+
+cat >"$d/docs/issues/open/$spike_id/findings.md" <<'EOF'
+# Findings: branch-check
+
+## Run Evidence
+Ran `node script.js` — output: "whirl run: 10000 rows processed" (see script.js).
+
+## Result vs. Success Criterion
+met — the script printed the final row count required by the Success Criterion.
+
+## Conclusion
+Whirl handles a 10k-row batch within the time-box.
+
+## Follow-up
+Can move to project.
+EOF
+git -C "$d" add "docs/issues/open/$spike_id/findings.md"
+git -C "$d" "${PF_TEST_GIT_ID[@]}" commit -q -m "docs: findings.md on the spike branch"
+
+# Phase 3: resolve PARENT-BRANCH (same as the idea path above).
+parent_branch="$(resolve_parent_branch_idea "$d" "$spike_id")"
+
+# Phase 3.5 step 1: currently on issue/<spike-id> -> switch to PARENT-BRANCH,
+# WITHOUT merge.
+current_branch="$(git -C "$d" branch --show-current)"
+if [ "$current_branch" = "issue/$spike_id" ]; then
+  git -C "$d" checkout -q "$parent_branch"
+fi
+# Phase 3.5 step 2: copy only the issue folder from the spike branch.
+git -C "$d" checkout -q "issue/$spike_id" -- "docs/issues/open/$spike_id"
+
+merges="$(git -C "$d" log --merges --oneline)"
+if [ -z "$merges" ]; then
+  pf_pass "TC-032 (branch): git log --merges is empty — issue/$spike_id was never merged"
+else
+  pf_fail "TC-032 (branch): unexpected merge commit(s) found: $merges"
+fi
+
+git -C "$d" add "docs/issues/open/$spike_id"
+git -C "$d" "${PF_TEST_GIT_ID[@]}" commit -q -m "close: copy $spike_id docs onto $parent_branch"
+
+mkdir -p "$d/docs/issues/closed"
+git -C "$d" mv "docs/issues/open/$spike_id" "docs/issues/closed/$spike_id"
+git -C "$d" "${PF_TEST_GIT_ID[@]}" commit -q -m "close: archive $spike_id"
+
+if [ -f "$d/docs/issues/closed/$spike_id/findings.md" ] && [ -f "$d/docs/issues/closed/$spike_id/hypothesis.md" ]; then
+  pf_pass "TC-032 (branch): docs/issues/closed/$spike_id/ carries the copied documents on $parent_branch"
+else
+  pf_fail "TC-032 (branch): docs/issues/closed/$spike_id/ is missing the copied documents"
+fi
+if git -C "$d" branch --list "issue/$spike_id" | grep -q .; then
+  pf_pass "TC-032 (branch): issue/$spike_id still exists after the full close (never deleted)"
+else
+  pf_fail "TC-032 (branch): issue/$spike_id was deleted — must never be deleted"
+fi
+if [ "$(git -C "$d" branch --show-current)" = "$parent_branch" ]; then
+  pf_pass "TC-032 (branch): closed on PARENT-BRANCH ($parent_branch), not on the issue branch"
+else
+  pf_fail "TC-032 (branch): current branch is '$(git -C "$d" branch --show-current)', want PARENT-BRANCH ($parent_branch)"
+fi
+if [ ! -f "$d/script.js" ]; then
+  pf_pass "TC-032 (branch): the experiment's code (script.js) stayed on issue/$spike_id, not copied to $parent_branch"
+else
+  pf_fail "TC-032 (branch): script.js leaked onto $parent_branch"
+fi
+
+# ══════════════════════════════════════════════════════════════════════════════
+printf '\n=== TC-033: pf-check never asks size_tier for idea/spike — TYPE guard precedes it\n'
+# ══════════════════════════════════════════════════════════════════════════════
+
+# pfcheck_opening_guard <type> <has_size_tier> — the opening guard in
+# skills/pf-check/SKILL.md, transcribed with its conditions in the fixed order
+# the skill text itself uses: (a) TYPE already known to the caller here;
+# (b) TYPE is idea/spike -> skip entirely, returning before (c) is reached;
+# (c) no size_tier -> ask (only reachable when (b) did not return).
+pfcheck_opening_guard() {
+  local type="$1" has_size_tier="$2"
+  if [ "$type" = "idea" ] || [ "$type" = "spike" ]; then
+    printf 'skip-size-tier-paragraph'
+    return 0
+  fi
+  if [ "$has_size_tier" != "true" ]; then
+    printf 'ask-size-tier'
+    return 0
+  fi
+  printf 'no-op'
+}
+
+d="$(pf_setup_case idea-no-size-tier --git)"
+issue_id="20260105-idea-tierless"
+prompt="$d/docs/issues/open/$issue_id/prompt.md"
+
+type_val="$(grep -m1 '^type:' "$prompt" | sed 's/^type: *//')"
+has_tier=false
+grep -q '^size_tier:' "$prompt" && has_tier=true
+
+result="$(pfcheck_opening_guard "$type_val" "$has_tier")"
+if [ "$result" = "skip-size-tier-paragraph" ]; then
+  pf_pass "TC-033: opening guard stops at the TYPE condition (idea) — size_tier question never reached"
+else
+  pf_fail "TC-033: opening guard returned '$result', want 'skip-size-tier-paragraph'"
+fi
+
+# Drift guard (same principle as test/pf-close.sh's TC-005): the TYPE
+# condition and the size_tier-question clause live in the SAME paragraph/line
+# in pf-check/SKILL.md — "physically precedes" is checked by character offset
+# within that line, not by line number.
+GUARD_LINE="$(grep -m1 'First, determine TYPE' "$CHECK")"
+if [ -n "$GUARD_LINE" ]; then
+  idx_type="$(awk -v s="$GUARD_LINE" -v t="skip this entire" 'BEGIN{print index(s,t)}')"
+  idx_ask="$(awk -v s="$GUARD_LINE" -v t="ask the user via" 'BEGIN{print index(s,t)}')"
+  if [ "$idx_type" -gt 0 ] && [ "$idx_ask" -gt 0 ] && [ "$idx_type" -lt "$idx_ask" ]; then
+    pf_pass "TC-033: drift guard — the TYPE/idea-spike-skip clause (offset $idx_type) precedes the size_tier-ask clause (offset $idx_ask) in pf-check/SKILL.md"
+  else
+    pf_fail "TC-033: drift guard failed — idx_type=$idx_type idx_ask=$idx_ask"
+  fi
+else
+  pf_fail "TC-033: could not locate the opening TYPE-guard paragraph in pf-check/SKILL.md"
+fi
+
+# ─── S-5 ──────────────────────────────────────────────────────────────────────
+assert_repo_untouched
+
 pf_summary
