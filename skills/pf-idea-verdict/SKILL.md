@@ -180,9 +180,12 @@ resolved `verdict` write actor.** Delegated actors cannot call
 the pipeline's designated human gate, not a delegable content-writing task —
 there is no "write != claude" branch here.
 
-Under Codex orchestration (`write == codex`), replace this `AskUserQuestion`
-call with `~/.claude/skills/pf-interaction/SKILL.md`'s "Codex text-REPL
-adapter" — same options, same pending-state discipline.
+When this session's own orchestrator is not Claude
+(`orchestrator_provider != claude` — `~/.claude/skills/pf-interaction/SKILL.md`'s
+"Codex text-REPL adapter" defines the flag; it is independent of the
+resolved `verdict` write actor referenced above, consistent with "there is
+no `write != claude` branch here"), replace this `AskUserQuestion` call with
+that adapter — same options, same pending-state discipline.
 
 ### 1. One batch (`AskUserQuestion`, ≤4 questions — the same limit as intake)
 

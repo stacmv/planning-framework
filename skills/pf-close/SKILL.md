@@ -50,9 +50,22 @@ Run all checks in order. Stop immediately if any check fails.
    - **Override an assumption** — pick one `open_questions.md` row with `Status: assumed` and give a new answer. Regenerate only the sections its `Used in` field names, and invalidate/re-check the rest of this issue's own document tail (this issue's own pipeline order — e.g. `brd.md → specs.md → test_plan.md → implementation_plan.md` [+ code, where applicable] — the same "canonical pipeline order, invalidate the whole tail" discipline `pf-idea-verdict`'s "2. Override" section already documents for `idea`, reused here by reference, not restated). Re-run `/pf-check` on every document this invalidated before this gate can be shown again (same `[pf-check OPEN]` marker mechanism), then return to step 1 above with the refreshed ledger.
    - **Stop** — cancel close, same as today's "no".
 
-   Under Codex orchestration (`write == codex`), replace this three-option
-   prompt with `~/.claude/skills/pf-interaction/SKILL.md`'s "Codex
-   text-REPL adapter" — same options, same pending-state discipline.
+   When this session's own orchestrator is not Claude
+   (`orchestrator_provider != claude` — `~/.claude/skills/pf-interaction/SKILL.md`'s
+   "Codex text-REPL adapter" defines the flag; independent of any role's
+   resolved `write` actor), replace this three-option prompt with that
+   adapter — same options, same pending-state discipline.
+
+   **This substitution also covers `TYPE: spike`**, despite this block's
+   heading (AC-12d is a feat/improve/bug-specific acceptance criterion):
+   spike's Phase 1 confirmation is a different shape — the plain summary +
+   yes/no confirmation below, with the `TYPE: spike` variant text, unchanged
+   in substance per US-09e (it does **not** inherit this three-option
+   prompt) — but it is likewise this issue's single final human gate
+   (`~/.claude/skills/pf-interaction/SKILL.md`, "One final human gate per
+   issue"), so it is asked via this same adapter (`stage=final-gate`)
+   whenever `orchestrator_provider != claude`, on the same basis as this
+   step's own substitution above.
 4. **A confirmed Proceed is this issue's recorded final confirmation** — proceed with Phase 2 onward exactly as today.
 
 Show the following summary and wait for explicit user confirmation before proceeding (front-loaded issues show this after the ledger above, as step 2; issues without `interaction: front-loaded` show only this, as today):

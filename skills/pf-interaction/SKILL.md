@@ -135,19 +135,45 @@ interaction: front-loaded    # опционально; отсутствует п
 
 Для `idea`/`spike` поле присутствует всегда, но **не читается как переключатель** — эти два типа front-loaded безусловно, само поле в их `prompt.md` — для единообразия grep'а/отображения, не активная логика ветвления (в отличие от feat/improve/bug, где поле — единственный переключатель этого поведения).
 
-## Codex text-REPL adapter (non-Claude `write`)
+## Codex text-REPL adapter (non-Claude orchestrator)
 
-Applies whenever the resolved `write` actor for an affected interactive point
-is `codex`, not `claude` (`~/.claude/skills/pf-roles/SKILL.md` §8/§10) — the
-two mandatory human stops that survive the front-loaded design: the intake
-batch and the final gate (decision session `pf-idea-verdict` Mode 2 for
-`idea`; front-loaded `pf-close`'s Phase 1 for `spike`/feat/improve/bug — see
-"One final human gate per issue" above). This section is the **contract**
-those call sites reference by name — not a Codex-runtime implementation
-(running the framework under Codex end-to-end is out of scope, BRD
-Non-Goals), but concrete enough for a future Codex-runtime issue or a manual
-Codex review (TC-029) to verify directly, without reopening the question
-from scratch.
+Applies whenever **this session's own orchestrating runtime** is not Claude
+Code — i.e. `orchestrator_provider` (defined next) resolves to something
+other than `claude` — **not** by any resolved `write` actor. `write`
+(`~/.claude/skills/pf-roles/SKILL.md` §4/§7) governs who *authors* a given
+document's content, resolved per role/key; `orchestrator_provider` governs
+whether *this session itself* has the `AskUserQuestion` tool available at
+all, and is a single fact about the session, never resolved per role. The
+two do not move together: a Claude session with `write: codex` still has
+`AskUserQuestion` and never needs this adapter (content authorship is
+delegated via §7's write-invocation form, called *by* this session, which
+keeps asking structured questions itself); a session actually orchestrated
+by a non-Claude runtime needs this adapter regardless of what any
+individual role's `write` resolves to.
+
+**`orchestrator_provider` — where it comes from, and the default.** A fact
+about which runtime is currently interpreting/driving this `pf-*` skill
+session — the same "this session" already referenced throughout these
+skills (e.g. `pf-idea-verdict`'s Mode 2, `pf/SKILL.md`'s `analysis.md`
+clarifying dialog) — one of `claude` | `codex`. It is **not** read from
+`prompt.md`, **not** resolved via `pf-roles`' actor-resolution algorithm
+(§4), and **not** auto-detected by probing the environment or the
+available-tools list — the runtime driving the session already knows its
+own identity, the same way this Claude Code session already knows it is
+Claude Code. **Default when unspecified: `claude`** — today, only Claude
+Code can run these skills at all (a Codex-native orchestrator is out of
+scope of this issue, BRD Non-Goals), so an unset `orchestrator_provider`
+preserves today's behavior exactly, unchanged, at every call site below.
+
+This is the contract for the two mandatory human stops that survive the
+front-loaded design: the intake batch and the final gate (decision session
+`pf-idea-verdict` Mode 2 for `idea`; front-loaded `pf-close`'s Phase 1 for
+`spike`/feat/improve/bug — see "One final human gate per issue" above). This
+section is the **contract** those call sites reference by name — not a
+Codex-runtime implementation (running the framework under Codex end-to-end
+is out of scope, BRD Non-Goals), but concrete enough for a future
+Codex-runtime issue or a manual Codex review (TC-029) to verify directly,
+without reopening the question from scratch.
 
 1. **Question format.** Instead of `AskUserQuestion`, the question is
    printed as plain text into the session, in the same field order as the

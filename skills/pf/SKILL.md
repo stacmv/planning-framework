@@ -453,6 +453,14 @@ Taken when the new issue's type is `idea` — reached either via Step 0's bare-f
 - **Batch 1** (4 questions): `idea_tier` (`personal`/`infra`/`content`/`product` — one-line descriptions from `~/.claude/skills/pf-idea-lenses/SKILL.md` §1, recommending based on the topic if it's obvious, otherwise no default); the idea itself — typed directly, **or** a path to a file to extract it from (see "Idea from a file" below); Evidence of Pain; Constraints.
 - **Batch 2** (3 questions): Out of Scope; "What Would Convince You: Project" (what would have to be true for the eventual verdict to be `project`); Decision Rights (what the AI may decide on its own, without asking, for the rest of this idea's pipeline).
 
+**Non-Claude orchestrator.** When this session's own orchestrator is not
+Claude (`orchestrator_provider != claude` — `~/.claude/skills/pf-interaction/SKILL.md`'s
+"Codex text-REPL adapter" defines the flag; independent of any role's
+resolved `write` actor), replace every `AskUserQuestion` call in this intake
+batch (`stage=intake`) with that adapter — same options, same pending-state
+discipline, draft document at `docs/issues/open/.pf-intake-draft-idea.md`
+per that section's item 5.
+
 **Idea from a file (US-03a).** If the user names a file instead of typing the idea directly, `/pf` reads it and decides for itself how to extract the idea from the contents — this is deliberately not prescribed (BRD Non-Goals: "how exactly to extract the idea from a file is not regulated by the skill, the AI decides"). After extraction, show the extracted text back to the user for confirmation with one more `AskUserQuestion` — **"Yes, that's it"** / **"No, let me rephrase"** (free text via "Other") — before it goes anywhere. Only confirmed text is written into `prompt.md`. This is the only point in the whole issue where reading an external file happens at all (potentially from the user's own notes/vault), and it happens as an ordinary read of a path the user named — no special-cased knowledge of any particular tool or storage location anywhere in this flow.
 
 **Unreadable/binary/empty file (§5.8).** If the named file can't be read as text (binary, corrupted, missing), do not fail silently: report the read error and ask the user to type the idea directly instead — within the same intake call, re-asking only that one question, not the whole batch.
@@ -508,6 +516,14 @@ Taken when the new issue's type is `spike` — reached only via Step 3's "Run a 
 **Spike intake batch — the same shape as the idea branch: two `AskUserQuestion` calls, at most 4 questions each:**
 - **Batch 1** (4 questions): Question (what's being tested); Success Criterion (as the user states it); Time-box (how much time/effort is budgeted); Method (how it will be tested).
 - **Batch 2** (up to 4 questions): `idea_tier` (`personal`/`infra`/`content`/`product` — one-line descriptions from `~/.claude/skills/pf-idea-lenses/SKILL.md` §1, recommending based on the topic if it's obvious, otherwise no default — same dictionary as the idea branch, affects only `hypothesis.md`/`findings.md` budgets, not lenses/personas); Constraints (optional); Out of Scope (optional); Decision Rights (what the AI may decide on its own without asking).
+
+**Non-Claude orchestrator.** Same substitution as the Idea branch above:
+when this session's own orchestrator is not Claude
+(`orchestrator_provider != claude` — `~/.claude/skills/pf-interaction/SKILL.md`'s
+"Codex text-REPL adapter"), replace every `AskUserQuestion` call in this
+intake batch (`stage=intake`) with that adapter — same options, same
+pending-state discipline, draft document at
+`docs/issues/open/.pf-intake-draft-spike.md` per that section's item 5.
 
 **No bare-folder carve-out for spike.** Unlike the Idea branch, there is no bare-folder entry to carve out here at all: Step 0's "An idea" answer only ever produces `type: idea`, never `type: spike` (see above), so a `spike` issue is never created in a folder where `has_pf` is false. Role assignment and the `on_unavailable` question are therefore **always** asked for a spike issue — never skipped the way the idea branch's bare-folder carve-out skips them.
 
