@@ -91,3 +91,52 @@ interaction: front-loaded    # опционально; отсутствует п
 поведение, без изменений.
 
 Для `idea`/`spike` поле присутствует всегда, но **не читается как переключатель** — эти два типа front-loaded безусловно, само поле в их `prompt.md` — для единообразия grep'а/отображения, не активная логика ветвления (в отличие от feat/improve/bug, где поле — единственный переключатель этого поведения).
+
+## Codex text-REPL adapter (non-Claude `write`)
+
+Applies whenever the resolved `write` actor for an affected interactive point
+is `codex`, not `claude` (`~/.claude/skills/pf-roles/SKILL.md` §8/§10) — the
+two mandatory human stops that survive the front-loaded design: the intake
+batch and the final gate (decision session `pf-idea-verdict` Mode 2 for
+`idea`; front-loaded `pf-close`'s Phase 1 for `spike`/feat/improve/bug — see
+"One final human gate per issue" above). This section is the **contract**
+those call sites reference by name — not a Codex-runtime implementation
+(running the framework under Codex end-to-end is out of scope, BRD
+Non-Goals), but concrete enough for a future Codex-runtime issue or a manual
+Codex review (TC-029) to verify directly, without reopening the question
+from scratch.
+
+1. **Question format.** Instead of `AskUserQuestion`, the question is
+   printed as plain text into the session, in the same field order as the
+   structured variant: a short context summary (recommendation + reason, or
+   the issue summary), then a numbered list of options (the same option
+   vocabulary as the structured question), then an explicit instruction —
+   "reply with the number or the exact option text".
+2. **Pending-state — exact marker, where it lives.** Before printing the
+   question, write a marker line into the document (not session memory):
+   `<!-- pf-pending-interaction: <stage-key> | options: <opt1>|<opt2>|... |
+   asked: <ISO-timestamp> -->`, inserted into `verdict.md` immediately
+   before "## Decision" (decision session), or into `open_questions.md` as
+   its own line (final gate at front-loaded `pf-close`'s Phase 1 — no
+   "## Decision" analog exists there). At most one open marker per
+   interactive point — a new question for the same point replaces it, never
+   duplicates it.
+3. **Answer parsing.** Normalize the reply (trim, lower-case, strip
+   punctuation) and match it against (a) the option's number, (b) the
+   option's exact text, (c) known synonyms of each option's first 1-2
+   significant words (e.g. "подтвер"/"confirm" → Подтвердить). Unrecognized
+   — re-ask the same question once, plain text: "Не понял ответ, выберите
+   один из: …", without writing a new marker (`asked` is not updated).
+4. **Safe resumption.** A new Codex session for the same issue, on
+   re-reading the document, must check for an unresolved
+   `pf-pending-interaction` marker **before** any other action; if one is
+   found, re-show the same question (do not recompute the recommendation —
+   it is already fixed in the surrounding document text), and do not
+   restart the stage from scratch. A valid answer removes the marker (or
+   marks it `resolved: <answer>` — the implementation records which of the
+   two equivalent forms it uses), and then normal logic resumes (append
+   "## Decision", etc.) exactly as on the Claude path.
+5. The same protocol also covers the intake batch (pending-state lives in
+   the not-yet-committed `prompt.md` draft at that point — same principle:
+   state lives in the document, not session memory) — one mechanism for
+   both remaining interactive points under Codex, not only the final gate.

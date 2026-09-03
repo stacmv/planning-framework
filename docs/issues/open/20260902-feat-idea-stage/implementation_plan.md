@@ -1496,7 +1496,7 @@ TC-019, TC-021, TC-022, TC-023, TC-024, TC-025, TC-026, TC-027
   issue уже прошёл без него).
 
 **Acceptance Criteria:**
-- [ ] TC-020 passes (частично — 12 из 13 скиллов; `pf-close` — Task 21)
+- [x] TC-020 passes (частично — 12 из 13 скиллов; `pf-close` — Task 21)
 
 ---
 
@@ -1564,7 +1564,7 @@ TC-019, TC-021, TC-022, TC-023, TC-024, TC-025, TC-026, TC-027
 **Acceptance Criteria:**
 - [x] TC-008 passes (частично — параллель с decision session, ссылка на pf-close Phase 1)
 - [x] TC-019 passes (частично — новый опциональный вопрос как единственный источник поля для feat/improve/bug)
-- [ ] TC-020 passes (частично — `pf-close` Phase 1 сайт; полное прохождение требует Task 20)
+- [x] TC-020 passes (частично — `pf-close` Phase 1 сайт; полное прохождение требует Task 20)
 
 ---
 
@@ -1606,7 +1606,7 @@ TC-019, TC-021, TC-022, TC-023, TC-024, TC-025, TC-026, TC-027
   сайт учтён в общей таблице).
 
 **Acceptance Criteria:**
-- [ ] TC-020 passes
+- [x] TC-020 passes
 
 ---
 
@@ -1686,10 +1686,10 @@ TC-019, TC-021, TC-022, TC-023, TC-024, TC-025, TC-026, TC-027
   статически, не рантайм.
 
 **Acceptance Criteria:**
-- [ ] `pf-interaction/SKILL.md` содержит раздел «Codex text-REPL adapter» с
+- [x] `pf-interaction/SKILL.md` содержит раздел «Codex text-REPL adapter» с
       форматом вопроса, точным местом/форматом pending-state маркера,
       правилом разбора ответа и правилом безопасного возобновления
-- [ ] `pf-idea-verdict/SKILL.md` (Режим 2) и `pf-close/SKILL.md`
+- [x] `pf-idea-verdict/SKILL.md` (Режим 2) и `pf-close/SKILL.md`
       (front-loaded Phase 1) ссылаются на этот раздел по имени для
       `write == codex`
 - [ ] TC-029 — manual/blocked per test_plan.md; ревью Task 24 сверяет, что
