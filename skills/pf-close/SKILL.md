@@ -24,7 +24,7 @@ Run all checks in order. Stop immediately if any check fails.
    |---|---|
    | feat / improve / bug | Unchanged: run `git branch --show-current`. If the result is not `issue/ISSUE-ID`, stop: "Switch to the issue branch first: `git checkout issue/ISSUE-ID`" |
    | idea | Not checked at all — the idea pipeline never creates an `issue/<id>` branch. Instead check the new condition: **`## Decision` is present in `verdict.md`**. If not, stop: "Verdict not confirmed. Run /pf-idea-verdict (decision session) first." |
-   | spike | Does not require standing exactly on `issue/<id>` — being on the parent branch **or** on `issue/<spike-id>` (if it exists) is both acceptable. |
+   | spike | Not restricted to any particular branch — Phase 3.5 below unconditionally switches to PARENT-BRANCH before copying documents, regardless of which branch this check finds the session on (CR-005). |
 
 4. **Run Evidence gate (spike only):**
    1. Both `hypothesis.md` and `findings.md` must be complete per `pf-size-tiers`'s "Stage completion" criterion. If not, stop: "Spike is not ready to close: <missing document>. Run /pf-idea-spike first."
@@ -115,7 +115,7 @@ For feat/improve/bug: Proceed to Phase 4. For `TYPE: spike`: Proceed to Phase 3.
 
 **Applies only to `TYPE: spike`** (`NO-REPO` is unreachable for spike — see Phase 0's type table). Runs between Phase 3 and Phase 4, and **replaces Phase 4 entirely** for this TYPE — do not also run Phase 4 for a spike.
 
-1. If the current branch is `issue/<spike-id>`, switch to PARENT-BRANCH (already determined by Phase 3), **without** `git merge`.
+1. Switch to PARENT-BRANCH (already determined by Phase 3) **unconditionally**, **without** `git merge` — regardless of which branch the session currently occupies (PARENT-BRANCH itself, `issue/<spike-id>`, or any other branch). This guarantees the copy in step 2 below, the archive in Phase 5, and the commit in Phase 8 all land on PARENT-BRANCH even when `/pf-close` was invoked from a foreign branch (CR-005) — never on whatever branch the session happened to be standing on.
 2. If the branch `issue/<spike-id>` exists (check with `git branch --list`), run `git checkout issue/<spike-id> -- docs/issues/open/<spike-id>`. This copies only the issue folder's contents from the spike branch onto the current branch (PARENT-BRANCH), touching nothing outside that folder. This is a staged change, not a commit — it is committed by the ordinary Phase 8.
 3. If the branch does not exist (the experiment never required code), skip this step — the documents are already on PARENT-BRANCH.
 4. The `issue/<spike-id>` branch, if it exists, is **never merged and never deleted** — not here, and not anywhere else in `pf-close`. Nothing in this file should run `git merge issue/<spike-id>` or `git branch -d issue/<spike-id>`.

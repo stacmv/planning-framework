@@ -22,7 +22,8 @@ final human gate per issue"). Every point below where an interactive skill
 would normally stop and ask — an ambiguous disposition, a persona that never
 recovers, a stale `critique.md` on disk — instead takes the recommended
 action automatically and records `[assumed]` in `open_questions.md`
-(`specs.md` §6.9 shape, `~/.claude/skills/pf-interaction/SKILL.md` step 2),
+(shape per `~/.claude/skills/pf-interaction/SKILL.md`'s "`open_questions.md`
+row schema (canonical)", step 2 of the same skill's "Front-loaded rule"),
 then continues without stopping.
 
 **Idempotency.** If `critique.md` already exists, judge it against
@@ -154,7 +155,8 @@ four or a tier-specific optional extension:
   Summary Table for this persona's absence with `Disposition: Риск принят`
   (default — insufficient data for any other assessment) and `Reflected in:
   open_questions.md #N`. Log the row in `open_questions.md` as an `[assumed]`
-  entry, e.g. (shape per `specs.md` §6.9):
+  entry, e.g. (shape per `~/.claude/skills/pf-interaction/SKILL.md`'s
+  "`open_questions.md` row schema (canonical)"):
 
   | # | Raised by | Question | Assumed answer | Why | Used in | Status |
   |---|---|---|---|---|---|---|

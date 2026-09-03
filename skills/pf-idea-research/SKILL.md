@@ -97,8 +97,8 @@ frontmatter) and `idea.md`.
    `Manual` row without a `Manual reason:` prefix.)
 4. For every `не проверено` row, additionally append one row (one row per
    fact, not a paraphrase) to `docs/issues/open/[ISSUE-ID]/open_questions.md`,
-   using the schema in `specs.md` §6.9 (this issue's own spec — the shared
-   `open_questions.md` format). If the file does not exist yet, create it with
+   using the schema in `~/.claude/skills/pf-interaction/SKILL.md`
+   ("`open_questions.md` row schema (canonical)"). If the file does not exist yet, create it with
    header `# Open Questions — [ISSUE-ID]` plus the table header row (this
    skill may be the first stage with something to log, per
    `~/.claude/skills/pf-interaction/SKILL.md`'s "created lazily" note);

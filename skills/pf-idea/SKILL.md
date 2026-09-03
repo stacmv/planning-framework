@@ -85,8 +85,8 @@ would convince you: project" criterion — and `idea_tier`.
    (e.g. a market-size estimate for a `product` idea's TAM/SAM/SOM) — **never
    invent it and never ask the user**: write an `[assumed]` row to
    `docs/issues/open/[ISSUE-ID]/open_questions.md`, using the schema in
-   `specs.md` §6.9 (this issue's own spec — the shared `open_questions.md`
-   format), with `Raised by: pf-idea` and `Status: assumed`, carrying the best
+   `~/.claude/skills/pf-interaction/SKILL.md` ("`open_questions.md` row
+   schema (canonical)"), with `Raised by: pf-idea` and `Status: assumed`, carrying the best
    guess and its reasoning. If the file does not exist yet, create it with
    header `# Open Questions — [ISSUE-ID]` plus the table header row (this may be
    the first stage with something to log, per

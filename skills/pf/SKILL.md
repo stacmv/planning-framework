@@ -38,7 +38,28 @@ Compute two booleans, **freshly, on every single `/pf` invocation** — never ca
 2. Create `docs/issues/{open,closed}/` and `docs/planning/`.
 3. Write `.pf-version` with the value of the `version:` field from the installed `~/.claude/skills/pf/SKILL.md`'s YAML frontmatter (read it fresh here) — **not** `PF_VERSION` from `converge-to-v3.sh`, which an installed skill has no access to. These are two independent literals that require manual sync when either is bumped.
 4. Copy `~/.claude/skills/pf/templates/project/config/PLANNING.md` → `./PLANNING.md`, substituting `[Project Name]` with the current directory's name.
-5. Create/append `CLAUDE.md` with the marker block `<!-- pf:begin -->…<!-- pf:end -->`, body from `~/.claude/skills/pf/templates/project/config/CLAUDE.md`, rendered the same way. In a genuinely empty folder, `CLAUDE.md` doesn't exist yet — just create it with this block.
+5. Create/append `CLAUDE.md` with the marker block `<!-- pf:begin -->…<!-- pf:end -->`, body from `~/.claude/skills/pf/templates/project/config/CLAUDE.md`, rendered the same way. In a genuinely empty folder, `CLAUDE.md` doesn't exist yet — just create it with this block. **Also create `AGENTS.md`** in the project root — but only if it doesn't already exist (never touch a pre-existing one; it may belong to other tooling and isn't ours to overwrite or append to). Codex builds its project context from `AGENTS.md`, not `CLAUDE.md` — without this file, a project scaffolded by this branch is invisible to a Codex session even though `CLAUDE.md` was just written. Write it as a short provider-neutral pointer at the just-created `CLAUDE.md`, not a duplicate of its body:
+
+   ```markdown
+   # Agent instructions
+
+   See `CLAUDE.md` in this directory for the complete Planning Framework v3.0
+   setup and pipeline. This file exists so agents that build project context
+   from `AGENTS.md` rather than `CLAUDE.md` (for example Codex) find the same
+   instructions.
+   ```
+
+   Scope this pointer honestly: it closes only the project-context *discovery*
+   gap — a Codex session finding framework instructions at all. It does not
+   make the rest of the framework run under Codex — `CLAUDE.md`'s own content
+   still assumes a Claude Code session (`/pf`, `AskUserQuestion`, the `Agent`
+   tool, literal `~/.claude/skills/...` paths, and more) and none of that is
+   fixed by adding `AGENTS.md`. **Known residual, accepted as out of scope for
+   this task:** `make converge`/`converge-to-v3.sh` is not updated to create
+   `AGENTS.md` for an *existing* project topped up through that path — only
+   this Step 0 "project, right away" branch gets it. Extending the scaffold
+   templates and `converge-to-v3.sh` accordingly is future work, not done
+   here.
 6. Copy `~/.claude/skills/pf/templates/project/global/*.md` → `docs/planning/*.md`, skipping any target file that already exists (in a fresh folder, none do).
 7. Mirror `~/.claude/skills/pf/templates/project/` → `docs/planning/templates/`.
 8. Skip the "reinstall skills/shim" steps — `/pf` is already the installed skill; there is nothing to reinstall.

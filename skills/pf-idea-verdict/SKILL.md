@@ -247,7 +247,9 @@ one afterward). The user picks one row and gives a new answer as free text.
    column — do not delete it. Update its `Assumed answer` cell in place to
    keep both answers visible for audit: `~~<original answer>~~ → <new
    answer>`. This is the one field in the framework allowed to be edited
-   after the fact (`specs-part2.md` §6.9 of this issue).
+   after the fact (`~/.claude/skills/pf-interaction/SKILL.md`'s
+   "`open_questions.md` row schema (canonical)", the "mixed append/edit
+   mode" note).
 6. **Recompute the recommended verdict from scratch**, applying Mode 1's
    task in full to the now-updated material, and update `verdict.md`'s "##
    Recommended Verdict" / "## Reasoning" / "## Return Conditions" / "##

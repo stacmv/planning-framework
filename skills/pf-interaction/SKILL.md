@@ -157,13 +157,68 @@ from scratch.
    "reply with the number or the exact option text".
 2. **Pending-state — exact marker, where it lives.** Before printing the
    question, write a marker line into the document (not session memory):
-   `<!-- pf-pending-interaction: <stage-key> | options: <opt1>|<opt2>|... |
-   asked: <ISO-timestamp> -->`, inserted into `verdict.md` immediately
-   before "## Decision" (decision session), or into `open_questions.md` as
-   its own line (final gate at front-loaded `pf-close`'s Phase 1 — no
-   "## Decision" analog exists there). At most one open marker per
-   interactive point — a new question for the same point replaces it, never
-   duplicates it.
+   `<!-- pf-pending-interaction: stage=<stage-key> step=<step> options=
+   <opt1>|<opt2>|... selected=<selected-object|-> asked=<ISO-timestamp>
+   status=<open|resolved:<answer>> -->`. Placement:
+   - `verdict.md` (decision session, `stage=decision-session`) — the marker
+     is **not** placed "immediately before `## Decision`": Mode 2 runs
+     exactly when that heading is absent — it is Mode 2's own eventual
+     output, not a precondition (`pf-idea-verdict` Режим 2 — "## Decision
+     is never written in this mode" applies equally to Mode 2 while a
+     question is still pending). Append the open marker as `verdict.md`'s
+     last line instead; once resolved (item 4 below), "## Decision" is
+     appended after it in the normal way, and the marker line is rewritten
+     in place, not moved.
+   - `open_questions.md` (final gate at front-loaded `pf-close`'s Phase 1,
+     `stage=final-gate`) — its own line, unchanged from before.
+   - the intake draft (`stage=intake`) — see item 5 below for where that
+     document lives and when it is created; the marker lives inside it, not
+     in the eventual `prompt.md`.
+
+   At most one open marker per interactive point (`stage`+document pair) — a
+   new question for the same point replaces it in place, never duplicates
+   it.
+
+   **Closed state schema — every field the marker must carry:**
+   - `stage` — exactly one of `intake` | `decision-session` | `final-gate`
+     (the three interactive points this contract's opening paragraph and
+     "One final human gate per issue" above enumerate — no fourth value).
+   - `step` — position within that stage, so a resumed session knows
+     exactly where it stopped, not merely that something is pending:
+     - `intake` → `<batch>.<question>` (e.g. `1.2` = batch 1, question 2).
+       Batch/question counts and order are each issue TYPE's own fixed,
+       statically-defined sequence in `~/.claude/skills/pf/SKILL.md`'s
+       intake batches (e.g. idea's Batch 1 has 4 questions, Batch 2 has 3)
+       — not restated here, looked up via `step` on resume.
+     - `decision-session` / `final-gate` → one of `main` (the opening
+       question — confirm/choose-other/override, or Proceed/Override/Stop)
+       | `choose-other` (`decision-session` only — the second question
+       listing the remaining verdict values) | `override-select` (pick an
+       `open_questions.md` row with `Status: assumed`) | `override-answer`
+       (free-text new answer for the row picked in `override-select`). Both
+       stages share the same override sub-flow shape by design
+       (`final-gate` reuses `decision-session`'s "2. Override" by
+       reference, per `~/.claude/skills/pf-close/SKILL.md` Phase 1's
+       front-loaded gate text).
+   - `options` — unchanged from before: the same option vocabulary as the
+     structured question this line stands in for. Empty/omitted for
+     `override-answer` (free text, not a menu).
+   - `selected` — the object a multi-step sub-flow is already committed to,
+     `-` when there is none yet: the `open_questions.md` row number once
+     `step=override-select` resolves and `step=override-answer` becomes
+     pending — so a resumed session knows which row's free-text answer it
+     is still waiting for, without re-showing the row picker.
+   - `asked` — unchanged (ISO-timestamp of the current `step`).
+   - `status` — `open` while the current `step` is unanswered; see item 4
+     for its one closing transition.
+
+   Question text itself is never duplicated into the marker: for `intake`,
+   the wording is the fixed, statically-defined text of that batch/question
+   named by `step`; for `decision-session`/`final-gate`, it is already
+   fixed in the surrounding document text (the recommended verdict and its
+   reasoning, or the assumptions/open-questions ledger) exactly as item 4
+   already required. `step` plus that surrounding text is sufficient
+   context to reproduce the question verbatim without recomputing anything.
 3. **Answer parsing.** Normalize the reply (trim, lower-case, strip
    punctuation) and match it against (a) the option's number, (b) the
    option's exact text, (c) known synonyms of each option's first 1-2
@@ -171,15 +226,49 @@ from scratch.
    — re-ask the same question once, plain text: "Не понял ответ, выберите
    один из: …", without writing a new marker (`asked` is not updated).
 4. **Safe resumption.** A new Codex session for the same issue, on
-   re-reading the document, must check for an unresolved
-   `pf-pending-interaction` marker **before** any other action; if one is
-   found, re-show the same question (do not recompute the recommendation —
-   it is already fixed in the surrounding document text), and do not
-   restart the stage from scratch. A valid answer removes the marker (or
-   marks it `resolved: <answer>` — the implementation records which of the
-   two equivalent forms it uses), and then normal logic resumes (append
-   "## Decision", etc.) exactly as on the Claude path.
-5. The same protocol also covers the intake batch (pending-state lives in
-   the not-yet-committed `prompt.md` draft at that point — same principle:
-   state lives in the document, not session memory) — one mechanism for
-   both remaining interactive points under Codex, not only the final gate.
+   re-reading the document, must check for a `pf-pending-interaction`
+   marker with `status=open` **before** any other action; if one is found,
+   re-show the question at its recorded `step` (item 2's schema above — do
+   not recompute the recommendation, do not restart the stage from
+   scratch, do not re-ask a `step` already resolved). **Closing a marker —
+   exactly one strategy:** a valid answer that resolves the current `step`
+   never deletes the marker line; it rewrites `status=open` to
+   `status=resolved:<answer>` in place — the same in-place,
+   audit-preserving edit `open_questions.md`'s `Status` column already uses
+   on override (`~/.claude/skills/pf-idea-verdict/SKILL.md`'s "2. Override"
+   step 5), reused here for the same reason: the record of what was asked
+   and answered stays legible after the fact. When the resolved `step` is
+   not the stage's last one (e.g. `override-select` just resolved and
+   `override-answer` is next), the same rewrite also advances `step` to the
+   next one and sets `status=open` again with `selected` filled in, rather
+   than being removed — the marker line is retired only when its stage
+   fully completes (item 5 covers the one case, `intake`, where that also
+   means the document holding it is retired). Once a marker reads
+   `status=resolved:<answer>` for a stage's last `step`, normal logic
+   resumes exactly as on the Claude path (append "## Decision", etc.).
+5. **Intake (`stage=intake`).** The same protocol also covers the intake
+   batch — pending-state lives in a draft document, not session memory, on
+   the same principle as items 2-4 above. The eventual issue folder name is
+   only decided once its slug is known, and the slug is itself derived from
+   an answer gathered *during* intake (`~/.claude/skills/pf/SKILL.md`'s
+   Idea/Spike branches — "a short kebab-case slug from the idea's topic,
+   decided when `prompt.md` is written"), so the draft cannot start life at
+   the final `docs/issues/open/<issue-id>/prompt.md` path — that path does
+   not exist yet when the first question is asked. Fix the moment and the
+   path: **before** printing intake's first question (batch 1, question 1),
+   create `docs/issues/open/.pf-intake-draft-<type>.md` (`<type>` = `idea`
+   | `spike` | `feat` | `improve` | `bug` — already known before any
+   question is asked; at most one draft per `<type>` open at a time, the
+   same one-open-marker-per-point rule from item 2 applied here to a
+   concurrently-running intake). Each answered question is appended into
+   this draft as it comes in, and the `pf-pending-interaction` marker
+   (`stage=intake`) lives inside it, advanced per item 4 as each question
+   resolves. Once the whole intake batch's last `step` resolves and the
+   slug is known, the draft's accumulated content (its answered-question
+   body, not the now-resolved marker line) becomes the real `prompt.md`
+   written to `docs/issues/open/<issue-id>/prompt.md` — the ordinary write,
+   unchanged — and `.pf-intake-draft-<type>.md` is deleted: this is the one
+   case where retiring a fully-resolved marker's document is expected
+   (item 4), because the draft is a transient stand-in for `prompt.md`, not
+   the pipeline's permanent record of the intake answers — `prompt.md`
+   itself is that record from this point on.
