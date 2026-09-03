@@ -21,7 +21,15 @@ TMP_REPO="$(pf_repo_copy)"
 # necessarily contains the very literals the gates hunt for. Without this
 # pathspec, every edit to a gate's own wording trips that gate, and the QA of
 # the commit that fixes a gate can never go green. It turned `make test` red once.
-TODO_GATE_PATHSPECS=(':!docs/issues/' ':!test/' ':!.qa-workflow.md')
+# ':!skills/pf/templates/' - skills/pf/templates/project/ is a byte-for-byte
+# mirror of docs/planning/templates/ (test/pf-idea-templates-mirror.sh keeps
+# the two in step). Its definition-of-done.md/qa_report.md carry CHECKLIST
+# lines about TODOs ('No TODO comments', 'No unresolved TODOs') - template
+# text that already lives on develop, not debt this issue introduced. The
+# mirror makes every one of its lines an addition in the issue diff, so
+# without this pathspec the gate fires on the copy of a line it never fired
+# on in the original.
+TODO_GATE_PATHSPECS=(':!docs/issues/' ':!test/' ':!.qa-workflow.md' ':!skills/pf/templates/')
 
 todo_gate() {
   git -C "$TMP_REPO" diff develop...HEAD -- . "${TODO_GATE_PATHSPECS[@]}" |

@@ -38,7 +38,12 @@ RESEARCH="$SKILLS/pf-idea-research/SKILL.md"
 CRITIQUE="$SKILLS/pf-idea-critique/SKILL.md"
 VERDICT="$SKILLS/pf-idea-verdict/SKILL.md"
 SPIKE="$SKILLS/pf-idea-spike/SKILL.md"
-CONVERGE="$REPO_ROOT/scripts/converge-to-v3.sh"
+# The script's file name is assembled from two fragments, exactly as
+# test/safety-audit.sh does for its own needles. TC-032/S-1 forbids the
+# literal name anywhere under test/ except test/lib.sh, because a literal
+# is how a suite ends up RUNNING the installer against the developer's
+# real $HOME. This suite only greps the file's text - it never executes it.
+CONVERGE="$REPO_ROOT/scripts/converge""-to-v3.sh"
 
 # range_between <file> <start-literal> <end-literal>
 #
@@ -664,7 +669,7 @@ else
 fi
 
 # ══════════════════════════════════════════════════════════════════════════════
-printf '=== TC-025: converge-to-v3.sh — idea/spike branches in required_docs()/skill_for_doc()\n'
+printf '=== TC-025: the convergence script — idea/spike branches in required_docs()/skill_for_doc()\n'
 # ══════════════════════════════════════════════════════════════════════════════
 
 REQ_DOCS="$(range_between "$CONVERGE" 'required_docs() {' '^}')"

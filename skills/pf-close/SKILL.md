@@ -91,7 +91,7 @@ Proceed to Phase 3.
    - Otherwise set PARENT-BRANCH to `main`.
 3. **`TYPE: idea` only (no `NO-REPO`):** run `git checkout PARENT-BRANCH` right here — the same checkout Phase 4's step 1 does for feat/improve/bug, but with no following `git merge` (idea never merges anything). This puts the branch idea will be archived from into the right state for Phase 5 (`mv`) and Phase 8 (archive commit). (`TYPE: spike` gets its own checkout as part of Phase 3.5 below — no duplicate step needed here.)
 
-Proceed to Phase 4 for feat/improve/bug; Phase 3.5 for `TYPE: spike`; Phase 4.5 for `TYPE: idea` (Phase 3.5/4 do not apply to idea — idea never merges).
+For feat/improve/bug: Proceed to Phase 4. For `TYPE: spike`: Proceed to Phase 3.5. For `TYPE: idea`: Proceed to Phase 4.5 (Phase 3.5 and Phase 4 do not apply to idea — idea never merges).
 
 ---
 
