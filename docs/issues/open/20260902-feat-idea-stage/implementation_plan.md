@@ -1562,8 +1562,8 @@ TC-019, TC-021, TC-022, TC-023, TC-024, TC-025, TC-026, TC-027
   задокументировано в Task 20).
 
 **Acceptance Criteria:**
-- [ ] TC-008 passes (частично — параллель с decision session, ссылка на pf-close Phase 1)
-- [ ] TC-019 passes (частично — новый опциональный вопрос как единственный источник поля для feat/improve/bug)
+- [x] TC-008 passes (частично — параллель с decision session, ссылка на pf-close Phase 1)
+- [x] TC-019 passes (частично — новый опциональный вопрос как единственный источник поля для feat/improve/bug)
 - [ ] TC-020 passes (частично — `pf-close` Phase 1 сайт; полное прохождение требует Task 20)
 
 ---

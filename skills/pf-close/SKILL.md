@@ -39,9 +39,19 @@ Run all checks in order. Stop immediately if any check fails.
 
 ## Phase 1: Confirm with User
 
-**Skip this entire phase for `TYPE: idea`** — the confirmed `## Decision` in `verdict.md` (already checked by Phase 0's branch check) is already the confirmation to close; asking "Proceed? (yes/no)" here would be a second confirmation for one decision session (see `pf-interaction` — one final human gate per issue). Proceed directly to Phase 2 (or, under `NO-REPO`, directly to Phase 4.6). For `TYPE: spike`, this phase is unchanged in substance — spike has no separate decision session, so this Phase 1 confirmation **is** the single final human gate — but the summary text below differs (see the `TYPE: spike` variant). For feat/improve/bug, unchanged.
+**Skip this entire phase for `TYPE: idea`** — the confirmed `## Decision` in `verdict.md` (already checked by Phase 0's branch check) is already the confirmation to close; asking "Proceed? (yes/no)" here would be a second confirmation for one decision session (see `pf-interaction` — one final human gate per issue). Proceed directly to Phase 2 (or, under `NO-REPO`, directly to Phase 4.6). For `TYPE: spike`, this phase is unchanged in substance — spike has no separate decision session, so this Phase 1 confirmation **is** the single final human gate — but the summary text below differs (see the `TYPE: spike` variant). For feat/improve/bug, unchanged **unless** `prompt.md`'s `interaction` field resolves to `front-loaded` (`~/.claude/skills/pf-interaction/SKILL.md`, "Front-loaded rule") — see "Front-loaded final decision gate" below. Without that field (the default — absent, `interaction: interactive`, or any value other than literally `front-loaded`), this Phase is exactly the plain summary and yes/no confirmation documented next, unchanged.
 
-Show the following summary and wait for explicit user confirmation before proceeding:
+**Front-loaded final decision gate (feat/improve/bug only, AC-12d).** If `prompt.md`'s `interaction` field resolves to `front-loaded`, this Phase is this issue's one final human gate — the same role the decision session plays for `idea`/`spike` (`~/.claude/skills/pf-interaction/SKILL.md`, "One final human gate per issue — not two"). Before showing the plain summary below, extend it instead of replacing it:
+
+1. **Show the full ledger first.** Read `open_questions.md` (it may not exist — see below) and print every `[assumed]` row and every `unverified-fact` row recorded across every stage this issue ran through, one batch, the same shape as `pf-idea-verdict`'s decision session batch (its "1. One batch" section): each row legible on its own — `<question> → <assumed answer> — <why> (#<N>)` for `assumed` rows, the same format minus the assumed answer for `unverified-fact` rows — not merely a count. If `open_questions.md` does not exist for this issue (no hook site ever needed it), show an empty ledger, not an error — the same lazy-creation rule that already governs this file for `idea`/`spike`.
+2. **Then show today's ordinary summary** (the "Ready to close ISSUE-ID... " block below, merge/archive/usage/session-log bullets) — after the ledger, not instead of it.
+3. **Offer three responses instead of the plain yes/no:**
+   - **Proceed** — close as-is, every assumption stands; continue to Phase 2 exactly as today.
+   - **Override an assumption** — pick one `open_questions.md` row with `Status: assumed` and give a new answer. Regenerate only the sections its `Used in` field names, and invalidate/re-check the rest of this issue's own document tail (this issue's own pipeline order — e.g. `brd.md → specs.md → test_plan.md → implementation_plan.md` [+ code, where applicable] — the same "canonical pipeline order, invalidate the whole tail" discipline `pf-idea-verdict`'s "2. Override" section already documents for `idea`, reused here by reference, not restated). Re-run `/pf-check` on every document this invalidated before this gate can be shown again (same `[pf-check OPEN]` marker mechanism), then return to step 1 above with the refreshed ledger.
+   - **Stop** — cancel close, same as today's "no".
+4. **A confirmed Proceed is this issue's recorded final confirmation** — proceed with Phase 2 onward exactly as today.
+
+Show the following summary and wait for explicit user confirmation before proceeding (front-loaded issues show this after the ledger above, as step 2; issues without `interaction: front-loaded` show only this, as today):
 
 ```
 Ready to close ISSUE-ID.
@@ -61,7 +71,9 @@ Proceed? (yes/no)
 
 **`TYPE: spike` variant** — replace the "Merge issue/ISSUE-ID into <parent-branch> with --no-ff" line with: "Copy docs/issues/open/ISSUE-ID/ from issue/ISSUE-ID to <parent-branch> — code stays on issue/ISSUE-ID, never merged or deleted". The rest of the summary is unchanged.
 
-If the user does not confirm (answers no or anything other than yes), stop: "Close cancelled. No changes made."
+**Front-loaded issues (`interaction: front-loaded`):** the closing "Proceed? (yes/no)" line above is replaced by the three-option prompt from step 3 above (Proceed / Override an assumption / Stop) — do not ask plain yes/no on top of it, this is the same single confirmation, not a second one.
+
+If the user does not confirm (answers no or anything other than yes — or, for a front-loaded issue, chooses Stop), stop: "Close cancelled. No changes made."
 
 To resume:
 1. Make whatever changes prompted you to answer no.
