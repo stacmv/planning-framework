@@ -486,7 +486,7 @@ Taken when the new issue's type is `spike` — reached only via Step 3's "Run a 
 
 **Spike intake batch — the same shape as the idea branch: two `AskUserQuestion` calls, at most 4 questions each:**
 - **Batch 1** (4 questions): Question (what's being tested); Success Criterion (as the user states it); Time-box (how much time/effort is budgeted); Method (how it will be tested).
-- **Batch 2** (up to 3 questions): Constraints (optional); Out of Scope (optional); Decision Rights (what the AI may decide on its own without asking).
+- **Batch 2** (up to 4 questions): `idea_tier` (`personal`/`infra`/`content`/`product` — one-line descriptions from `~/.claude/skills/pf-idea-lenses/SKILL.md` §1, recommending based on the topic if it's obvious, otherwise no default — same dictionary as the idea branch, affects only `hypothesis.md`/`findings.md` budgets, not lenses/personas); Constraints (optional); Out of Scope (optional); Decision Rights (what the AI may decide on its own without asking).
 
 **No bare-folder carve-out for spike.** Unlike the Idea branch, there is no bare-folder entry to carve out here at all: Step 0's "An idea" answer only ever produces `type: idea`, never `type: spike` (see above), so a `spike` issue is never created in a folder where `has_pf` is false. Role assignment and the `on_unavailable` question are therefore **always** asked for a spike issue — never skipped the way the idea branch's bare-folder carve-out skips them.
 

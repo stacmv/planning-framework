@@ -99,17 +99,20 @@ currently on (Mode 1 never creates a branch). Next step:
 2. **If yes — same Branch Setup as `~/.claude/skills/pf-execute/SKILL.md`'s
    Phase 0**, referenced by name (not restated here), with `<spike-id>` in
    place of `ISSUE-ID` throughout: create/checkout `issue/<spike-id>`. Run
-   the experiment on that branch. Commit the experiment's code with a plain
-   `git add -A && git commit` — **do not push yet**; the push happens once,
-   at the end of this stage, via "Close Mode 2" below, on this same branch.
+   the experiment on that branch. This requires the orchestrating session to
+   have a shell-command-execution capability (Claude Code: `Bash`) — commit
+   the experiment's code with a plain `git add -A && git commit` through
+   that capability — **do not push yet**; the push happens once, at the end
+   of this stage, via "Close Mode 2" below, on this same branch.
    `findings.md` is written on this branch too, not on the parent branch —
    this is the copy `/pf-close`'s spike path later reads back onto the
    parent (specs-part1.md §3.6, п.2 / §7.3.2).
 
-3. **If no — run the experiment directly in this session** (e.g. `WebFetch`
-   against real, live documentation/an API), no branch created. `findings.md`
-   is written wherever this session already is (usually the parent branch,
-   if this spike never created a branch).
+3. **If no — run the experiment directly in this session**, using whatever
+   network-access capability the orchestrating session has (Claude Code:
+   `WebFetch`/`WebSearch`) against real, live documentation/an API, no
+   branch created. `findings.md` is written wherever this session already
+   is (usually the parent branch, if this spike never created a branch).
 
 4. **Write gate (AC-09c) — the same discipline `research.md` applies to its
    Source requirement (specs-part1.md §3.3, п.3).** `pf-idea-spike` does
@@ -152,10 +155,11 @@ blocked on X", etc.>
 
 Steps 1-3 (the code-need judgment, branch mechanics, and running the
 experiment itself) always happen in this session, regardless of the
-resolved `findings` write actor — the write-invocation form
-(`pf-roles` §7, `task ... --write`) has no `Bash`/`WebFetch` access, the
-same reason `pf-brd`/`pf-spec`'s clarifying-question loops always run in
-session even when the document's write is delegated. Once `## Run Evidence`
+resolved `findings` write actor — the write-invocation form (`pf-roles` §7,
+`task ... --write`) has no shell-command-execution or network-access
+capability (Claude Code: `Bash`/`WebFetch`), the same reason
+`pf-brd`/`pf-spec`'s clarifying-question loops always run in session even
+when the document's write is delegated. Once `## Run Evidence`
 exists, **resolve role** for the `findings` key per `pf-roles` §4 and write
 the document itself the same three ways as Mode 1 above (direct / non-default
 tier via `Agent` dispatch / delegated write per §7) — for a delegated write,

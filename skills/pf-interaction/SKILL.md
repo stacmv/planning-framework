@@ -12,9 +12,12 @@ This is the single point of definition for front-loaded mode — read by both th
 feat/improve/bug (where it is the optional `interaction: front-loaded` field in
 `prompt.md`, default: today's interactive behavior). The full list of hook sites
 that read this rule for feat/improve/bug lives in `specs.md` §7.13 for this
-issue; the exact `open_questions.md` row format shared by both applications lives
-in `specs.md` §6.9. Here — the rule itself, referenced by name from every hook
-site.
+issue (a development-time record of which existing skills were edited — not
+something read at runtime). The exact `open_questions.md` row format shared by
+both applications is defined below, in this skill — the canonical copy an
+installed project actually carries (`specs.md` is this issue's own spec and is
+never shipped to user projects). Here — the rule itself, referenced by name
+from every hook site.
 
 ## Front-loaded rule
 
@@ -32,11 +35,51 @@ site.
 >    "add your recommendation (with reason why) below the options"
 >    практически везде в текущих скиллах).
 > 2. Записать строку в `open_questions.md`:
->    `[assumed] <вопрос> → <взятый ответ> — <почему>` (точный формат
->    `specs.md` §6.9; этот файл появляется лениво, первым пишущим
->    скиллом/стадией, которой есть что в него записать — он не создаётся
->    этой задачей заранее).
+>    `[assumed] <вопрос> → <взятый ответ> — <почему>` (точная схема строки —
+>    см. "`open_questions.md` row schema (canonical)" ниже; этот файл
+>    появляется лениво, первым пишущим скиллом/стадией, которой есть что в
+>    него записать — он не создаётся этой задачей заранее).
 > 3. Продолжить стадию с этим ответом, не останавливаясь.
+
+## `open_questions.md` row schema (canonical)
+
+This is the canonical definition of the `open_questions.md` row format,
+shared by every stage that writes `[assumed]`/`unverified-fact` rows (both
+front-loaded applications above). It lives here — inside `skills/`, the only
+tree copied into an installed project — not in `specs.md` §6.9, which is this
+issue's own spec and is never shipped.
+
+```markdown
+# Open Questions — <ISSUE-ID>
+
+| # | Raised by | Question | Assumed answer | Why | Used in | Status |
+|---|---|---|---|---|---|---|
+| 1 | pf-idea | Какой объём рынка у идеи? | Не оценивается численно — нет данных на intake | Оценка TAM без источника была бы выдумкой | idea.md §MVP | assumed |
+| 2 | pf-idea-research | Есть ли лицензионные ограничения у аналога X? | (нет — не проверено, не допущение) | Официальный прайсинг не найден за разумное время поиска | research.md (Facts #4) | unverified-fact |
+| 3 | pf-idea-critique | Как реагировать на возражение техлида про масштабирование? | Риск принят — MVP не требует масштабирования | critique.md's диспозиция не дала однозначного ответа без дополнительного контекста | verdict.md §Reasoning | assumed |
+```
+
+**Columns:**
+- **Raised by** — the stage/skill that produced the row.
+- **Question** — the question as phrased, the same way it would have been
+  asked in interactive mode.
+- **Assumed answer** — the taken answer; for `unverified-fact` rows —
+  literally `(нет — не проверено, не допущение)`, since this is not an
+  assumption but an explicitly unresolved fact (AC-03d distinguishes the two
+  cases).
+- **Why** — the reasoning behind the choice (for `assumed`) or the reason it
+  could not be verified (for `unverified-fact`).
+- **Used in** — document + section where the row is used — a mandatory
+  field; point-fix regeneration on override is built on it. May list several
+  `document §section` pairs, separated by `;`.
+- **Status** — `assumed` \| `unverified-fact` \| `overridden` \| `resolved`.
+  `overridden` rows are never deleted — the new answer is appended alongside
+  the old one, in place (audit trail).
+
+The file is **append-only for new rows**, but an existing row's
+`Status`/`Assumed answer` may be updated in place on override — the one
+field in the framework with this mixed append/edit mode (`session-log.md`,
+by contrast, is purely append-only — never edits existing rows).
 
 ## One final human gate per issue — not two
 

@@ -1787,9 +1787,9 @@ TC-019, TC-021, TC-022, TC-023, TC-024, TC-025, TC-026, TC-027
   `pf-idea-lenses` §1; ссылаться на него, не дублировать (TC-015).
 
 **Acceptance Criteria:**
-- [ ] TC-007 passes (лимит вопросов в батче не превышен)
-- [ ] TC-015 passes (словарь `idea_tier` не продублирован)
-- [ ] Прямо созданный spike-issue получает `prompt.md` с непустым `idea_tier`
+- [x] TC-007 passes (лимит вопросов в батче не превышен)
+- [x] TC-015 passes (словарь `idea_tier` не продублирован)
+- [x] Прямо созданный spike-issue получает `prompt.md` с непустым `idea_tier`
 
 ---
 
@@ -1811,8 +1811,8 @@ TC-019, TC-021, TC-022, TC-023, TC-024, TC-025, TC-026, TC-027
   автоматический follow-up) обязаны давать `prompt.md` одной и той же формы.
 
 **Acceptance Criteria:**
-- [ ] TC-031 passes
-- [ ] Follow-up спайка, порождённый вердиктом `spike-first`, несёт непустой
+- [x] TC-031 passes
+- [x] Follow-up спайка, порождённый вердиктом `spike-first`, несёт непустой
       `idea_tier`, унаследованный от исходной идеи
 
 ---
@@ -1838,9 +1838,9 @@ TC-019, TC-021, TC-022, TC-023, TC-024, TC-025, TC-026, TC-027
   осознанное решение, чинится способ выхода из неё, а не она сама.
 
 **Acceptance Criteria:**
-- [ ] TC-013 passes
+- [x] TC-013 passes
 - [ ] TC-014 — manual, per test_plan.md (живой прогон override)
-- [ ] После override каждый инвалидированный документ можно перепроверить и
+- [x] После override каждый инвалидированный документ можно перепроверить и
       закрыть, не редактируя `session-log.md` руками
 
 ---
@@ -1866,9 +1866,13 @@ TC-019, TC-021, TC-022, TC-023, TC-024, TC-025, TC-026, TC-027
   любая, от которой зависит поведение у потребителя, — тот же дефект.
 
 **Acceptance Criteria:**
-- [ ] TC-008 passes
+- [x] TC-008 passes
 - [ ] Схема строк `open_questions.md` определена внутри `skills/`, и ни один
       установленный скилл не зависит от `specs.md` этого issue ради поведения
+      (частично: канонизировано в `pf-interaction`; `pf-idea`,
+      `pf-idea-critique`, `pf-idea-research`, `pf-idea-verdict` всё ещё
+      ссылаются на `specs.md` §6.9 за той же схемой — вне зоны записи этой
+      задачи, см. сводку)
 
 ---
 
@@ -2026,10 +2030,50 @@ TC-019, TC-021, TC-022, TC-023, TC-024, TC-025, TC-026, TC-027
   возможностей, а не строгость гейта.
 
 **Acceptance Criteria:**
-- [ ] TC-018 passes
+- [x] TC-018 passes
 - [ ] TC-029 — manual, per test_plan.md
-- [ ] Ни одна обязательная инструкция `pf-idea-spike` не требует инструмента,
+- [x] Ни одна обязательная инструкция `pf-idea-spike` не требует инструмента,
       названного provider-specific именем, без provider-neutral формулировки
+
+---
+
+
+#### Task 34: Убрать оставшиеся поведенческие ссылки на `specs.md` §6.9 (CR-004, вторая половина)
+
+**Task Type:** code
+**Mapped Test Cases:** TC-008, TC-009, TC-010, TC-011
+
+**Files:**
+- `skills/pf-idea/SKILL.md` - правка: ссылка на схему `open_questions.md`
+- `skills/pf-idea-research/SKILL.md` - правка: то же
+- `skills/pf-idea-critique/SKILL.md` - правка: то же (два места)
+- `skills/pf-idea-verdict/SKILL.md` - правка: то же
+
+**Implementation Notes:**
+- Task 28 перенесла каноническую схему строки `open_questions.md` в
+  `skills/pf-interaction/SKILL.md` (раздел «`open_questions.md` row schema
+  (canonical)»), но её исполнитель обнаружил, что тот же дефект остался ещё
+  в пяти местах четырёх других скиллов, и честно пометил свой критерий
+  приёмки выполненным лишь частично. Найденные места:
+  `pf-idea/SKILL.md:88`, `pf-idea-research/SKILL.md:100`,
+  `pf-idea-critique/SKILL.md:25` и `:157`, `pf-idea-verdict/SKILL.md:244`.
+- Заменить каждую на ссылку по имени на раздел в `pf-interaction` — тем же
+  приёмом, каким остальные скиллы уже ссылаются на `pf-idea-lenses` и
+  `pf-size-tiers`. Номера строк проверять по факту, они могли сдвинуться.
+- Прогнать по всем семи новым скиллам поиск `specs.md`/`specs-part` и
+  убедиться, что не осталось ни одной ссылки, от которой зависит поведение
+  у потребителя установленного фреймворка. Ссылки dev-time характера (напр.
+  список hook-сайтов §7.13, который сами hook-сайты не читают) допустимы —
+  их отличать по признаку «нужна ли она, чтобы стадия отработала в проекте,
+  где `specs.md` этого issue отсутствует».
+
+**Acceptance Criteria:**
+- [ ] TC-008 passes
+- [ ] TC-009 passes
+- [ ] TC-010 passes
+- [ ] TC-011 passes
+- [ ] Ни один установленный скилл не зависит от `specs.md` этого issue ради
+      поведения — вторая половина критерия Task 28 закрыта
 
 ---
 

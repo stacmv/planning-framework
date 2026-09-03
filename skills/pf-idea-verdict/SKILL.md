@@ -57,7 +57,13 @@ every other stage).
   both the ordinary post-Mode-1 state (just written, check not run yet) and
   the post-override state (§3.5.2 below re-marked the tail `OPEN`) — in both
   cases the correct action is "wait for a fresh `PASSED`", not rewrite or
-  ask again.
+  ask again. **If reached via the post-override state**, do not stop at the
+  bare `/pf-check` next step — scan `session-log.md` for every other
+  `[pf-check OPEN]` marker left by the same override (`idea.md`/
+  `research.md`/`critique.md`, not only `verdict.md`) and report the full
+  ordered list exactly as §3.5.2 step 8 below does, each with its own
+  explicit `/pf-check <file>` command (CR-003) — a bare `/pf-check` alone
+  only ever re-checks `verdict.md`.
 
 ## Mode 1 — write `verdict.md`
 
@@ -255,10 +261,24 @@ one afterward). The user picks one row and gives a new answer as free text.
 8. **Stop here — do not loop back to "1. One batch" in this same run.**
    Report: every document marked `[pf-check OPEN]` above needs a fresh
    `PASSED` from `/pf-check` before the decision session can show again (the
-   "VERDICT + check OPEN after override" row of the stage table). Next step
-   to print: `/pf-check`. The user may come back and override another
-   `[assumed]` row in a later run of Mode 2, once all `OPEN` documents are
-   `PASSED` again and the batch reappears with the recomputed verdict/lists.
+   "VERDICT + check OPEN after override" row of the stage table). **List each
+   invalidated document individually, in canonical pipeline order** (`idea.md
+   → research.md → critique.md → verdict.md`, whichever subset step 4 marked
+   this run), with its own explicit command: `/pf-check <file>`
+   (`~/.claude/skills/pf-check/SKILL.md`'s explicit-TARGET argument — CR-003).
+   Do **not** print a bare `/pf-check` as the next step here: with no
+   argument it only ever re-picks the single most-recently-produced document
+   (`verdict.md`), and `research.md`/`critique.md` sit outside the stage
+   table's normal check gate entirely
+   (`~/.claude/skills/pf-idea-lenses/SKILL.md` §5, "Почему `/pf-check` только
+   после `idea.md` и после `verdict.md`") — so nothing would ever revisit
+   their `OPEN` marker without naming them explicitly here. Once every listed
+   document carries a fresh `PASSED` as its last marker, the user re-runs
+   `/pf-idea-verdict`, which re-enters this "Which mode runs" logic above and
+   reopens the decision session with the recomputed verdict/lists. The user
+   may come back and override another `[assumed]` row in a later run of
+   Mode 2, once all `OPEN` documents are `PASSED` again and the batch
+   reappears.
 
 ### 3. Confirmation (specs-part1.md §3.5.3 of this issue)
 
