@@ -1753,8 +1753,8 @@ TC-019, TC-021, TC-022, TC-023, TC-024, TC-025, TC-026, TC-027
   не пройден/провален (test_plan.md, Prerequisites).
 
 **Acceptance Criteria:**
-- [ ] `make test` зелёный (весь набор, включая три новых файла)
-- [ ] `scripts/install.sh`/`scripts/update-skills.sh` подтверждены
+- [x] `make test` зелёный (весь набор, включая три новых файла)
+- [x] `scripts/install.sh`/`scripts/update-skills.sh` подтверждены
       неизменными и рабочими для 28 директорий
 - [ ] TC-003 — manual, per test_plan.md
 - [ ] TC-029 — manual, per test_plan.md
