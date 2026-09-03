@@ -41,16 +41,20 @@ site.
 ## One final human gate per issue — not two
 
 > **Один финальный человеческий гейт на issue (G6/AC-03c/AC-12d) — не два.**
-> Для `idea`/`spike` этот гейт — сессия решения (`pf-idea-verdict` Режим 2).
+> Для `idea` этот гейт — сессия решения (`pf-idea-verdict` Режим 2).
+> Для `spike` отдельной сессии решения нет (пайплайн spike не производит
+> `verdict.md`), поэтому его единственный гейт — обычный `/pf-close`'s
+> Phase 1, сохраняемый без изменений по смыслу (US-09e).
 > Для front-loaded `feat`/`improve`/`bug` этот же гейт — расширенный
 > `/pf-close`'s Phase 1 ("Final decision gate"), показывающий тот же
 > ledger `[assumed]`/открытых вопросов, что и decision session, перед
 > обычным подтверждением закрытия. Ни для одного из четырёх типов эти два
-> гейта не удваиваются: `idea`/`spike` **не** проходят затем ещё и через
-> обычный `/pf-close` Phase 1 (Phase 1 для `TYPE: idea`/`spike`
-> пропускается целиком — подтверждённая "## Decision" уже и есть
-> подтверждение закрытия); front-loaded `feat`/`improve`/`bug` не получают
-> отдельной "decision session" сверх расширенного Phase 1.
+> гейта не удваиваются: `idea` **не** проходит затем ещё и через обычный
+> `/pf-close` Phase 1 (Phase 1 для `TYPE: idea` пропускается целиком —
+> подтверждённая "## Decision" уже и есть подтверждение закрытия); `spike`
+> не получает decision session сверх своего Phase 1; front-loaded
+> `feat`/`improve`/`bug` не получают отдельной "decision session" сверх
+> расширенного Phase 1.
 
 ## Exceptions for idea/spike — exactly one case
 

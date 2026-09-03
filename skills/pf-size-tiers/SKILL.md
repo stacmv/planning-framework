@@ -64,6 +64,17 @@ every prerequisite gate.
 | feat (small/medium/large) | CREATE → BRD (`brd.md`) → SPEC (`specs.md`) → TEST_PLAN → IMPL_PLAN (`implementation_plan.md`) → CODE_REVIEW (`code_review.md`) → TESTING → USER_DOCS (`user_docs.md`) → DEV_DOCS (`dev_docs.md`) → QA |
 | improve (small/medium/large) | CREATE → BRD → TEST_PLAN → IMPL_PLAN → CODE_REVIEW (`code_review.md`) → TESTING → USER_DOCS (`user_docs.md`) → DEV_DOCS (`dev_docs.md`) → QA |
 | bug (small/medium/large) | CREATE → ANALYSIS (`analysis.md`) → TEST_PLAN → IMPL_PLAN → CODE_REVIEW (`code_review.md`) → TESTING → USER_DOCS (`user_docs.md`) → DEV_DOCS (`dev_docs.md`) → QA |
+| `idea` (issue TYPE, not `size_tier` — see note below) | See `~/.claude/skills/pf-idea-lenses/SKILL.md`'s "Stage tables" (the `idea` table) — read live from there, not copied here. |
+| `spike` (issue TYPE, not `size_tier` — see note below) | See the same file's "Stage tables" (the `spike` table). |
+
+These two pipelines are keyed on issue TYPE (folder-name prefix `idea`-/
+`spike`-), not on any `size_tier` value — `idea`/`spike` issues never carry
+`size_tier` at all (see `pf-idea-lenses/SKILL.md`'s `idea_tier` instead).
+Unlike every other row in this table, these two rows do not restate the
+stage order inline — they point at `pf-idea-lenses/SKILL.md`, the single
+normative source. Conjunct 3 of "Stage completion" described earlier in
+this section, when evaluated for an `idea`/`spike` issue, reads the order
+from that file directly at evaluation time.
 
 **USER_DOCS and DEV_DOCS are formally-skippable stages**, present in every
 pipeline above — including `size_tier: trivial` — between TESTING and QA.
@@ -93,7 +104,11 @@ incomplete stage is TEST_PLAN, so its next step is `/pf-test-plan`, never
 - The criterion applies to **every** document of an issue, not to `test_plan.md`
   alone: `prompt.md`, `notes.md`, `brd.md`, `specs.md`, `analysis.md`,
   `test_plan.md`, `implementation_plan.md`, `code_review.md`,
-  `manual_test_checklist.md`, `user_docs.md`, `dev_docs.md`, `qa_report.md`.
+  `manual_test_checklist.md`, `user_docs.md`, `dev_docs.md`, `qa_report.md`,
+  `idea.md`, `research.md`, `critique.md`, `verdict.md`, `hypothesis.md`,
+  `findings.md`. `open_questions.md` is deliberately excluded from this
+  list — it is a side ledger, not a pipeline-stage document; see
+  `20260902-feat-idea-stage/specs.md` §5.6.
 - `user_docs.md`/`dev_docs.md` are the one exception to conjunct 1 above:
   when role resolution (`pf-roles` §4, level 3) yields
   `skip` for `roles.user_docs`/`roles.dev_docs`, that stage counts as

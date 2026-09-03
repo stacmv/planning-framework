@@ -808,9 +808,9 @@ runtime-зависимостей (npm-пакетов, языковых рант�
   закрытие idea/spike-issue.
 
 **Acceptance Criteria:**
-- [ ] TC-017 passes (частично — Phase 0/1/4.5; полное прохождение требует Task 11)
-- [ ] TC-027 passes (частично — обусловленность правок pf-close)
-- [ ] TC-032 passes
+- [x] TC-017 passes (частично — Phase 0/1/4.5; полное прохождение требует Task 11)
+- [x] TC-027 passes (частично — обусловленность правок pf-close)
+- [x] TC-032 passes
 
 ---
 
@@ -848,7 +848,7 @@ runtime-зависимостей (npm-пакетов, языковых рант�
   automigration ran this same invocation)».
 
 **Acceptance Criteria:**
-- [ ] TC-004 passes
+- [x] TC-004 passes
 
 ---
 
@@ -985,7 +985,7 @@ runtime-зависимостей (npm-пакетов, языковых рант�
   для feat/improve/bug (их `pf-close` не несёт добавку Phase 9).
 
 **Acceptance Criteria:**
-- [ ] TC-023 passes
+- [x] TC-023 passes
 
 ---
 
@@ -1041,9 +1041,9 @@ runtime-зависимостей (npm-пакетов, языковых рант�
   ветки без дублирования.
 
 **Acceptance Criteria:**
-- [ ] TC-016 passes (частично — pf-check-часть; Task 1 несёт таблицу бюджетов)
-- [ ] TC-021 passes
-- [ ] TC-033 passes (drift-guard часть — фикстура и транскрипция в Task 18)
+- [x] TC-016 passes (частично — pf-check-часть; Task 1 несёт таблицу бюджетов)
+- [x] TC-021 passes
+- [x] TC-033 passes (drift-guard часть — фикстура и транскрипция в Task 18)
 
 ---
 
@@ -1109,9 +1109,9 @@ runtime-зависимостей (npm-пакетов, языковых рант�
   списка — сквозной журнал, не документ стадии.
 
 **Acceptance Criteria:**
-- [ ] TC-022 passes
-- [ ] TC-024 passes
-- [ ] TC-027 passes (частично — эта задача покрывает pf-brd/pf-roles/pf-size-tiers; полная обусловленность проверяется Task 17 по всем шести изменённым общим скиллам)
+- [x] TC-022 passes
+- [x] TC-024 passes
+- [x] TC-027 passes (частично — эта задача покрывает pf-brd/pf-roles/pf-size-tiers; полная обусловленность проверяется Task 17 по всем шести изменённым общим скиллам)
 
 ---
 

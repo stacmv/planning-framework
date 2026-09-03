@@ -8,19 +8,38 @@ Determine the active issue from `docs/issues/open/`. If no issue folder is found
 
 Read ISSUE-ID from the active folder name (e.g. `docs/issues/open/20260630-feat-example/` → ISSUE-ID is `20260630-feat-example`).
 
+Extract TYPE from ISSUE-ID the same way `~/.claude/skills/pf/SKILL.md` Step 4 does (folder-name prefix); TYPE ∈ {feat, improve, bug, idea, spike}.
+
 ## Phase 0: Prerequisite Checks
 
 Run all checks in order. Stop immediately if any check fails.
 
-1. **QA report exists:** Check for `docs/issues/open/ISSUE-ID/qa_report.md`. If absent, stop: "QA report not found. Run /pf-qa first."
+1. **QA report exists** — only when TYPE is feat, improve, or bug; skipped entirely for idea/spike (neither type ever produces `qa_report.md`). Check for `docs/issues/open/ISSUE-ID/qa_report.md`. If absent, stop: "QA report not found. Run /pf-qa first."
 
-2. **QA verdict is PASS:** Read `docs/issues/open/ISSUE-ID/qa_report.md`. Locate the `## Verdict` section and find the verdict line. The verdict line is the last non-empty line that contains `**PASS**` or `**FAIL**`. If the verdict contains `**FAIL**` or no `**PASS**` line is found, stop: "QA did not pass. Fix the blockers listed in qa_report.md and re-run /pf-qa."
+2. **QA verdict is PASS** — only when TYPE is feat, improve, or bug; skipped entirely for idea/spike (neither type ever produces `qa_report.md`). Read `docs/issues/open/ISSUE-ID/qa_report.md`. Locate the `## Verdict` section and find the verdict line. The verdict line is the last non-empty line that contains `**PASS**` or `**FAIL**`. If the verdict contains `**FAIL**` or no `**PASS**` line is found, stop: "QA did not pass. Fix the blockers listed in qa_report.md and re-run /pf-qa."
 
-3. **On correct branch:** Run `git branch --show-current`. If the result is not `issue/ISSUE-ID`, stop: "Switch to the issue branch first: `git checkout issue/ISSUE-ID`"
+3. **On correct branch** — the check depends on TYPE:
+
+   | TYPE | Check |
+   |---|---|
+   | feat / improve / bug | Unchanged: run `git branch --show-current`. If the result is not `issue/ISSUE-ID`, stop: "Switch to the issue branch first: `git checkout issue/ISSUE-ID`" |
+   | idea | Not checked at all — the idea pipeline never creates an `issue/<id>` branch. Instead check the new condition: **`## Decision` is present in `verdict.md`**. If not, stop: "Verdict not confirmed. Run /pf-idea-verdict (decision session) first." |
+   | spike | Does not require standing exactly on `issue/<id>` — being on the parent branch **or** on `issue/<spike-id>` (if it exists) is both acceptable. |
+
+4. **Run Evidence gate (spike only):**
+   1. Both `hypothesis.md` and `findings.md` must be complete per `pf-size-tiers`'s "Stage completion" criterion. If not, stop: "Spike is not ready to close: <missing document>. Run /pf-idea-spike first."
+   2. `findings.md`'s `## Run Evidence` section must be non-empty and not the template placeholder (`<concrete evidence of an actual run — command+output, path to an artifact, or a direct quote with its source — NOT a restatement of expectation>` from `pf-idea-spike`'s skeleton). If empty/missing/still a placeholder, stop: "findings.md's Run Evidence is empty or a template placeholder — spike close requires evidence of an actual run. Fix findings.md (or re-run /pf-idea-spike Mode 2), then re-run /pf-close."
+   3. `## Result vs. Success Criterion` must reference a concrete item from `## Run Evidence` (not an empty section).
+
+5. **Compute `has_git`.** If false (the only reachable case is an `idea` issue created in a bare, non-git folder that has never grown a project since) — set a `NO-REPO` flag for the rest of this `pf-close` run, unless Phase 4.6 later clears it (the only place a repository can appear within a single run).
+
+   **`NO-REPO` branch (idea only):** if step 5 set `NO-REPO`, Phase 2 ("Pre-Close Cleanup"), Phase 3 ("Detect Parent Branch"), and Phase 3.5/4 (merge or spike-copy, both require git) are **skipped entirely** — proceed directly to Phase 4.6.
 
 ---
 
 ## Phase 1: Confirm with User
+
+**Skip this entire phase for `TYPE: idea`** — the confirmed `## Decision` in `verdict.md` (already checked by Phase 0's branch check) is already the confirmation to close; asking "Proceed? (yes/no)" here would be a second confirmation for one decision session (see `pf-interaction` — one final human gate per issue). Proceed directly to Phase 2 (or, under `NO-REPO`, directly to Phase 4.6). For `TYPE: spike`, this phase is unchanged in substance — spike has no separate decision session, so this Phase 1 confirmation **is** the single final human gate — but the summary text below differs (see the `TYPE: spike` variant). For feat/improve/bug, unchanged.
 
 Show the following summary and wait for explicit user confirmation before proceeding:
 
@@ -39,6 +58,8 @@ This will:
 
 Proceed? (yes/no)
 ```
+
+**`TYPE: spike` variant** — replace the "Merge issue/ISSUE-ID into <parent-branch> with --no-ff" line with: "Copy docs/issues/open/ISSUE-ID/ from issue/ISSUE-ID to <parent-branch> — code stays on issue/ISSUE-ID, never merged or deleted". The rest of the summary is unchanged.
 
 If the user does not confirm (answers no or anything other than yes), stop: "Close cancelled. No changes made."
 
@@ -68,12 +89,28 @@ Proceed to Phase 3.
 2. Fallback (the git-config value was ignored or unavailable):
    - Run `git branch --list develop`. If `develop` is listed, set PARENT-BRANCH to `develop`.
    - Otherwise set PARENT-BRANCH to `main`.
+3. **`TYPE: idea` only (no `NO-REPO`):** run `git checkout PARENT-BRANCH` right here — the same checkout Phase 4's step 1 does for feat/improve/bug, but with no following `git merge` (idea never merges anything). This puts the branch idea will be archived from into the right state for Phase 5 (`mv`) and Phase 8 (archive commit). (`TYPE: spike` gets its own checkout as part of Phase 3.5 below — no duplicate step needed here.)
 
-Proceed to Phase 4.
+Proceed to Phase 4 for feat/improve/bug; Phase 3.5 for `TYPE: spike`; Phase 4.5 for `TYPE: idea` (Phase 3.5/4 do not apply to idea — idea never merges).
+
+---
+
+## Phase 3.5: Copy Issue Documents (spike only, requires git)
+
+**Applies only to `TYPE: spike`** (`NO-REPO` is unreachable for spike — see Phase 0's type table). Runs between Phase 3 and Phase 4, and **replaces Phase 4 entirely** for this TYPE — do not also run Phase 4 for a spike.
+
+1. If the current branch is `issue/<spike-id>`, switch to PARENT-BRANCH (already determined by Phase 3), **without** `git merge`.
+2. If the branch `issue/<spike-id>` exists (check with `git branch --list`), run `git checkout issue/<spike-id> -- docs/issues/open/<spike-id>`. This copies only the issue folder's contents from the spike branch onto the current branch (PARENT-BRANCH), touching nothing outside that folder. This is a staged change, not a commit — it is committed by the ordinary Phase 8.
+3. If the branch does not exist (the experiment never required code), skip this step — the documents are already on PARENT-BRANCH.
+4. The `issue/<spike-id>` branch, if it exists, is **never merged and never deleted** — not here, and not anywhere else in `pf-close`. Nothing in this file should run `git merge issue/<spike-id>` or `git branch -d issue/<spike-id>`.
+
+Proceed to Phase 4.5.
 
 ---
 
 ## Phase 4: Merge
+
+**Applies only to `TYPE: feat`, `improve`, or `bug`.** `TYPE: spike` uses Phase 3.5 above instead; `TYPE: idea` does not merge at all (see the checkout step Phase 3 adds for idea).
 
 1. Run `git checkout PARENT-BRANCH`.
 2. Run `git merge --no-ff issue/ISSUE-ID -m "merge: close ISSUE-ID"`.
@@ -89,6 +126,8 @@ Proceed to Phase 4.
 ---
 
 ## Phase 4.5
+
+Skip this entire phase for `TYPE: idea` or `TYPE: spike` — neither type ever produces a `test_plan.md`; reading a non-existent Status Tracker would incorrectly trigger the "no Status Tracker table found at all" stop-and-surface rule in step 2 below. For `TYPE: idea` under `NO-REPO`, this phase is reached directly from Phase 0 (Phases 2/3/3.5/4 all skipped) and is skipped in turn, proceeding to Phase 4.6.
 
 Runs after Phase 4 (Merge) and before Phase 5 (Archive Issue Folder), while `docs/issues/open/ISSUE-ID/` still exists. This ordering is required: `/pf-close` resolves the active issue by scanning `docs/issues/open/` alone (see the top of this file). If this phase fails after Phase 5 has already moved the issue folder to `docs/issues/closed/`, a re-run of `/pf-close` reports "No active issue found" and the issue's Manual test cases are lost with no way to recover them. Placed before archiving instead, a failure here leaves the issue folder in `docs/issues/open/`, so the issue is still discoverable and nothing is lost.
 

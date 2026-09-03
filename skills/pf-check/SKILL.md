@@ -4,7 +4,7 @@ description: Review the most recently produced planning document in the active i
 version: 3.0.0
 ---
 
-Before checking any other prerequisite, read `prompt.md`'s frontmatter. If it has no `size_tier` field, ask the user via `AskUserQuestion` — same 4 tier options and descriptions as in `~/.claude/skills/pf-size-tiers/SKILL.md`, recommending medium ("matches today's default behavior") — then write the answer into `prompt.md`'s frontmatter before proceeding with the rest of this skill.
+First, determine TYPE from the active issue's folder-name prefix (the same way `~/.claude/skills/pf/SKILL.md` Step 4 does). If TYPE is `idea` or `spike`, skip this entire `size_tier` paragraph — these issue types never carry `size_tier` and are never asked for it (`~/.claude/skills/pf-idea-lenses/SKILL.md`'s `idea_tier` instead, handled separately below). Only for any other TYPE does the rest of this paragraph apply, unchanged: before checking any other prerequisite, read `prompt.md`'s frontmatter. If it has no `size_tier` field, ask the user via `AskUserQuestion` — same 4 tier options and descriptions as in `~/.claude/skills/pf-size-tiers/SKILL.md`, recommending medium ("matches today's default behavior") — then write the answer into `prompt.md`'s frontmatter before proceeding with the rest of this skill.
 
 Determine the active issue from `docs/issues/open/`. Identify the most recently produced document (TARGET) and all its predecessor documents:
 - If checking notes.md: no predecessors (it's the first document produced for a trivial-tier issue — there is no brd.md before it).
@@ -12,6 +12,14 @@ Determine the active issue from `docs/issues/open/`. Identify the most recently 
 - If checking test_plan.md: predecessors are brd.md (and specs.md if present). **Exception:** if `size_tier: trivial`, the predecessor is notes.md instead — the brd.md/specs.md predecessor relationship only applies when `size_tier` is small/medium/large.
 - If checking implementation_plan.md: predecessors are brd.md, specs.md (if present), test_plan.md
 - If checking analysis.md (bug pipeline): predecessors are none (it's the first document produced).
+- If checking idea.md: no predecessors (it's the first document produced for the idea pipeline).
+- If checking research.md: predecessors are idea.md
+- If checking critique.md: predecessors are idea.md, research.md
+- If checking verdict.md: predecessors are idea.md, research.md, critique.md
+- If checking hypothesis.md: no predecessors (it's the first document produced for the spike pipeline).
+- If checking findings.md: predecessors are hypothesis.md
+
+**Additional context, not a predecessor.** For every `idea`/`spike` TARGET above (`idea.md`, `research.md`, `critique.md`, `verdict.md`, `hypothesis.md`, `findings.md`), also read `docs/issues/open/[ISSUE-ID]/prompt.md`'s intake body (not just its `size_tier`/`idea_tier` frontmatter) as required context — the review must be able to compare TARGET against what the user actually said at intake, not only against TARGET's own predecessor documents. For `critique.md`, `verdict.md`, and `findings.md` specifically, also read `open_questions.md` if it exists — without it, the reviewer cannot verify that every `[assumed]`/`unverified-fact` entry the document claims to summarize is actually reflected (AC-05d/AC-06c/AC-07b depend on this cross-check). `open_questions.md` is a side ledger, not a pipeline-stage predecessor (`~/.claude/skills/pf-idea-lenses/SKILL.md`) — it does not gate completeness, it is read purely as reviewer context.
 
 ## Automigration — this skill's own prerequisite
 
@@ -29,6 +37,12 @@ Before dispatching any analysis, resolve the role for TARGET's key per `~/.claud
 | `test_plan.md` | `test_plan` |
 | `implementation_plan.md` | `implementation_plan` |
 | `analysis.md` | `analysis` |
+| `idea.md` | `idea` |
+| `research.md` | `research` |
+| `critique.md` | `critique` |
+| `verdict.md` | `verdict` |
+| `hypothesis.md` | `hypothesis` |
+| `findings.md` | `findings` |
 
 The resolved role's `review` field (a list + `mode`, per `pf-roles` §1) drives which path runs below. Which path a given actor uses is decided by that actor's `agents.yml` entry (`~/.claude/skills/pf-roles/SKILL.md` §2), not by its name: any actor with `invoke: agent` (`claude`, `haiku`, or any other actor registered that way) dispatches via the **"Claude review path"** below — the heading name is legacy, the path itself is generic, see that section's opening note; any actor with `invoke: codex-companion` (`codex`, today's only such actor) dispatches via the **"Codex invocation chain"**. `claude` is simply today's default/most common `invoke: agent` actor — it is not a hardcoded special case, and neither is `codex` for `invoke: codex-companion`. Backward-compat equivalence, dictated by `~/.claude/skills/pf-roles/SKILL.md` §5's automigration rule:
 
@@ -48,6 +62,8 @@ If role resolution yields no `roles:`/`profile:` at all for this issue (§4's le
 **Do not read these documents yourself.** Dispatch a single sub-agent (Agent tool, default/general-purpose type — no need for a fork, since its full context is not needed afterward), with the resolved actor's `model` set as above, and a prompt along these lines:
 
 > Read `docs/issues/open/[ISSUE-ID]/[TARGET]` and its predecessor documents: [list]. Analyze the codebase context and identify potential problems with [TARGET] from different angles, considering every edge case. Use ASCII diagrams to illustrate if helpful. Do not edit anything — analysis only.
+>
+> If TARGET is one of `idea.md`/`research.md`/`critique.md`/`verdict.md`/`hypothesis.md`/`findings.md`: instead of the `size_tier` budget check below, read `idea_tier` from the same `prompt.md` and compare [TARGET]'s actual size against `~/.claude/skills/pf-idea-lenses/SKILL.md`'s document-budgets table (§4 there) — [TARGET]'s row, the issue's `idea_tier` column — never against `pf-size-tiers`'s table. If [TARGET] exceeds its `idea_tier`'s budget, include the same **P0** finding as below, with "size_tier" replaced by "idea_tier" in the finding text. Skip the rest of this paragraph and the next (the `size_tier` budget list and its P0 finding) for these six TARGETs — that list applies only to `brd.md`/`specs.md`/`notes.md`/`implementation_plan.md`/`analysis.md`/`test_plan.md`.
 >
 > Also read `docs/issues/open/[ISSUE-ID]/prompt.md`'s `size_tier` field (default: medium if absent) and `~/.claude/skills/pf-size-tiers/SKILL.md`'s document-budgets table. Compare [TARGET]'s actual size against that tier's budget for [TARGET]'s document type:
 > - `notes.md` (trivial) > ~50 lines
