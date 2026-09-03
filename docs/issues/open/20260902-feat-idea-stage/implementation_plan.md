@@ -945,8 +945,8 @@ runtime-зависимостей (npm-пакетов, языковых рант�
   автопилотом).
 
 **Acceptance Criteria:**
-- [ ] TC-017 passes
-- [ ] TC-031 passes
+- [x] TC-017 passes
+- [x] TC-031 passes
 
 ---
 

@@ -223,6 +223,50 @@ Re-running is safe: no row is duplicated, because identity is the pair (`ISSUE-I
 
 ---
 
+## Phase 4.6: Bootstrap + Follow-up Issue (idea only, before archiving)
+
+**Applies only to `TYPE: idea`.** Runs between Phase 4.5 and Phase 5 — **before** archiving, not after, following the same principle that already justifies today's Phase 4.5 ordering: a failure here must leave the idea folder still in `docs/issues/open/`, discoverable, not lost inside `closed/`.
+
+1. Read the confirmed verdict from `docs/issues/open/ISSUE-ID/verdict.md`'s `## Decision` section. The issue has **not** been moved to `closed/` yet at this point.
+2. **`defer` or `archive`:** this phase is a no-op. Do not touch `has_git`/`NO-REPO`, do not create anything. Proceed to Phase 5.
+3. **`project` or `spike-first`** (both verdicts go through the identical bootstrap below — a `spike-first` idea born in a bare folder gets exactly the same repository/scaffold as a `project` idea, so the resulting spike is always git-backed):
+   a. Compute, **separately**:
+      - `has_git` — as usual (`git rev-parse --is-inside-work-tree`).
+      - `has_full_scaffold` := `PLANNING.md` exists in CWD. **Not** the `has_pf` disjunction (`PLANNING.md` OR `docs/issues/` OR `.pf-version`) used elsewhere in the framework — that disjunction is already true for a bare idea folder purely because `docs/issues/open/` exists, even though no scaffold exists at all.
+   b. If `!has_git` — run `git init`.
+   c. If `!has_full_scaffold` — expand the scaffold: the same procedure as `~/.claude/skills/pf/SKILL.md` Step 0's "A project, right away" branch, steps 2 and 4-7 (create `docs/issues/{open,closed}/` and `docs/planning/` where they don't already exist — for an idea already living inside a project they exist; write `.pf-version`; copy `PLANNING.md`/`CLAUDE.md`; copy `docs/planning/*.md` without overwriting anything that exists; mirror `docs/planning/templates/`). That procedure's step 1 (`git init`) and step 3 (`.pf-version`) are already covered by b/this step; its steps 8-9 (skip shim reinstall, "no issue folders found" flow) do not apply here — this phase leads into follow-up issue creation below, never into intake.
+   d. **PARENT-BRANCH.**
+      - If Phase 3 already computed it during this run (the "idea inside an existing project" case — `NO-REPO` was never set) — reuse that same value, including the checkout that Phase 3's added step already performed.
+      - If Phase 3 was skipped (the bare-folder case — `NO-REPO` was set by Phase 0) — PARENT-BRANCH := the branch the session is on immediately after step b's `git init` (`git branch --show-current`). Do not fall back to Phase 3's develop/main detection — there is nothing to compare against, since `git init` has only just created this one branch.
+   e. **Atomic initial scaffold commit — only if step b or step c actually did something in this run** (idempotency: a re-run after a partial failure must neither fail nor create an empty commit when the repository/scaffold is already in place):
+      `git add PLANNING.md CLAUDE.md .pf-version docs/planning` (scoped — **not** `-A`, and **not** `docs/issues/`, which is committed separately by the ordinary Phase 8) and
+      `git commit -m "chore: bootstrap PF scaffold for ISSUE-ID (verdict: <verdict>)"`.
+   f. Clear `NO-REPO` (guaranteed false from this point on for `project`/`spike-first` — the flag matters, per "Non-git guard (`NO-REPO`) across Phase 5-9" in Important Notes below, only for a `defer`/`archive` verdict in an originally-bare non-git folder, the one case where it survives past this phase).
+   g. Determine `<slug>` from `idea.md`'s title/topic.
+   h. **Idempotency — recovery from a partial failure.** Before creating a new follow-up issue, check whether a folder already exists under `docs/issues/open/` whose frontmatter carries `idea_ref: ISSUE-ID` (evidence that a previous, interrupted run of this same phase already created the follow-up issue but never reached Phase 5). If one exists, reuse it — do not create a second one, do not overwrite it — skip straight to the matching report line (i/j below), then to Phase 5.
+   i. **`project` verdict:** create `docs/issues/open/<YYYYMMDD>-feat-<slug>/prompt.md`, pre-filled:
+      - `doc_language` — inherited directly from the idea.
+      - `roles`/`profile`/`on_unavailable` — copied as-is when present in the idea's `prompt.md` (the same values apply — the idea's `idea`/`research`/`critique`/`verdict` keys resolve through the same `pf-roles` algorithm as `code`/`tests`/…; the idea has no explicit values for `code`/`brd`/`specs`/… so only what's actually present is copied — whatever is absent stays absent, and the ordinary fallback applies later, as for any new issue).
+      - `size_tier` — derived from `idea.md`'s "Cost (Effort)" and `idea_tier`, per the table below, and **written immediately** (not left for the legacy-tier guard to ask about later), with the reasoning logged as `[assumed]` in a **new** `open_questions.md` for this feat-issue:
+
+        | `idea_tier` | Signal in "Cost (Effort)" | Derived `size_tier` |
+        |---|---|---|
+        | `personal` | any | `small` |
+        | `infra` | "a few hours" / "one day" or shorter | `small` |
+        | `infra` | "a few days" or longer | `medium` |
+        | `content` | any | `small` |
+        | `product` | "a week" or shorter | `medium` |
+        | `product` | "a few weeks" / "a month" or longer | `large` |
+
+        If "Cost (Effort)" carries no recognizable duration signal (free text with no time unit) — `size_tier` is **not** written; it stays a genuine gap, and the ordinary legacy-tier guard in `/pf-brd`/`pf-spec`/… asks about it as it would for any issue with no tier (the one case where AC-08c's "only ask when it can't be derived" rule still permits a question).
+      - `idea_ref: <idea-id>`; body — composed from `idea.md` + `verdict.md` + the original intake text of `prompt.md` (the idea, still physically in `open/` at this point per step 1 above). Report line for Phase 9: "Created follow-up issue: <feat-id> (idea_ref: <idea-id>). Next: /pf-brd."
+   j. **`spike-first` verdict:** likewise create `docs/issues/open/<YYYYMMDD>-spike-<slug>/prompt.md`, `idea_ref: <idea-id>`, with `## Question`/`## Success Criterion`/`## Time-box`/`## Method` best-effort derived from `verdict.md`'s "## Reasoning" and `critique.md`'s Summary Table (rows disposed "Idea changes" or carrying an unresolved technical objection are the natural source for a Question candidate). Nothing is asked of the user — the same front-loaded rule applies: resolve ambiguity with the recommended judgment, log it `[assumed]` in a **new** `open_questions.md` for the just-created spike-issue. This spike is now **always** git-backed (steps a-f above already ran identically for both `project` and `spike-first`) — `pf-idea-spike`'s Mode 2 can create `issue/<spike-id>` if the experiment needs code, with no "no repository" risk. Report line for Phase 9: "Created follow-up issue: <spike-id> (idea_ref: <idea-id>). Next: /pf-idea-spike."
+4. Proceed to Phase 5.
+
+**Recovery — what a re-run of `/pf-close` does if Phase 4.6 failed partway.** A run interrupted inside this phase leaves `docs/issues/open/` holding **two** folders: the original idea (ISSUE-ID, not yet archived) and, if the failure happened after step h/i/j, the already-created follow-up issue. Within one continuous run, `/pf-close`'s active-issue detection ("read ISSUE-ID from the active folder name" at the top of this file) is unaffected by this — ISSUE-ID is fixed once, at the very start, and never rescanned. What is affected is only a **new, cold** `/pf-close` invocation (a new session, after the failure): if `docs/issues/open/` contains more than one folder, `pf-close` cannot silently pick the first one — the same principle `/pf` already applies when several issues are open (not a new mechanism): prefer the folder whose `verdict.md`/`findings.md` already carries a confirmed closure marker (for idea, `## Decision`); if more than one candidate qualifies, stop and ask the user which to close. The follow-up folder this phase just created is distinguishable by its `idea_ref`, which points at an ISSUE-ID whose own folder is **still** in `open/` — an unambiguous sign that "Phase 4.6 partially ran, but Phase 5 hasn't moved the idea yet," not a second, independent active issue.
+
+---
+
 ## Phase 5: Archive Issue Folder
 
 1. Ensure `docs/issues/closed/` directory exists. If it does not, create it (e.g. `mkdir -p docs/issues/closed/`).
@@ -281,6 +325,8 @@ Proceed to Phase 7.
 
 ## Phase 7: Update Session Log
 
+**If `NO-REPO`:** `docs/planning/session-log.md` does not exist (no PF scaffold was ever created for this issue) — skip this phase entirely, and note in Phase 9's report: "session-log.md not updated — no PF scaffold exists in this folder." Do not create `docs/planning/` just to hold one line.
+
 1. Read `docs/planning/session-log.md`.
 2. Determine a one-line summary:
    - Try to read `docs/issues/closed/ISSUE-ID/qa_report.md` — use the issue title from the `**Issue ID:**` line or any summary text in the report.
@@ -301,6 +347,8 @@ Proceed to Phase 8.
 
 ## Phase 8: Archive Commit
 
+**If `NO-REPO`:** skip both `git add` and `git commit` — there is no repository to commit to. Report "not committed — no git repository" in Phase 9 instead of the usual commit-summary lines.
+
 1. Run `git add docs/issues/ docs/planning/session-log.md docs/planning/test-plan.md`.
 2. Run `git commit -m "close: archive ISSUE-ID"`.
 
@@ -311,6 +359,8 @@ Proceed to Phase 8.5.
 ## Phase 8.5: Push Parent Branch (safe auto-push)
 
 After the archive commit, push PARENT-BRANCH to its remote automatically — but only when it is safe. This step never aborts the closure: the issue is already closed locally, so any push problem is reported in Phase 9, not fatal.
+
+**If `NO-REPO`:** this phase does not run at all — there is no repository, so there is nothing to push and no remote to check. This is a distinct condition from "no remote configured" below, but the wording reported in Phase 9 is the same either way; the distinction is not visible to the user.
 
 1. **Safety guard — skip the push (and record the reason for the Phase 9 report) if either holds:**
    - PARENT-BRANCH is `main` or `master` — release branches are pushed by the user manually, never automatically.
@@ -324,6 +374,8 @@ Proceed to Phase 9.
 ---
 
 ## Phase 9: Report
+
+**Autopilot schedule cleanup — `TYPE: idea`/`spike` only, before printing the report below.** Check whether a schedule named `pf-autopilot-<project>` exists (`CronList`). If it does, delete it (`CronDelete pf-autopilot-<project>`) and add one line to this phase's report: "Autopilot schedule removed." If none exists, say nothing extra — this is the common case for an issue that was never driven by autopilot. This is the one point every `idea`/`spike` closure passes through regardless of whether a human closed it directly or `/pf-autopilot` stopped itself before the final gate, so it is the reliable place to clear a schedule an autopilot run may have left behind.
 
 Print the following closing report:
 
@@ -344,9 +396,22 @@ Remote push: <report the Phase 8.5 outcome, one of>
   - FAILED — <git error>; run `git push` manually after resolving
 ```
 
+**If `NO-REPO`:** replace the entire "Two commits added to PARENT-BRANCH…"/"Remote push: …" block above with a single line: "Not committed — no git repository. Issue folder archived on disk only: docs/issues/closed/ISSUE-ID/."
+
 ---
 
 ## Important Notes
+
+- **Non-git guard (`NO-REPO`) across Phase 5-9.** Once set by Phase 0's step 5, `NO-REPO` is never recomputed inside Phase 6-8 — the only place it can flip to "there's a repository now" within one `pf-close` run is Phase 4.6 (step 3.f, `project`/`spike-first` verdict), which runs **before** Phase 5. So everything below applies only to a `defer`/`archive` verdict for an idea that started life in an originally-bare, non-git folder — the one case where `NO-REPO` survives all the way to Phase 5 and beyond:
+
+  | Phase | Effect when `NO-REPO` has survived to this point |
+  |---|---|
+  | Phase 5 ("Archive Issue Folder") | Unchanged — `mv`, not a git operation; runs regardless of `NO-REPO`. |
+  | Phase 6 ("Compute LLM Usage & Cost") | No structural change — step 1's empty `git log` result already routes straight to step 3 with "window could not be determined", which is the only reachable path under `NO-REPO` anyway. `usage_report.md` is written noting the absence of auto-computed data, same as for any issue with no transactions at start. |
+  | Phase 7 ("Update Session Log") | Skipped entirely — see the caveat at the top of that phase. |
+  | Phase 8 ("Archive Commit") | `git add`/`git commit` skipped — see the caveat at the top of that phase. |
+  | Phase 8.5 ("Push Parent Branch") | Skipped entirely, same as "no remote configured" — see the caveat at the top of that phase. |
+  | Phase 9 ("Report") | The usual commit/push block is replaced by one line — see the caveat at the end of that phase. |
 
 - **Auto-push the parent branch on close, but only when safe** (Phase 8.5) — push PARENT-BRANCH to its remote automatically if a remote is configured AND the parent is not `main`/`master`. Never force-push, never `--no-verify`. If no remote exists or the parent is a release branch, skip with a note; if the push errors, report it but keep the closure (already committed locally). Releases to `main`/`master` are always pushed by the user manually.
 - **Verdict check is strict** — only `**PASS**` (bold, exact casing) in the Verdict section satisfies the prerequisite. A commented-out or unchecked PASS does not count.
