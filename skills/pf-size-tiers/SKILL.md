@@ -65,7 +65,7 @@ every prerequisite gate.
 | improve (small/medium/large) | CREATE → BRD → TEST_PLAN → IMPL_PLAN → CODE_REVIEW (`code_review.md`) → TESTING → USER_DOCS (`user_docs.md`) → DEV_DOCS (`dev_docs.md`) → QA |
 | bug (small/medium/large) | CREATE → ANALYSIS (`analysis.md`) → TEST_PLAN → IMPL_PLAN → CODE_REVIEW (`code_review.md`) → TESTING → USER_DOCS (`user_docs.md`) → DEV_DOCS (`dev_docs.md`) → QA |
 | `idea` (issue TYPE, not `size_tier` — see note below) | See `~/.claude/skills/pf-idea-lenses/SKILL.md`'s "Stage tables" (the `idea` table) — read live from there, not copied here. |
-| `spike` (issue TYPE, not `size_tier` — see note below) | See the same file's "Stage tables" (the `spike` table). |
+| `spike` (issue TYPE, not `size_tier` — see note below) | See `~/.claude/skills/pf-idea-lenses/SKILL.md`'s "Stage tables" (the `spike` table) — read live from there, not copied here. |
 
 These two pipelines are keyed on issue TYPE (folder-name prefix `idea`-/
 `spike`-), not on any `size_tier` value — `idea`/`spike` issues never carry

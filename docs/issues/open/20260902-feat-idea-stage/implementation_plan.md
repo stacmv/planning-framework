@@ -1273,29 +1273,29 @@ TC-019, TC-021, TC-022, TC-023, TC-024, TC-025, TC-026, TC-027
   документов.
 
 **Acceptance Criteria:**
-- [ ] TC-001 passes
-- [ ] TC-002 passes
-- [ ] TC-004 passes
-- [ ] TC-005 passes
-- [ ] TC-006 passes
-- [ ] TC-007 passes
-- [ ] TC-008 passes
-- [ ] TC-009 passes
-- [ ] TC-010 passes
-- [ ] TC-011 passes
-- [ ] TC-013 passes
-- [ ] TC-015 passes
-- [ ] TC-016 passes
-- [ ] TC-017 passes
-- [ ] TC-018 passes
-- [ ] TC-019 passes
-- [ ] TC-021 passes
-- [ ] TC-022 passes
-- [ ] TC-023 passes
-- [ ] TC-024 passes
-- [ ] TC-025 passes
-- [ ] TC-026 passes
-- [ ] TC-027 passes
+- [x] TC-001 passes
+- [x] TC-002 passes
+- [x] TC-004 passes
+- [x] TC-005 passes
+- [x] TC-006 passes
+- [x] TC-007 passes
+- [x] TC-008 passes
+- [x] TC-009 passes
+- [x] TC-010 passes
+- [x] TC-011 passes
+- [x] TC-013 passes
+- [x] TC-015 passes
+- [x] TC-016 passes
+- [x] TC-017 passes
+- [x] TC-018 passes
+- [x] TC-019 passes
+- [x] TC-021 passes
+- [x] TC-022 passes
+- [x] TC-023 passes
+- [x] TC-024 passes
+- [x] TC-025 passes
+- [x] TC-026 passes
+- [x] TC-027 passes
 
 ---
 

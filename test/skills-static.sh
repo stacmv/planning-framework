@@ -105,7 +105,12 @@ fi
 # If a gate had restated the criterion instead of referencing it, the literal
 # would show up in that gate's file too. This is the drift detector.
 
-marker_files="$(grep -rl -- "$STUB_MARKER" "$SKILLS" 2>/dev/null | LC_ALL=C sort)"
+# --exclude-dir=templates: skills/pf/templates/project/ is a byte-for-byte
+# mirror of docs/planning/templates/ (scaffold payload deployed into new
+# projects), not a skill. Its PLANNING.md/CLAUDE.md legitimately carry the
+# stub marker as template text; scanning them here would report a copied
+# definition that does not exist.
+marker_files="$(grep -rl --exclude-dir=templates -- "$STUB_MARKER" "$SKILLS" 2>/dev/null | LC_ALL=C sort)"
 n_marker="$(printf '%s' "$marker_files" | grep -c . || true)"
 if [ "$n_marker" -eq 1 ] && [ "$marker_files" = "$TIERS" ]; then
   pf_pass "step 3: the stub marker occurs in exactly one file under skills/ (pf-size-tiers)"
@@ -114,7 +119,7 @@ else
   printf '%s\n' "$marker_files" >&2
 fi
 
-def_home="$(grep -rlE '^## Stage completion' "$SKILLS" 2>/dev/null | LC_ALL=C sort)"
+def_home="$(grep -rlE --exclude-dir=templates '^## Stage completion' "$SKILLS" 2>/dev/null | LC_ALL=C sort)"
 if [ "$def_home" = "$TIERS" ]; then
   pf_pass "step 3: exactly one skill DEFINES stage completion; the rest reference it"
 else
@@ -361,18 +366,23 @@ else
   pf_fail "step 6: pf-execute does not refuse a stub"
 fi
 
-# ─── Step 7: 'regenerate' appears in exactly four skills — never in pf-execute ─
+# ─── Step 7: 'regenerate' appears only in output-gate skills — never in pf-execute ─
 
-regen_files="$(grep -rl 'regenerate' "$SKILLS" 2>/dev/null | LC_ALL=C sort)"
+# -w (whole word): pf-git says "regenerated" in prose inside a staging-table
+# row, which is not an output gate. --exclude-dir=templates: see step 3.
+regen_files="$(grep -rlw --exclude-dir=templates 'regenerate' "$SKILLS" 2>/dev/null | LC_ALL=C sort)"
 expected_regen="$(
   printf '%s\n' \
     "$SKILLS/pf-brd/SKILL.md" \
+    "$SKILLS/pf-idea/SKILL.md" \
+    "$SKILLS/pf-idea-critique/SKILL.md" \
+    "$SKILLS/pf-idea-research/SKILL.md" \
     "$SKILLS/pf-impl-plan/SKILL.md" \
     "$SKILLS/pf-spec/SKILL.md" \
     "$SKILLS/pf-test-plan/SKILL.md" | LC_ALL=C sort
 )"
 if [ "$regen_files" = "$expected_regen" ]; then
-  pf_pass "step 7: 'regenerate' occurs in exactly the four output-gate skills"
+  pf_pass "step 7: 'regenerate' occurs in exactly the output-gate skills"
 else
   pf_fail "step 7: 'regenerate' occurs in the wrong set of skills"
   diff <(printf '%s\n' "$expected_regen") <(printf '%s\n' "$regen_files") >&2 || true
