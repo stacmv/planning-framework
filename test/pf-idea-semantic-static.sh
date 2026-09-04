@@ -2,7 +2,7 @@
 # shellcheck disable=SC2016  # backticks are literal markdown code-spans in grep patterns, not command substitution
 # @pf-issue [20260902-feat-idea-stage]
 # test/pf-idea-semantic-static.sh — scenario-level regression tests for the
-# six round-2 code-review findings (CR-014..CR-019, docs/issues/open/
+# round-2/round-3 code-review findings (CR-014..CR-024, docs/issues/open/
 # 20260902-feat-idea-stage/code_review.md) that a fully green `make test`
 # missed at the time: every one of them was a semantic gap in a SKILL.md
 # contract, not a structural/shape defect, and the existing static suites
@@ -12,11 +12,21 @@
 # Same style as those two suites: read-only, grep/awk-based, no ~/.claude
 # involved, no real /pf run — this is a skill-based framework, so "behavior"
 # is text in a SKILL.md, and a scenario test here checks that the relevant
-# text is present, mutually consistent, and (where the property is checkable
-# in bash directly, per CR-019) literally holds — not that any code executes.
+# text is present, mutually consistent, order-correct, and (where the
+# property is checkable in bash directly, per CR-024) actually round-trips —
+# not that any code executes.
 #
-# One section per finding, each naming what would have to regress in the
-# SKILL.md text for that section's asserts to go red again.
+# Task 37 (CR-023/CR-024) rewrote this suite after a Codex review found it
+# was NOT a real barrier: 25/29 asserts only checked that a fixed phrase was
+# present somewhere in a wide range (no coupling to the specific call site,
+# no negative checks — an adapter could be deleted from a batch this suite
+# never looked at and every assert stayed green), and 3 of the CR-019
+# property asserts were true by construction (a literal fixture, a
+# non-emptiness check, an unconditional `tr -d`) — provably unable to go red
+# from ANY mutation of the skill text. This version's bar, enforced while
+# writing it: every assert below must name a concrete mutation of the
+# SKILL.md source it reads that turns it red, verified in practice on a
+# throwaway copy — never against this repo's own working tree (S-5).
 
 # shellcheck source=test/lib.sh
 . "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)/lib.sh"
@@ -50,34 +60,63 @@ first_line() {
 }
 
 # ══════════════════════════════════════════════════════════════════════════════
-printf '=== CR-014: closing a spike from a foreign branch never commits on it\n'
+printf '=== CR-014 & CR-021: spike branch preflight runs before any marker write, Phase 2 reuses it\n'
 # ══════════════════════════════════════════════════════════════════════════════
-# Contract: skills/pf-close/SKILL.md Phase 2 ("Pre-Close Cleanup"). For
-# TYPE:spike, before the unconditional "git add -A" that Phase 2 otherwise
-# always runs on a dirty tree, there must be a branch guard that (a) computes
-# PARENT-BRANCH early, (b) checks the current branch, and (c) STOPS — without
-# running git add -A — when the branch is neither issue/<spike-id> nor
-# PARENT-BRANCH. Breaks if: the guard text is deleted (reverting to the
-# pre-CR-014 unconditional add -A), or the guard is reordered to fall after
-# the git add -A step (making it decorative), or the stop wording no longer
-# actually forbids running git add -A.
+# Contract (Task 36 rewrite of the original CR-014 fix): PARENT-BRANCH for a
+# spike close is computed exactly once, in Phase 1's "Branch preflight"
+# (skills/pf-close/SKILL.md), BEFORE Phase 1 can write any final-gate marker
+# and BEFORE Phase 2 runs at all. Phase 2's own branch guard is retained only
+# as defense-in-depth and explicitly reuses that value rather than
+# recomputing it. The preflight distinguishes three outcomes over
+# branch-state x dirty-tree: (issue/<spike-id> or PARENT-BRANCH) -> no
+# action; (foreign branch, clean) -> checkout PARENT-BRANCH; (foreign
+# branch, dirty) -> stop before writing anything. Phase 3.5 separately
+# guarantees the final-gate marker survives its `git checkout issue/
+# <spike-id> -- docs/issues/open/<spike-id>` step by snapshotting it first
+# and reconciling by `asked` timestamp, never a blind append.
+#
+# The previous version of this section grepped for the literal phrase
+# "Compute PARENT-BRANCH now" INSIDE Phase 2's range — that phrase legally
+# moved to Phase 1 as part of this very fix (Task 36), so the assert had
+# gone red for the right reason (Task 37) but the wrong contract. Rewritten
+# below to check where PARENT-BRANCH is actually computed, and that Phase 2
+# reuses rather than recomputes it.
 
-phase2="$(range_between "$CLOSE" '## Phase 2: Pre-Close Cleanup' '## Phase 3: Detect Parent Branch')"
+preflight="$(range_between "$CLOSE" '**Branch preflight (`TYPE: spike` only' '**Front-loaded final decision gate')"
+phase2_guard="$(range_between "$CLOSE" '## Phase 2: Pre-Close Cleanup' '## Phase 3: Detect Parent Branch')"
+phase35="$(range_between "$CLOSE" '## Phase 3.5: Copy Issue Documents' '## Phase 4: Merge')"
 
-if printf '%s\n' "$phase2" | grep -qF 'verify the branch first'; then
+if printf '%s\n' "$preflight" | grep -qF 'Compute PARENT-BRANCH now'; then
+  pf_pass "CR-021: Phase 1's branch preflight computes PARENT-BRANCH up front"
+else
+  pf_fail "CR-021: Phase 1's branch preflight no longer computes PARENT-BRANCH — Task 36 moved this out of Phase 2 on purpose, it must live here"
+fi
+
+preflight_line="$(first_line "$CLOSE" 'Compute PARENT-BRANCH now')"
+stop_line="$(first_line "$CLOSE" 'do not run `git add -A`')"
+add_line="$(first_line "$CLOSE" '- Run `git add -A`')"
+
+if [ -n "$preflight_line" ] && [ -n "$stop_line" ]; then
+  if [ "$preflight_line" -lt "$stop_line" ]; then
+    pf_pass "CR-021: PARENT-BRANCH computation (line $preflight_line) precedes Phase 2's guard (line $stop_line)"
+  else
+    pf_fail "CR-021: PARENT-BRANCH computation no longer precedes Phase 2's guard — Phase 1 and Phase 2 could disagree on PARENT-BRANCH again"
+  fi
+else
+  pf_fail "CR-021: could not locate both the preflight's PARENT-BRANCH computation and Phase 2's stop wording"
+fi
+
+if printf '%s\n' "$phase2_guard" | grep -qF 'do not recompute it'; then
+  pf_pass "CR-014: Phase 2's guard explicitly reuses Phase 1's PARENT-BRANCH instead of recomputing it"
+else
+  pf_fail "CR-014: Phase 2's guard no longer states it reuses (not recomputes) PARENT-BRANCH — the two phases could drift apart"
+fi
+
+if printf '%s\n' "$phase2_guard" | grep -qF 'verify the branch first'; then
   pf_pass "CR-014: Phase 2 defines a spike-only branch guard before committing"
 else
   pf_fail "CR-014: Phase 2 has no spike branch guard — a spike close would git-add-A unconditionally again"
 fi
-
-if printf '%s\n' "$phase2" | grep -qF 'Compute PARENT-BRANCH now'; then
-  pf_pass "CR-014: the guard computes PARENT-BRANCH before checking the branch"
-else
-  pf_fail "CR-014: the guard no longer computes PARENT-BRANCH up front"
-fi
-
-stop_line="$(first_line "$CLOSE" 'do not run `git add -A`')"
-add_line="$(first_line "$CLOSE" '- Run `git add -A`')"
 
 if [ -n "$stop_line" ] && [ -n "$add_line" ]; then
   pf_pass "CR-014: the stop-on-foreign-branch wording exists ('do not run \`git add -A\`')"
@@ -90,27 +129,74 @@ else
   pf_fail "CR-014: could not locate both the stop wording and the git add -A step (guard text likely removed)"
 fi
 
-if printf '%s\n' "$phase2" | grep -qF 'neither the spike'; then
+if printf '%s\n' "$phase2_guard" | grep -qF 'neither the spike'; then
   pf_pass "CR-014: the guard's condition names 'neither issue/<spike-id> nor the parent' explicitly"
 else
   pf_fail "CR-014: the guard no longer states the neither-branch-nor-parent condition"
 fi
 
+if printf '%s\n' "$preflight" | grep -qF 'as defense-in-depth'; then
+  pf_pass "CR-014: Phase 2's guard is documented as defense-in-depth, not the primary defense"
+else
+  pf_fail "CR-014: Phase 2's guard is no longer documented as defense-in-depth — the ordering claim above may be stale"
+fi
+
+# Finite-state check: the three outcomes the preflight distinguishes over
+# branch-state x dirty-tree must each still be named explicitly — deleting
+# or inverting any one of them (e.g. checking out on DIRTY instead of clean)
+# would silently reopen CR-005/CR-014/CR-021.
+if printf '%s\n' "$preflight" | grep -qF 'no action; proceed'; then
+  pf_pass "CR-021: state '(issue/<spike-id> or PARENT-BRANCH)' -> no action"
+else
+  pf_fail "CR-021: the 'no action' outcome for issue/<spike-id>/PARENT-BRANCH is gone"
+fi
+if printf '%s\n' "$preflight" | grep -qF 'run `git checkout PARENT-BRANCH` now'; then
+  pf_pass "CR-021: state '(foreign branch, clean)' -> checkout PARENT-BRANCH"
+else
+  pf_fail "CR-021: the '(foreign branch, clean) -> checkout PARENT-BRANCH' outcome is gone"
+fi
+if printf '%s\n' "$preflight" | grep -qF 'stop here, before showing any confirmation or writing any marker'; then
+  pf_pass "CR-021: state '(foreign branch, dirty)' -> stop before any marker write"
+else
+  pf_fail "CR-021: the '(foreign branch, dirty) -> stop before any marker write' outcome is gone"
+fi
+
+# Phase 3.5: the final-gate marker must be snapshotted BEFORE the checkout
+# that can overwrite open_questions.md with a stale spike-branch copy, and
+# reconciled by `asked` timestamp rather than blindly appended (which would
+# duplicate the marker, violating "at most one open marker per point").
+snapshot_line="$(first_line "$CLOSE" 'Snapshot the final-gate marker before copying')"
+checkout_line="$(first_line "$CLOSE" 'git checkout issue/<spike-id> -- docs/issues/open/<spike-id>')"
+if [ -n "$snapshot_line" ] && [ -n "$checkout_line" ] && [ "$snapshot_line" -lt "$checkout_line" ]; then
+  pf_pass "CR-021: the final-gate marker is snapshotted (line $snapshot_line) before the checkout that could overwrite it (line $checkout_line)"
+else
+  pf_fail "CR-021: the marker snapshot no longer precedes the spike-branch checkout — a fresher PARENT-BRANCH marker could be silently clobbered"
+fi
+
+if printf '%s\n' "$phase35" | grep -qF "keep only the more recent one as the file's trailing line"; then
+  pf_pass "CR-021: the reconcile step keeps the marker with the later 'asked' timestamp, never a blind append"
+else
+  pf_fail "CR-021: the reconcile-by-timestamp rule is gone — could duplicate or lose the final-gate marker"
+fi
+
 # ══════════════════════════════════════════════════════════════════════════════
-printf '\n=== CR-015: every /pf intake question goes through the non-Claude adapter\n'
+printf '\n=== CR-015 & CR-023: every /pf intake question is locally replaced for a non-Claude orchestrator\n'
 # ══════════════════════════════════════════════════════════════════════════════
-# Contract: skills/pf/SKILL.md — every AskUserQuestion call the intake
-# sequence makes must have a "Non-Claude orchestrator" / orchestrator_provider
-# substitution documented near it, so a Codex-orchestrated session never hits
-# a missing tool mid-intake. Six call sites named by CR-015: Step 0's type
-# question, Step 3's type question (+ its spike-vs-feature confirm), the
-# doc_language question, the idea-from-a-file confirmation, role assignment,
-# and on_unavailable. Each assert below breaks if that specific call site's
-# adapter substitution text is removed or the call site itself moves out of
-# range of it (i.e. this specific intake question would again be unconditional).
+# Contract: skills/pf/SKILL.md — every AskUserQuestion call reachable from
+# the idea/spike intake path must have a "Non-Claude orchestrator"
+# substitution documented near it, AND that substitution must name the
+# specific `step=`/draft-path token for THAT call — not just the generic
+# phrase, which a neighboring, unrelated adapter mention could also satisfy.
+# Eight call sites are reachable from idea/spike (verified against
+# skills/pf/SKILL.md and skills/pf-interaction/SKILL.md item 2's `step`
+# dictionary): Step 0's folder-state question, Step 3's type question (+
+# type-confirm), doc_language, idea-from-a-file confirmation, the idea
+# content batches, the spike content batches, and role assignment (+
+# on_unavailable). CR-023's core finding was that the two CONTENT-BATCH
+# adapters were never checked at all — deleting either left the suite green.
 
 assert_adapter_covers() {
-  local label="$1" start="$2" end="$3"
+  local label="$1" start="$2" end="$3" bind="${4:-}"
   local range
   range="$(range_between "$PF" "$start" "$end")"
   if printf '%s\n' "$range" | grep -qF 'Non-Claude orchestrator'; then
@@ -118,15 +204,24 @@ assert_adapter_covers() {
   else
     pf_fail "CR-015: $label has NO Non-Claude orchestrator substitution nearby — unconditional AskUserQuestion again"
   fi
+  if [ -n "$bind" ]; then
+    if printf '%s\n' "$range" | grep -qF "$bind"; then
+      pf_pass "CR-023: $label's substitution names '$bind' — bound to this specific call, not a generic mention"
+    else
+      pf_fail "CR-023: $label's substitution no longer names '$bind' — could be satisfied by an unrelated adapter mention nearby"
+    fi
+  fi
 }
 
 assert_adapter_covers 'Step 0 folder-state type question' \
   '**"What are we working on: an idea' \
-  '**Branch — "An idea" answer.**'
+  '**Branch — "An idea" answer.**' \
+  'step=folder-mode'
 
-assert_adapter_covers 'Step 3 type question (+ type-confirm)' \
+assert_adapter_covers 'Step 3 type question' \
   '## Step 3: Handle zero or multiple issues' \
-  '**Build a feature / Fix a bug**'
+  '**Build a feature / Fix a bug**' \
+  'step=issue-type'
 
 step3_range="$(range_between "$PF" '## Step 3: Handle zero or multiple issues' '**Build a feature / Fix a bug**')"
 if printf '%s\n' "$step3_range" | grep -qF 'step=type-confirm'; then
@@ -137,11 +232,26 @@ fi
 
 assert_adapter_covers 'doc_language question' \
   'What language should the planning documents' \
-  'Immediately after, use AskUserQuestion to ask a second question'
+  'Immediately after, use AskUserQuestion to ask a second question' \
+  'step=language'
 
 assert_adapter_covers 'idea-from-a-file confirmation' \
   'Idea from a file (US-03a)' \
-  'Unreadable/binary/empty file'
+  'Unreadable/binary/empty file' \
+  'step=file-confirm'
+
+# CR-023's headline finding: these two content-batch adapters were outside
+# every range above, so deleting either one (removing the substitution for
+# up to 7 AskUserQuestion calls at once) left the whole suite green.
+assert_adapter_covers 'Idea intake batch (content Batch 1+2)' \
+  '**Idea intake batch' \
+  '**Idea from a file (US-03a).**' \
+  '.pf-intake-draft-idea.md'
+
+assert_adapter_covers 'Spike intake batch (content Batch 1+2)' \
+  '**Spike intake batch' \
+  '**No bare-folder carve-out for spike.**' \
+  '.pf-intake-draft-spike.md'
 
 role_range="$(range_between "$PF" '### Role assignment' '**Question 3 (optional')"
 if printf '%s\n' "$role_range" | grep -qF 'Non-Claude orchestrator'; then
@@ -160,16 +270,60 @@ else
   pf_fail "CR-015: the substitution no longer names step=on-unavailable — on_unavailable question left unconditional"
 fi
 
+# Coverage count: every adapter paragraph above starts with the literal
+# sentence "**Non-Claude orchestrator.**" (role assignment's one paragraph
+# covers both Question 1 and Question 2, so 8 call sites -> 7 paragraphs).
+# This catches a call site none of the per-range asserts above happens to
+# name losing its adapter, not just the two named above.
+adapter_count="$(grep -cF 'Non-Claude orchestrator' "$PF")"
+if [ "$adapter_count" -eq 7 ]; then
+  pf_pass "CR-023: exactly 7 'Non-Claude orchestrator' substitutions in pf/SKILL.md (one per intake call-site group)"
+else
+  pf_fail "CR-023: expected exactly 7 'Non-Claude orchestrator' substitutions in pf/SKILL.md, found $adapter_count — a call site gained or lost its adapter"
+fi
+
+# Negative: the has_pf/has_git branch table (Step 0) must not be silently
+# invertible — "true" must gate the unchanged Normal path, "false" must gate
+# the NEW folder-state question, never the reverse.
+if grep -qF '| true | (either) | Normal path' "$PF"; then
+  pf_pass "CR-023: has_pf=true still routes to the unchanged Normal path"
+else
+  pf_fail "CR-023: has_pf=true no longer routes to the Normal path row — the branch table changed or was inverted"
+fi
+if grep -qF '| false | (either) | **NEW**' "$PF"; then
+  pf_pass "CR-023: has_pf=false still routes to the NEW folder-state question"
+else
+  pf_fail "CR-023: has_pf=false no longer routes to the NEW row — the branch table changed or was inverted"
+fi
+
+# Negative: with multiple pending drafts, resumption must pick the EARLIEST
+# `asked` draft, never the latest (which would silently strand the older,
+# already-in-progress one and could discard answers already collected).
+if grep -qF 'resume the one with the earliest `asked`' "$PF"; then
+  pf_pass "CR-023: multi-draft resumption picks the EARLIEST-asked draft"
+else
+  pf_fail "CR-023: the earliest-asked-first rule for multiple pending drafts is gone"
+fi
+if grep -qF 'resume the one with the latest `asked`' "$PF"; then
+  pf_fail "CR-023: found a 'latest asked' draft-selection rule alongside/instead of 'earliest' — contradictory or inverted contract"
+else
+  pf_pass "CR-023: no contradicting 'latest asked' draft-selection rule present"
+fi
+
 # ══════════════════════════════════════════════════════════════════════════════
-printf '\n=== CR-016: a pending intake draft is found before has_pf/has_git\n'
+printf '\n=== CR-016 & CR-020: draft resume ordering, step-key separation, entry provenance, atomic handoff\n'
 # ══════════════════════════════════════════════════════════════════════════════
 # Contract: skills/pf/SKILL.md Step 0. A cold /pf must check for an open
 # .pf-intake-draft-* marker BEFORE computing has_pf/has_git (which decide the
 # folder-state question) — otherwise a fresh session re-asks "type" and
-# clobbers the draft. Also: with several drafts pending, behavior must be
-# defined (not silently pick one and lose the rest). Breaks if the draft
-# check is moved after the boolean computation, or the multi-draft case is
-# dropped back to being unhandled.
+# clobbers the draft. CR-020 (Task 35) additionally requires: (a) Step 0's
+# two-option fork and Step 3's four-option fork use two DISTINCT step keys
+# (`folder-mode` / `issue-type`), never one shared `step=type` serving both
+# incompatible questions; (b) which fork produced the draft (`entry`) is
+# carried forward as stored state, never re-derived from a freshly
+# recomputed `has_pf` at resume time. CR-022 (adjacent, same task) requires
+# the handoff from the type-agnostic pending draft to the typed draft to
+# create-and-verify the new file BEFORE deleting the old one.
 
 draft_line="$(first_line "$PF" 'Resume a pending intake draft')"
 bool_line="$(first_line "$PF" 'Compute two booleans')"
@@ -188,6 +342,37 @@ if grep -qF 'More than one found' "$PF"; then
   pf_pass "CR-016: the multiple-pending-drafts case is explicitly handled"
 else
   pf_fail "CR-016: the multiple-pending-drafts case is no longer addressed — behavior with >1 draft is undefined again"
+fi
+
+# CR-020: the pre-fix collapsed key `step=type` must not reappear anywhere —
+# folder-mode and issue-type each need their own key so a resumed session
+# can tell which of the two incompatible questions is pending.
+if grep -qF 'step=type`' "$PF" || grep -qF 'step=type`' "$INTERACTION"; then
+  pf_fail "CR-020: found the pre-fix collapsed key 'step=type' — folder-mode and issue-type must stay separate keys"
+else
+  pf_pass "CR-020: no collapsed 'step=type' key anywhere — folder-mode/issue-type stayed separate"
+fi
+
+# CR-020, second half: intake origin (`entry`) must be carried forward from
+# the draft, never re-derived from a freshly recomputed has_pf on resume.
+if grep -qF 'not on a freshly recomputed `has_pf`' "$PF"; then
+  pf_pass "CR-020: the bare-folder/existing-project carve-out branches on stored entry, not a freshly recomputed has_pf"
+else
+  pf_fail "CR-020: the 'stored entry, not freshly recomputed has_pf' guarantee is gone — resuming could silently flip the carve-out"
+fi
+
+# CR-022: handoff from the type-agnostic pending draft to the typed draft
+# must create-and-verify the new file BEFORE deleting the old one — never
+# the reverse, or an interruption mid-handoff leaves no open marker anywhere
+# (Step 0 would then find "None found" and restart intake from scratch).
+create_line="$(first_line "$INTERACTION" 'Create the typed draft below')"
+verify_line="$(first_line "$INTERACTION" 'Read the typed-draft path back and confirm')"
+delete_line="$(first_line "$INTERACTION" 'Only then remove `.pf-intake-draft-pending.md`')"
+if [ -n "$create_line" ] && [ -n "$verify_line" ] && [ -n "$delete_line" ] \
+   && [ "$create_line" -lt "$verify_line" ] && [ "$verify_line" -lt "$delete_line" ]; then
+  pf_pass "CR-022: handoff order is create (line $create_line) -> verify (line $verify_line) -> delete (line $delete_line)"
+else
+  pf_fail "CR-022: handoff steps are missing or out of order (create=$create_line verify=$verify_line delete=$delete_line) — could reopen the zero-open-marker gap"
 fi
 
 # ══════════════════════════════════════════════════════════════════════════════
@@ -271,16 +456,32 @@ else
 fi
 
 # ══════════════════════════════════════════════════════════════════════════════
-printf '\n=== CR-019: pending-interaction answers are base64 in their own field\n'
+printf '\n=== CR-019 & CR-024: pending-interaction marker — status/answer are separate fields, round-trip\n'
 # ══════════════════════════════════════════════════════════════════════════════
 # Contract: skills/pf-interaction/SKILL.md item 2's closed-state schema.
 # `status` must be a closed two-value enum (open|resolved) and the free-text
-# reply must live in a SEPARATE `answer` field, base64-encoded — never
+# reply must live in a SEPARATE `answer` field, standard base64 — never
 # embedded as `status=resolved:<answer>` — because a raw reply containing a
-# newline or the literal sequence `-->` would otherwise break the single-line
-# HTML-comment marker. First check the contract text says this; then check
-# the property literally: base64-encoding a reply that contains both a
-# newline and `-->` produces output containing neither.
+# newline or the literal sequence `-->` would otherwise break the
+# single-line HTML-comment marker.
+#
+# The previous version of this section's last three asserts were true BY
+# CONSTRUCTION and could not go red from any SKILL.md mutation (confirmed by
+# the round-3 review): the fixture literally contained `-->`; the newline
+# check (`printf '%s\n' x | grep -q .`) only proved the string was
+# non-empty; `tr -d '\n'` guarantees a single line regardless of what
+# encoder produced its input; and `-->` is algebraically impossible in the
+# base64 alphabet regardless of the skill text. None of that exercises the
+# contract text at all. Replaced below with: (1) a literal check that the
+# marker TEMPLATE in the skill text itself defines `status=` and `answer=`
+# as two distinct, space-separated fields, (2) a round-trip built by filling
+# THAT extracted template's placeholders (not an independently-invented
+# format) with a hostile multiline/Unicode reply, verifying the result is
+# one line, `status` stays closed, and decoding `answer` back reproduces the
+# original byte-for-byte, and (3) an explicit count-based check that the old
+# `status=resolved:<answer>` form appears exactly once in the file — as the
+# rejected example in the contract's own rationale sentence, never as an
+# actual field spec anywhere else.
 
 if grep -qF 'closed two-value enum' "$INTERACTION"; then
   pf_pass "CR-019: 'status' is documented as a closed two-value enum"
@@ -294,29 +495,65 @@ else
   pf_fail "CR-019: the separate base64-encoded 'answer' field is no longer documented"
 fi
 
-# Property check: a hostile reply containing both a newline and the marker's
-# own closing sequence, base64-encoded, must contain neither.
-hostile_reply=$'first line\nsecond line--> status=resolved:tricked -->'
-if ! printf '%s' "$hostile_reply" | grep -qF -- '-->'; then
-  pf_fail "CR-019: test fixture is broken — hostile_reply doesn't even contain '-->' to begin with"
-elif ! printf '%s\n' "$hostile_reply" | grep -q .; then
-  pf_fail "CR-019: test fixture is broken — hostile_reply has no embedded newline to begin with"
+# The literal marker template line must define status/answer as two
+# distinct, space-separated fields — `status=<open|resolved> answer=
+# <base64|->` — not a merged `status=<open|resolved:<answer>>` form.
+marker_template_line="$(grep -F 'status=<open|resolved> answer=<base64|->' "$INTERACTION" | head -1)"
+if [ -n "$marker_template_line" ]; then
+  pf_pass "CR-024: the marker template defines 'status' and 'answer' as two distinct, space-separated fields"
 else
-  pf_pass "CR-019: fixture confirmed hostile (embeds a newline and a literal '-->')"
+  pf_fail "CR-024: the marker template no longer defines separate 'status=<open|resolved>' and 'answer=<base64|->' fields — CR-019's fix may have been reverted"
 fi
 
-encoded="$(printf '%s' "$hostile_reply" | base64 | tr -d '\n')"
-
-if [ -n "$encoded" ] && [[ "$encoded" != *$'\n'* ]]; then
-  pf_pass "CR-019: base64(hostile_reply) contains no embedded newline"
-else
-  pf_fail "CR-019: base64(hostile_reply) still contains a newline — the marker line would still break"
+# Round-trip: fill the extracted template's placeholders with a base64
+# encoding of a hostile multiline/Unicode reply, then verify the result.
+hostile_reply=$'первая строка — юникод\nвторая строка--> status=resolved:tricked -->'
+encoded_answer="$(printf '%s' "$hostile_reply" | base64 | tr -d '\n')"
+instance=""
+if [ -n "$marker_template_line" ]; then
+  instance="${marker_template_line//<open|resolved>/resolved}"
+  instance="${instance//<base64|->/$encoded_answer}"
 fi
 
-if [[ "$encoded" != *'-->'* ]]; then
-  pf_pass "CR-019: base64(hostile_reply) contains no literal '-->' — cannot terminate the HTML comment early"
+if [ -n "$marker_template_line" ] && [[ "$instance" != *$'\n'* ]]; then
+  pf_pass "CR-024: the filled-in template fragment is a single line (no embedded newline survived encoding)"
 else
-  pf_fail "CR-019: base64(hostile_reply) still contains '-->' — the RFC 4648 standard alphabet claim doesn't hold here"
+  pf_fail "CR-024: the filled-in template fragment contains an embedded newline, or the template is missing — the marker line would break"
+fi
+
+if [ -n "$marker_template_line" ] && [[ "$instance" == *'status=resolved '* ]]; then
+  pf_pass "CR-024: 'status=resolved' is closed and immediately followed by the separate 'answer=' field, not ':<raw-answer>'"
+else
+  pf_fail "CR-024: 'status=resolved' is no longer followed by a distinct 'answer=' field (or the template is missing)"
+fi
+
+if [ -n "$marker_template_line" ]; then
+  parsed_answer="$(printf '%s' "$instance" | sed -E 's/.*answer=([^ ]*).*/\1/')"
+  decoded="$(printf '%s' "$parsed_answer" | base64 -d 2>/dev/null || true)"
+  if [ "$decoded" = "$hostile_reply" ]; then
+    pf_pass "CR-024: round-trip holds — decoding the template's 'answer=' field reproduces the hostile multiline/Unicode reply byte-for-byte"
+  else
+    pf_fail "CR-024: round-trip broke — decoding the template's 'answer=' field did not reproduce the original hostile reply"
+  fi
+else
+  pf_fail "CR-024: round-trip skipped — no marker template to fill in (see previous FAIL)"
+fi
+
+# The old merged form must appear exactly once in the whole file — as the
+# rejected example inside the contract's own rationale sentence ("...the
+# reason status and answer are two separate fields instead of one
+# status=resolved:<answer> field..."), never anywhere else as an actual spec.
+if grep -qF 'instead of one `status=resolved:<answer>` field' "$INTERACTION"; then
+  pf_pass "CR-024: the contract explicitly rejects the old merged form (status=resolved:<answer>)"
+else
+  pf_fail "CR-024: the contract no longer explicitly rejects the old merged status=resolved:<answer> form"
+fi
+
+status_resolved_colon_count="$(grep -oF 'status=resolved:' "$INTERACTION" | wc -l)"
+if [ "$status_resolved_colon_count" -eq 1 ]; then
+  pf_pass "CR-024: 'status=resolved:' appears exactly once in pf-interaction/SKILL.md — only as the rejected old form"
+else
+  pf_fail "CR-024: 'status=resolved:' appears $status_resolved_colon_count times (expected exactly 1) — the old merged form may have crept back in as an actual field spec"
 fi
 
 # ─── S-5 ──────────────────────────────────────────────────────────────────────
