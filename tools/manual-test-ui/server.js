@@ -246,16 +246,20 @@ function readChecklistContent(entry) {
 }
 
 // A simplified stand-in for /pf's own stage-completion judgment
-// (skills/pf-size-tiers/SKILL.md: stub-marker detection, tier-based skip
-// resolution for user_docs/dev_docs, notes.md standing in for brd/specs/
-// implementation_plan at `size_tier: trivial`) — deliberately not
-// replicated here. This is "does the file exist" (`classifyIssueDoc`,
-// already used for doc-tabs — status "present"/"on_branch" both read as
-// done, "missing"/"not_applicable" as not done), nothing more nuanced.
-// Flagged as a scope simplification in the project-inbox screen's plan,
-// not a silent gap: a trivial-tier issue (no brd.md/specs.md/
-// implementation_plan.md by design, notes.md instead) will show those
-// three as not-done here rather than "not applicable at this tier".
+// (skills/pf-size-tiers/SKILL.md: stub-marker detection, "every preceding
+// stage is itself complete") — deliberately not replicated here. This is
+// "does the file exist, or does it legitimately not apply" per
+// `classifyIssueDoc` (already used for doc-tabs), nothing more nuanced: no
+// stub-marker check, no recursive "preceding stage" gate.
+//
+// `status` (CR-016 fix) carries `classifyIssueDoc`'s real
+// "present"/"not_applicable"/"missing" verdict — tier-based pipeline
+// exclusion, `roles.<key>: skip` (explicit or tier-default), and the
+// closed-issue archive rule are all folded into it via `docstate.js`'s
+// `applicability()`. `done` stays a boolean roll-up (`status === "present"`)
+// for any caller that only needs "is this document there", but a consumer
+// that must not conflate "legitimately not applicable" with "missing" reads
+// `status`, not `done` — see `public/status.js`'s `issueDocProblem()`.
 const STAGE_DOCS = [
   { key: "brd", doc: "brd.md" },
   { key: "specs", doc: "specs.md" },
@@ -271,7 +275,11 @@ const STAGE_DOCS = [
 function issueStages(ctx) {
   return STAGE_DOCS.map(({ key, doc }) => {
     const state = docstate.classifyIssueDoc(ctx, doc);
-    return { key, done: state.status === "present" || state.status === "on_branch" };
+    // `classifyIssueDoc` never actually returns a literal "on_branch"
+    // status — a document living only on the issue's own branch comes back
+    // as `{ status: "present", location: "branch" }` (CR-017) — so `done`
+    // is exactly "is this document present", nothing more.
+    return { key, status: state.status, done: state.status === "present" };
   });
 }
 

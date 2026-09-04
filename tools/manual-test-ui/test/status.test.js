@@ -216,3 +216,68 @@ test("projectCategory: role-filtered \"problems\" section only surfaces a role-o
   assert.strictEqual(developerResult.category, "problems");
   assert.deepStrictEqual(developerResult.detail, { issueId: "20260102-feat-b", message: "Нет QA report" });
 });
+
+// ---------------------------------------------------------------------------
+// CR-016 — `status` (real classifyIssueDoc verdict: present/not_applicable/
+// missing) must be read in preference to the collapsed `done` boolean, so a
+// stage that legitimately does not apply to this issue never renders as a
+// "Нет <Doc>" defect. A stage entry with no `status` field at all (every
+// fixture above, and any older caller) keeps behaving exactly as before —
+// `!done` is still the fallback.
+// ---------------------------------------------------------------------------
+
+// Every stage entry a real `GET .../issues` response now carries: `key`,
+// `done` (kept for any caller that only reads that) and `status`.
+function stage(key, status) {
+  return { key, status, done: status === "present" };
+}
+
+test("issueDocProblem: (a) a trivial-tier issue's collapsed docs (not_applicable, not missing) produce no problem", async () => {
+  const mod = await loadModule();
+  // A trivial-tier issue: brd/specs/implementation_plan collapse into
+  // notes.md and are legitimately not_applicable, not missing — see
+  // docstate.js's PIPELINES.trivial / TRIVIAL_COLLAPSED. Everything the
+  // trivial pipeline does produce is present.
+  const stages = [
+    stage("brd", "not_applicable"),
+    stage("specs", "not_applicable"),
+    stage("test_plan", "present"),
+    stage("implementation_plan", "not_applicable"),
+    stage("code_review", "present"),
+    stage("testing", "present"),
+    stage("user_docs", "not_applicable"), // tier-default skip at trivial (pf-roles §4, level 3)
+    stage("dev_docs", "not_applicable"), // same
+    stage("qa", "present"),
+  ];
+  const issue = { stages, codeReviewVerdict: "PASS", qaVerdict: "PASS" };
+  assert.strictEqual(mod.issueDocProblem(issue), null, "not_applicable must never read as \"Нет BRD\"/\"Нет Spec\"/…");
+  assert.strictEqual(mod.issueStatusMessage(issue, 0, 0), null);
+});
+
+test("issueDocProblem: (b) roles.user_docs: skip (not_applicable) produces no \"Нет User docs\" problem", async () => {
+  const mod = await loadModule();
+  const stages = stagesAllDone().map((s) => stage(s.key, "present"));
+  stages.find((s) => s.key === "user_docs").status = "not_applicable"; // roles.user_docs: skip
+  const issue = { stages, codeReviewVerdict: "PASS", qaVerdict: "PASS" };
+  assert.strictEqual(mod.issueDocProblem(issue), null);
+});
+
+test("issueDocProblem: (c) a genuinely missing document still produces a problem, even alongside not_applicable ones", async () => {
+  const mod = await loadModule();
+  // Mixed states in pipeline order: brd/specs not_applicable (this issue's
+  // pipeline never produces them), qa genuinely missing — over-suppression
+  // would swallow qa's problem too; under-suppression would flag brd/specs
+  // as well. Exactly one problem, and it is the real one.
+  const stages = [
+    stage("brd", "not_applicable"),
+    stage("specs", "not_applicable"),
+    stage("test_plan", "present"),
+    stage("implementation_plan", "present"),
+    stage("code_review", "present"),
+    stage("testing", "present"),
+    stage("user_docs", "not_applicable"),
+    stage("dev_docs", "not_applicable"),
+    stage("qa", "missing"),
+  ];
+  assert.strictEqual(mod.issueDocProblem({ stages }), "Нет QA report");
+});

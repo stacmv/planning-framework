@@ -31,20 +31,40 @@ const path = require("node:path");
 
 const git = require("./git");
 const markdown = require("./markdown");
+const rolesResolve = require("./roles-resolve");
 
 // The pipelines, copied from the single definition in
 // `skills/pf-size-tiers/SKILL.md` ("Pipelines — what 'preceding stage'
 // means"). A document is applicable to an issue exactly when it appears in
-// that issue's pipeline.
+// that issue's pipeline. `code_review.md`/`user_docs.md`/`dev_docs.md` are
+// present in every pipeline below, `trivial` included — pf-size-tiers is
+// explicit that CODE_REVIEW "applies uniformly across every tier" and that
+// USER_DOCS/DEV_DOCS are "present in every pipeline ... including
+// size_tier: trivial". Whether either of the three actually requires a
+// document on a given issue is decided by role resolution
+// (`applicability()`, below), not by this table — same division of labour
+// pf-size-tiers itself draws.
 const PIPELINES = {
-  trivial: ["prompt.md", "notes.md", "test_plan.md", "manual_test_checklist.md", "qa_report.md"],
+  trivial: [
+    "prompt.md",
+    "notes.md",
+    "test_plan.md",
+    "code_review.md",
+    "manual_test_checklist.md",
+    "user_docs.md",
+    "dev_docs.md",
+    "qa_report.md",
+  ],
   feat: [
     "prompt.md",
     "brd.md",
     "specs.md",
     "test_plan.md",
     "implementation_plan.md",
+    "code_review.md",
     "manual_test_checklist.md",
+    "user_docs.md",
+    "dev_docs.md",
     "qa_report.md",
   ],
   improve: [
@@ -52,7 +72,10 @@ const PIPELINES = {
     "brd.md",
     "test_plan.md",
     "implementation_plan.md",
+    "code_review.md",
     "manual_test_checklist.md",
+    "user_docs.md",
+    "dev_docs.md",
     "qa_report.md",
   ],
   bug: [
@@ -60,7 +83,10 @@ const PIPELINES = {
     "analysis.md",
     "test_plan.md",
     "implementation_plan.md",
+    "code_review.md",
     "manual_test_checklist.md",
+    "user_docs.md",
+    "dev_docs.md",
     "qa_report.md",
   ],
 };
@@ -78,8 +104,21 @@ const ISSUE_DOC_STAGES = {
   "specs.md": "/pf-spec",
   "test_plan.md": "/pf-test-plan",
   "implementation_plan.md": "/pf-impl-plan",
+  "code_review.md": "/pf-codereview",
   "manual_test_checklist.md": "/pf-test",
+  "user_docs.md": "/pf-user-docs",
+  "dev_docs.md": "/pf-dev-docs",
   "qa_report.md": "/pf-qa",
+};
+
+// The three documents whose applicability is not decided by tier/type alone
+// (CR-016) — each is governed by one `roles.<key>` entry, resolved via
+// `lib/roles-resolve.js`'s `resolveRole()` (the same five-level fallback
+// order `pf-roles` SKILL.md §4 documents, reused rather than reimplemented).
+const ROLE_GOVERNED_DOCS = {
+  "code_review.md": "code",
+  "user_docs.md": "user_docs",
+  "dev_docs.md": "dev_docs",
 };
 
 // Project-level documents are never issue-specific, so they are always
@@ -163,20 +202,105 @@ function pipelineFor(meta) {
 }
 
 /**
+ * Resolve the `roles.<key>` entry that governs one of the three
+ * role-governed documents, via `lib/roles-resolve.js`'s `resolveRole()`.
+ * `null` when `docName` is not one of them.
+ *
+ * Pure with respect to I/O — the raw YAML texts are read once, by
+ * `buildIssueContext`, and carried on `ctx`; a `ctx` that never went through
+ * `buildIssueContext` (a hand-built object in a test, say) degrades to the
+ * same empty-string defaults `resolveRole` already treats as "nothing
+ * explicit configured" (general default, level 5).
+ */
+function resolveDocRole(docName, ctx) {
+  const key = ROLE_GOVERNED_DOCS[docName];
+  if (!key) return null;
+  return rolesResolve.resolveRole(key, {
+    promptText: (ctx && ctx.promptText) || "",
+    roleProfilesText: (ctx && ctx.roleProfilesText) || "",
+    agentsText: (ctx && ctx.agentsText) || "",
+    sizeTier: ctx && ctx.sizeTier,
+  });
+}
+
+/**
+ * Why `docName` does not apply to this issue because of role resolution —
+ * `null` when it is not one of the three role-governed documents, or when
+ * resolution does not land on a skip for it.
+ *
+ * Only two shapes count as "skipped":
+ *   * `user_docs.md`/`dev_docs.md` — `resolveRole("user_docs"|"dev_docs", …)`
+ *     came back `{ ok: true, skip: true }`, whether from an explicit
+ *     `roles.<key>: skip` (level 1/2) or the tier default for
+ *     `trivial`/`small` (level 3, pf-roles §4).
+ *   * `code_review.md` — `resolveRole("code", …)` came back `{ ok: true,
+ *     review: "skip" }` (`code.review: skip` — review only; authorship of
+ *     `code` itself can never be skipped, so the whole-stage `skip` shape
+ *     never applies to this key at all).
+ * A resolution failure (`ok: false` — e.g. `roles.code: skip`'s
+ * `invalid_skip`) and a human actor (`kind: "human"`) are different,
+ * unrelated outcomes and must not be misread as a skip.
+ */
+function roleSkipReason(docName, ctx) {
+  const key = ROLE_GOVERNED_DOCS[docName];
+  if (!key) return null;
+  const resolved = resolveDocRole(docName, ctx);
+  if (!resolved || resolved.kind === "human" || resolved.ok !== true) return null;
+
+  if (key === "code") {
+    if (resolved.review === "skip") {
+      return `roles.code.review: skip is set for this issue — code review is not offered`;
+    }
+    return null;
+  }
+
+  if (!resolved.skip) return null;
+  const tier = (ctx && ctx.sizeTier) || DEFAULT_SIZE_TIER;
+  return resolved.level === 3
+    ? `${key} resolves to skip by default at ${tier} tier (pf-roles SKILL.md §4, level 3) — no roles.${key} override is set`
+    : `roles.${key}: skip is set for this issue`;
+}
+
+/**
  * Is `docName` produced by this issue's pipeline at all?
  *
  * A name the pipelines say nothing about (a file inside `test-data/`, say)
  * is treated as applicable: "this tool has no rule about it" must not be
  * reported to a reader as "it should not be here".
  *
+ * Three layers, most specific reason first:
+ *   1. the type/tier pipeline table (existing behavior) — a document a
+ *      pipeline never produces at all (a BRD on a bug issue, say);
+ *   2. role resolution (CR-016) — `code_review.md`/`user_docs.md`/
+ *      `dev_docs.md` only, skipped by an explicit or tier-default
+ *      `roles.<key>: skip`;
+ *   3. archive status — a closed issue is merged and done; pf-size-tiers'
+ *      single stage-completion definition states plainly that its
+ *      mechanical "missing, and here is the stage that creates it" check
+ *      "applies to issues under docs/issues/open/ ... Issues under
+ *      docs/issues/closed/ are archive ... this criterion never fires on
+ *      it" — the same reasoning `prepareVisibility()` already applies to
+ *      the prepare action ("a closed issue is an archive").
+ *
  * @returns {{applicable: boolean, reason: string|null}}
  */
-function applicability(docName, meta) {
+function applicability(docName, ctx) {
   if (!Object.prototype.hasOwnProperty.call(ISSUE_DOC_STAGES, docName)) {
     return { applicable: true, reason: null };
   }
-  if (pipelineFor(meta).includes(docName)) return { applicable: true, reason: null };
-  return { applicable: false, reason: notApplicableReason(docName, meta) };
+  if (!pipelineFor(ctx).includes(docName)) {
+    return { applicable: false, reason: notApplicableReason(docName, ctx) };
+  }
+  const roleReason = roleSkipReason(docName, ctx);
+  if (roleReason) return { applicable: false, reason: roleReason };
+  if (ctx && ctx.issueStatus === "closed") {
+    return {
+      applicable: false,
+      reason:
+        "this issue is closed — the mechanical stage-completion check (skills/pf-size-tiers/SKILL.md) only routes open issues; a closed issue is an archive",
+    };
+  }
+  return { applicable: true, reason: null };
 }
 
 function notApplicableReason(docName, meta) {
@@ -287,7 +411,33 @@ function buildIssueContext(projectRoot, issueId, issueStatus) {
   const ctx = { projectRoot, issueId, issueStatus, issueDir, issueRelDir, branch, branchFiles };
   const prompt = readIssueFile(ctx, "prompt.md");
   const meta = readIssueMeta(prompt ? prompt.content : null, issueId);
-  return { ...ctx, ...meta, metaSource: prompt ? prompt.location : "none" };
+  // `roles.<key>` resolution (CR-016, `roleSkipReason` above) needs the raw
+  // `prompt.md` text (for its `roles:`/`profile:` frontmatter) plus the two
+  // project-level YAML files `resolveRole` reads `profiles:`/`actors:` out
+  // of. Both are project-level, not per-issue, so — unlike `prompt.md` —
+  // they are read from disk only, with no issue-branch fallback: a project
+  // that genuinely keeps them only on a branch degrades to `resolveRole`'s
+  // own defaults (general default at level 5, no tier-default skip source),
+  // exactly as it would if the files did not exist at all.
+  const roleProfilesText = readProjectFileText(projectRoot, "docs/planning/role-profiles.yml");
+  const agentsText = readProjectFileText(projectRoot, "docs/planning/agents.yml");
+  return {
+    ...ctx,
+    ...meta,
+    metaSource: prompt ? prompt.location : "none",
+    promptText: prompt ? prompt.content : "",
+    roleProfilesText,
+    agentsText,
+  };
+}
+
+/** `projectRoot`-relative file text, or `""` when it cannot be read — never throws. */
+function readProjectFileText(projectRoot, relPath) {
+  try {
+    return fs.readFileSync(path.join(projectRoot, ...String(relPath).split("/")), "utf8");
+  } catch {
+    return "";
+  }
 }
 
 /**
@@ -777,6 +927,9 @@ module.exports = {
   readIssueMeta,
   pipelineFor,
   applicability,
+  ROLE_GOVERNED_DOCS,
+  resolveDocRole,
+  roleSkipReason,
   stageFor,
   buildIssueContext,
   readIssueFile,

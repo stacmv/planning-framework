@@ -48,6 +48,26 @@ function relevantToRoles(stageKey, roleIds) {
 }
 
 /**
+ * Is this stage entry a genuinely *missing* document — as opposed to one
+ * that legitimately does not apply to this issue (`not_applicable`)?
+ *
+ * `status` (CR-016) is the real `classifyIssueDoc` verdict and is checked
+ * first when present. A stage entry with no `status` field at all — a
+ * hand-built fixture from before this fix, or any future caller that only
+ * ever sends `{key, done}` — falls back to the old `!done` reading, so
+ * existing behaviour is unchanged wherever `status` is absent. Where
+ * `status` *is* present, `not_applicable` must contribute nothing here: a
+ * trivial-tier issue with no `specs.md`, or `roles.user_docs: skip`, is not
+ * a defect and must not render as "Нет Spec"/"Нет User docs".
+ *
+ * @param {{key: string, done: boolean, status?: string}} stage
+ * @returns {boolean}
+ */
+function isMissingStage(stage) {
+  return stage.status ? stage.status === "missing" : !stage.done;
+}
+
+/**
  * Priority 1-3 of the status message: a missing pipeline doc, or a FAIL
  * verdict on one that exists — filtered to `roleIds` (empty/omitted =
  * unfiltered) via `stage-roles.js`'s "who creates this document" table.
@@ -55,15 +75,16 @@ function relevantToRoles(stageKey, roleIds) {
  * selected roles) — this issue may still have pending tests/tasks, checked
  * separately by `issueStatusMessage` below.
  *
- * @param {{stages?: Array<{key: string, done: boolean}>, codeReviewVerdict?: string|null, qaVerdict?: string|null}} issue
+ * @param {{stages?: Array<{key: string, done: boolean, status?: string}>, codeReviewVerdict?: string|null, qaVerdict?: string|null}} issue
  * @param {string[]} [roleIds]
  * @returns {string|null}
  */
 export function issueDocProblem(issue, roleIds) {
   const stages = Array.isArray(issue && issue.stages) ? issue.stages : [];
-  const doneByKey = new Map(stages.map((s) => [s.key, s.done]));
+  const stageByKey = new Map(stages.map((s) => [s.key, s]));
   for (const [key, label] of STAGE_LABELS) {
-    if (doneByKey.has(key) && !doneByKey.get(key) && relevantToRoles(key, roleIds)) return `Нет ${label}`;
+    const stage = stageByKey.get(key);
+    if (stage && isMissingStage(stage) && relevantToRoles(key, roleIds)) return `Нет ${label}`;
   }
   if (issue && issue.codeReviewVerdict === "FAIL" && relevantToRoles("code_review", roleIds)) return "Code review: FAIL";
   if (issue && issue.qaVerdict === "FAIL" && relevantToRoles("qa", roleIds)) return "QA: FAIL";
