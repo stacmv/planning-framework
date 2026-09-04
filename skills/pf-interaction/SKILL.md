@@ -183,8 +183,9 @@ without reopening the question from scratch.
    "reply with the number or the exact option text".
 2. **Pending-state — exact marker, where it lives.** Before printing the
    question, write a marker line into the document (not session memory):
-   `<!-- pf-pending-interaction: stage=<stage-key> step=<step> options=
-   <opt1>|<opt2>|... selected=<selected-object|-> asked=<ISO-timestamp>
+   `<!-- pf-pending-interaction: stage=<stage-key> step=<step> entry=
+   <bare-folder|existing-project|-> options=<opt1>|<opt2>|...
+   selected=<selected-object|-> asked=<ISO-timestamp>
    status=<open|resolved> answer=<base64|-> -->`. Placement:
    - `verdict.md` (decision session, `stage=decision-session`) — the marker
      is **not** placed "immediately before `## Decision`": Mode 2 runs
@@ -212,6 +213,20 @@ without reopening the question from scratch.
      one by the empty-ledger check ("show an empty ledger, not an error")
      `pf-close` Phase 1 already runs. If the file already exists, append or
      rewrite the marker as its last line exactly as before.
+
+     **For `TYPE: spike` specifically, this file's branch is not fixed.**
+     `pf-close`'s Phase 1 branch preflight (CR-021) may put this write on
+     `issue/<spike-id>` or on PARENT-BRANCH depending on where the close
+     started, and Phase 3.5's later `git checkout issue/<spike-id> --
+     docs/issues/open/<spike-id>` can replace this whole file with a
+     different branch's copy. Placement stays exactly as specified above —
+     still the file's last line, after the table — this skill defines
+     *where the line goes inside the file*, not *which branch's copy of the
+     file survives close*; that guarantee (the marker line is carried
+     forward across that checkout whenever it would otherwise be lost) is
+     `pf-close`'s responsibility, not this skill's — see
+     `~/.claude/skills/pf-close/SKILL.md` Phase 1 ("Branch preflight") and
+     Phase 3.5 (CR-021).
    - the intake draft (`stage=intake`) — see item 5 below for where that
      document lives and when it is created; the marker lives inside it, not
      in the eventual `prompt.md`.
@@ -231,14 +246,29 @@ without reopening the question from scratch.
        `~/.claude/skills/pf/SKILL.md`'s Step 0, Step 3, and the Idea/Spike
        branches under "Creating prompt.md" — not only the two content
        batches:
-       - `type` — the issue-type fork (Step 0's "An idea"/"a project", or
-         Step 3's feat/bug/idea/spike four-option question).
+       - `folder-mode` — Step 0's own fork ("An idea"/"a project, right
+         away", exactly two options), asked only when `has_pf` was false at
+         the start of this run. Never confused with `issue-type` below:
+         the two ask genuinely different questions (two options deciding
+         whether an intake pipeline runs at all, vs. four options deciding
+         which pipeline) and never both fire in the same intake sequence —
+         `folder-mode`'s "An idea" answer resolves `<type>` to `idea`
+         directly, without ever reaching `issue-type`; its "A project,
+         right away" answer resolves no `<type>` at all, it scaffolds and
+         falls through to Step 3, whose own `issue-type` question is what
+         actually resolves `<type>` for that path.
+       - `issue-type` — Step 3's feat/bug/idea/spike four-option question,
+         asked whenever Step 3 runs (a project where `has_pf` was already
+         true, or one Step 0's "A project, right away" branch just
+         scaffolded and fell through into Step 3).
        - `type-confirm` — the conditional spike-vs-feature disambiguation
-         follow-up ("This sounds like a technical spike…", Step 3 only,
-         fires only when free text was ambiguous). Absent from the
-         sequence when it never fired — a resumed session that finds no
-         marker at this step, with `type` already resolved unambiguously,
-         treats it as never asked, not as still pending.
+         follow-up ("This sounds like a technical spike…"), exists only
+         after `issue-type`, fires only when free text was ambiguous. Never
+         follows `folder-mode` — Step 0's fork has no confirmation
+         follow-up of its own. Absent from the sequence when it never
+         fired — a resumed session that finds no marker at this step, with
+         `issue-type` already resolved unambiguously, treats it as never
+         asked, not as still pending.
        - `language` — the shared `doc_language` question ("What language
          should the planning documents…"), asked once regardless of type.
        - `<batch>.<question>` (e.g. `1.2` = batch 1, question 2) — the
@@ -283,6 +313,28 @@ without reopening the question from scratch.
        (`final-gate` reuses `decision-session`'s "2. Override" by
        reference, per `~/.claude/skills/pf-close/SKILL.md` Phase 1's
        front-loaded gate text).
+   - `entry` — **`intake` only**; `-` for `decision-session`/`final-gate`
+     (not applicable there) and while `stage=intake` is still at
+     `step=folder-mode`/`issue-type`/`type-confirm` (`<type>` itself not
+     yet known — see item 5 below). One of `bare-folder` |
+     `existing-project` once set: which fork produced this intake
+     sequence — Step 0's bare-folder `folder-mode` "An idea" answer, or
+     Step 3's `issue-type` question (reached either because `has_pf` was
+     already true, or because `folder-mode`'s "A project, right away"
+     answer just scaffolded one and fell through into Step 3). Set exactly
+     once, at the same moment `<type>` itself becomes known and the typed
+     draft `.pf-intake-draft-<type>.md` is created (item 5 below), and
+     never recomputed afterward — in particular, never re-derived from a
+     fresh `has_pf` check on resume, since folder state can change between
+     when intake started and when a later session resumes it. This is what
+     `~/.claude/skills/pf/SKILL.md`'s Idea branch bare-folder carve-out
+     ("Bare-folder carve-out (AC-01b)" vs. "Existing-project role
+     assignment") resumes on: `entry=bare-folder` skips
+     `roles.<n>`/`on-unavailable` outright (consistent with those steps
+     never appearing in this draft's own `step` sequence, per the
+     `roles.<n>`/`on-unavailable` paragraph above); `entry=existing-project`
+     runs them normally. A resumed session reads this stored field to
+     decide, never `has_pf` recomputed at resume time.
    - `options` — unchanged from before: the same option vocabulary as the
      structured question this line stands in for. Empty/omitted for
      `override-answer` (free text, not a menu).
@@ -308,8 +360,9 @@ without reopening the question from scratch.
    Question text itself is never duplicated into the marker: for `intake`,
    the wording is the fixed, statically-defined text of the question named
    by `step` (a content-batch question, or one of the named pre-/post-batch
-   questions above — `type`, `type-confirm`, `language`, `file-confirm`,
-   `roles.<n>`, `on-unavailable`); for `decision-session`/`final-gate`, it is already
+   questions above — `folder-mode`, `issue-type`, `type-confirm`,
+   `language`, `file-confirm`, `roles.<n>`, `on-unavailable`); for
+   `decision-session`/`final-gate`, it is already
    fixed in the surrounding document text (the recommended verdict and its
    reasoning, or the assumptions/open-questions ledger) exactly as item 4
    already required. `step` plus that surrounding text is sufficient
@@ -341,31 +394,91 @@ without reopening the question from scratch.
    same rewrite also advances `step` to the next one and sets
    `status=open`/`answer=-` again with `selected` filled in, rather than
    being removed — the marker line is retired only when its stage fully
-   completes (item 5 covers the one case, `intake`, where that also means
-   the document holding it is retired). Once a marker reads
-   `status=resolved` (with `answer` decoded) for a stage's last `step`,
-   normal logic resumes exactly as on the Claude path (append
+   completes (item 5 covers two such retirements for `intake`, each also
+   retiring the document holding it: the typed draft's marker, when the
+   draft becomes `prompt.md`; and, as a **sanctioned exception to
+   "exactly one strategy" above**, the type-agnostic pending file's
+   marker, when `folder-mode`/`issue-type`/`type-confirm` resolves. That
+   one answer is never rewritten to `status=resolved` in place, and its
+   document is deleted rather than retained resolved: its "answer" isn't a
+   base64 reply to preserve, it *is* `<type>` and `entry`, which the typed
+   draft created in the same handoff already carries forward as its own
+   `entry` field and its filename — recording it twice would duplicate,
+   not preserve, the audit trail. CR-022's ordering — create the typed
+   draft with its own open marker, verify it, only then delete the pending
+   file — is what keeps this exception from ever producing a
+   zero-open-marker gap; see item 5's "Handoff to the typed draft" for the
+   exact steps and the transitional window they can leave open.). Once a
+   marker reads `status=resolved` (with `answer` decoded) for a stage's
+   last `step`, normal logic resumes exactly as on the Claude path (append
    "## Decision", etc.).
 5. **Intake (`stage=intake`).** The same protocol also covers the whole
    intake sequence (item 2's `step` dictionary above, not only the two
    content batches) — pending-state lives in a draft document, not session
    memory, on the same principle as items 2-4 above. Two sub-cases, split
    by whether `<type>` is already known:
-   - **`step=type` and `step=type-confirm`.** These are what determines
-     `<type>` in the first place, so neither a `<type>`-named draft nor
-     `docs/issues/open/<issue-id>/prompt.md` can exist yet when either is
-     asked — for Step 0's bare-folder entry, `docs/issues/open/` itself may
-     not exist yet either. Before printing the `type` question, create (the
+   - **`step=folder-mode`, `step=issue-type`, and `step=type-confirm`.**
+     These are what determines `<type>` in the first place, so neither a
+     `<type>`-named draft nor `docs/issues/open/<issue-id>/prompt.md` can
+     exist yet when any of them is asked — for Step 0's bare-folder entry,
+     `docs/issues/open/` itself may not exist yet either. Before printing
+     whichever of these questions comes first on this run's path
+     (`folder-mode` for Step 0, `issue-type` for Step 3), create (the
      parent directory too, if absent) a fixed, type-agnostic pending file,
      `docs/issues/open/.pf-intake-draft-pending.md`, and write the marker
-     into it — item 2's "at most one open marker per interactive point"
-     rule applied with only one point instead of one-per-`<type>`, since no
-     `<type>` exists yet to key separate points by. Nothing else is written
-     into this file: the `type`/`type-confirm` answers are a routing
-     decision, not `prompt.md` content. Once `type` resolves (and
-     `type-confirm`, if it fired), `<type>` is known and this file is
-     deleted — its job was only to survive a resumption while `<type>` was
-     still undetermined.
+     into it, `entry=-` — item 2's "at most one open marker per interactive
+     point" rule applied with only one point instead of one-per-`<type>`,
+     since no `<type>` exists yet to key separate points by (a single run
+     only ever takes one of the two forks, never both, so this is still one
+     point). Nothing else is written into this file: the
+     `folder-mode`/`issue-type`/`type-confirm` answers are a routing
+     decision, not `prompt.md` content.
+
+     **Handoff to the typed draft — create-and-verify before delete, never
+     the reverse (CR-022).** `folder-mode`'s "An idea" answer resolves
+     `<type>` to `idea` directly (`entry=bare-folder`); `issue-type` (and
+     `type-confirm`, if it fired) resolves `<type>` to whichever of
+     `feat`/`improve`/`bug`/`idea`/`spike` was chosen (`entry=
+     existing-project` — `folder-mode`'s "A project, right away" answer
+     never resolves `<type>` itself, it scaffolds and falls through to
+     Step 3's `issue-type` question instead, which is what actually
+     resolves it, to `entry=existing-project`). Once `<type>`/`entry` are
+     known, hand off in this order, never the reverse:
+     1. Create the typed draft below (or, where the runtime's file
+        operations support it, atomically rename
+        `.pf-intake-draft-pending.md` to `.pf-intake-draft-<type>.md` and
+        edit the renamed file's content in place — either way, the file
+        that ends up at the typed-draft path already carries `entry` and a
+        `pf-pending-interaction` marker advanced to `step=language`,
+        `status=open` — the *next* pending question, not the
+        just-resolved `folder-mode`/`issue-type`/`type-confirm` step).
+     2. Read the typed-draft path back and confirm the marker line is
+        actually there with `status=open` at `step=language` — the file on
+        disk, not memory of having just written it.
+     3. Only then remove `.pf-intake-draft-pending.md`, if it still exists
+        as a separate path (a no-op when step 1 used rename).
+
+     Deleting `.pf-intake-draft-pending.md` before the typed draft exists
+     and is confirmed — the previous ordering — is exactly the bug this
+     fixes: an interruption inside that gap left the system with **no**
+     open marker anywhere, and the next `/pf` found "None found" at Step 0
+     and restarted intake from scratch, discarding the already-resolved
+     `<type>`/`entry` and every answer gathered so far — precisely what
+     this whole mechanism exists to prevent. With the order above, a crash
+     before step 1 completes leaves the pending file's `status=open`
+     marker intact (resumes the `folder-mode`/`issue-type`/`type-confirm`
+     question, unanswered from the file's own perspective — safe, if
+     mildly redundant when the user had just answered it this session). A
+     crash between step 1 and step 3 (only reachable via the two-file
+     variant; rename collapses this window to nothing) briefly leaves
+     *both* files present with open markers — safe under the same
+     invariant, resolved by Step 0's existing "More than one found" rule
+     the same way two concurrently mid-flight typed drafts already are
+     (`~/.claude/skills/pf/SKILL.md` Step 0): pick the earliest `asked`
+     first. That may re-show the already-resolved
+     `folder-mode`/`issue-type`/`type-confirm` question once more instead
+     of jumping straight to `language` — never the CR-022 failure mode of
+     losing the marker altogether.
    - **`step=language` onward.** The eventual issue folder name is only
      decided once its slug is known, and the slug is itself derived from an
      answer gathered *later* in intake (`~/.claude/skills/pf/SKILL.md`'s
@@ -373,16 +486,15 @@ without reopening the question from scratch.
      decided when `prompt.md` is written"), so the draft still cannot start
      life at the final `docs/issues/open/<issue-id>/prompt.md` path even
      once `<type>` is known — that path does not exist yet when `language`
-     is asked. Fix the moment and the path: **before** printing `step=language`
-     (intake's first question once `<type>` is known — immediately after
-     deleting `.pf-intake-draft-pending.md` above, when that step ran; or
-     immediately, for any type that skips `type-confirm`), create
-     `docs/issues/open/.pf-intake-draft-<type>.md` (`<type>` = `idea` |
-     `spike` | `feat` | `improve` | `bug`; at most one draft per `<type>`
-     open at a time, the same one-open-marker-per-point rule from item 2
-     applied here to a concurrently-running intake — this is what lets two
-     different-`<type>` intakes run concurrently once each has passed
-     `step=type`, unlike the single shared pending file above). Each
+     is asked. `docs/issues/open/.pf-intake-draft-<type>.md` (`<type>` =
+     `idea` | `spike` | `feat` | `improve` | `bug`; at most one draft per
+     `<type>` open at a time, the same one-open-marker-per-point rule from
+     item 2 applied here to a concurrently-running intake — this is what
+     lets two different-`<type>` intakes run concurrently once each has
+     separately completed the handoff above) is exactly the file the
+     handoff above already created, `entry` already set and its marker
+     already open at `step=language` — there is nothing further to create
+     here, only to keep appending to. Each
      answered question from `language` onward is appended into this draft
      as it comes in, and the `pf-pending-interaction` marker (`stage=intake`)
      lives inside it, advanced per item 4 as each question resolves. Once

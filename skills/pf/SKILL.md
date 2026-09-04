@@ -28,29 +28,59 @@ same as no draft (do not resume it).
   recompute `has_pf`/`has_git` first, since `docs/issues/open/` may itself
   have been created only as a side effect of writing this draft. Re-derive
   `<type>` (unresolved for `.pf-intake-draft-pending.md`; otherwise the
-  `<type>` named in the filename), re-enter the matching flow at the marker's
-  recorded `step` (Step 0's own question when `step` is `type`/`type-confirm`;
-  otherwise "Creating prompt.md"'s flow for that `<type>`), and re-show the
-  pending question — via `AskUserQuestion` or the Codex text-REPL adapter,
+  `<type>` named in the filename), re-enter the matching flow at the
+  marker's recorded `step` — Step 0's own two-option question when `step`
+  is `folder-mode`; Step 3's four-option question (or its confirming
+  follow-up) when `step` is `issue-type`/`type-confirm`; otherwise
+  "Creating prompt.md"'s flow for that `<type>` — and re-show the pending
+  question — via `AskUserQuestion` or the Codex text-REPL adapter,
   whichever this session's own `orchestrator_provider` calls for, same as
   every other intake question below — following item 4's resumption
   discipline ("Safe resumption"): do not recompute a recommendation, do not
   restart the stage from scratch, do not re-ask a `step` already resolved.
-- **More than one found** (only possible among the `<type>`-named drafts —
-  item 5's "at most one draft per `<type>`" rule already limits
-  `.pf-intake-draft-pending.md` to a single file, and two different `<type>`
-  intakes can only both be mid-flight once each has separately passed
-  `step=type`) — resume the one with the earliest `asked` timestamp first;
-  deterministic, so no extra question is needed to choose one (the tool that
-  would ask it may not even exist yet under a non-Claude orchestrator).
-  Mention the rest in this run's output, e.g. "N other intake draft(s)
-  pending: `<type>` (asked `<timestamp>`) — resume with a later `/pf` run" —
-  so they are never silently forgotten — and do not touch them this run.
+  For a `<type>`-named draft (`<type>` already known), also read its
+  marker's `entry` field and carry it forward as-is for the rest of this
+  run — in particular, the Idea branch's carve-out below
+  ("Bare-folder carve-out (AC-01b)" vs. "Existing-project role assignment")
+  branches on this stored `entry`, never on a freshly recomputed `has_pf`,
+  which may no longer match the value `has_pf` held when this intake
+  originally started.
+- **More than one found** — resume the one with the earliest `asked`
+  timestamp first; deterministic, so no extra question is needed to choose
+  one (the tool that would ask it may not even exist yet under a
+  non-Claude orchestrator). Mention the rest in this run's output, e.g. "N
+  other intake draft(s) pending: `<type>` (asked `<timestamp>`) — resume
+  with a later `/pf` run" — so they are never silently forgotten — and do
+  not touch them this run. Two ways this happens: the ordinary case (item
+  5's "at most one draft per `<type>`" rule already limits
+  `.pf-intake-draft-pending.md` to a single file, and two different
+  `<type>` intakes can only both be mid-flight once each has separately
+  passed `step=folder-mode`/`issue-type`); and the brief transitional case
+  where `.pf-intake-draft-pending.md` and a freshly-created
+  `.pf-intake-draft-<type>.md` are both found open at once, immediately
+  after `<type>` resolves and before the handoff between them finishes
+  (`~/.claude/skills/pf-interaction/SKILL.md`'s "Codex text-REPL adapter"
+  item 5, "Handoff to the typed draft" — CR-022's create-and-verify-before-
+  delete ordering leaves this window open on purpose rather than risking a
+  window with no open marker at all). Both cases use the same
+  earliest-`asked`-first rule; in the transitional case that means the
+  stale pending file (older) resumes first and simply re-asks the
+  already-resolved `folder-mode`/`issue-type`/`type-confirm` question once
+  more — harmless redundancy, not data loss. If the re-answer matches the
+  `<type>` already committed to the existing typed draft, that draft
+  resumes normally on the following `/pf` run once the pending file's
+  leftover is cleaned up. If it names a **different** `<type>` instead
+  (the user answered "spike" the first time, "idea" on the re-ask), the
+  earlier typed draft is not touched or merged — it is simply a second,
+  independently-resumable pending draft from here on, surfaced the normal
+  way by this same "More than one found" case on a later run ("N other
+  intake draft(s) pending: `<type>` …") until the user resumes and
+  finishes or abandons it; nothing silently deletes or loses it.
 
 Whichever draft is resumed, this replaces Step 0's folder-state question and
 the rest of this run's normal routing entirely: an open draft is never
-overwritten by a fresh `type` question, and its document is never re-created
-from scratch.
+overwritten by a fresh `folder-mode`/`issue-type` question, and its document
+is never re-created from scratch.
 
 Before anything else — including Step 1 — determine whether the current working directory already carries a Planning Framework project, so the git-sync in Step 2 is never attempted against a directory that isn't even a git repository yet.
 
@@ -76,8 +106,8 @@ Compute two booleans, **freshly, on every single `/pf` invocation** — never ca
 Claude (`orchestrator_provider != claude` —
 `~/.claude/skills/pf-interaction/SKILL.md`'s "Codex text-REPL adapter"
 defines the flag; independent of any role's resolved `write` actor), replace
-this call with that adapter (`stage=intake`, `step=type`) — same options,
-same pending-state discipline, using the type-agnostic draft
+this call with that adapter (`stage=intake`, `step=folder-mode`) — same
+options, same pending-state discipline, using the type-agnostic draft
 `docs/issues/open/.pf-intake-draft-pending.md` per that section's item 5.
 
 `has_git` does not affect *whether* this question is asked — only what happens *after* the "project, right away" answer (git initialization is only needed there; the "idea" answer never touches git at all).
@@ -162,9 +192,9 @@ Free text via the built-in "Other" option remains available for anything that do
 Claude (`orchestrator_provider != claude` —
 `~/.claude/skills/pf-interaction/SKILL.md`'s "Codex text-REPL adapter"
 defines the flag), replace the "What are we working on?" call above with
-that adapter (`stage=intake`, `step=type`), and the confirming call just
-above (when it fires) with the same adapter (`step=type-confirm`) — same
-options, same pending-state discipline, using the type-agnostic draft
+that adapter (`stage=intake`, `step=issue-type`), and the confirming call
+just above (when it fires) with the same adapter (`step=type-confirm`) —
+same options, same pending-state discipline, using the type-agnostic draft
 `docs/issues/open/.pf-intake-draft-pending.md` per that section's item 5.
 
 **Build a feature / Fix a bug** (or free text classified as such, including `improve`) continues the **exact same, unchanged** path as today: "Creating prompt.md" below, feat/improve/bug branch — no additional fork inside that path.
@@ -535,7 +565,7 @@ Record the role-assignment answers as `roles:` and/or `profile:`, and the `on_un
 
 ### Idea branch
 
-Taken when the new issue's type is `idea` — reached either via Step 0's bare-folder "An idea" answer (`has_pf` was false), or via Step 3's "Describe an idea" button/confirmed free text in an already-scaffolded project (`has_pf` was already true). Reuse the `doc_language` question above rather than asking it twice; everything else below is content this branch, not "Creating prompt.md"'s general path, is responsible for.
+Taken when the new issue's type is `idea` — reached either via Step 0's bare-folder "An idea" answer (`entry=bare-folder`, set the moment `<type>` resolves per `~/.claude/skills/pf-interaction/SKILL.md`'s "Codex text-REPL adapter" item 5), or via Step 3's "Describe an idea" button/confirmed free text in an already-scaffolded project (`entry=existing-project`). Reuse the `doc_language` question above rather than asking it twice; everything else below is content this branch, not "Creating prompt.md"'s general path, is responsible for.
 
 **Idea intake batch — two `AskUserQuestion` calls, at most 4 questions each** (never a per-field round-trip):
 - **Batch 1** (4 questions): `idea_tier` (`personal`/`infra`/`content`/`product` — one-line descriptions from `~/.claude/skills/pf-idea-lenses/SKILL.md` §1, recommending based on the topic if it's obvious, otherwise no default); the idea itself — typed directly, **or** a path to a file to extract it from (see "Idea from a file" below); Evidence of Pain; Constraints.
@@ -562,9 +592,9 @@ typed directly rather than read from a file.
 
 **Unreadable/binary/empty file (§5.8).** If the named file can't be read as text (binary, corrupted, missing), do not fail silently: report the read error and ask the user to type the idea directly instead — within the same intake call, re-asking only that one question, not the whole batch.
 
-**Bare-folder carve-out (AC-01b) — Step 0 entry only.** When this branch was reached via Step 0 (`has_pf` was false), **skip role assignment and the `on_unavailable` question entirely** — no `roles:`/`profile:`/`on_unavailable:` field is written by this intake. Resolution for this issue falls back to the framework default (`write: claude, review: [claude]`) until the user hand-adds a `roles.<key>` entry to `prompt.md` later.
+**Bare-folder carve-out (AC-01b) — `entry=bare-folder` only.** When this issue's draft carries `entry=bare-folder` (Step 0 origin), **skip role assignment and the `on_unavailable` question entirely** — no `roles:`/`profile:`/`on_unavailable:` field is written by this intake. Resolution for this issue falls back to the framework default (`write: claude, review: [claude]`) until the user hand-adds a `roles.<key>` entry to `prompt.md` later. Branch on the draft's stored `entry`, not on a freshly recomputed `has_pf` — this matters on a resumed session: folder state can change between when intake started (when `entry` was set, once, per `~/.claude/skills/pf-interaction/SKILL.md`'s "Codex text-REPL adapter" item 5) and when a later `/pf` resumes it, so re-deriving this decision from a fresh `has_pf` check at resume time could silently flip it.
 
-**Existing-project role assignment — Step 3 entry only.** When this branch was reached via Step 3 (`has_pf` was already true), run the same **Role assignment** procedure documented above (Question 1 — individually per stage / apply a profile; Question 2 — `on_unavailable`), unchanged except for the applicable key set: `idea`, `research`, `critique`, `verdict` (never `code`/`tests`/`user_docs`/`dev_docs` — those keys don't apply to this pipeline). Group them as a single group ("Idea documents") for the write/review questions, built via the same `~/.claude/skills/pf-roles/SKILL.md` §10 Recommendation procedure as any other group in that section.
+**Existing-project role assignment — `entry=existing-project` only.** When this issue's draft carries `entry=existing-project` (Step 3 origin, whether `has_pf` was already true or Step 0's "A project, right away" branch just scaffolded one), run the same **Role assignment** procedure documented above (Question 1 — individually per stage / apply a profile; Question 2 — `on_unavailable`), unchanged except for the applicable key set: `idea`, `research`, `critique`, `verdict` (never `code`/`tests`/`user_docs`/`dev_docs` — those keys don't apply to this pipeline). Group them as a single group ("Idea documents") for the write/review questions, built via the same `~/.claude/skills/pf-roles/SKILL.md` §10 Recommendation procedure as any other group in that section. Same resumption discipline as above: branch on stored `entry`, never a freshly recomputed `has_pf`.
 
 Write `prompt.md`:
 
