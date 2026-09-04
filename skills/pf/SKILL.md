@@ -26,18 +26,27 @@ same as no draft (do not resume it).
 - **Exactly one found** — resume it immediately, before asking Step 0's
   folder-state question below or running Step 1/Step 2/Step 3: do not
   recompute `has_pf`/`has_git` first, since `docs/issues/open/` may itself
-  have been created only as a side effect of writing this draft. Re-derive
-  `<type>` (unresolved for `.pf-intake-draft-pending.md`; otherwise the
-  `<type>` named in the filename), re-enter the matching flow at the
-  marker's recorded `step` — Step 0's own two-option question when `step`
-  is `folder-mode`; Step 3's four-option question (or its confirming
-  follow-up) when `step` is `issue-type`/`type-confirm`; otherwise
-  "Creating prompt.md"'s flow for that `<type>` — and re-show the pending
-  question — via `AskUserQuestion` or the Codex text-REPL adapter,
-  whichever this session's own `orchestrator_provider` calls for, same as
-  every other intake question below — following item 4's resumption
-  discipline ("Safe resumption"): do not recompute a recommendation, do not
-  restart the stage from scratch, do not re-ask a `step` already resolved.
+  have been created only as a side effect of writing this draft — **except
+  at `step=scaffold`**, whose own definition
+  (`~/.claude/skills/pf-interaction/SKILL.md` item 2's `scaffold` bullet)
+  requires recomputing `has_git` fresh on every entry, including this one,
+  since its `git init` decision needs a current answer, not whatever
+  `has_git` read before an earlier interruption. Re-derive `<type>`
+  (unresolved for `.pf-intake-draft-pending.md`; otherwise the `<type>`
+  named in the filename), re-enter the matching flow at the marker's
+  recorded `step` — Step 0's own two-option question when `step` is
+  `folder-mode`; Step 0's "A project, right away" scaffold branch below,
+  re-run idempotently and re-verified against its checkpoint before
+  continuing, when `step` is `scaffold`; Step 3's four-option question (or
+  its confirming follow-up) when `step` is `issue-type`/`type-confirm`;
+  otherwise "Creating prompt.md"'s flow for that `<type>` — and re-show the
+  pending question (or, at `step=scaffold`, resume the checkpoint instead —
+  there is no question to re-show there) — via `AskUserQuestion` or the
+  Codex text-REPL adapter, whichever this session's own
+  `orchestrator_provider` calls for, same as every other intake question
+  below — following item 4's resumption discipline ("Safe resumption"): do
+  not recompute a recommendation, do not restart the stage from scratch, do
+  not re-ask a `step` already resolved.
   For a `<type>`-named draft (`<type>` already known), also read its
   marker's `entry` field and carry it forward as-is for the rest of this
   run — in particular, the Idea branch's carve-out below
@@ -114,7 +123,24 @@ options, same pending-state discipline, using the type-agnostic draft
 
 **Branch — "An idea" answer.** Creates **only** `docs/issues/open/YYYYMMDD-idea-<slug>/prompt.md`, filled in via the idea intake batch (see the "Idea branch" subsection under "Creating prompt.md" below). Nothing else is created — not `PLANNING.md`, not `docs/planning/`, not `.pf-version`, not a `git init`. `<slug>` is derived the same way as for feat/improve/bug: a short kebab-case slug from the idea's topic, decided when `prompt.md` is written. After writing, proceed straight to the "Idea branch" subsection under "Creating prompt.md" for the terminal git-status line — do not fall through to Step 1/Step 2 for this run.
 
-**Branch — "A project, right away" answer.** Mirrors what `make converge`/`converge-to-v3.sh` already does for a fresh v3 project, but performed **from inside `/pf` itself** as an installed skill — never by invoking `converge-to-v3.sh` (that script isn't available to an end user's installed skill). The scaffold source is `~/.claude/skills/pf/templates/project/`, not `docs/planning/templates/`. Steps:
+**Branch — "A project, right away" answer.** Mirrors what `make converge`/`converge-to-v3.sh` already does for a fresh v3 project, but performed **from inside `/pf` itself** as an installed skill — never by invoking `converge-to-v3.sh` (that script isn't available to an end user's installed skill). The scaffold source is `~/.claude/skills/pf/templates/project/`, not `docs/planning/templates/`.
+
+**Under a non-Claude orchestrator (`orchestrator_provider != claude`),
+this whole branch is `step=scaffold`.** Steps 1-8 below are exactly the
+`scaffold` checkpoint defined in
+`~/.claude/skills/pf-interaction/SKILL.md` item 2's `scaffold` bullet: on
+first entry (right after `folder-mode` resolves to this answer) as well as
+on any later resumed entry, recompute `has_git` fresh before step 1 — never
+reuse whatever `has_git` read earlier in this run or in an interrupted one
+— then run steps 1-8 idempotently (each already skips itself when its
+target exists). Only once every artifact they produce is confirmed present
+does the marker advance from `step=scaffold` to `step=issue-type`,
+`status=open`, immediately before step 9 falls through into Step 3. Under
+Claude (`orchestrator_provider=claude`, the default), no marker is written
+at all — this paragraph describes the non-Claude adapter path only; the
+steps below run exactly as before either way, unaffected.
+
+Steps:
 
 1. `git init` — only if `has_git` is false (if it's already a repository, leave it alone). If `git` itself isn't on PATH (see the distinction above), stop here with the "`git` not found on PATH" message instead of proceeding.
 2. Create `docs/issues/{open,closed}/` and `docs/planning/`.

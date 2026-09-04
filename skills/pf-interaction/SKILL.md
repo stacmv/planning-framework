@@ -245,22 +245,67 @@ without reopening the question from scratch.
        `AskUserQuestion` call the intake sequence makes anywhere in
        `~/.claude/skills/pf/SKILL.md`'s Step 0, Step 3, and the Idea/Spike
        branches under "Creating prompt.md" — not only the two content
-       batches:
+       batches — plus one non-question checkpoint (`scaffold`, below)
+       inserted into the same sequence purely for its own resumability:
        - `folder-mode` — Step 0's own fork ("An idea"/"a project, right
          away", exactly two options), asked only when `has_pf` was false at
          the start of this run. Never confused with `issue-type` below:
          the two ask genuinely different questions (two options deciding
          whether an intake pipeline runs at all, vs. four options deciding
-         which pipeline) and never both fire in the same intake sequence —
-         `folder-mode`'s "An idea" answer resolves `<type>` to `idea`
-         directly, without ever reaching `issue-type`; its "A project,
-         right away" answer resolves no `<type>` at all, it scaffolds and
-         falls through to Step 3, whose own `issue-type` question is what
-         actually resolves `<type>` for that path.
+         which pipeline). They are **not** mutually exclusive across a
+         single run — `folder-mode`'s "A project, right away" answer does
+         lead to `issue-type` firing later, via `scaffold` below — but they
+         never both *resolve* `<type>`: `folder-mode`'s "An idea" answer
+         resolves `<type>` to `idea` directly, without `issue-type` ever
+         firing at all; its "A project, right away" answer resolves no
+         `<type>` itself, it enters `scaffold` and, once that checkpoint
+         passes, falls through to Step 3, whose own `issue-type` question
+         is what actually resolves `<type>` for that path. Conversely, a
+         run that starts with `has_pf` already true never asks
+         `folder-mode` at all — only `issue-type` fires.
+       - `scaffold` — Step 0's "A project, right away" branch itself (the
+         8-step scaffold: `git init` if needed, `docs/issues/{open,closed}/`
+         and `docs/planning/`, `.pf-version`, `PLANNING.md`, `CLAUDE.md`/
+         `AGENTS.md`, template copies), entered immediately after
+         `folder-mode` resolves to "A project, right away" — never after
+         "An idea" (that answer resolves `<type>` directly and never
+         reaches `scaffold`), and never when `has_pf` was already true at
+         the start of the run (then `folder-mode` never fired either). Not
+         a question — no `AskUserQuestion`/adapter call happens at this
+         step, so `options` is `-` here. It exists so a cold resume lands
+         on an explicit, checkpointed state instead of inferring scaffold
+         progress from whatever `step` happens to be recorded next (the
+         gap CR-025 found: without this step, a resumed session that found
+         `step=issue-type` already recorded would jump straight to Step 3,
+         skipping the scaffold work — including `git init` — that step was
+         supposed to gate). **Entry and re-entry (including on resume)
+         always recompute `has_git` fresh** — the one carve-out to
+         `~/.claude/skills/pf/SKILL.md` Step 0's "resume it immediately…
+         do not recompute `has_pf`/`has_git` first" rule, scoped to this
+         one step, because `scaffold`'s own step 1 (`git init`) needs a
+         current answer, not whatever `has_git` read before an
+         interruption. **Checkpoint.** The step (re-)runs the scaffold
+         list idempotently — each item already skips itself when its
+         target exists (`git init` only if `has_git` is false, template
+         files only if missing, etc.) — then confirms every artifact the
+         list produces is actually present: `.pf-version`, `PLANNING.md`,
+         `CLAUDE.md`'s `<!-- pf:begin -->` block, `AGENTS.md`,
+         `docs/issues/{open,closed}/`, `docs/planning/*.md`, and
+         `docs/planning/templates/`. Only once every one of these is
+         confirmed on disk does the checkpoint pass. There is no user
+         reply to parse at this step (unlike every other `step` value), so
+         closing it does not follow item 4's "base64-encode the reply"
+         strategy below — the checkpoint passing *is* the resolution: the
+         same atomic rewrite advances `step` straight to `issue-type`,
+         `status=open`, `answer=-` (there was never a reply to record). A
+         checkpoint that does not yet pass leaves `status=open` at
+         `step=scaffold`, so a later `/pf` resumes here again rather than
+         proceeding to `issue-type` on an incomplete scaffold.
        - `issue-type` — Step 3's feat/bug/idea/spike four-option question,
          asked whenever Step 3 runs (a project where `has_pf` was already
-         true, or one Step 0's "A project, right away" branch just
-         scaffolded and fell through into Step 3).
+         true, or one Step 0's "A project, right away" branch just entered
+         `scaffold`, whose checkpoint passed, and fell through into
+         Step 3).
        - `type-confirm` — the conditional spike-vs-feature disambiguation
          follow-up ("This sounds like a technical spike…"), exists only
          after `issue-type`, fires only when free text was ambiguous. Never
@@ -315,13 +360,14 @@ without reopening the question from scratch.
        front-loaded gate text).
    - `entry` — **`intake` only**; `-` for `decision-session`/`final-gate`
      (not applicable there) and while `stage=intake` is still at
-     `step=folder-mode`/`issue-type`/`type-confirm` (`<type>` itself not
-     yet known — see item 5 below). One of `bare-folder` |
+     `step=folder-mode`/`scaffold`/`issue-type`/`type-confirm` (`<type>`
+     itself not yet known — see item 5 below). One of `bare-folder` |
      `existing-project` once set: which fork produced this intake
      sequence — Step 0's bare-folder `folder-mode` "An idea" answer, or
      Step 3's `issue-type` question (reached either because `has_pf` was
      already true, or because `folder-mode`'s "A project, right away"
-     answer just scaffolded one and fell through into Step 3). Set exactly
+     answer entered `scaffold`, whose checkpoint then passed, and fell
+     through into Step 3). Set exactly
      once, at the same moment `<type>` itself becomes known and the typed
      draft `.pf-intake-draft-<type>.md` is created (item 5 below), and
      never recomputed afterward — in particular, never re-derived from a
@@ -361,7 +407,9 @@ without reopening the question from scratch.
    the wording is the fixed, statically-defined text of the question named
    by `step` (a content-batch question, or one of the named pre-/post-batch
    questions above — `folder-mode`, `issue-type`, `type-confirm`,
-   `language`, `file-confirm`, `roles.<n>`, `on-unavailable`); for
+   `language`, `file-confirm`, `roles.<n>`, `on-unavailable`; `scaffold` is
+   the one exception, since it asks nothing — its "reproduce on resume"
+   procedure is the checkpoint above, not a question); for
    `decision-session`/`final-gate`, it is already
    fixed in the surrounding document text (the recommended verdict and its
    reasoning, or the assumptions/open-questions ledger) exactly as item 4
@@ -379,8 +427,11 @@ without reopening the question from scratch.
    re-show the question at its recorded `step` (item 2's schema above — do
    not recompute the recommendation, do not restart the stage from
    scratch, do not re-ask a `step` already resolved). **Closing a marker —
-   exactly one strategy:** a valid answer that resolves the current `step`
-   never deletes the marker line; it base64-encodes the literal reply text
+   exactly one strategy for question steps** (`step=scaffold` is the one
+   non-question step, and closes by checkpoint instead — see its own
+   bullet in item 2 above, not this paragraph): a valid answer that
+   resolves the current `step` never deletes the marker line; it
+   base64-encodes the literal reply text
    into `answer` and rewrites `status=open` to `status=resolved` in place —
    the same in-place, audit-preserving *edit* `open_questions.md`'s
    `Status` column already uses on override
@@ -417,22 +468,28 @@ without reopening the question from scratch.
    content batches) — pending-state lives in a draft document, not session
    memory, on the same principle as items 2-4 above. Two sub-cases, split
    by whether `<type>` is already known:
-   - **`step=folder-mode`, `step=issue-type`, and `step=type-confirm`.**
-     These are what determines `<type>` in the first place, so neither a
+   - **`step=folder-mode`, `step=scaffold`, `step=issue-type`, and
+     `step=type-confirm`.** These are what determines `<type>` in the
+     first place (`scaffold` is a routing waypoint on the way to
+     `issue-type`, not a determination of `<type>` itself), so neither a
      `<type>`-named draft nor `docs/issues/open/<issue-id>/prompt.md` can
-     exist yet when any of them is asked — for Step 0's bare-folder entry,
-     `docs/issues/open/` itself may not exist yet either. Before printing
-     whichever of these questions comes first on this run's path
-     (`folder-mode` for Step 0, `issue-type` for Step 3), create (the
-     parent directory too, if absent) a fixed, type-agnostic pending file,
+     exist yet when any of them is asked or entered — for Step 0's
+     bare-folder entry, `docs/issues/open/` itself may not exist yet
+     either. Before printing whichever of these questions comes first on
+     this run's path (`folder-mode` for Step 0, `issue-type` for Step 3 —
+     `scaffold` is never first: it is only ever entered from `folder-mode`
+     resolving to "A project, right away", so it always finds the pending
+     file `folder-mode` already created), create (the parent directory
+     too, if absent) a fixed, type-agnostic pending file,
      `docs/issues/open/.pf-intake-draft-pending.md`, and write the marker
      into it, `entry=-` — item 2's "at most one open marker per interactive
      point" rule applied with only one point instead of one-per-`<type>`,
      since no `<type>` exists yet to key separate points by (a single run
      only ever takes one of the two forks, never both, so this is still one
      point). Nothing else is written into this file: the
-     `folder-mode`/`issue-type`/`type-confirm` answers are a routing
-     decision, not `prompt.md` content.
+     `folder-mode`/`issue-type`/`type-confirm` answers — and the `scaffold`
+     checkpoint's own completion — are a routing decision, not `prompt.md`
+     content.
 
      **Handoff to the typed draft — create-and-verify before delete, never
      the reverse (CR-022).** `folder-mode`'s "An idea" answer resolves
@@ -440,10 +497,11 @@ without reopening the question from scratch.
      `type-confirm`, if it fired) resolves `<type>` to whichever of
      `feat`/`improve`/`bug`/`idea`/`spike` was chosen (`entry=
      existing-project` — `folder-mode`'s "A project, right away" answer
-     never resolves `<type>` itself, it scaffolds and falls through to
-     Step 3's `issue-type` question instead, which is what actually
-     resolves it, to `entry=existing-project`). Once `<type>`/`entry` are
-     known, hand off in this order, never the reverse:
+     never resolves `<type>` itself, it enters `scaffold` and, once that
+     checkpoint passes, falls through to Step 3's `issue-type` question
+     instead, which is what actually resolves it, to
+     `entry=existing-project`). Once `<type>`/`entry` are known, hand off
+     in this order, never the reverse:
      1. Create the typed draft below (or, where the runtime's file
         operations support it, atomically rename
         `.pf-intake-draft-pending.md` to `.pf-intake-draft-<type>.md` and
