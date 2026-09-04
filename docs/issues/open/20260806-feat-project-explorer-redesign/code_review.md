@@ -1,7 +1,7 @@
 # Code Review Report
 
 **Issue ID:** 20260806-feat-project-explorer-redesign
-**Date:** 2026-08-17 (round 1), 2026-08-17 (round 2)
+**Date:** 2026-08-17 (round 1), 2026-08-17 (round 2), 2026-09-04 (round 3)
 **Reviewer(s):** Claude
 
 ---
@@ -25,9 +25,12 @@
 | CR-013 | 2 | P2 | `renderChecklistPanel` (Задача 26, чистая строковая функция) больше не вызывается из продуктового кода — с волны 14 живой путь рендера чек-листа `renderChecklistBody` строит DOM напрямую. Единственные оставшиеся вызывающие — тесты (`workspace.test.js`'s TC-030, `workspace-ui.test.js`). Не баг (общие строительные блоки и порядок looseSections совпадают), но тот же паттерн «тест проверяет путь, которого пользователь больше не видит», что CR-009 уже отмечал. |  | open |
 | CR-014 | 2 | P1 | Обнаружено при `/pf-user-docs` (не отдельным раундом `/pf-codereview`, но та же ревью-механика): `brd.md`'s AC-01a явно обещает сетку карточек проектов «с поиском», но `public/launcher.js`/`public/index.html` не реализуют ни поиск, ни фильтр (0 совпадений при grep по `search`/`filter`). Не регресс — фича заявлена в BRD, но никогда не была построена в рамках implementation_plan.md. Решено не реализовывать в рамках этого issue (масштаб уже большой, 34 задачи/2 раунда ревью) — вынесено в отдельный issue. | 20260818-improve-project-explorer-launcher-search-and-tc-scroll | deferred |
 | CR-015 | 2 | P2 | Обнаружено при `/pf-user-docs`: `ptcId` из инбокса (формат продукта `PTC-NNNN`, `docs/planning/test-plan.md`) не совпадает с форматом TC-ID внутри issue (`TC-NNN`, issue-локальный `manual_test_checklist.md`) — CR-005's scroll-to-highlight (`workspace-ui.test.js`'s «nice-to-have on top» комментарий) в этом случае молча не срабатывает. Основной фикс CR-005 (попасть на правильный таб) не затронут — это только точечная подсветка нужного TC. | 20260818-improve-project-explorer-launcher-search-and-tc-scroll | deferred |
+| CR-016 | 3 | P1 | `issueStages()` (`server.js`, добавлена в `0681de1`) схлопывает статус документа в булево `done`, считая `done` только `present`/`on_branch` — а `not_applicable` попадает в то же ведро, что и «отсутствует». `public/status.js`'s `issueDocProblem()` берёт первый `done === false` и рендерит его как «Нет BRD»/«Нет Spec», то есть как дефект, после чего `projectCategory()` поднимает весь проект в категорию «требует внимания». Сценарий отказа, подтверждён реальным запросом `GET /api/projects/planning-framework/issues` к поднятому серверу: закрытый с QA PASS issue `20260709-bug-pf-skills-absolute-path-references` (`size_tier: trivial`) отдаёт `brd/specs/implementation_plan/code_review/user_docs/dev_docs` как `done:false`, и при дефолтном (пустом) фильтре ролей — состоянии по умолчанию любого нового пользователя — статус-строка показывает «Нет BRD» для успешно завершённой работы, а `planning-framework` навсегда висит в «проблемах». Радиус шире trivial-тира: `docstate.js`'s `ISSUE_DOC_STAGES` вообще не знает ключей `code_review.md`/`user_docs.md`/`dev_docs.md`, поэтому для них `not_applicable` не возвращается никогда — легитимный `roles.<key>: skip` читается как пропажа документа. Комментарий в `server.js` предупреждает только про trivial-tier в данных `stages[]`, но именно этот коммит впервые превращает булево в пользовательский сигнал о дефекте — новый контракт поверх старого, не покрытый ни одним тестом (`status.test.js`/`project-picker.test.js`/`project-inbox.test.js` не содержат сценариев с `trivial`/`not_applicable`/`skip`). |  | open |
+| CR-017 | 3 | P2 | Мёртвая ветка в новом коде: `server.js`'s `issueStages()` проверяет `state.status === "on_branch"`, но `classifyIssueDoc()` (`lib/docstate.js`) такого статуса не возвращает никогда — документ, живущий только на ветке issue, приходит как `{ status: "present", location: "branch" }`. По эффекту безвредно, но это то же самое неверное прочтение контракта `classifyIssueDoc()`, что и CR-016. |  | open |
+| CR-018 | 3 | P2 | `public/attention.js`'s `attentionForRoles(inboxResponse, projectName, roleIds, missingDocsByIssue)` — четвёртый параметр не передаётся ни одним вызывающим (`project-inbox.js:292`, `project-picker.js:93` — единственные два места вызова), то есть он и вся обработка внутри функции мертвы, а JSDoc при этом утверждает, что экран списка issue его поставляет. Комментарий описывает несуществующее поведение. |  | open |
 
 ---
 
 ## Verdict
 
-**PASS**
+**FAIL**
