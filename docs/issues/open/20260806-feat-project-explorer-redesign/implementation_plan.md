@@ -898,6 +898,34 @@ Criteria этого раздела)
 
 ---
 
+#### Task 35 (fix CR-016): `server.js`/`status.js`/`lib/docstate.js` — «не применимо» перестаёт читаться как «документа нет»
+
+**Task Type:** code
+**Mapped Test Cases:** TC-001, TC-032
+
+**Files:**
+- `tools/manual-test-ui/server.js`
+- `tools/manual-test-ui/public/status.js`
+- `tools/manual-test-ui/lib/docstate.js`
+- `tools/manual-test-ui/test/status.test.js`
+
+**Implementation Notes:**
+- Корень проблемы — потеря информации, а не неверное условие: `issueStages()` схлопывает результат `classifyIssueDoc()` в булево `done`, из-за чего `not_applicable` становится неотличим от `missing`. Чинить на этом уровне: пробрасывать в `stages[]` полноценный статус (`present`/`not_applicable`/`missing`) рядом с `done` — так потребители смогут различать случаи, а существующая форма ответа не ломается для тех, кто читает только `done`.
+- `public/status.js`'s `issueDocProblem()` — брать первый элемент, который `missing`, а не первый, который `!done`. `not_applicable` не должен порождать ни строки «Нет BRD», ни вклада в `projectCategory() === "problems"`.
+- `lib/docstate.js`'s `applicability()` сейчас возвращает `{ applicable: true }` для любого ключа вне `ISSUE_DOC_STAGES`, а `code_review.md`/`user_docs.md`/`dev_docs.md` там отсутствуют — то есть для них `not_applicable` невозможен в принципе. Добавить эти три ключа и научить `applicability()` учитывать `roles.<key>: skip` из `prompt.md` (для `user_docs`/`dev_docs` — включая tier-дефолт `skip` для trivial/small, `pf-roles/SKILL.md` §4; для `code_review` — `roles.code.review: skip`). Резолвинг ролей уже есть в `lib/roles-resolve.js` — переиспользовать, не писать второй парсер.
+- Не расширять write-поверхность: задача целиком read-only, новых маршрутов и новых git-подкоманд не добавляется (это и проверяет TC-032).
+- Заодно устранить CR-017, если это ничего не удорожает: ветка `state.status === "on_branch"` в `issueStages()` недостижима — `classifyIssueDoc()` возвращает документ с ветки как `{ status: "present", location: "branch" }`. При переходе на проброс полного статуса эта ветка исчезает сама.
+- Тесты: `status.test.js` сегодня не содержит ни одного сценария с `trivial`/`not_applicable`/`skip` — добавить их, иначе фикс нечем удержать. Минимум: (а) trivial-tier issue не даёт «Нет BRD»; (б) issue с `roles.user_docs: skip` не даёт «Нет User docs»; (в) реально отсутствующий документ по-прежнему даёт проблему.
+- Проверка на живых данных, а не только на фикстуре: поднять сервер на этом репозитории и убедиться, что закрытый trivial-tier issue `20260709-bug-pf-skills-absolute-path-references` больше не помечается проблемным при пустом фильтре ролей — именно этим запросом находка и была подтверждена.
+
+**Acceptance Criteria:**
+- [ ] TC-001 passes (состав экрана лаунчера и источник данных не изменились)
+- [ ] TC-032 passes (write-allowlist не расширен: ни новых маршрутов, ни новых git-подкоманд)
+- [ ] `status.test.js` покрывает `not_applicable` и `roles.<key>: skip`, и падает, если вернуть старое поведение
+- [ ] На живом репозитории закрытый trivial-tier issue не порождает ложного «Нет BRD», а `planning-framework` не висит в категории «требует внимания» из-за него
+
+---
+
 ### Complexity Estimate
 
 **Complex** (6+ задач — фактически 28 задач). Обоснование: issue затрагивает три независимых подсистемы (навигационная оболочка с разбиением `app.js` на три ES-модуля; единый инбокс и полноценная реализация актора `human` с новым YAML-подмножеством, hash-based stale-проверкой и тремя разными путями валидации выполнения; палитра/типографика/a11y с автоматической контрастной проверкой) плюс три независимо редактируемых framework-скилл-файла вне `tools/manual-test-ui`, с ~32 test cases, покрывающими UI, API и skill-файлы одновременно.
