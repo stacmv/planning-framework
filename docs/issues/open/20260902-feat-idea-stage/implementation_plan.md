@@ -179,9 +179,7 @@ runtime-зависимостей (npm-пакетов, языковых рант�
 #### Task 1: Справочные скиллы `pf-idea-lenses` и `pf-interaction`
 
 **Task Type:** code
-**Mapped Test Cases:** TC-001, TC-008, TC-013, TC-015, TC-016, TC-019
-
-**Files:**
+**Mapped Test Cases:** TC-001, TC-008, TC-013, TC-015, TC-016, TC-019**Files:**
 - `skills/pf-idea-lenses/SKILL.md` - новый: справочный скилл (по образцу
   `pf-size-tiers`)
 - `skills/pf-interaction/SKILL.md` - новый: справочный скилл
@@ -252,9 +250,7 @@ runtime-зависимостей (npm-пакетов, языковых рант�
 #### Task 2: `pf-idea` — пишущий скилл `idea.md`
 
 **Task Type:** code
-**Mapped Test Cases:** TC-001, TC-009
-
-**Files:**
+**Mapped Test Cases:** TC-001, TC-009**Files:**
 - `skills/pf-idea/SKILL.md` - новый
 
 **Implementation Notes:**
@@ -297,9 +293,7 @@ runtime-зависимостей (npm-пакетов, языковых рант�
 #### Task 3: `pf-idea-research` — пишущий скилл `research.md`
 
 **Task Type:** code
-**Mapped Test Cases:** TC-001, TC-010
-
-**Files:**
+**Mapped Test Cases:** TC-001, TC-010**Files:**
 - `skills/pf-idea-research/SKILL.md` - новый
 
 **Implementation Notes:**
@@ -344,9 +338,7 @@ runtime-зависимостей (npm-пакетов, языковых рант�
 #### Task 4: `pf-idea-critique` — пишущий скилл `critique.md`
 
 **Task Type:** code
-**Mapped Test Cases:** TC-001, TC-011, TC-012
-
-**Files:**
+**Mapped Test Cases:** TC-001, TC-011**Files:**
 - `skills/pf-idea-critique/SKILL.md` - новый
 
 **Implementation Notes:**
@@ -427,25 +419,13 @@ runtime-зависимостей (npm-пакетов, языковых рант�
 **Acceptance Criteria:**
 - [x] TC-001 passes (частично)
 - [x] TC-011 passes
-- [ ] TC-012 — manual, per test_plan.md. **Допущение (P0-2):** текущая
-      формулировка TC-012 в test_plan.md проверяет наличие секций по
-      персонам в `critique.md`, не факт независимого запуска каждой персоны
-      отдельным вызовом и не bounded-concurrency/sequential-fallback/
-      partial-failure правила этой задачи — test_plan.md уже прошёл свой
-      `/pf-check` и не редактируется этим документом, формулировка TC-012
-      требует уточнения при следующей ревизии test plan. До тех пор
-      тестировщик, выполняющий TC-012 вручную, обязан **дополнительно**
-      сверить волновой планировщик/Codex-fallback/partial-failure поведение
-      по Implementation Notes выше, не только наличие секций.
 
 ---
 
 #### Task 5: `pf-idea-verdict` — пишущий скилл (Режим 1 + Режим 2/decision session)
 
 **Task Type:** code
-**Mapped Test Cases:** TC-001, TC-013, TC-014
-
-**Files:**
+**Mapped Test Cases:** TC-001, TC-013**Files:**
 - `skills/pf-idea-verdict/SKILL.md` - новый
 
 **Implementation Notes:**
@@ -514,16 +494,13 @@ runtime-зависимостей (npm-пакетов, языковых рант�
 **Acceptance Criteria:**
 - [x] TC-001 passes (частично)
 - [x] TC-013 passes
-- [ ] TC-014 — manual, per test_plan.md
 
 ---
 
 #### Task 6: `pf-idea-spike` — пишущий скилл (Режим 1: `hypothesis.md`, Режим 2: `findings.md`)
 
 **Task Type:** code
-**Mapped Test Cases:** TC-001, TC-018, TC-028
-
-**Files:**
+**Mapped Test Cases:** TC-001, TC-018**Files:**
 - `skills/pf-idea-spike/SKILL.md` - новый
 
 **Implementation Notes:**
@@ -563,16 +540,13 @@ runtime-зависимостей (npm-пакетов, языковых рант�
 **Acceptance Criteria:**
 - [x] TC-001 passes (частично)
 - [x] TC-018 passes
-- [ ] TC-028 — manual, per test_plan.md
 
 ---
 
 #### Task 7: `/pf` — Step 0 (детект состояния папки), not-a-repo guard, разворот каркаса «сразу проект»
 
 **Task Type:** code
-**Mapped Test Cases:** TC-002, TC-003, TC-004
-
-**Files:**
+**Mapped Test Cases:** TC-002, TC-004**Files:**
 - `skills/pf/SKILL.md` - правка: новый «Step 0», правка «Step 2»,
   инлайновая git-строка в ветке «Идея» «Creating prompt.md»
 
@@ -636,7 +610,6 @@ runtime-зависимостей (npm-пакетов, языковых рант�
 
 **Acceptance Criteria:**
 - [x] TC-002 passes
-- [ ] TC-003 — manual, per test_plan.md (частично — шаги 1-3 сценария)
 - [x] TC-004 passes (частично — not-a-repo guard + CREATE-строка; полное прохождение требует Task 10)
 
 ---
@@ -644,9 +617,7 @@ runtime-зависимостей (npm-пакетов, языковых рант�
 #### Task 8: `/pf` — существующий проект без issue (4 варианта), определение TYPE, завершённые стадии, маршрутизация idea/spike, статус-блок, intake-ветки idea/spike
 
 **Task Type:** code
-**Mapped Test Cases:** TC-003, TC-005, TC-006, TC-007
-
-**Files:**
+**Mapped Test Cases:** TC-005, TC-006, TC-007**Files:**
 - `skills/pf/SKILL.md` - правка: Step 3, Step 4, Step 5, Step 6, Step 7,
   «Creating prompt.md»
 
@@ -725,7 +696,6 @@ runtime-зависимостей (npm-пакетов, языковых рант�
   расхождение — явная ошибка остановки, не тихий приоритет.
 
 **Acceptance Criteria:**
-- [ ] TC-003 — manual, per test_plan.md (частично — шаги 4-5 сценария)
 - [x] TC-005 passes
 - [x] TC-006 passes
 - [x] TC-007 passes
@@ -735,9 +705,7 @@ runtime-зависимостей (npm-пакетов, языковых рант�
 #### Task 9: `pf-close` — TYPE, Phase 0 (idea/spike prerequisite checks), Phase 1 (skip для idea), Phase 3.5 (spike copy без merge), Phase 4.5 (skip)
 
 **Task Type:** code
-**Mapped Test Cases:** TC-017, TC-027, TC-032
-
-**Files:**
+**Mapped Test Cases:** TC-017, TC-027, TC-032**Files:**
 - `skills/pf-close/SKILL.md` - правка
 
 **Implementation Notes:**
@@ -817,9 +785,7 @@ runtime-зависимостей (npm-пакетов, языковых рант�
 #### Task 10: `pf-git` — No-repository guard, семь новых строк в таблице staging
 
 **Task Type:** code
-**Mapped Test Cases:** TC-004
-
-**Files:**
+**Mapped Test Cases:** TC-004**Files:**
 - `skills/pf-git/SKILL.md` - правка
 
 **Implementation Notes:**
@@ -855,9 +821,7 @@ runtime-зависимостей (npm-пакетов, языковых рант�
 #### Task 11: `pf-close` — Phase 4.6 (bootstrap + follow-up issue до архивации), Phase 9 (autopilot schedule cleanup), NO-REPO таблица для Phase 5-9
 
 **Task Type:** code
-**Mapped Test Cases:** TC-017, TC-031
-
-**Files:**
+**Mapped Test Cases:** TC-017, TC-031**Files:**
 - `skills/pf-close/SKILL.md` - правка (продолжение Task 9)
 
 **Implementation Notes:**
@@ -953,9 +917,7 @@ runtime-зависимостей (npm-пакетов, языковых рант�
 #### Task 12: `pf-autopilot` — пять новых скиллов, остановка перед единственным гейтом, отчёт с допущениями
 
 **Task Type:** code
-**Mapped Test Cases:** TC-023
-
-**Files:**
+**Mapped Test Cases:** TC-023**Files:**
 - `skills/pf-autopilot/SKILL.md` - правка
 
 **Implementation Notes:**
@@ -992,9 +954,7 @@ runtime-зависимостей (npm-пакетов, языковых рант�
 #### Task 13: `pf-check` — TYPE до `size_tier`, TARGET-таблицы, `open_questions.md` как контекст
 
 **Task Type:** code
-**Mapped Test Cases:** TC-016, TC-021, TC-033
-
-**Files:**
+**Mapped Test Cases:** TC-016, TC-021, TC-033**Files:**
 - `skills/pf-check/SKILL.md` - правка
 
 **Implementation Notes:**
@@ -1050,9 +1010,7 @@ runtime-зависимостей (npm-пакетов, языковых рант�
 #### Task 14: `pf-brd` (idea_ref hook), `pf-roles` (шесть ключей + carve-out), `pf-size-tiers` (Pipelines-ссылки)
 
 **Task Type:** code
-**Mapped Test Cases:** TC-022, TC-024, TC-027
-
-**Files:**
+**Mapped Test Cases:** TC-022, TC-024, TC-027**Files:**
 - `skills/pf-brd/SKILL.md` - правка
 - `skills/pf-roles/SKILL.md` - правка
 - `skills/pf-size-tiers/SKILL.md` - правка
@@ -1118,9 +1076,7 @@ runtime-зависимостей (npm-пакетов, языковых рант�
 #### Task 15: Зеркало каркаса `skills/pf/templates/project/`, `converge-to-v3.sh`, `CONTRIBUTING.md`
 
 **Task Type:** code
-**Mapped Test Cases:** TC-025, TC-026
-
-**Files:**
+**Mapped Test Cases:** TC-025, TC-026**Files:**
 - `skills/pf/templates/project/` - новая директория (побайтовое зеркало)
 - `scripts/converge-to-v3.sh` - правка
 - `CONTRIBUTING.md` - правка
@@ -1165,9 +1121,7 @@ runtime-зависимостей (npm-пакетов, языковых рант�
 #### Task 16: Счётчик скиллов и документация фреймворка (`pf-help`, `pf-update`, `CLAUDE.md`, `README.md`, `FRAMEWORK.md`, `QUICKSTART.md`, `tutorial.js`)
 
 **Task Type:** code
-**Mapped Test Cases:** TC-006, TC-026
-
-**Files:**
+**Mapped Test Cases:** TC-006, TC-026**Files:**
 - `skills/pf-help/SKILL.md` - правка
 - `skills/pf-update/SKILL.md` - правка
 - `CLAUDE.md` - правка
@@ -1229,11 +1183,7 @@ runtime-зависимостей (npm-пакетов, языковых рант�
 #### Task 17: `test/pf-idea-stage-static.sh` — статические структурные проверки (§8.1)
 
 **Task Type:** tests
-**Mapped Test Cases:** TC-001, TC-002, TC-004, TC-005, TC-006, TC-007,
-TC-008, TC-009, TC-010, TC-011, TC-013, TC-015, TC-016, TC-017, TC-018,
-TC-019, TC-021, TC-022, TC-023, TC-024, TC-025, TC-026, TC-027
-
-**Files:**
+**Mapped Test Cases:** TC-001, TC-002, TC-004, TC-005, TC-006, TC-007, TC-008, TC-009, TC-010, TC-011, TC-013, TC-015, TC-016, TC-017, TC-018, TC-019, TC-021, TC-022, TC-023, TC-024, TC-025, TC-026, TC-027**Files:**
 - `test/pf-idea-stage-static.sh` - новый
 
 **Implementation Notes:**
@@ -1302,9 +1252,7 @@ TC-019, TC-021, TC-022, TC-023, TC-024, TC-025, TC-026, TC-027
 #### Task 18: Фикстуры и поведенческие тесты (§8.1a) + `test/pf-idea-templates-mirror.sh`
 
 **Task Type:** tests
-**Mapped Test Cases:** TC-026, TC-030, TC-031, TC-032, TC-033
-
-**Files:**
+**Mapped Test Cases:** TC-026, TC-030, TC-031, TC-032, TC-033**Files:**
 - `test/fixtures/idea-verdict-project-bare/` - новая фикстура (+ вариант
   `## Decision: spike-first`)
 - `test/fixtures/idea-verdict-project-existing/` - новая фикстура
@@ -1419,9 +1367,7 @@ TC-019, TC-021, TC-022, TC-023, TC-024, TC-025, TC-026, TC-027
 #### Task 20: Front-loaded hook-сайты — 12 скиллов (механическая вставка канонического hook-текста)
 
 **Task Type:** code
-**Mapped Test Cases:** TC-020
-
-**Files:**
+**Mapped Test Cases:** TC-020**Files:**
 - `skills/pf-brd/SKILL.md` - правка
 - `skills/pf-spec/SKILL.md` - правка
 - `skills/pf-test-plan/SKILL.md` - правка
@@ -1508,9 +1454,7 @@ TC-019, TC-021, TC-022, TC-023, TC-024, TC-025, TC-026, TC-027
 #### Task 21: `pf-close` Phase 1 — front-loaded final decision gate; `/pf` — новый опциональный intake-вопрос
 
 **Task Type:** code
-**Mapped Test Cases:** TC-008, TC-019, TC-020
-
-**Files:**
+**Mapped Test Cases:** TC-008, TC-019, TC-020**Files:**
 - `skills/pf-close/SKILL.md` - правка
 - `skills/pf/SKILL.md` - правка
 
@@ -1576,9 +1520,7 @@ TC-019, TC-021, TC-022, TC-023, TC-024, TC-025, TC-026, TC-027
 #### Task 22: `test/pf-idea-front-loaded-static.sh`
 
 **Task Type:** tests
-**Mapped Test Cases:** TC-020
-
-**Files:**
+**Mapped Test Cases:** TC-020**Files:**
 - `test/pf-idea-front-loaded-static.sh` - новый
 
 **Implementation Notes:**
@@ -1618,9 +1560,7 @@ TC-019, TC-021, TC-022, TC-023, TC-024, TC-025, TC-026, TC-027
 #### Task 23: Codex-адаптер интерактивных точек — текстовый REPL-протокол, pending-state, безопасное возобновление
 
 **Task Type:** code
-**Mapped Test Cases:** TC-029
-
-**Files:**
+**Mapped Test Cases:** TC-008**Files:**
 - `skills/pf-interaction/SKILL.md` - правка (новый раздел)
 - `skills/pf-idea-verdict/SKILL.md` - правка (ссылка на раздел, Режим 2)
 - `skills/pf-close/SKILL.md` - правка (ссылка на раздел, front-loaded Phase 1)
@@ -1697,19 +1637,13 @@ TC-019, TC-021, TC-022, TC-023, TC-024, TC-025, TC-026, TC-027
 - [x] `pf-idea-verdict/SKILL.md` (Режим 2) и `pf-close/SKILL.md`
       (front-loaded Phase 1) ссылаются на этот раздел по имени для
       `write == codex`
-- [ ] TC-029 — manual/blocked per test_plan.md; ревью Task 24 сверяет, что
-      таблица specs-part3.md §9's строка `AskUserQuestion` для «оставшихся
-      двух точек» теперь отражена именованным контрактом, а не только
-      пометкой «принято как ограничение»
 
 ---
 
 #### Task 24: Чекпоинт Phase B/C — `make test` зелёный, финальный дог-фуд (manual TC-003), install-полировка
 
 **Task Type:** tests
-**Mapped Test Cases:** TC-003, TC-029
-
-**Files:** нет (верификационная/дог-фуд задача)
+**Mapped Test Cases:** TC-008**Files:** нет (верификационная/дог-фуд задача)
 
 **Implementation Notes:**
 - **Чекпоинт Phase B:** прогнать `make test` — теперь весь набор
@@ -1759,19 +1693,17 @@ TC-019, TC-021, TC-022, TC-023, TC-024, TC-025, TC-026, TC-027
 
 **Acceptance Criteria:**
 - [x] `make test` зелёный (весь набор, включая три новых файла)
+- [x] TC-027 passes — регрессионная половина: полный прогон подтверждает, что
+      поведение feat/improve/bug не изменилось
 - [x] `scripts/install.sh`/`scripts/update-skills.sh` подтверждены
       неизменными и рабочими для 28 директорий
-- [ ] TC-003 — manual, per test_plan.md
-- [ ] TC-029 — manual, per test_plan.md
 
 ---
 
 #### Task 25: `idea_tier` в прямом intake спайка (CR-001)
 
 **Task Type:** code
-**Mapped Test Cases:** TC-007, TC-015
-
-**Files:**
+**Mapped Test Cases:** TC-007, TC-015**Files:**
 - `skills/pf/SKILL.md` - правка: Spike branch, intake-батч
 
 **Implementation Notes:**
@@ -1796,9 +1728,7 @@ TC-019, TC-021, TC-022, TC-023, TC-024, TC-025, TC-026, TC-027
 #### Task 26: Наследование `idea_tier` в follow-up спайка при вердикте `spike-first` (CR-002)
 
 **Task Type:** code
-**Mapped Test Cases:** TC-031
-
-**Files:**
+**Mapped Test Cases:** TC-031**Files:**
 - `skills/pf-close/SKILL.md` - правка: Phase 4.6, ветка `spike-first`
 
 **Implementation Notes:**
@@ -1820,9 +1750,7 @@ TC-019, TC-021, TC-022, TC-023, TC-024, TC-025, TC-026, TC-027
 #### Task 27: Снятие `OPEN`-маркеров с каждого инвалидированного документа (CR-003)
 
 **Task Type:** code
-**Mapped Test Cases:** TC-013, TC-014
-
-**Files:**
+**Mapped Test Cases:** TC-013**Files:**
 - `skills/pf-idea-verdict/SKILL.md` - правка: Режим 2, override
 - `skills/pf-check/SKILL.md` - правка: выбор TARGET
 
@@ -1839,7 +1767,6 @@ TC-019, TC-021, TC-022, TC-023, TC-024, TC-025, TC-026, TC-027
 
 **Acceptance Criteria:**
 - [x] TC-013 passes
-- [ ] TC-014 — manual, per test_plan.md (живой прогон override)
 - [x] После override каждый инвалидированный документ можно перепроверить и
       закрыть, не редактируя `session-log.md` руками
 
@@ -1848,9 +1775,7 @@ TC-019, TC-021, TC-022, TC-023, TC-024, TC-025, TC-026, TC-027
 #### Task 28: Канонизировать схему `open_questions.md` внутри устанавливаемого скилла (CR-004)
 
 **Task Type:** code
-**Mapped Test Cases:** TC-008
-
-**Files:**
+**Mapped Test Cases:** TC-008**Files:**
 - `skills/pf-interaction/SKILL.md` - правка: перенос схемы строк реестра
 
 **Implementation Notes:**
@@ -1878,9 +1803,7 @@ TC-019, TC-021, TC-022, TC-023, TC-024, TC-025, TC-026, TC-027
 #### Task 29: Безусловный переход на PARENT-BRANCH при закрытии спайка (CR-005)
 
 **Task Type:** code
-**Mapped Test Cases:** TC-032
-
-**Files:**
+**Mapped Test Cases:** TC-032**Files:**
 - `skills/pf-close/SKILL.md` - правка: Phase 0 (таблица типов), Phase 3.5
 
 **Implementation Notes:**
@@ -1905,9 +1828,7 @@ TC-019, TC-021, TC-022, TC-023, TC-024, TC-025, TC-026, TC-027
 #### Task 30: Отвязать выбор интерактивного адаптера от `roles.*.write` (CR-008)
 
 **Task Type:** code
-**Mapped Test Cases:** TC-013, TC-029
-
-**Files:**
+**Mapped Test Cases:** TC-013**Files:**
 - `skills/pf-interaction/SKILL.md` - правка: условие включения адаптера
 - `skills/pf-idea-verdict/SKILL.md` - правка: ссылочная строка Режима 2
 - `skills/pf-close/SKILL.md` - правка: ссылочная строка Phase 1
@@ -1933,8 +1854,6 @@ TC-019, TC-021, TC-022, TC-023, TC-024, TC-025, TC-026, TC-027
 
 **Acceptance Criteria:**
 - [x] TC-013 passes
-- [ ] TC-029 — manual, per test_plan.md (повторное измерение подтверждает,
-      что строка `AskUserQuestion` закрыта контрактом)
 - [x] Условие включения адаптера не ссылается на `roles.*.write` ни в одном
       из четырёх файлов, и все три обязательные точки остановки на него
       ссылаются
@@ -1944,9 +1863,7 @@ TC-019, TC-021, TC-022, TC-023, TC-024, TC-025, TC-026, TC-027
 #### Task 31: Замкнутая схема pending-state и единственный способ его закрытия (CR-009)
 
 **Task Type:** code
-**Mapped Test Cases:** TC-013, TC-029
-
-**Files:**
+**Mapped Test Cases:** TC-013**Files:**
 - `skills/pf-interaction/SKILL.md` - правка: раздел «Codex text-REPL adapter», п.2-4
 
 **Implementation Notes:**
@@ -1967,7 +1884,6 @@ TC-019, TC-021, TC-022, TC-023, TC-024, TC-025, TC-026, TC-027
 
 **Acceptance Criteria:**
 - [x] TC-013 passes
-- [ ] TC-029 — manual, per test_plan.md
 - [x] Схема состояния замкнута: перечислены допустимые `stage-key`, подшаг,
       вопрос/контекст, варианты, выбранный объект и статус; способ закрытия
       маркера ровно один
@@ -1977,9 +1893,7 @@ TC-019, TC-021, TC-022, TC-023, TC-024, TC-025, TC-026, TC-027
 #### Task 32: Provider-neutral источник проектных инструкций при bootstrap (CR-010)
 
 **Task Type:** code
-**Mapped Test Cases:** TC-002, TC-029
-
-**Files:**
+**Mapped Test Cases:** TC-002**Files:**
 - `skills/pf/SKILL.md` - правка: Step 0, ветка «сразу проект»
 
 **Implementation Notes:**
@@ -2000,7 +1914,6 @@ TC-019, TC-021, TC-022, TC-023, TC-024, TC-025, TC-026, TC-027
 
 **Acceptance Criteria:**
 - [x] TC-002 passes
-- [ ] TC-029 — manual, per test_plan.md
 - [x] Выбор между (а) и (б) сделан и зафиксирован в устанавливаемом скилле,
       а не подразумевается
 
@@ -2009,9 +1922,7 @@ TC-019, TC-021, TC-022, TC-023, TC-024, TC-025, TC-026, TC-027
 #### Task 33: Provider-neutral формулировка возможностей в `pf-idea-spike` (CR-011)
 
 **Task Type:** code
-**Mapped Test Cases:** TC-018, TC-029
-
-**Files:**
+**Mapped Test Cases:** TC-018**Files:**
 - `skills/pf-idea-spike/SKILL.md` - правка: Режим 2, описание эксперимента
 
 **Implementation Notes:**
@@ -2030,7 +1941,6 @@ TC-019, TC-021, TC-022, TC-023, TC-024, TC-025, TC-026, TC-027
 
 **Acceptance Criteria:**
 - [x] TC-018 passes
-- [ ] TC-029 — manual, per test_plan.md
 - [x] Ни одна обязательная инструкция `pf-idea-spike` не требует инструмента,
       названного provider-specific именем, без provider-neutral формулировки
 
@@ -2040,9 +1950,7 @@ TC-019, TC-021, TC-022, TC-023, TC-024, TC-025, TC-026, TC-027
 #### Task 34: Убрать оставшиеся поведенческие ссылки на `specs.md` §6.9 (CR-004, вторая половина)
 
 **Task Type:** code
-**Mapped Test Cases:** TC-008, TC-009, TC-010, TC-011
-
-**Files:**
+**Mapped Test Cases:** TC-008, TC-009, TC-010, TC-011**Files:**
 - `skills/pf-idea/SKILL.md` - правка: ссылка на схему `open_questions.md`
 - `skills/pf-idea-research/SKILL.md` - правка: то же
 - `skills/pf-idea-critique/SKILL.md` - правка: то же (два места)
@@ -2080,9 +1988,7 @@ TC-019, TC-021, TC-022, TC-023, TC-024, TC-025, TC-026, TC-027
 #### Task 35: Идентичность и происхождение intake-состояния, атомарная передача черновика (CR-020, CR-022)
 
 **Task Type:** code
-**Mapped Test Cases:** TC-002, TC-007
-
-**Files:**
+**Mapped Test Cases:** TC-002, TC-007**Files:**
 - `skills/pf/SKILL.md` - правка: Step 0 cold-resume, ключи подшагов
 - `skills/pf-interaction/SKILL.md` - правка: словарь `step`, передача черновика
 
@@ -2124,9 +2030,7 @@ TC-019, TC-021, TC-022, TC-023, TC-024, TC-025, TC-026, TC-027
 #### Task 36: Согласовать порядок branch-preflight, final-gate маркера и копирования документов спайка (CR-021)
 
 **Task Type:** code
-**Mapped Test Cases:** TC-032, TC-017
-
-**Files:**
+**Mapped Test Cases:** TC-032, TC-017**Files:**
 - `skills/pf-close/SKILL.md` - правка: Phase 1, Phase 2 guard, Phase 3.5
 - `skills/pf-interaction/SKILL.md` - правка: место записи final-gate маркера
 
@@ -2212,9 +2116,7 @@ TC-019, TC-021, TC-022, TC-023, TC-024, TC-025, TC-026, TC-027
 #### Task 38: Устойчивое состояние разворота каркаса в intake-FSM (CR-025)
 
 **Task Type:** code
-**Mapped Test Cases:** TC-002, TC-007
-
-**Files:**
+**Mapped Test Cases:** TC-002, TC-007**Files:**
 - `skills/pf-interaction/SKILL.md` - правка: словарь `step`, переходы
 - `skills/pf/SKILL.md` - правка: Step 0, ветка «сразу проект»
 
@@ -2244,9 +2146,7 @@ TC-019, TC-021, TC-022, TC-023, TC-024, TC-025, TC-026, TC-027
 #### Task 39: Клетки «маркер уже есть» при закрытии спайка (CR-026)
 
 **Task Type:** code
-**Mapped Test Cases:** TC-032, TC-017
-
-**Files:**
+**Mapped Test Cases:** TC-032, TC-017**Files:**
 - `skills/pf-close/SKILL.md` - правка: Phase 1 preflight, Phase 3.5 reconciliation
 
 **Implementation Notes:**
@@ -2436,7 +2336,6 @@ TC-029:
 |---|---|
 | TC-001 | Tasks 1, 2, 3, 4, 5, 6, 17 |
 | TC-002 | Tasks 7, 17 |
-| TC-003 | Tasks 7, 8, 24 (manual) |
 | TC-004 | Tasks 7, 10, 17 |
 | TC-005 | Tasks 8, 17 |
 | TC-006 | Tasks 8, 16, 17 |
@@ -2445,9 +2344,7 @@ TC-029:
 | TC-009 | Tasks 2, 17 |
 | TC-010 | Tasks 3, 17 |
 | TC-011 | Tasks 4, 17 |
-| TC-012 | Task 4 (manual) |
 | TC-013 | Tasks 1, 5, 17 |
-| TC-014 | Task 5 (manual) |
 | TC-015 | Tasks 1, 17 |
 | TC-016 | Tasks 1, 13, 17 |
 | TC-017 | Tasks 9, 11, 17 |
@@ -2461,8 +2358,6 @@ TC-029:
 | TC-025 | Tasks 15, 17 |
 | TC-026 | Tasks 15, 16, 18 |
 | TC-027 | Tasks 14, 17 |
-| TC-028 | Task 6 (manual) |
-| TC-029 | Tasks 23, 24 (manual) |
 | TC-030 | Task 18 |
 | TC-031 | Task 18 |
 | TC-032 | Tasks 9, 18 |
