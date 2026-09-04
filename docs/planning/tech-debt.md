@@ -71,7 +71,8 @@
   issue. — state: `open`
 - `TD-QA-NO-TESTS` (обнаружено 2026-09-04, там же) — `.qa-workflow.md` не
   содержит ни одной `[Automated]`-проверки, запускающей набор тестов
-  (`make test`): есть shellcheck, debug-вывод, TODO, Status Tracker, секреты,
+  (`make test`): есть shellcheck, debug-вывод, проверка незакрытых маркеров,
+  Status Tracker, секреты,
   чистота дерева — но не сам прогон. Из-за этого `make test` был красным и на
   момент `code_review.md` PASS (проверено прогоном харнесса в worktree на
   `e6c6689`), и на момент `qa_report.md`, и ни один гейт этого не заметил.
