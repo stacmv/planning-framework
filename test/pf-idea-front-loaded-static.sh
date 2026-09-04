@@ -69,7 +69,12 @@ range_between() {
 # Positive assert for an ordinary hook row: the range must contain BOTH
 # `pf-interaction` and `front-loaded`.
 assert_hook() {
-  local tag="$1" label="$2" file="$3" start="$4" end="$5"
+  # $1 is the TC-ID. It stays at every call site so a reader (and a grep) can
+  # see which case a site belongs to, but the labels below spell TC-020
+  # literally: /pf-test truncates a label at its first interpolation, so a
+  # label starting with "$tag" collapses to the bare TC-ID and stops being
+  # matchable against the runner output.
+  local label="$2" file="$3" start="$4" end="$5"
   local range
   range="$(range_between "$file" "$start" "$end")"
   if [ -z "$range" ]; then
@@ -89,7 +94,12 @@ assert_hook() {
 # hook reference (checked as absence of `pf-interaction`, the anchor every
 # canonical/equivalent hook reference carries).
 assert_no_hook() {
-  local tag="$1" label="$2" file="$3" start="$4" end="$5"
+  # $1 is the TC-ID. It stays at every call site so a reader (and a grep) can
+  # see which case a site belongs to, but the labels below spell TC-020
+  # literally: /pf-test truncates a label at its first interpolation, so a
+  # label starting with "$tag" collapses to the bare TC-ID and stops being
+  # matchable against the runner output.
+  local label="$2" file="$3" start="$4" end="$5"
   local range
   range="$(range_between "$file" "$start" "$end")"
   if [ -z "$range" ]; then
