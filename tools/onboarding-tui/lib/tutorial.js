@@ -69,8 +69,17 @@ stage of the pipeline for the active issue.
                      the other skills, not normally invoked directly
   /pf-user-docs    - write user-facing documentation for the active issue
   /pf-dev-docs     - write developer-facing documentation for the active issue
+  /pf-idea         - write idea.md via guided intake already captured in prompt.md
+  /pf-idea-research - write research.md, verified/unverified facts with sources
+  /pf-idea-critique - write critique.md via independent multi-persona review
+  /pf-idea-verdict - write verdict.md and run the end-of-pipeline decision session
+  /pf-idea-spike   - write hypothesis.md and findings.md for a technical spike
+  /pf-idea-lenses  - reference data (idea_tier lenses, personas, budgets, stage
+                     tables); read by the other skills, not invoked directly
+  /pf-interaction  - reference data (the front-loaded interaction rule); read
+                     by the other skills, not normally invoked directly
 
-That is all 21 of them.`,
+That is all 28 of them.`,
 
   // Screen 4: pointers to more detail.
   `Screen 4/4 — Where to learn more

@@ -4,7 +4,7 @@ description: Generate a comprehensive test plan for the active issue based on BR
 version: 3.0.0
 ---
 
-Before checking any other prerequisite, read `prompt.md`'s frontmatter. If it has no `size_tier` field, ask the user via `AskUserQuestion` — same 4 tier options and descriptions as in `~/.claude/skills/pf-size-tiers/SKILL.md`, recommending medium ("matches today's default behavior") — then write the answer into `prompt.md`'s frontmatter before proceeding with the rest of this skill.
+Before checking any other prerequisite, read `prompt.md`'s frontmatter. If it has no `size_tier` field, ask the user via `AskUserQuestion` — same 4 tier options and descriptions as in `~/.claude/skills/pf-size-tiers/SKILL.md`, recommending medium ("matches today's default behavior"). Front-loaded check: if `prompt.md`'s `interaction` field resolves to `front-loaded` (`~/.claude/skills/pf-interaction/SKILL.md`, "Front-loaded rule"), apply that rule instead of asking this question interactively. Then write the answer into `prompt.md`'s frontmatter before proceeding with the rest of this skill.
 
 Determine the active issue from `docs/issues/open/`. Read `size_tier` from `prompt.md`'s frontmatter (default: medium if absent). Check prerequisites — "exists" below always means **complete** per the shared definition of "stage complete" in `~/.claude/skills/pf-size-tiers/SKILL.md` ("Stage completion"); a stub does not satisfy a prerequisite:
 - **If `size_tier: trivial`:** `notes.md` must be complete. If not, stop: "Notes document is required. Run /pf-brd first."
@@ -16,6 +16,8 @@ Determine the active issue from `docs/issues/open/`. Read `size_tier` from `prom
 - **regenerate** — produce a fresh test plan via whichever actor `write` resolves to (see the role resolution below) and overwrite the existing file (recommend this when it is not complete — e.g. a migration stub whose whole body is the stub marker);
 - **keep** — leave it untouched and stop, reporting that the TEST_PLAN stage is already complete (recommend this when it is complete);
 - **cancel** — stop and change nothing.
+
+Front-loaded check: if `prompt.md`'s `interaction` field resolves to `front-loaded` (`~/.claude/skills/pf-interaction/SKILL.md`, "Front-loaded rule"), apply that rule instead of asking this question interactively.
 
 **Oversized-predecessor guard.** Before producing `test_plan.md`, recompute the oversized-for-tier check against the predecessor document(s) that will be handed to whichever actor drafts the plan:
 - `size_tier: trivial` → `notes.md`, budget ~50 lines.
@@ -126,7 +128,7 @@ Triggered only when Step 4b found the count over budget. Dispatch a separate, fo
 
 ### Step 4d: Gate — ask the user
 
-Triggered only when Step 4c's post-automation-pass count is still over budget. Use `AskUserQuestion` with the question "This test plan has more Manual cases than the `<size_tier>` tier's budget (`<count>` vs `<budget>`, hard cap 5) even after automating what could be automated. How do you want to proceed?" and exactly these three options — no fourth option, no "accept as-is":
+Triggered only when Step 4c's post-automation-pass count is still over budget. Use `AskUserQuestion` with the question "This test plan has more Manual cases than the `<size_tier>` tier's budget (`<count>` vs `<budget>`, hard cap 5) even after automating what could be automated. How do you want to proceed?" and exactly these three options — no fourth option, no "accept as-is". Front-loaded check: if `prompt.md`'s `interaction` field resolves to `front-loaded` (`~/.claude/skills/pf-interaction/SKILL.md`, "Front-loaded rule"), apply that rule instead of asking this question interactively. Take the first option ("Split the issue") as the assumed answer, recording it in `open_questions.md`.
 
 - **"Split the issue"** (recommended when the excess is one coherent chunk of functionality) — on this choice, add a note to `test_plan.md` (e.g. a short paragraph above or within the Status Tracker section) recording that a split is recommended, and which cases are the excess.
 - **"Raise the tier"** (requires a written justification) — on this choice, ask the user for a short justification text, then update `prompt.md`'s `size_tier` field to the next tier up, record the justification and the old→new tier change as a note in `test_plan.md`, and re-check the Manual count against the new tier's budget (it should now fit, since budgets grow with tier up to the hard cap of 5 — if it still doesn't fit even at `large`, the hard cap itself is exceeded, which this same gate does not resolve further; save what you have and note that the hard cap is still exceeded).

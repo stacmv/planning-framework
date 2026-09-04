@@ -28,6 +28,17 @@ Run `/pf` at any time to see where you are and what to do next.
 **Bug fix** (`bug`):
 > Root Cause Analysis → ✓ Check → Test Plan → ✓ Check → Implementation Plan → ✓ Check → Execute → Test → QA → Close
 
+**Idea** (`idea`) — for a project that may not happen yet:
+> Intake → Idea → ✓ Check → Research → Critique → Verdict → ✓ Check → Decision session → Close
+
+**Spike** (`spike`) — a time-boxed technical experiment:
+> Intake → Hypothesis → Findings → Close
+
+Don't know where to start? Just run `/pf` in an empty folder, or in a
+project with no open issue — it will ask whether you're working on an
+idea (which may never become a project) or building something you already
+know you want.
+
 ## Skills
 
 | Command | What it does |
@@ -45,6 +56,11 @@ Run `/pf` at any time to see where you are and what to do next.
 | `/pf-qa` | Run QA checks, confirm manual items, produce `qa_report.md` (PASS/FAIL) |
 | `/pf-close` | Close the issue — merge branch, archive folder, update session-log |
 | `/pf-autopilot` | Drive the active issue to `/pf-close` autonomously (self-resume schedule survives session limits) |
+| `/pf-idea` | Write `idea.md` via guided intake already captured in `prompt.md` |
+| `/pf-idea-research` | Write `research.md`, verified/unverified facts with sources |
+| `/pf-idea-critique` | Write `critique.md` via independent multi-persona review |
+| `/pf-idea-verdict` | Write `verdict.md` and run the end-of-pipeline decision session |
+| `/pf-idea-spike` | Write `hypothesis.md` and `findings.md` for a technical spike |
 | `/pf-update` | Update all skills to the latest version |
 | `/pf-help` | Show this help |
 
@@ -63,6 +79,8 @@ Run `/pf` at any time to see where you are and what to do next.
 | feat | `prompt.md`, `brd.md`, `specs.md`, `test_plan.md`, `implementation_plan.md`, `session-log.md`, `manual_test_checklist.md`, `qa_report.md` |
 | improve | `prompt.md`, `brd.md`, `test_plan.md`, `implementation_plan.md`, `session-log.md`, `manual_test_checklist.md`, `qa_report.md` |
 | bug | `prompt.md`, `analysis.md`, `test_plan.md`, `implementation_plan.md`, `session-log.md`, `manual_test_checklist.md`, `qa_report.md` |
+| idea | `prompt.md`, `idea.md`, `research.md`, `critique.md`, `verdict.md`, `session-log.md` |
+| spike | `prompt.md`, `hypothesis.md`, `findings.md`, `session-log.md` |
 
 ## Installing in a new project
 

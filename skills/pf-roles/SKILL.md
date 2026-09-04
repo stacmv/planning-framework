@@ -76,7 +76,12 @@ not the feat/improve pipeline shown above: `analysis` (bug-type issues,
 `analysis.md`, non-trivial tier) and `notes` (`notes.md`, `size_tier: trivial`,
 any issue type — replaces `brd`/`specs`/`implementation_plan`, and for bug-type
 also `analysis`). Both `analysis` and `notes` resolve through the exact same
-algorithm as every other key (§4) — they are not a special case.
+algorithm as every other key (§4) — they are not a special case. Plus six keys
+belonging to the `idea`/`spike` issue types (never combined with the keys
+above on the same issue): `idea`, `research`, `critique`, `verdict`
+(idea-type only), `hypothesis`, `findings` (spike-type only). All six
+resolve through the exact same algorithm as every other key (§4) — not a
+special case.
 
 Fields of a stage's role record:
 - **`write`** — exactly one actor name (a key under `agents.yml`'s `actors:`).
@@ -236,6 +241,23 @@ If `docs/planning/agents.yml` does not exist yet, the **first** `pf-*` skill tha
 needs to resolve any actor creates it with exactly the default content above —
 no question asked to the user. Same mechanism as `role-profiles.yml` below.
 
+**Exception — bare `idea`/`spike` folder.** Skip auto-creation entirely (do
+not write this file) when the resolving issue's TYPE is `idea` or `spike`
+**and** the project has no PF scaffold at all — no `PLANNING.md` and no
+`docs/planning/` directory. **Level 1 (an explicit `roles.<key>`/`profile:`
+literally present in this issue's own `prompt.md`) is still checked first,
+exactly as always** — a bare folder never suppresses an explicit key the
+user hand-wrote after the fact. What this exception actually skips is
+levels 2-4, which are the ones that need a *resolved profile* to exist
+(`role-profiles.yml`) — **those alone** require `docs/planning/`, which a
+bare folder by construction does not have. So: level 1 checked normally; if
+it doesn't match, resolution falls straight through to level 5 (`write:
+claude, review: [claude]`), skipping 2-4 only. The moment the project gains
+a PF scaffold (the idea's verdict becomes `project`/`spike-first` and
+`~/.claude/skills/pf-close/SKILL.md`'s Phase 4.6 creates `docs/planning/` as
+part of scaffolding), normal auto-creation resumes on that project's very
+next role resolution, same as any other project.
+
 ---
 
 ## 3. `docs/planning/role-profiles.yml` — named profiles
@@ -293,6 +315,23 @@ Same rule as `agents.yml`: if `docs/planning/role-profiles.yml` does not exist
 yet, the first `pf-*` skill that needs to resolve a profile creates it with
 exactly the default content above — no question asked.
 
+**Exception — bare `idea`/`spike` folder.** Skip auto-creation entirely (do
+not write this file) when the resolving issue's TYPE is `idea` or `spike`
+**and** the project has no PF scaffold at all — no `PLANNING.md` and no
+`docs/planning/` directory. **Level 1 (an explicit `roles.<key>`/`profile:`
+literally present in this issue's own `prompt.md`) is still checked first,
+exactly as always** — a bare folder never suppresses an explicit key the
+user hand-wrote after the fact. What this exception actually skips is
+levels 2-4, which are the ones that need a *resolved profile* to exist
+(`role-profiles.yml`) — **those alone** require `docs/planning/`, which a
+bare folder by construction does not have. So: level 1 checked normally; if
+it doesn't match, resolution falls straight through to level 5 (`write:
+claude, review: [claude]`), skipping 2-4 only. The moment the project gains
+a PF scaffold (the idea's verdict becomes `project`/`spike-first` and
+`~/.claude/skills/pf-close/SKILL.md`'s Phase 4.6 creates `docs/planning/` as
+part of scaffolding), normal auto-creation resumes on that project's very
+next role resolution, same as any other project.
+
 ---
 
 ## 4. Resolving a stage's role — the fallback order
@@ -336,6 +375,11 @@ the corrected, load-bearing order (do not swap levels 3 and 4):
    level 5 for *this* key. Level 5 is unreachable for key `<key>` only when
    `<key>` itself already has an explicit entry (then level 1 already
    resolved it) or a `profile:` is set (then levels 2–4 take over for it).
+   (For a bare `idea`/`spike` folder with no PF scaffold, level 1 is still
+   checked as usual; only levels 2-4 are unreachable per the Auto-creation
+   exception above, since they require a resolved `role-profiles.yml` that
+   cannot exist there — level 5 is reached whenever level 1 does not match,
+   not unconditionally.)
 
 ### Why level 3 must come before level 4, not after
 

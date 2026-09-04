@@ -69,7 +69,7 @@ Run each discovered command (plus any built-in fallback commands from Phase 0):
 
 Find all checklist items (`- [ ]`) in `.qa-workflow.md` that are NOT located inside a runnable block section (i.e., not under a heading or bold label that triggered command extraction in Phase 1).
 
-These items require human confirmation. Present them to the user as a grouped list and ask: "Please review each item below and confirm whether it passes or fails. Respond with the item number and PASS or FAIL."
+These items require human confirmation. Present them to the user as a grouped list and ask: "Please review each item below and confirm whether it passes or fails. Respond with the item number and PASS or FAIL." Front-loaded check: if `prompt.md`'s `interaction` field resolves to `front-loaded` (`~/.claude/skills/pf-interaction/SKILL.md`, "Front-loaded rule"), apply that rule instead of asking this question interactively. This is a hook site even though it is plain-text confirmation, not a literal `AskUserQuestion` call: the Front-loaded rule generalizes to any point where a stage would otherwise wait for a human reply. Resolution: assume **PASS** for every item with no contraindication in the collected artifacts, recording an explicit `[assumed]` line per item in `open_questions.md` — each such item still appears in `qa_report.md` as an assumed-PASS, never hidden.
 
 Example prompt:
 ```

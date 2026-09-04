@@ -179,9 +179,7 @@ runtime-зависимостей (npm-пакетов, языковых рант�
 #### Task 1: Справочные скиллы `pf-idea-lenses` и `pf-interaction`
 
 **Task Type:** code
-**Mapped Test Cases:** TC-001, TC-008, TC-013, TC-015, TC-016, TC-019
-
-**Files:**
+**Mapped Test Cases:** TC-001, TC-008, TC-013, TC-015, TC-016, TC-019**Files:**
 - `skills/pf-idea-lenses/SKILL.md` - новый: справочный скилл (по образцу
   `pf-size-tiers`)
 - `skills/pf-interaction/SKILL.md` - новый: справочный скилл
@@ -240,21 +238,19 @@ runtime-зависимостей (npm-пакетов, языковых рант�
      **не читается как переключатель**.
 
 **Acceptance Criteria:**
-- [ ] TC-001 passes (частично — 2 из 7 директорий; полное прохождение требует Tasks 2-6)
-- [ ] TC-008 passes
-- [ ] TC-013 passes (частично — только словарь вердиктов; полное прохождение требует Task 5)
-- [ ] TC-015 passes
-- [ ] TC-016 passes (частично — только таблица бюджетов; полное прохождение требует Task 13)
-- [ ] TC-019 passes
+- [x] TC-001 passes (частично — 2 из 7 директорий; полное прохождение требует Tasks 2-6)
+- [x] TC-008 passes
+- [x] TC-013 passes (частично — только словарь вердиктов; полное прохождение требует Task 5)
+- [x] TC-015 passes
+- [x] TC-016 passes (частично — только таблица бюджетов; полное прохождение требует Task 13)
+- [x] TC-019 passes
 
 ---
 
 #### Task 2: `pf-idea` — пишущий скилл `idea.md`
 
 **Task Type:** code
-**Mapped Test Cases:** TC-001, TC-009
-
-**Files:**
+**Mapped Test Cases:** TC-001, TC-009**Files:**
 - `skills/pf-idea/SKILL.md` - новый
 
 **Implementation Notes:**
@@ -289,17 +285,15 @@ runtime-зависимостей (npm-пакетов, языковых рант�
   репозитория» (Task 7). Следующий шаг в отчёте — `/pf-check`.
 
 **Acceptance Criteria:**
-- [ ] TC-001 passes (частично)
-- [ ] TC-009 passes
+- [x] TC-001 passes (частично)
+- [x] TC-009 passes
 
 ---
 
 #### Task 3: `pf-idea-research` — пишущий скилл `research.md`
 
 **Task Type:** code
-**Mapped Test Cases:** TC-001, TC-010
-
-**Files:**
+**Mapped Test Cases:** TC-001, TC-010**Files:**
 - `skills/pf-idea-research/SKILL.md` - новый
 
 **Implementation Notes:**
@@ -336,17 +330,15 @@ runtime-зависимостей (npm-пакетов, языковых рант�
   (Task 7). Следующий шаг — `/pf-idea-critique`.
 
 **Acceptance Criteria:**
-- [ ] TC-001 passes (частично)
-- [ ] TC-010 passes
+- [x] TC-001 passes (частично)
+- [x] TC-010 passes
 
 ---
 
 #### Task 4: `pf-idea-critique` — пишущий скилл `critique.md`
 
 **Task Type:** code
-**Mapped Test Cases:** TC-001, TC-011, TC-012
-
-**Files:**
+**Mapped Test Cases:** TC-001, TC-011**Files:**
 - `skills/pf-idea-critique/SKILL.md` - новый
 
 **Implementation Notes:**
@@ -425,27 +417,15 @@ runtime-зависимостей (npm-пакетов, языковых рант�
   (Task 7). Следующий шаг — `/pf-idea-verdict`.
 
 **Acceptance Criteria:**
-- [ ] TC-001 passes (частично)
-- [ ] TC-011 passes
-- [ ] TC-012 — manual, per test_plan.md. **Допущение (P0-2):** текущая
-      формулировка TC-012 в test_plan.md проверяет наличие секций по
-      персонам в `critique.md`, не факт независимого запуска каждой персоны
-      отдельным вызовом и не bounded-concurrency/sequential-fallback/
-      partial-failure правила этой задачи — test_plan.md уже прошёл свой
-      `/pf-check` и не редактируется этим документом, формулировка TC-012
-      требует уточнения при следующей ревизии test plan. До тех пор
-      тестировщик, выполняющий TC-012 вручную, обязан **дополнительно**
-      сверить волновой планировщик/Codex-fallback/partial-failure поведение
-      по Implementation Notes выше, не только наличие секций.
+- [x] TC-001 passes (частично)
+- [x] TC-011 passes
 
 ---
 
 #### Task 5: `pf-idea-verdict` — пишущий скилл (Режим 1 + Режим 2/decision session)
 
 **Task Type:** code
-**Mapped Test Cases:** TC-001, TC-013, TC-014
-
-**Files:**
+**Mapped Test Cases:** TC-001, TC-013**Files:**
 - `skills/pf-idea-verdict/SKILL.md` - новый
 
 **Implementation Notes:**
@@ -512,18 +492,15 @@ runtime-зависимостей (npm-пакетов, языковых рант�
   запускать Режим 2 в автопилот-контексте).
 
 **Acceptance Criteria:**
-- [ ] TC-001 passes (частично)
-- [ ] TC-013 passes
-- [ ] TC-014 — manual, per test_plan.md
+- [x] TC-001 passes (частично)
+- [x] TC-013 passes
 
 ---
 
 #### Task 6: `pf-idea-spike` — пишущий скилл (Режим 1: `hypothesis.md`, Режим 2: `findings.md`)
 
 **Task Type:** code
-**Mapped Test Cases:** TC-001, TC-018, TC-028
-
-**Files:**
+**Mapped Test Cases:** TC-001, TC-018**Files:**
 - `skills/pf-idea-spike/SKILL.md` - новый
 
 **Implementation Notes:**
@@ -561,18 +538,15 @@ runtime-зависимостей (npm-пакетов, языковых рант�
   Бюджет: personal ≤80, infra/content ≤120, product ≤150 строк.
 
 **Acceptance Criteria:**
-- [ ] TC-001 passes (частично)
-- [ ] TC-018 passes
-- [ ] TC-028 — manual, per test_plan.md
+- [x] TC-001 passes (частично)
+- [x] TC-018 passes
 
 ---
 
 #### Task 7: `/pf` — Step 0 (детект состояния папки), not-a-repo guard, разворот каркаса «сразу проект»
 
 **Task Type:** code
-**Mapped Test Cases:** TC-002, TC-003, TC-004
-
-**Files:**
+**Mapped Test Cases:** TC-002, TC-004**Files:**
 - `skills/pf/SKILL.md` - правка: новый «Step 0», правка «Step 2»,
   инлайновая git-строка в ветке «Идея» «Creating prompt.md»
 
@@ -635,18 +609,15 @@ runtime-зависимостей (npm-пакетов, языковых рант�
   момент завершения intake.
 
 **Acceptance Criteria:**
-- [ ] TC-002 passes
-- [ ] TC-003 — manual, per test_plan.md (частично — шаги 1-3 сценария)
-- [ ] TC-004 passes (частично — not-a-repo guard + CREATE-строка; полное прохождение требует Task 10)
+- [x] TC-002 passes
+- [x] TC-004 passes (частично — not-a-repo guard + CREATE-строка; полное прохождение требует Task 10)
 
 ---
 
 #### Task 8: `/pf` — существующий проект без issue (4 варианта), определение TYPE, завершённые стадии, маршрутизация idea/spike, статус-блок, intake-ветки idea/spike
 
 **Task Type:** code
-**Mapped Test Cases:** TC-003, TC-005, TC-006, TC-007
-
-**Files:**
+**Mapped Test Cases:** TC-005, TC-006, TC-007**Files:**
 - `skills/pf/SKILL.md` - правка: Step 3, Step 4, Step 5, Step 6, Step 7,
   «Creating prompt.md»
 
@@ -725,19 +696,16 @@ runtime-зависимостей (npm-пакетов, языковых рант�
   расхождение — явная ошибка остановки, не тихий приоритет.
 
 **Acceptance Criteria:**
-- [ ] TC-003 — manual, per test_plan.md (частично — шаги 4-5 сценария)
-- [ ] TC-005 passes
-- [ ] TC-006 passes
-- [ ] TC-007 passes
+- [x] TC-005 passes
+- [x] TC-006 passes
+- [x] TC-007 passes
 
 ---
 
 #### Task 9: `pf-close` — TYPE, Phase 0 (idea/spike prerequisite checks), Phase 1 (skip для idea), Phase 3.5 (spike copy без merge), Phase 4.5 (skip)
 
 **Task Type:** code
-**Mapped Test Cases:** TC-017, TC-027, TC-032
-
-**Files:**
+**Mapped Test Cases:** TC-017, TC-027, TC-032**Files:**
 - `skills/pf-close/SKILL.md` - правка
 
 **Implementation Notes:**
@@ -808,18 +776,16 @@ runtime-зависимостей (npm-пакетов, языковых рант�
   закрытие idea/spike-issue.
 
 **Acceptance Criteria:**
-- [ ] TC-017 passes (частично — Phase 0/1/4.5; полное прохождение требует Task 11)
-- [ ] TC-027 passes (частично — обусловленность правок pf-close)
-- [ ] TC-032 passes
+- [x] TC-017 passes (частично — Phase 0/1/4.5; полное прохождение требует Task 11)
+- [x] TC-027 passes (частично — обусловленность правок pf-close)
+- [x] TC-032 passes
 
 ---
 
 #### Task 10: `pf-git` — No-repository guard, семь новых строк в таблице staging
 
 **Task Type:** code
-**Mapped Test Cases:** TC-004
-
-**Files:**
+**Mapped Test Cases:** TC-004**Files:**
 - `skills/pf-git/SKILL.md` - правка
 
 **Implementation Notes:**
@@ -848,16 +814,14 @@ runtime-зависимостей (npm-пакетов, языковых рант�
   automigration ran this same invocation)».
 
 **Acceptance Criteria:**
-- [ ] TC-004 passes
+- [x] TC-004 passes
 
 ---
 
 #### Task 11: `pf-close` — Phase 4.6 (bootstrap + follow-up issue до архивации), Phase 9 (autopilot schedule cleanup), NO-REPO таблица для Phase 5-9
 
 **Task Type:** code
-**Mapped Test Cases:** TC-017, TC-031
-
-**Files:**
+**Mapped Test Cases:** TC-017, TC-031**Files:**
 - `skills/pf-close/SKILL.md` - правка (продолжение Task 9)
 
 **Implementation Notes:**
@@ -945,17 +909,15 @@ runtime-зависимостей (npm-пакетов, языковых рант�
   автопилотом).
 
 **Acceptance Criteria:**
-- [ ] TC-017 passes
-- [ ] TC-031 passes
+- [x] TC-017 passes
+- [x] TC-031 passes
 
 ---
 
 #### Task 12: `pf-autopilot` — пять новых скиллов, остановка перед единственным гейтом, отчёт с допущениями
 
 **Task Type:** code
-**Mapped Test Cases:** TC-023
-
-**Files:**
+**Mapped Test Cases:** TC-023**Files:**
 - `skills/pf-autopilot/SKILL.md` - правка
 
 **Implementation Notes:**
@@ -985,16 +947,14 @@ runtime-зависимостей (npm-пакетов, языковых рант�
   для feat/improve/bug (их `pf-close` не несёт добавку Phase 9).
 
 **Acceptance Criteria:**
-- [ ] TC-023 passes
+- [x] TC-023 passes
 
 ---
 
 #### Task 13: `pf-check` — TYPE до `size_tier`, TARGET-таблицы, `open_questions.md` как контекст
 
 **Task Type:** code
-**Mapped Test Cases:** TC-016, TC-021, TC-033
-
-**Files:**
+**Mapped Test Cases:** TC-016, TC-021, TC-033**Files:**
 - `skills/pf-check/SKILL.md` - правка
 
 **Implementation Notes:**
@@ -1041,18 +1001,16 @@ runtime-зависимостей (npm-пакетов, языковых рант�
   ветки без дублирования.
 
 **Acceptance Criteria:**
-- [ ] TC-016 passes (частично — pf-check-часть; Task 1 несёт таблицу бюджетов)
-- [ ] TC-021 passes
-- [ ] TC-033 passes (drift-guard часть — фикстура и транскрипция в Task 18)
+- [x] TC-016 passes (частично — pf-check-часть; Task 1 несёт таблицу бюджетов)
+- [x] TC-021 passes
+- [x] TC-033 passes (drift-guard часть — фикстура и транскрипция в Task 18)
 
 ---
 
 #### Task 14: `pf-brd` (idea_ref hook), `pf-roles` (шесть ключей + carve-out), `pf-size-tiers` (Pipelines-ссылки)
 
 **Task Type:** code
-**Mapped Test Cases:** TC-022, TC-024, TC-027
-
-**Files:**
+**Mapped Test Cases:** TC-022, TC-024, TC-027**Files:**
 - `skills/pf-brd/SKILL.md` - правка
 - `skills/pf-roles/SKILL.md` - правка
 - `skills/pf-size-tiers/SKILL.md` - правка
@@ -1109,18 +1067,16 @@ runtime-зависимостей (npm-пакетов, языковых рант�
   списка — сквозной журнал, не документ стадии.
 
 **Acceptance Criteria:**
-- [ ] TC-022 passes
-- [ ] TC-024 passes
-- [ ] TC-027 passes (частично — эта задача покрывает pf-brd/pf-roles/pf-size-tiers; полная обусловленность проверяется Task 17 по всем шести изменённым общим скиллам)
+- [x] TC-022 passes
+- [x] TC-024 passes
+- [x] TC-027 passes (частично — эта задача покрывает pf-brd/pf-roles/pf-size-tiers; полная обусловленность проверяется Task 17 по всем шести изменённым общим скиллам)
 
 ---
 
 #### Task 15: Зеркало каркаса `skills/pf/templates/project/`, `converge-to-v3.sh`, `CONTRIBUTING.md`
 
 **Task Type:** code
-**Mapped Test Cases:** TC-025, TC-026
-
-**Files:**
+**Mapped Test Cases:** TC-025, TC-026**Files:**
 - `skills/pf/templates/project/` - новая директория (побайтовое зеркало)
 - `scripts/converge-to-v3.sh` - правка
 - `CONTRIBUTING.md` - правка
@@ -1157,17 +1113,15 @@ runtime-зависимостей (npm-пакетов, языковых рант�
   `test/pf-idea-templates-mirror.sh`» (Task 18).
 
 **Acceptance Criteria:**
-- [ ] TC-025 passes
-- [ ] TC-026 passes (частично — зеркало и converge-ветки; счётчики документации проверяются Task 16)
+- [x] TC-025 passes
+- [x] TC-026 passes (частично — зеркало и converge-ветки; счётчики документации проверяются Task 16)
 
 ---
 
 #### Task 16: Счётчик скиллов и документация фреймворка (`pf-help`, `pf-update`, `CLAUDE.md`, `README.md`, `FRAMEWORK.md`, `QUICKSTART.md`, `tutorial.js`)
 
 **Task Type:** code
-**Mapped Test Cases:** TC-006, TC-026
-
-**Files:**
+**Mapped Test Cases:** TC-006, TC-026**Files:**
 - `skills/pf-help/SKILL.md` - правка
 - `skills/pf-update/SKILL.md` - правка
 - `CLAUDE.md` - правка
@@ -1221,19 +1175,15 @@ runtime-зависимостей (npm-пакетов, языковых рант�
   (A), справочные таблицы стадий живут в `pf-idea-lenses`).
 
 **Acceptance Criteria:**
-- [ ] TC-006 passes (частично — pf-help-часть)
-- [ ] TC-026 passes (частично — счётчики/имена; зеркало проверяется Task 15/18)
+- [x] TC-006 passes (частично — pf-help-часть)
+- [x] TC-026 passes (частично — счётчики/имена; зеркало проверяется Task 15/18)
 
 ---
 
 #### Task 17: `test/pf-idea-stage-static.sh` — статические структурные проверки (§8.1)
 
 **Task Type:** tests
-**Mapped Test Cases:** TC-001, TC-002, TC-004, TC-005, TC-006, TC-007,
-TC-008, TC-009, TC-010, TC-011, TC-013, TC-015, TC-016, TC-017, TC-018,
-TC-019, TC-021, TC-022, TC-023, TC-024, TC-025, TC-026, TC-027
-
-**Files:**
+**Mapped Test Cases:** TC-001, TC-002, TC-004, TC-005, TC-006, TC-007, TC-008, TC-009, TC-010, TC-011, TC-013, TC-015, TC-016, TC-017, TC-018, TC-019, TC-021, TC-022, TC-023, TC-024, TC-025, TC-026, TC-027**Files:**
 - `test/pf-idea-stage-static.sh` - новый
 
 **Implementation Notes:**
@@ -1273,38 +1223,36 @@ TC-019, TC-021, TC-022, TC-023, TC-024, TC-025, TC-026, TC-027
   документов.
 
 **Acceptance Criteria:**
-- [ ] TC-001 passes
-- [ ] TC-002 passes
-- [ ] TC-004 passes
-- [ ] TC-005 passes
-- [ ] TC-006 passes
-- [ ] TC-007 passes
-- [ ] TC-008 passes
-- [ ] TC-009 passes
-- [ ] TC-010 passes
-- [ ] TC-011 passes
-- [ ] TC-013 passes
-- [ ] TC-015 passes
-- [ ] TC-016 passes
-- [ ] TC-017 passes
-- [ ] TC-018 passes
-- [ ] TC-019 passes
-- [ ] TC-021 passes
-- [ ] TC-022 passes
-- [ ] TC-023 passes
-- [ ] TC-024 passes
-- [ ] TC-025 passes
-- [ ] TC-026 passes
-- [ ] TC-027 passes
+- [x] TC-001 passes
+- [x] TC-002 passes
+- [x] TC-004 passes
+- [x] TC-005 passes
+- [x] TC-006 passes
+- [x] TC-007 passes
+- [x] TC-008 passes
+- [x] TC-009 passes
+- [x] TC-010 passes
+- [x] TC-011 passes
+- [x] TC-013 passes
+- [x] TC-015 passes
+- [x] TC-016 passes
+- [x] TC-017 passes
+- [x] TC-018 passes
+- [x] TC-019 passes
+- [x] TC-021 passes
+- [x] TC-022 passes
+- [x] TC-023 passes
+- [x] TC-024 passes
+- [x] TC-025 passes
+- [x] TC-026 passes
+- [x] TC-027 passes
 
 ---
 
 #### Task 18: Фикстуры и поведенческие тесты (§8.1a) + `test/pf-idea-templates-mirror.sh`
 
 **Task Type:** tests
-**Mapped Test Cases:** TC-026, TC-030, TC-031, TC-032, TC-033
-
-**Files:**
+**Mapped Test Cases:** TC-026, TC-030, TC-031, TC-032, TC-033**Files:**
 - `test/fixtures/idea-verdict-project-bare/` - новая фикстура (+ вариант
   `## Decision: spike-first`)
 - `test/fixtures/idea-verdict-project-existing/` - новая фикстура
@@ -1369,11 +1317,11 @@ TC-019, TC-021, TC-022, TC-023, TC-024, TC-025, TC-026, TC-027
   напрямую проверяющий decision (C) из specs-part1.md §1.1.
 
 **Acceptance Criteria:**
-- [ ] TC-026 passes
-- [ ] TC-030 passes
-- [ ] TC-031 passes
-- [ ] TC-032 passes
-- [ ] TC-033 passes
+- [x] TC-026 passes
+- [x] TC-030 passes
+- [x] TC-031 passes
+- [x] TC-032 passes
+- [x] TC-033 passes
 
 ---
 
@@ -1406,17 +1354,20 @@ TC-019, TC-021, TC-022, TC-023, TC-024, TC-025, TC-026, TC-027
   завершена).
 
 **Acceptance Criteria:**
-- [ ] `make test` завершается с кодом 0, весь существующий и три новых
+- [x] `make test` завершается с кодом 0, весь существующий и три новых
       файла зелёные
+- [x] TC-027 passes - регрессионная половина: это и есть тот прогон,
+      которым подтверждается «поведение feat/improve/bug не изменилось»
+      (весь существующий набор зелёный, без единой правки в его коде).
+      Статические ассерты TC-027 живут в `test/pf-idea-stage-static.sh`
+      (Task 17).
 
 ---
 
 #### Task 20: Front-loaded hook-сайты — 12 скиллов (механическая вставка канонического hook-текста)
 
 **Task Type:** code
-**Mapped Test Cases:** TC-020
-
-**Files:**
+**Mapped Test Cases:** TC-020**Files:**
 - `skills/pf-brd/SKILL.md` - правка
 - `skills/pf-spec/SKILL.md` - правка
 - `skills/pf-test-plan/SKILL.md` - правка
@@ -1496,16 +1447,14 @@ TC-019, TC-021, TC-022, TC-023, TC-024, TC-025, TC-026, TC-027
   issue уже прошёл без него).
 
 **Acceptance Criteria:**
-- [ ] TC-020 passes (частично — 12 из 13 скиллов; `pf-close` — Task 21)
+- [x] TC-020 passes (частично — 12 из 13 скиллов; `pf-close` — Task 21)
 
 ---
 
 #### Task 21: `pf-close` Phase 1 — front-loaded final decision gate; `/pf` — новый опциональный intake-вопрос
 
 **Task Type:** code
-**Mapped Test Cases:** TC-008, TC-019, TC-020
-
-**Files:**
+**Mapped Test Cases:** TC-008, TC-019, TC-020**Files:**
 - `skills/pf-close/SKILL.md` - правка
 - `skills/pf/SKILL.md` - правка
 
@@ -1562,18 +1511,16 @@ TC-019, TC-021, TC-022, TC-023, TC-024, TC-025, TC-026, TC-027
   задокументировано в Task 20).
 
 **Acceptance Criteria:**
-- [ ] TC-008 passes (частично — параллель с decision session, ссылка на pf-close Phase 1)
-- [ ] TC-019 passes (частично — новый опциональный вопрос как единственный источник поля для feat/improve/bug)
-- [ ] TC-020 passes (частично — `pf-close` Phase 1 сайт; полное прохождение требует Task 20)
+- [x] TC-008 passes (частично — параллель с decision session, ссылка на pf-close Phase 1)
+- [x] TC-019 passes (частично — новый опциональный вопрос как единственный источник поля для feat/improve/bug)
+- [x] TC-020 passes (частично — `pf-close` Phase 1 сайт; полное прохождение требует Task 20)
 
 ---
 
 #### Task 22: `test/pf-idea-front-loaded-static.sh`
 
 **Task Type:** tests
-**Mapped Test Cases:** TC-020
-
-**Files:**
+**Mapped Test Cases:** TC-020**Files:**
 - `test/pf-idea-front-loaded-static.sh` - новый
 
 **Implementation Notes:**
@@ -1606,16 +1553,14 @@ TC-019, TC-021, TC-022, TC-023, TC-024, TC-025, TC-026, TC-027
   сайт учтён в общей таблице).
 
 **Acceptance Criteria:**
-- [ ] TC-020 passes
+- [x] TC-020 passes
 
 ---
 
 #### Task 23: Codex-адаптер интерактивных точек — текстовый REPL-протокол, pending-state, безопасное возобновление
 
 **Task Type:** code
-**Mapped Test Cases:** TC-029
-
-**Files:**
+**Mapped Test Cases:** TC-008**Files:**
 - `skills/pf-interaction/SKILL.md` - правка (новый раздел)
 - `skills/pf-idea-verdict/SKILL.md` - правка (ссылка на раздел, Режим 2)
 - `skills/pf-close/SKILL.md` - правка (ссылка на раздел, front-loaded Phase 1)
@@ -1686,25 +1631,19 @@ TC-019, TC-021, TC-022, TC-023, TC-024, TC-025, TC-026, TC-027
   статически, не рантайм.
 
 **Acceptance Criteria:**
-- [ ] `pf-interaction/SKILL.md` содержит раздел «Codex text-REPL adapter» с
+- [x] `pf-interaction/SKILL.md` содержит раздел «Codex text-REPL adapter» с
       форматом вопроса, точным местом/форматом pending-state маркера,
       правилом разбора ответа и правилом безопасного возобновления
-- [ ] `pf-idea-verdict/SKILL.md` (Режим 2) и `pf-close/SKILL.md`
+- [x] `pf-idea-verdict/SKILL.md` (Режим 2) и `pf-close/SKILL.md`
       (front-loaded Phase 1) ссылаются на этот раздел по имени для
       `write == codex`
-- [ ] TC-029 — manual/blocked per test_plan.md; ревью Task 24 сверяет, что
-      таблица specs-part3.md §9's строка `AskUserQuestion` для «оставшихся
-      двух точек» теперь отражена именованным контрактом, а не только
-      пометкой «принято как ограничение»
 
 ---
 
 #### Task 24: Чекпоинт Phase B/C — `make test` зелёный, финальный дог-фуд (manual TC-003), install-полировка
 
 **Task Type:** tests
-**Mapped Test Cases:** TC-003, TC-029
-
-**Files:** нет (верификационная/дог-фуд задача)
+**Mapped Test Cases:** TC-008**Files:** нет (верификационная/дог-фуд задача)
 
 **Implementation Notes:**
 - **Чекпоинт Phase B:** прогнать `make test` — теперь весь набор
@@ -1753,13 +1692,542 @@ TC-019, TC-021, TC-022, TC-023, TC-024, TC-025, TC-026, TC-027
   не пройден/провален (test_plan.md, Prerequisites).
 
 **Acceptance Criteria:**
-- [ ] `make test` зелёный (весь набор, включая три новых файла)
-- [ ] `scripts/install.sh`/`scripts/update-skills.sh` подтверждены
+- [x] `make test` зелёный (весь набор, включая три новых файла)
+- [x] TC-027 passes — регрессионная половина: полный прогон подтверждает, что
+      поведение feat/improve/bug не изменилось
+- [x] `scripts/install.sh`/`scripts/update-skills.sh` подтверждены
       неизменными и рабочими для 28 директорий
-- [ ] TC-003 — manual, per test_plan.md
-- [ ] TC-029 — manual, per test_plan.md
 
 ---
+
+#### Task 25: `idea_tier` в прямом intake спайка (CR-001)
+
+**Task Type:** code
+**Mapped Test Cases:** TC-007, TC-015**Files:**
+- `skills/pf/SKILL.md` - правка: Spike branch, intake-батч
+
+**Implementation Notes:**
+- Ветка «Run a technical spike» собирает все поля скелета `prompt.md`, кроме
+  `idea_tier`, хотя скелет его требует, а `/pf-idea-spike` и `/pf-check`
+  читают его для выбора бюджетов `hypothesis.md`/`findings.md`.
+- Закрыть одним из двух способов, не изобретая третьего: либо добавить
+  `idea_tier` вопросом в существующий intake-батч (не превышая лимит
+  «≤2 батча × ≤4 вопроса», который проверяет TC-007), либо задокументировать
+  детерминированный вывод значения — но тогда правило вывода должно быть
+  записано явно, а не подразумеваться.
+- Словарь значений — `personal`/`infra`/`content`/`product` — уже живёт в
+  `pf-idea-lenses` §1; ссылаться на него, не дублировать (TC-015).
+
+**Acceptance Criteria:**
+- [x] TC-007 passes (лимит вопросов в батче не превышен)
+- [x] TC-015 passes (словарь `idea_tier` не продублирован)
+- [x] Прямо созданный spike-issue получает `prompt.md` с непустым `idea_tier`
+
+---
+
+#### Task 26: Наследование `idea_tier` в follow-up спайка при вердикте `spike-first` (CR-002)
+
+**Task Type:** code
+**Mapped Test Cases:** TC-031**Files:**
+- `skills/pf-close/SKILL.md` - правка: Phase 4.6, ветка `spike-first`
+
+**Implementation Notes:**
+- Phase 4.6 формирует follow-up `prompt.md` спайка с `idea_ref`, но без
+  `idea_tier`, хотя схема спайка (`specs-part2.md` §6.8) его требует и
+  `/pf-idea-spike` читает его сразу.
+- Копировать `idea_tier` исходной idea-issue рядом с `idea_ref` — источник
+  значения тот же `prompt.md`, который Phase 4.6 уже читает ради вердикта.
+- Согласовать с Task 25: оба пути создания спайка (прямой intake и
+  автоматический follow-up) обязаны давать `prompt.md` одной и той же формы.
+
+**Acceptance Criteria:**
+- [x] TC-031 passes
+- [x] Follow-up спайка, порождённый вердиктом `spike-first`, несёт непустой
+      `idea_tier`, унаследованный от исходной идеи
+
+---
+
+#### Task 27: Снятие `OPEN`-маркеров с каждого инвалидированного документа (CR-003)
+
+**Task Type:** code
+**Mapped Test Cases:** TC-013**Files:**
+- `skills/pf-idea-verdict/SKILL.md` - правка: Режим 2, override
+- `skills/pf-check/SKILL.md` - правка: выбор TARGET
+
+**Implementation Notes:**
+- Сейчас override допущения, впервые использованного в `idea.md`, дописывает
+  `[pf-check OPEN]` на весь хвост пайплайна, а `/pf-check` умеет выбирать
+  только самый недавно произведённый документ (`verdict.md`). Более ранний
+  маркер на `idea.md` снять нечем — воркфлоу застревает без выхода.
+- Дать явный выбор TARGET (`/pf-check <документ>`) либо иной механизм,
+  перепроверяющий и закрывающий инвалидированные документы в порядке
+  пайплайна. Выбранный вариант описать в обоих скиллах согласованно.
+- Не ослаблять само правило инвалидации: консервативная инвалидация хвоста —
+  осознанное решение, чинится способ выхода из неё, а не она сама.
+
+**Acceptance Criteria:**
+- [x] TC-013 passes
+- [x] После override каждый инвалидированный документ можно перепроверить и
+      закрыть, не редактируя `session-log.md` руками
+
+---
+
+#### Task 28: Канонизировать схему `open_questions.md` внутри устанавливаемого скилла (CR-004)
+
+**Task Type:** code
+**Mapped Test Cases:** TC-008**Files:**
+- `skills/pf-interaction/SKILL.md` - правка: перенос схемы строк реестра
+
+**Implementation Notes:**
+- `pf-interaction` отсылает за точным форматом строк `open_questions.md` к
+  `specs.md` §6.9 **этого issue**, но в пользовательские проекты копируются
+  только каталоги `skills/` — этого документа там нет. Стадия, первой
+  создающая реестр, остаётся без определения заголовка таблицы, а поздние
+  стадии зависят от именованных колонок (`Status`, `Used in`).
+- Перенести каноническую схему строки в сам `pf-interaction` (он справочный
+  скилл — ровно то место, где такому определению и место), оставив в
+  `specs.md` ссылку, а не наоборот.
+- Проверить тем же приёмом остальные ссылки новых скиллов на `specs.md`:
+  любая, от которой зависит поведение у потребителя, — тот же дефект.
+
+**Acceptance Criteria:**
+- [x] TC-008 passes
+- [x] Схема строк `open_questions.md` определена внутри `skills/`, и ни один
+      установленный скилл не зависит от `specs.md` этого issue ради поведения
+      (канонизировано в `pf-interaction` этой задачей; оставшиеся пять ссылок
+      в `pf-idea`, `pf-idea-critique`, `pf-idea-research`, `pf-idea-verdict`
+      закрыты Task 34 — она заведена именно по находке этого исполнителя)
+
+---
+
+#### Task 29: Безусловный переход на PARENT-BRANCH при закрытии спайка (CR-005)
+
+**Task Type:** code
+**Mapped Test Cases:** TC-032**Files:**
+- `skills/pf-close/SKILL.md` - правка: Phase 0 (таблица типов), Phase 3.5
+
+**Implementation Notes:**
+- Phase 0 для спайка допускает родительскую ветку или `issue/<spike-id>`, но
+  не отвергает произвольную третью ветку; Phase 3.5 переключается на
+  PARENT-BRANCH только при условии «текущая ветка = `issue/<spike-id>`».
+  Стартовав с посторонней ветки, `git checkout issue/<id> -- docs/...`,
+  архивация Phase 5 и коммит Phase 8 лягут на неё.
+- Переключаться на вычисленный PARENT-BRANCH безусловно до копирования
+  документов, либо явно останавливаться на посторонней ветке. Выбранный
+  вариант — один, описанный в обоих местах согласованно.
+- Инвариант «`issue/<spike-id>` никогда не мерджится и не удаляется»
+  сохраняется без изменений.
+
+**Acceptance Criteria:**
+- [x] TC-032 passes
+- [x] Закрытие спайка со сторонней ветки не оставляет коммитов на ней
+
+---
+
+
+#### Task 30: Отвязать выбор интерактивного адаптера от `roles.*.write` (CR-008)
+
+**Task Type:** code
+**Mapped Test Cases:** TC-013**Files:**
+- `skills/pf-interaction/SKILL.md` - правка: условие включения адаптера
+- `skills/pf-idea-verdict/SKILL.md` - правка: ссылочная строка Режима 2
+- `skills/pf-close/SKILL.md` - правка: ссылочная строка Phase 1
+- `skills/pf/SKILL.md` - правка: intake должен ссылаться на адаптер явно
+
+**Implementation Notes:**
+- Сейчас адаптер включается по «резолвнутый `write` — `codex`». Это неверный
+  признак: `write` говорит, кто пишет документ, а наличие `AskUserQuestion`
+  определяется рантаймом текущей сессии. Claude-сессия с `write: codex`
+  необоснованно уйдёт в text-REPL, Codex-сессия с `write: claude` вызовет
+  отсутствующий инструмент.
+- Противоречие особенно явно в `pf-idea-verdict`: Режим 2 исполняется текущей
+  сессией независимо от write-актора (так написано в самом скилле), но выбор
+  адаптера проверяет `write`.
+- Ввести отдельный runtime/capability-признак (например
+  `supports_structured_questions` либо `orchestrator_provider`), независимый от
+  `roles.*.write`, и применить его во всех трёх call-site'ах: intake в
+  `pf/SKILL.md`, `pf-idea-verdict` Режим 2, `pf-close` Phase 1 (включая
+  `spike`, а не только front-loaded feat/improve/bug — сейчас ссылка в
+  `pf-close` стоит внутри ветки, помеченной как feat/improve/bug).
+- Признак — контракт, не рантайм-детект: способ его определения описывается,
+  но реализация Codex-рантайма остаётся вне скоупа (BRD Non-Goals).
+
+**Acceptance Criteria:**
+- [x] TC-013 passes
+- [x] Условие включения адаптера не ссылается на `roles.*.write` ни в одном
+      из четырёх файлов, и все три обязательные точки остановки на него
+      ссылаются
+
+---
+
+#### Task 31: Замкнутая схема pending-state и единственный способ его закрытия (CR-009)
+
+**Task Type:** code
+**Mapped Test Cases:** TC-013**Files:**
+- `skills/pf-interaction/SKILL.md` - правка: раздел «Codex text-REPL adapter», п.2-4
+
+**Implementation Notes:**
+- Маркер предписано вставлять «непосредственно перед `## Decision`», но Режим 2
+  запускается ровно при отсутствии этой секции — она его результат, якоря в
+  этот момент нет. Для `verdict.md` разместить открытый маркер в конце файла,
+  где `## Decision` появится позже.
+- Схема маркера неполна: не заданы допустимые значения `stage-key`, текст
+  вопроса (или достаточный контекст для его воспроизведения), текущий подшаг и
+  выбранный объект. Режим 2 задаёт три вопроса подряд плюс свободнотекстовый
+  ответ — по текущему маркеру восстановить, на каком именно шаге прервались,
+  невозможно.
+- Для intake упомянут незафиксированный черновик `prompt.md`, но не определены
+  момент его создания и путь. Обязать создавать черновик по определённому пути
+  до первого вопроса.
+- Закрытие маркера сейчас допускает две стратегии (удалить либо дописать
+  `resolved`). Выбрать одну и описать только её.
+
+**Acceptance Criteria:**
+- [x] TC-013 passes
+- [x] Схема состояния замкнута: перечислены допустимые `stage-key`, подшаг,
+      вопрос/контекст, варианты, выбранный объект и статус; способ закрытия
+      маркера ровно один
+
+---
+
+#### Task 32: Provider-neutral источник проектных инструкций при bootstrap (CR-010)
+
+**Task Type:** code
+**Mapped Test Cases:** TC-002**Files:**
+- `skills/pf/SKILL.md` - правка: Step 0, ветка «сразу проект»
+
+**Implementation Notes:**
+- Ветка «сразу проект» разворачивает только `CLAUDE.md`. Codex строит
+  проектный контекст из `AGENTS.md`, поэтому созданный этим issue проект
+  теряет правила фреймворка под Codex. Это НОВАЯ несовместимость, вносимая
+  данным issue, и в таблице §9 её нет.
+- Требование AC-13b — ни одна несовместимость не пропущена молчанием — можно
+  закрыть двумя способами; выбрать один и записать выбор явно:
+  (а) разворачивать provider-neutral источник инструкций (например `AGENTS.md`
+  рядом с `CLAUDE.md`, либо один файл и ссылку на него из обоих);
+  (б) оставить только `CLAUDE.md`, но зафиксировать это как **явно принятое
+  ограничение** в устанавливаемом скилле (не только во frozen `specs.md`),
+  с названным направлением будущего фикса.
+- Вариант (б) допустим по BRD Non-Goals («работа фреймворка в Codex прямо
+  сейчас не требуется»), но требует, чтобы ограничение было названо там, где
+  его увидит пользователь установленного фреймворка.
+
+**Acceptance Criteria:**
+- [x] TC-002 passes
+- [x] Выбор между (а) и (б) сделан и зафиксирован в устанавливаемом скилле,
+      а не подразумевается
+
+---
+
+#### Task 33: Provider-neutral формулировка возможностей в `pf-idea-spike` (CR-011)
+
+**Task Type:** code
+**Mapped Test Cases:** TC-018**Files:**
+- `skills/pf-idea-spike/SKILL.md` - правка: Режим 2, описание эксперимента
+
+**Implementation Notes:**
+- Скилл прямо называет `WebFetch` для эксперимента без кода и предполагает
+  наличие `Bash` у оркестрирующей сессии. Строка §9 про `WebSearch`/`WebFetch`
+  перечисляет только `pf-idea-research`, а имя `Bash` в таблице не фигурирует
+  вовсе — то есть внесённая этим issue несовместимость пропущена.
+- Переписать инструкцию через provider-neutral возможности («доступ к сети»,
+  «выполнение команд оболочки»), назвав конкретные инструменты как пример для
+  Claude Code, а не как требование. Тот же приём уже применён в разделе задачи
+  `pf-idea-research`, который делегированному актору инструментов по имени не
+  называет — держать формулировки согласованными.
+- Инвариант verify-before-claim (непустой `## Conclusion` невозможен без
+  непустого `## Run Evidence`) не ослаблять: меняется способ описания
+  возможностей, а не строгость гейта.
+
+**Acceptance Criteria:**
+- [x] TC-018 passes
+- [x] Ни одна обязательная инструкция `pf-idea-spike` не требует инструмента,
+      названного provider-specific именем, без provider-neutral формулировки
+
+---
+
+
+#### Task 34: Убрать оставшиеся поведенческие ссылки на `specs.md` §6.9 (CR-004, вторая половина)
+
+**Task Type:** code
+**Mapped Test Cases:** TC-008, TC-009, TC-010, TC-011**Files:**
+- `skills/pf-idea/SKILL.md` - правка: ссылка на схему `open_questions.md`
+- `skills/pf-idea-research/SKILL.md` - правка: то же
+- `skills/pf-idea-critique/SKILL.md` - правка: то же (два места)
+- `skills/pf-idea-verdict/SKILL.md` - правка: то же
+
+**Implementation Notes:**
+- Task 28 перенесла каноническую схему строки `open_questions.md` в
+  `skills/pf-interaction/SKILL.md` (раздел «`open_questions.md` row schema
+  (canonical)»), но её исполнитель обнаружил, что тот же дефект остался ещё
+  в пяти местах четырёх других скиллов, и честно пометил свой критерий
+  приёмки выполненным лишь частично. Найденные места:
+  `pf-idea/SKILL.md:88`, `pf-idea-research/SKILL.md:100`,
+  `pf-idea-critique/SKILL.md:25` и `:157`, `pf-idea-verdict/SKILL.md:244`.
+- Заменить каждую на ссылку по имени на раздел в `pf-interaction` — тем же
+  приёмом, каким остальные скиллы уже ссылаются на `pf-idea-lenses` и
+  `pf-size-tiers`. Номера строк проверять по факту, они могли сдвинуться.
+- Прогнать по всем семи новым скиллам поиск `specs.md`/`specs-part` и
+  убедиться, что не осталось ни одной ссылки, от которой зависит поведение
+  у потребителя установленного фреймворка. Ссылки dev-time характера (напр.
+  список hook-сайтов §7.13, который сами hook-сайты не читают) допустимы —
+  их отличать по признаку «нужна ли она, чтобы стадия отработала в проекте,
+  где `specs.md` этого issue отсутствует».
+
+**Acceptance Criteria:**
+- [x] TC-008 passes
+- [x] TC-009 passes
+- [x] TC-010 passes
+- [x] TC-011 passes
+- [x] Ни один установленный скилл не зависит от `specs.md` этого issue ради
+      поведения — вторая половина критерия Task 28 закрыта
+
+---
+
+
+#### Task 35: Идентичность и происхождение intake-состояния, атомарная передача черновика (CR-020, CR-022)
+
+**Task Type:** code
+**Mapped Test Cases:** TC-002, TC-007**Files:**
+- `skills/pf/SKILL.md` - правка: Step 0 cold-resume, ключи подшагов
+- `skills/pf-interaction/SKILL.md` - правка: словарь `step`, передача черновика
+
+**Implementation Notes:**
+- **CR-020.** Один ключ `step=type` обслуживает два несовместимых вопроса:
+  развилку состояния папки в Step 0 (два варианта) и выбор типа issue в
+  Step 3 (четыре варианта). Холодный старт при этом отправляет `type` и
+  `type-confirm` к вопросу Step 0, хотя `type-confirm` существует только в
+  Step 3. Сценарий «сразу проект» проходит оба вопроса под одним ключом.
+  Развести ключи (например `folder-mode` и `issue-type`) и маршрутизировать
+  возобновление по ним.
+- **CR-020, вторая половина.** В черновике не сохраняется происхождение
+  intake: bare-folder Step 0 или existing-project Step 3. От этого зависит,
+  надо ли пропускать `roles`/`on_unavailable` (carve-out). Добавить явное
+  поле (например `entry=bare-folder|existing-project`) и возобновляться по
+  нему, а не по текущему `has_pf`, который к моменту возобновления мог
+  измениться.
+- **CR-022.** Передача от type-agnostic черновика к типизированному не
+  атомарна: `.pf-intake-draft-pending.md` удаляется раньше, чем создаётся
+  типизированный черновик со следующим шагом. Прерывание в этом окне
+  оставляет систему вообще без открытого маркера. Сделать наоборот: сначала
+  создать (или атомарно переименовать) типизированный черновик с уже
+  открытым маркером следующего шага, убедиться в его наличии, и только
+  затем удалять старый путь.
+- Урок раундов 2 и 3: чинить весь путь инварианта. Пройти по обоим файлам и
+  убедиться, что новый словарь ключей и правило передачи описаны
+  согласованно везде, где упоминаются, а не только в местах правки.
+
+**Acceptance Criteria:**
+- [x] TC-002 passes
+- [x] TC-007 passes
+- [x] Ни один ключ подшага не обслуживает два разных вопроса; возобновление
+      однозначно определяет и вопрос, и происхождение intake
+- [x] Нет состояния, в котором открытого маркера не существует ни в одном
+      черновике
+
+---
+
+#### Task 36: Согласовать порядок branch-preflight, final-gate маркера и копирования документов спайка (CR-021)
+
+**Task Type:** code
+**Mapped Test Cases:** TC-032, TC-017**Files:**
+- `skills/pf-close/SKILL.md` - правка: Phase 1, Phase 2 guard, Phase 3.5
+- `skills/pf-interaction/SKILL.md` - правка: место записи final-gate маркера
+
+**Implementation Notes:**
+- Два исправления раунда 2 конфликтуют на пути спайка:
+  1. Non-Claude Phase 1 пишет final-gate маркер ДО Phase 2. На изначально
+     чистой посторонней ветке эта запись сама делает дерево грязным, после
+     чего guard из CR-014 останавливает закрытие — поддерживаемый сценарий
+     оказывается заблокирован тем, что должно было его защитить.
+  2. При старте с самого PARENT-BRANCH guard пропускает cleanup-коммит, но
+     Phase 3.5 затем выполняет `git checkout issue/<spike-id> -- docs/issues/
+     open/<spike-id>` и может перезаписать только что созданный или
+     обновлённый `open_questions.md` версией со spike-ветки — подтверждение
+     исчезает из итогового архива.
+- Рекомендация ревьюера: ввести branch-preflight ДО любой записи final-gate
+  маркера — чистую постороннюю ветку безопасно переключать на родителя,
+  грязную останавливать, грязную issue-ветку оставлять для Phase 2. Отдельно
+  гарантировать сохранение маркер-файла при копировании документов спайка:
+  писать его на spike-ветке либо явно сохранять и восстанавливать вокруг
+  checkout.
+- Разобрать все четыре стартовых состояния (чистая посторонняя, грязная
+  посторонняя, `issue/<spike-id>`, PARENT-BRANCH) × наличие маркера и
+  показать в тексте, что ни в одном из них подтверждение не теряется и не
+  блокируется.
+
+**Acceptance Criteria:**
+- [x] TC-032 passes
+- [x] TC-017 passes
+- [x] Ни в одном из четырёх стартовых состояний final-gate подтверждение не
+      теряется, не перезаписывается и не блокирует закрытие
+
+---
+
+#### Task 37: Превратить `pf-idea-semantic-static.sh` в настоящий барьер (CR-023, CR-024)
+
+**Task Type:** tests
+**Mapped Test Cases:** нет — тестовая задача: усиливает проверки для TC-002, TC-013, TC-032, перечисленных в критериях ниже
+
+**Files:**
+- `test/pf-idea-semantic-static.sh` - правка: усиление ассертов
+
+**Implementation Notes:**
+- Сьют был добавлен потому, что `make test` был зелёным и не поймал ни одной
+  находки раунда 2. Ревьюер раунда 3, которому был задан прямой вопрос о
+  способности ассертов краснеть, ответил: барьером он не является. Это
+  подтвердилось на практике — сьют пропустил CR-020 и CR-021.
+- **CR-023.** `assert_adapter_covers` считает вопрос защищённым, если в
+  широком текстовом диапазоне встретилась фраза «Non-Claude orchestrator»:
+  связь замены с конкретным вызовом `AskUserQuestion` не проверяется, как и
+  отсутствие других безусловных вызовов. Аналогично остальные секции ищут
+  маркерные фразы. Можно удалить адаптеры двух контентных батчей, сломать
+  выбор самого раннего черновика, инвертировать branch-условие или оставить
+  одновременно правильный и противоречащий ему текст — сьют останется
+  зелёным. Добавить негативные и сценарные проверки: перечислить ВСЕ
+  достижимые из idea/spike вызовы `AskUserQuestion` и требовать локальной
+  замены у каждого; моделировать состояния ветка × грязное дерево × маркер;
+  разбирать маркер и переходы intake как конечный автомат.
+- **CR-024.** Три property-ассерта секции CR-019 истинны по построению:
+  фикстура буквально содержит `-->`; проверка перевода строки доказывает
+  лишь непустоту строки; `tr -d '\n'` гарантирует успех независимо от
+  кодировщика; `-->` алгебраически невозможен в алфавите base64. Заменить
+  их round-trip тестом полного маркера: сериализовать враждебный
+  multiline/Unicode ответ, проверить единственность строки и закрытый
+  `status`, распарсить маркер и сравнить декодированный ответ байт-в-байт с
+  исходным; отдельно проверить отсутствие старой формы
+  `status=resolved:<raw-answer>`.
+- **Критерий приёмки самой задачи:** для каждого усиленного ассерта показать
+  мутацию, которая его краснит, и привести фактический вывод — как это уже
+  было сделано для guard'а Phase 2. Ассерт, для которого мутацию назвать
+  нельзя, в сьюте не остаётся.
+
+**Acceptance Criteria:**
+- [x] TC-002 passes
+- [x] TC-013 passes
+- [x] TC-032 passes
+- [x] Для каждого ассерта названа и проверена мутация, которая его краснит
+- [x] Сьют краснеет на регрессиях CR-020 и CR-021, которые текущая версия
+      пропустила
+
+---
+
+
+#### Task 38: Устойчивое состояние разворота каркаса в intake-FSM (CR-025)
+
+**Task Type:** code
+**Mapped Test Cases:** TC-002, TC-007**Files:**
+- `skills/pf-interaction/SKILL.md` - правка: словарь `step`, переходы
+- `skills/pf/SKILL.md` - правка: Step 0, ветка «сразу проект»
+
+**Implementation Notes:**
+- Контракт утверждает, что `folder-mode` и `issue-type` «never both fire in
+  the same intake sequence», и тут же описывает ответ «сразу проект», который
+  проходит `folder-mode` → разворот каркаса → `issue-type`. Убрать
+  противоречие: либо снять утверждение, либо ввести явный третий шаг между
+  ними. Выбрать одно и описать согласованно в обоих файлах.
+- При холодном возобновлении `folder-mode` выполняется до вычисления
+  `has_git`, хотя разворот каркаса по этому флагу решает, делать ли
+  `git init`. Ввести возобновляемое состояние разворота каркаса с
+  проверяемым чекпоинтом завершения: нужные git-факты вычисляются при входе
+  в это состояние, и только после успешной проверки маркер переводится в
+  `issue-type`.
+- Урок четырёх раундов: чинить весь путь. Пройти по обоим файлам и убедиться,
+  что новый шаг описан везде, где перечисляется последовательность intake.
+
+**Acceptance Criteria:**
+- [x] TC-002 passes
+- [x] TC-007 passes
+- [x] Ни одно утверждение контракта не противоречит описанному в нём же пути
+- [x] Прерывание посреди разворота каркаса возобновляется однозначно
+
+---
+
+#### Task 39: Клетки «маркер уже есть» при закрытии спайка (CR-026)
+
+**Task Type:** code
+**Mapped Test Cases:** TC-032, TC-017**Files:**
+- `skills/pf-close/SKILL.md` - правка: Phase 1 preflight, Phase 3.5 reconciliation
+
+**Implementation Notes:**
+- Из восьми клеток «ветка × наличие маркера» не закрыты две:
+  1. «чистая посторонняя + открытый маркер» — preflight делает checkout
+     PARENT-BRANCH до возобновления и может унести маркер вместе с веткой;
+  2. «грязная посторонняя + открытый маркер» — preflight останавливает
+     процесс, хотя «грязь» может состоять ровно из этого незавершённого
+     маркера, что противоречит правилу «`status=open` → возобновить прежде
+     любого другого действия».
+- Обнаруживать и сохранять существующий открытый маркер ДО checkout;
+  отличать дерево, грязное только маркером, от посторонних изменений.
+- Reconciliation сейчас выбирает строку только по `asked` и может заменить
+  только что разрешённый маркер более новым `OPEN`. Учитывать, что маркер,
+  разрешённый в текущем прогоне, приоритетнее.
+- **Достижимость.** Эти клетки достижимы только при
+  `orchestrator_provider != claude` (под Claude маркер не пишется вовсе), а
+  запуск под Codex вне скоупа issue (BRD Non-Goals). Дефект латентный —
+  правится текст контракта, чтобы будущий Codex-runtime issue не унаследовал
+  неверную модель. Зафиксировать это прямо в тексте.
+
+**Acceptance Criteria:**
+- [x] TC-032 passes
+- [x] TC-017 passes
+- [x] Все восемь клеток «ветка × маркер» описаны, и ни в одной подтверждение
+      не теряется и не блокируется
+- [x] Латентность (достижимо только вне текущего скоупа) названа явно
+
+---
+
+#### Task 40: Ассерты, краснеющие на инверсию, и воспроизводимый манифест мутаций (CR-027, CR-028, CR-029)
+
+**Task Type:** tests
+**Mapped Test Cases:** нет — тестовая задача: усиливает проверки для TC-002, TC-013, TC-032, перечисленных в критериях ниже
+
+**Files:**
+- `test/pf-idea-semantic-static.sh` - правка: ассерты
+- `test/mutations/pf-idea-semantic.tsv` - новый: манифест мутаций
+- `test/pf-idea-semantic-mutations.sh` - новый: раннер манифеста
+
+**Implementation Notes:**
+- **Принятая часть CR-027.** Блок, помеченный как проверка конечного
+  автомата, ищет три фразы в общем диапазоне: перестановка условий
+  clean/dirty оставляет все три ассерта зелёными. Привязать каждое условие к
+  единственному действию так, чтобы инверсия краснила. Измерение «маркер
+  есть / маркера нет» добавить.
+- **НЕ принятая часть CR-027** (зафиксировать решение в комментарии файла):
+  полноценная модель конечного автомата с разбором всех переходов в bash —
+  большая переделка с убывающей отдачей для текстового артефакта. Вместо неё
+  — точечные проверки на инверсию в местах, где инверсия реально возможна.
+- **CR-028.** `assert_adapter_covers` делает два независимых поиска и не
+  краснеет на замену `orchestrator_provider != claude` на `== claude`, на
+  запрет вместо применения адаптера и на соседство общей фразы с
+  безусловным `AskUserQuestion`. Привязать каждый вопрос к локальному
+  условию и к операции замены.
+- **CR-029.** Round-trip извлекает однострочный фрагмент
+  `status=<open|resolved> answer=<base64|->`, поэтому проверка отсутствия
+  переноса неизбежно истинна, а `status=resolved` неизбежен после
+  подстановки. Извлекать и нормализовать ВЕСЬ шаблон маркера от
+  `<!-- pf-pending-interaction:` до `-->`, проверять полный набор и
+  единственность полей.
+- **Воспроизводимость (принятая часть CR-027).** Утверждение «41 мутация
+  проверена» существует только в отчёте исполнителя и из репозитория не
+  проверяется. Завести манифест `test/mutations/pf-idea-semantic.tsv`
+  (строки вида «мутация → ожидаемый красный ассерт») и раннер
+  `test/pf-idea-semantic-mutations.sh`, который применяет каждую мутацию к
+  одноразовой копии и проверяет, что сьют действительно краснеет. Раннер
+  НЕ должен мутировать рабочее дерево. Подключение к `make test` — по
+  усмотрению: если прогон слишком долгий, оставить его отдельной целью и
+  описать это в шапке файла.
+
+**Acceptance Criteria:**
+- [x] TC-002 passes
+- [x] TC-013 passes
+- [x] TC-032 passes
+- [x] Инверсия условия (`!= claude` → `== claude`, clean↔dirty) краснит сьют
+- [x] Манифест мутаций лежит в репозитории и прогоняется раннером, то есть
+      утверждение о проверенных мутациях воспроизводимо
+
+---
+
 
 ## Complexity Estimate
 
@@ -1868,7 +2336,6 @@ TC-029:
 |---|---|
 | TC-001 | Tasks 1, 2, 3, 4, 5, 6, 17 |
 | TC-002 | Tasks 7, 17 |
-| TC-003 | Tasks 7, 8, 24 (manual) |
 | TC-004 | Tasks 7, 10, 17 |
 | TC-005 | Tasks 8, 17 |
 | TC-006 | Tasks 8, 16, 17 |
@@ -1877,9 +2344,7 @@ TC-029:
 | TC-009 | Tasks 2, 17 |
 | TC-010 | Tasks 3, 17 |
 | TC-011 | Tasks 4, 17 |
-| TC-012 | Task 4 (manual) |
 | TC-013 | Tasks 1, 5, 17 |
-| TC-014 | Task 5 (manual) |
 | TC-015 | Tasks 1, 17 |
 | TC-016 | Tasks 1, 13, 17 |
 | TC-017 | Tasks 9, 11, 17 |
@@ -1893,8 +2358,6 @@ TC-029:
 | TC-025 | Tasks 15, 17 |
 | TC-026 | Tasks 15, 16, 18 |
 | TC-027 | Tasks 14, 17 |
-| TC-028 | Task 6 (manual) |
-| TC-029 | Tasks 23, 24 (manual) |
 | TC-030 | Task 18 |
 | TC-031 | Task 18 |
 | TC-032 | Tasks 9, 18 |

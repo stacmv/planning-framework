@@ -30,6 +30,24 @@ create an empty commit.
 
 ---
 
+## Step 0: No-repository guard
+
+Before any of the steps below, check `has_git` (`git rev-parse
+--is-inside-work-tree`) — the same computation as `/pf`'s Step 0. If it is
+false, do **not** run Step 1 (stage), Step 2 (commit), or Step 3 (push). In
+place of the normal Step 4 line, print:
+
+```
+Git: not committed — no git repository
+```
+
+(translated per `doc_language`, if set to something other than English).
+This is the single definition of that text — every stage that reaches this
+procedure references it rather than restating the wording, including `/pf`'s
+CREATE step for the idea branch, which prints it inline since there is
+nothing yet to stage (see `pf/SKILL.md`'s "Terminal git-status line"), and
+`/pf-close`'s no-repo branch.
+
 ## Step 1: Stage the artifact — scoped, never `-A`
 
 Stage **only the paths this stage owns**:
@@ -47,6 +65,13 @@ Stage **only the paths this stage owns**:
 | `/pf-user-docs` | `docs/issues/open/<ISSUE-ID>/user_docs.md` (+ `prompt.md`, if automigration ran this same invocation) |
 | `/pf-dev-docs` | `docs/issues/open/<ISSUE-ID>/dev_docs.md` (+ `prompt.md`, if automigration ran this same invocation) |
 | `/pf-qa` | `docs/issues/open/<ISSUE-ID>/qa_report.md` (+ `prompt.md`, if automigration ran this same invocation) |
+| `/pf-idea` | `docs/issues/open/<ISSUE-ID>/idea.md` (+ `open_questions.md`, if created/changed this run) (+ `prompt.md`, if automigration ran this same invocation) |
+| `/pf-idea-research` | `docs/issues/open/<ISSUE-ID>/research.md` (+ `open_questions.md`) (+ `prompt.md`, if automigration ran this same invocation) |
+| `/pf-idea-critique` | `docs/issues/open/<ISSUE-ID>/critique.md` (+ `open_questions.md`) (+ `prompt.md`, if automigration ran this same invocation) |
+| `/pf-idea-verdict` [mode 1] | `docs/issues/open/<ISSUE-ID>/verdict.md` (+ `open_questions.md`) (+ `prompt.md`, if automigration ran this same invocation) |
+| `/pf-idea-verdict` [mode 2, decision session] | `docs/issues/open/<ISSUE-ID>/verdict.md`, `open_questions.md` (+ any documents whose sections were regenerated on override) (+ `prompt.md`, if automigration ran this same invocation) |
+| `/pf-idea-spike` [mode 1] | `docs/issues/open/<ISSUE-ID>/hypothesis.md` (+ `prompt.md`, if automigration ran this same invocation) |
+| `/pf-idea-spike` [mode 2] | `docs/issues/open/<ISSUE-ID>/findings.md` (+ experiment code — `-A` for this stage if a branch was created, same rationale as `/pf-execute`, since this stage also "owns the code, not just the issue folder" when code exists) (+ `prompt.md`, if automigration ran this same invocation) |
 
 For `size_tier: trivial`, `notes.md` stands in for `brd.md` / `specs.md` /
 `implementation_plan.md` — stage it under whichever stage produced it.

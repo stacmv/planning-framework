@@ -6,7 +6,7 @@ version: 3.0.0
 
 Determine the active issue from `docs/issues/open/`.
 
-Before checking any other prerequisite, read `prompt.md`'s frontmatter. If it has no `size_tier` field, ask the user via `AskUserQuestion` — same 4 tier options and descriptions as in `~/.claude/skills/pf-size-tiers/SKILL.md`, recommending medium ("matches today's default behavior") — then write the answer into `prompt.md`'s frontmatter before proceeding with the rest of this skill.
+Before checking any other prerequisite, read `prompt.md`'s frontmatter. If it has no `size_tier` field, ask the user via `AskUserQuestion` — same 4 tier options and descriptions as in `~/.claude/skills/pf-size-tiers/SKILL.md`, recommending medium ("matches today's default behavior"). Front-loaded check: if `prompt.md`'s `interaction` field resolves to `front-loaded` (`~/.claude/skills/pf-interaction/SKILL.md`, "Front-loaded rule"), apply that rule instead of asking this question interactively. Then write the answer into `prompt.md`'s frontmatter before proceeding with the rest of this skill.
 
 **Oversized-predecessor guard.** Before creating tasks, recompute the oversized-for-tier check as a lightweight mechanical count (e.g. `wc -l`) — its own first action, before the full prerequisite read below:
 - If `size_tier: trivial`: count lines in `notes.md`. Budget is ~50 lines.
