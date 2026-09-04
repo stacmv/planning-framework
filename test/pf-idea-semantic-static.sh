@@ -27,6 +27,49 @@
 # writing it: every assert below must name a concrete mutation of the
 # SKILL.md source it reads that turns it red, verified in practice on a
 # throwaway copy — never against this repo's own working tree (S-5).
+#
+# Task 40 (round 4 review: CR-027/CR-028/CR-029) rewrote it AGAIN — a second
+# "barrier or not" verdict on the same suite. Three concrete gaps closed:
+#   - CR-027: the branch-preflight "finite-state check" searched three action
+#     phrases independently over a wide range — swapping which condition
+#     (clean vs. dirty) led to which action left every assert green. Fixed by
+#     pinning each condition to its action as ONE literal spanning both
+#     halves on the bullet's own source line (and the 8-cell branch x marker
+#     table's own rows), so an inversion changes the literal itself.
+#   - CR-027 also flagged that NO assert measured "marker present vs.
+#     absent" at all, which is structurally why round 3's suite could not
+#     catch CR-025/CR-026. Closed via the 8-cell table asserts below.
+#   - CR-027, explicitly NOT accepted: a full finite-state-machine model of
+#     the preflight (every branch x dirty x marker x carried-marker
+#     transition, prose steps 4a-4d) implemented in bash. This is a textual
+#     artifact, not executable code — a full FSM interpreter here is a large
+#     rewrite for a shrinking marginal catch rate over the pinned-literal
+#     approach above. Accepted scope boundary; point-in-time inversion
+#     checks at the specific places CR-027 named instead.
+#   - CR-028: `assert_adapter_covers` searched for the phrase "Non-Claude
+#     orchestrator" and a step token independently, both over a wide range —
+#     flipping `orchestrator_provider != claude` to `== claude`, replacing
+#     "replace...with the adapter" with a bare prohibition, or an unrelated
+#     adapter mention nearby, all left it green. Fixed by isolating the
+#     specific "**Non-Claude orchestrator.**" paragraph for each call site
+#     and binding the condition, the apply-verb, and the step token all to
+#     THAT paragraph. `adapter_count` now counts structurally-valid
+#     paragraphs (condition + apply-verb both present), not phrase mentions.
+#   - CR-029: the round-trip extracted a single physical line containing the
+#     `status=<open|resolved> answer=<base64|->` fragment — the "no embedded
+#     newline" and "status=resolved " checks were then true by construction.
+#     Fixed by extracting and normalizing the WHOLE marker template (`<!--
+#     pf-pending-interaction:` through `-->`, which spans 4 markdown-wrapped
+#     source lines), checking every field's presence and uniqueness, and
+#     only then filling in ALL placeholders (not just status/answer) to
+#     build the round-trip instance.
+#
+# Reproducibility (CR-027's other finding): a claim like "N mutations
+# checked" is worthless from outside the session that produced it unless the
+# mutations themselves are in the repository and re-runnable. See
+# test/mutations/pf-idea-semantic.tsv (the manifest) and
+# test/pf-idea-semantic-mutations.sh (the runner) — not wired into `make
+# test` (see that script's own header for why), run it directly to verify.
 
 # shellcheck source=test/lib.sh
 . "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)/lib.sh"
@@ -141,24 +184,110 @@ else
   pf_fail "CR-014: Phase 2's guard is no longer documented as defense-in-depth — the ordering claim above may be stale"
 fi
 
-# Finite-state check: the three outcomes the preflight distinguishes over
-# branch-state x dirty-tree must each still be named explicitly — deleting
-# or inverting any one of them (e.g. checking out on DIRTY instead of clean)
-# would silently reopen CR-005/CR-014/CR-021.
-if printf '%s\n' "$preflight" | grep -qF 'no action; proceed'; then
-  pf_pass "CR-021: state '(issue/<spike-id> or PARENT-BRANCH)' -> no action"
+# ══════════════════════════════════════════════════════════════════════════════
+printf '\n=== CR-027: branch-preflight conditions are paired with a SINGLE action each (inversion reddens), marker-present/absent measured\n'
+# ══════════════════════════════════════════════════════════════════════════════
+# Contract: skills/pf-close/SKILL.md's branch preflight (CR-021/CR-026). Round-4
+# review found the previous version of this check searched the whole preflight
+# range independently for three action phrases ("no action"/"checkout"/
+# "stop") — swapping which condition (clean vs. dirty, own-branch vs.
+# foreign) leads to which action left all three green, because no assert
+# looked at what preceded the action phrase on its own bullet. Below, every
+# condition->action pairing is checked as ONE literal substring spanning both
+# halves on the bullet's own source line — an inversion changes what that
+# combined literal actually reads, so the assert for the ORIGINAL pairing
+# goes red. Two direct negative probes additionally look for the specific
+# swapped pairing (checkout-on-dirty / stop-on-clean) appearing anywhere.
+#
+# The "marker present / marker absent" dimension CR-027 named as entirely
+# unmeasured (structurally why round 3's suite could not catch
+# CR-025/CR-026) is checked against the 8-cell "branch x marker" table
+# skills/pf-close/SKILL.md now states explicitly for this purpose — each of
+# the four data rows is pinned by a single-line, both-columns literal, so a
+# value swapped between the "No marker"/"Marker present" columns of one row,
+# or a whole row swapped with another, breaks that row's own assert.
+#
+# NOT modeled here (accepted scope boundary — see file header): the full
+# preflight finite-state machine (every branch x dirty x marker x
+# carried-marker transition, prose steps 4a-4d). Point pairing/inversion
+# checks at the places CR-027 actually named instead of a bash FSM.
+
+own_branch_pairing='or PARENT-BRANCH itself** — no action; proceed'
+foreign_clean_pairing='clean or marker-only dirty, no carried marker** — run `git checkout PARENT-BRANCH` now'
+foreign_dirty_pairing='ordinary dirty (not marker-only)** — stop here, before showing any confirmation'
+
+if grep -qF -- "$own_branch_pairing" "$CLOSE"; then
+  pf_pass "CR-027: own-branch condition (issue/<spike-id> or PARENT-BRANCH) is paired with 'no action' on its own source line"
 else
-  pf_fail "CR-021: the 'no action' outcome for issue/<spike-id>/PARENT-BRANCH is gone"
+  pf_fail "CR-027: own-branch condition is no longer paired with 'no action' on one line — could have been reassigned to a different action"
 fi
-if printf '%s\n' "$preflight" | grep -qF 'run `git checkout PARENT-BRANCH` now'; then
-  pf_pass "CR-021: state '(foreign branch, clean)' -> checkout PARENT-BRANCH"
+
+if grep -qF -- "$foreign_clean_pairing" "$CLOSE"; then
+  pf_pass "CR-027: foreign+clean/no-carried-marker condition is paired with checkout on its own source line"
 else
-  pf_fail "CR-021: the '(foreign branch, clean) -> checkout PARENT-BRANCH' outcome is gone"
+  pf_fail "CR-027: foreign+clean/no-carried-marker condition is no longer paired with checkout on one line — a clean/dirty swap would slip through here"
 fi
-if printf '%s\n' "$preflight" | grep -qF 'stop here, before showing any confirmation or writing any marker'; then
-  pf_pass "CR-021: state '(foreign branch, dirty)' -> stop before any marker write"
+
+if grep -qF -- "$foreign_dirty_pairing" "$CLOSE"; then
+  pf_pass "CR-027: foreign+ordinary-dirty condition is paired with stop on its own source line"
 else
-  pf_fail "CR-021: the '(foreign branch, dirty) -> stop before any marker write' outcome is gone"
+  pf_fail "CR-027: foreign+ordinary-dirty condition is no longer paired with stop on one line — a clean/dirty swap would slip through here"
+fi
+
+# Direct inversion probes: the exact CR-027 attack is checking out on the
+# ordinarily-dirty branch, or stopping on the clean one.
+if grep -qF -- 'ordinary dirty (not marker-only)** — run `git checkout PARENT-BRANCH` now' "$CLOSE"; then
+  pf_fail "CR-027: found ordinary-dirty paired with checkout — clean/dirty branch actions have been swapped"
+else
+  pf_pass "CR-027: ordinary-dirty is not paired with checkout (no clean/dirty swap found)"
+fi
+if grep -qF -- 'clean or marker-only dirty, no carried marker** — stop here' "$CLOSE"; then
+  pf_fail "CR-027: found clean/no-carried-marker paired with stop — clean/dirty branch actions have been swapped"
+else
+  pf_pass "CR-027: clean/no-carried-marker is not paired with stop (no clean/dirty swap found)"
+fi
+
+# The 8-cell table's marker-present/absent dimension: full-row literals bind
+# the branch condition to BOTH column values together — swapping the two
+# column values within one row, or swapping two rows, breaks that row's own
+# assert below.
+table_row1='| `issue/<spike-id>` | no action (Task 36) | no action; resumed in place by `pf-interaction`'
+table_row2='| PARENT-BRANCH itself | no action (Task 36) | no action; resumed in place by `pf-interaction`'
+table_row3='| foreign, clean | checkout PARENT-BRANCH (Task 36) | checkout PARENT-BRANCH, carried marker applied onto it'
+table_row4='| foreign, dirty | stop (Task 36) | marker-only dirt: same as'
+
+if grep -qF -- "$table_row1" "$CLOSE"; then
+  pf_pass "CR-027: table row 'issue/<spike-id>' pairs no-marker='no action' with marker-present='resumed in place'"
+else
+  pf_fail "CR-027: table row 'issue/<spike-id>' no longer pairs both columns as expected — a cell may have been swapped"
+fi
+if grep -qF -- "$table_row2" "$CLOSE"; then
+  pf_pass "CR-027: table row 'PARENT-BRANCH itself' pairs no-marker='no action' with marker-present='resumed in place'"
+else
+  pf_fail "CR-027: table row 'PARENT-BRANCH itself' no longer pairs both columns as expected — a cell may have been swapped"
+fi
+if grep -qF -- "$table_row3" "$CLOSE"; then
+  pf_pass "CR-027: table row 'foreign, clean' pairs no-marker='checkout' with marker-present='checkout + apply marker'"
+else
+  pf_fail "CR-027: table row 'foreign, clean' no longer pairs both columns as expected — a cell may have been swapped"
+fi
+if grep -qF -- "$table_row4" "$CLOSE"; then
+  pf_pass "CR-027: table row 'foreign, dirty' pairs no-marker='stop' with marker-present='marker-only dirt bypasses stop'"
+else
+  pf_fail "CR-027: table row 'foreign, dirty' no longer pairs both columns as expected — a cell may have been swapped"
+fi
+
+# Negative: the two foreign-branch rows' no-marker actions must never appear
+# swapped with each other (a clean/dirty inversion at the table level too).
+if grep -qF -- '| foreign, clean | stop (Task 36)' "$CLOSE"; then
+  pf_fail "CR-027: table row 'foreign, clean' has been paired with 'stop' — clean/dirty rows swapped"
+else
+  pf_pass "CR-027: table row 'foreign, clean' is not paired with 'stop'"
+fi
+if grep -qF -- '| foreign, dirty | checkout PARENT-BRANCH (Task 36)' "$CLOSE"; then
+  pf_fail "CR-027: table row 'foreign, dirty' has been paired with 'checkout' — clean/dirty rows swapped"
+else
+  pf_pass "CR-027: table row 'foreign, dirty' is not paired with 'checkout'"
 fi
 
 # Phase 3.5: the final-gate marker must be snapshotted BEFORE the checkout
@@ -195,20 +324,77 @@ printf '\n=== CR-015 & CR-023: every /pf intake question is locally replaced for
 # on_unavailable). CR-023's core finding was that the two CONTENT-BATCH
 # adapters were never checked at all — deleting either left the suite green.
 
+# extract_adapter_paragraph — reads a (possibly wide) range on stdin, prints
+# just the "**Non-Claude orchestrator.**" paragraph inside it (its bold
+# header line through the next blank line), nothing if absent. Isolating
+# this one paragraph — rather than searching the whole wide range — is the
+# CR-028 fix: everything checked below is bound to THIS specific paragraph.
+extract_adapter_paragraph() {
+  awk '
+    /\*\*Non-Claude orchestrator\.\*\*/ { flag=1 }
+    flag { print }
+    flag && /^[[:space:]]*$/ { exit }
+  '
+}
+
+# para_join — collapses a multi-line paragraph to one space-joined line, so a
+# regex spanning a markdown-wrapped sentence (e.g. "replace ... call above
+# with\nthat adapter") still matches as one phrase.
+para_join() { tr '\n' ' ' | tr -s ' '; }
+
+# assert_adapter_covers <label> <range-start> <range-end> [bind-token]
+#
+# CR-028: the previous version made two INDEPENDENT searches — the phrase
+# "Non-Claude orchestrator" and a step/draft-path token — over the whole
+# wide range, so it stayed green if `orchestrator_provider != claude` was
+# flipped to `== claude`, if "replace...with the adapter" was swapped for a
+# bare prohibition, or if some unrelated adapter mention elsewhere in the
+# range happened to satisfy the phrase search. Below, every check — the
+# condition, the apply-verb, and the bind token — is run against the SAME
+# isolated paragraph, so any one of those three mutations reddens the
+# specific assert that names it.
 assert_adapter_covers() {
   local label="$1" start="$2" end="$3" bind="${4:-}"
-  local range
+  local range para para1
   range="$(range_between "$PF" "$start" "$end")"
-  if printf '%s\n' "$range" | grep -qF 'Non-Claude orchestrator'; then
-    pf_pass "CR-015: $label has a Non-Claude orchestrator substitution"
-  else
+  para="$(printf '%s\n' "$range" | extract_adapter_paragraph)"
+
+  if [ -z "$para" ]; then
     pf_fail "CR-015: $label has NO Non-Claude orchestrator substitution nearby — unconditional AskUserQuestion again"
+    pf_fail "CR-028: $label — no paragraph found to check condition/apply-verb binding (see previous FAIL)"
+    return
   fi
+  pf_pass "CR-015: $label has a Non-Claude orchestrator substitution"
+
+  # The inequality must be LOCAL to this paragraph, and no contradicting
+  # equality may sit in it — `!= claude` -> `== claude` would hand the
+  # adapter to Claude sessions and leave a Codex session's AskUserQuestion
+  # unconditional again.
+  if printf '%s\n' "$para" | grep -qF 'orchestrator_provider != claude'; then
+    pf_pass "CR-028: $label's paragraph tests orchestrator_provider != claude locally"
+  else
+    pf_fail "CR-028: $label's paragraph no longer tests != claude locally — could have been flipped to == claude"
+  fi
+  if printf '%s\n' "$para" | grep -qF 'orchestrator_provider == claude'; then
+    pf_fail "CR-028: $label's paragraph also contains an == claude condition — inverted or contradictory guard"
+  else
+    pf_pass "CR-028: $label's paragraph has no contradicting == claude condition"
+  fi
+
+  # The paragraph must APPLY the adapter, never merely forbid the
+  # unconditional call without saying what replaces it.
+  para1="$(printf '%s\n' "$para" | para_join)"
+  if printf '%s' "$para1" | grep -Eq 'replace.*with (that|the) adapter'; then
+    pf_pass "CR-028: $label's paragraph applies the adapter ('replace ... with the adapter'), not a bare prohibition"
+  else
+    pf_fail "CR-028: $label's paragraph no longer says 'replace ... with the adapter' — could be a bare prohibition with nothing applied"
+  fi
+
   if [ -n "$bind" ]; then
-    if printf '%s\n' "$range" | grep -qF "$bind"; then
-      pf_pass "CR-023: $label's substitution names '$bind' — bound to this specific call, not a generic mention"
+    if printf '%s\n' "$para" | grep -qF -- "$bind"; then
+      pf_pass "CR-023: $label's substitution names '$bind' inside its OWN Non-Claude-orchestrator paragraph"
     else
-      pf_fail "CR-023: $label's substitution no longer names '$bind' — could be satisfied by an unrelated adapter mention nearby"
+      pf_fail "CR-023: $label's substitution no longer names '$bind' inside its own paragraph — could be satisfied by an unrelated adapter mention nearby"
     fi
   fi
 }
@@ -254,32 +440,59 @@ assert_adapter_covers 'Spike intake batch (content Batch 1+2)' \
   '.pf-intake-draft-spike.md'
 
 role_range="$(range_between "$PF" '### Role assignment' '**Question 3 (optional')"
-if printf '%s\n' "$role_range" | grep -qF 'Non-Claude orchestrator'; then
-  pf_pass "CR-015: role assignment has a Non-Claude orchestrator substitution"
-else
+role_para="$(printf '%s\n' "$role_range" | extract_adapter_paragraph)"
+if [ -z "$role_para" ]; then
   pf_fail "CR-015: role assignment has NO Non-Claude orchestrator substitution"
-fi
-if printf '%s\n' "$role_range" | grep -qF 'step=roles'; then
-  pf_pass "CR-015: the substitution names step=roles.<n> explicitly (Question 1 covered)"
+  pf_fail "CR-028: role assignment — no paragraph found to check condition/apply-verb binding (see previous FAIL)"
 else
-  pf_fail "CR-015: the substitution no longer names step=roles.<n>"
-fi
-if printf '%s\n' "$role_range" | grep -qF 'step=on-unavailable'; then
-  pf_pass "CR-015: the substitution names step=on-unavailable explicitly (Question 2 covered)"
-else
-  pf_fail "CR-015: the substitution no longer names step=on-unavailable — on_unavailable question left unconditional"
+  pf_pass "CR-015: role assignment has a Non-Claude orchestrator substitution"
+  if printf '%s\n' "$role_para" | grep -qF 'orchestrator_provider != claude'; then
+    pf_pass "CR-028: role assignment's paragraph tests orchestrator_provider != claude locally"
+  else
+    pf_fail "CR-028: role assignment's paragraph no longer tests != claude locally — could have been flipped to == claude"
+  fi
+  if printf '%s\n' "$role_para" | grep -qF 'orchestrator_provider == claude'; then
+    pf_fail "CR-028: role assignment's paragraph also contains an == claude condition — inverted or contradictory guard"
+  else
+    pf_pass "CR-028: role assignment's paragraph has no contradicting == claude condition"
+  fi
+  role_para1="$(printf '%s\n' "$role_para" | para_join)"
+  if printf '%s' "$role_para1" | grep -Eq 'replace.*with (that|the) adapter'; then
+    pf_pass "CR-028: role assignment's paragraph applies the adapter, not a bare prohibition"
+  else
+    pf_fail "CR-028: role assignment's paragraph no longer says 'replace ... with the adapter'"
+  fi
+  if printf '%s\n' "$role_para" | grep -qF 'step=roles'; then
+    pf_pass "CR-015: the substitution names step=roles.<n> explicitly (Question 1 covered) inside its own paragraph"
+  else
+    pf_fail "CR-015: the substitution no longer names step=roles.<n> inside its own paragraph"
+  fi
+  if printf '%s\n' "$role_para" | grep -qF 'step=on-unavailable'; then
+    pf_pass "CR-015: the substitution names step=on-unavailable explicitly (Question 2 covered) inside its own paragraph"
+  else
+    pf_fail "CR-015: the substitution no longer names step=on-unavailable inside its own paragraph — on_unavailable question left unconditional"
+  fi
 fi
 
-# Coverage count: every adapter paragraph above starts with the literal
-# sentence "**Non-Claude orchestrator.**" (role assignment's one paragraph
-# covers both Question 1 and Question 2, so 8 call sites -> 7 paragraphs).
-# This catches a call site none of the per-range asserts above happens to
-# name losing its adapter, not just the two named above.
-adapter_count="$(grep -cF 'Non-Claude orchestrator' "$PF")"
+# Coverage count (CR-028): count STRUCTURALLY VALID adapter paragraphs —
+# condition (`!= claude`) AND apply-verb ("replace...with the/that adapter")
+# both present in the same paragraph — not bare occurrences of the phrase
+# "Non-Claude orchestrator". A paragraph that kept its bold header but lost
+# the replace-with-adapter clause (turned into a bare prohibition, say) no
+# longer counts, where the old phrase-occurrence count would not have
+# noticed. Role assignment's one paragraph covers both Question 1 and
+# Question 2, so 8 call sites -> 7 paragraphs.
+adapter_paragraphs="$(awk '
+  /\*\*Non-Claude orchestrator\.\*\*/ { if (in_para) print buf; in_para=1; buf=$0; next }
+  in_para && /^[[:space:]]*$/ { print buf; in_para=0; next }
+  in_para { buf = buf " " $0 }
+  END { if (in_para) print buf }
+' "$PF")"
+adapter_count="$(printf '%s\n' "$adapter_paragraphs" | grep -F 'orchestrator_provider != claude' | grep -Ec 'replace.*with (that|the) adapter')"
 if [ "$adapter_count" -eq 7 ]; then
-  pf_pass "CR-023: exactly 7 'Non-Claude orchestrator' substitutions in pf/SKILL.md (one per intake call-site group)"
+  pf_pass "CR-028: exactly 7 structurally-valid Non-Claude-orchestrator paragraphs in pf/SKILL.md (condition + apply-verb both present)"
 else
-  pf_fail "CR-023: expected exactly 7 'Non-Claude orchestrator' substitutions in pf/SKILL.md, found $adapter_count — a call site gained or lost its adapter"
+  pf_fail "CR-028: expected exactly 7 structurally-valid substitutions in pf/SKILL.md, found $adapter_count — a call site gained, lost, or broke its adapter"
 fi
 
 # Negative: the has_pf/has_git branch table (Step 0) must not be silently
@@ -472,13 +685,24 @@ printf '\n=== CR-019 & CR-024: pending-interaction marker — status/answer are 
 # non-empty; `tr -d '\n'` guarantees a single line regardless of what
 # encoder produced its input; and `-->` is algebraically impossible in the
 # base64 alphabet regardless of the skill text. None of that exercises the
-# contract text at all. Replaced below with: (1) a literal check that the
-# marker TEMPLATE in the skill text itself defines `status=` and `answer=`
-# as two distinct, space-separated fields, (2) a round-trip built by filling
-# THAT extracted template's placeholders (not an independently-invented
-# format) with a hostile multiline/Unicode reply, verifying the result is
-# one line, `status` stays closed, and decoding `answer` back reproduces the
-# original byte-for-byte, and (3) an explicit count-based check that the old
+# contract text at all.
+#
+# Round 4 (CR-029) found the Task-37 replacement still cascaded from a single
+# GREP'D PHYSICAL LINE: `grep -F 'status=<open|resolved> answer=<base64|->'`
+# only ever matches the one line the marker template happens to wrap onto,
+# not the marker as a whole — the full template (`<!-- pf-pending-interaction:
+# stage=<stage-key> step=<step> entry=... options=... selected=...
+# asked=... status=<open|resolved> answer=<base64|-> -->`) spans 4
+# markdown-wrapped source lines and has 6 OTHER fields never inspected at
+# all. Fixed below: (1) extract and normalize the WHOLE marker template, from
+# `<!-- pf-pending-interaction:` through `-->`, into one line; (2) check every
+# field (`stage`, `step`, `entry`, `options`, `selected`, `asked`, `status`,
+# `answer`) is present exactly once — not just status/answer; (3) build the
+# round-trip instance by filling in ALL of that template's placeholders (not
+# an independently-invented format, and not just the two status/answer ones)
+# with a hostile multiline/Unicode reply, verifying the result is one line,
+# `status` stays closed, and decoding `answer` back reproduces the original
+# byte-for-byte; and (4) an explicit count-based check that the old
 # `status=resolved:<answer>` form appears exactly once in the file — as the
 # rejected example in the contract's own rationale sentence, never as an
 # actual field spec anywhere else.
@@ -495,48 +719,85 @@ else
   pf_fail "CR-019: the separate base64-encoded 'answer' field is no longer documented"
 fi
 
-# The literal marker template line must define status/answer as two
-# distinct, space-separated fields — `status=<open|resolved> answer=
-# <base64|->` — not a merged `status=<open|resolved:<answer>>` form.
-marker_template_line="$(grep -F 'status=<open|resolved> answer=<base64|->' "$INTERACTION" | head -1)"
-if [ -n "$marker_template_line" ]; then
-  pf_pass "CR-024: the marker template defines 'status' and 'answer' as two distinct, space-separated fields"
-else
-  pf_fail "CR-024: the marker template no longer defines separate 'status=<open|resolved>' and 'answer=<base64|->' fields — CR-019's fix may have been reverted"
+# Extract the WHOLE marker template (CR-029), not one physical line. The
+# source wraps it across 4 markdown lines with inconsistent spacing at the
+# wrap points (sometimes a genuine word-space, sometimes mid-token) — rather
+# than guess which, every field below is matched with optional whitespace
+# after its '=' (`field=[[:space:]]*`), so an incidental extra space from the
+# wrap never changes a pass/fail verdict, while an actually MISSING or
+# DUPLICATED field always does.
+raw_marker="$(awk '
+  /<!-- pf-pending-interaction:/ { flag=1 }
+  flag { print }
+  flag && /-->/ { exit }
+' "$INTERACTION")"
+
+marker_template=""
+if [ -n "$raw_marker" ]; then
+  marker_template="$(printf '%s\n' "$raw_marker" | tr -d '`' | tr '\n' ' ' | tr -s ' ' | sed -E 's/^ +| +$//g')"
+  marker_template="${marker_template%%-->*}-->"
 fi
 
-# Round-trip: fill the extracted template's placeholders with a base64
-# encoding of a hostile multiline/Unicode reply, then verify the result.
+if [ -n "$marker_template" ]; then
+  pf_pass "CR-029: extracted the full pending-interaction marker template ('<!-- pf-pending-interaction:' through '-->')"
+else
+  pf_fail "CR-029: could not find the '<!-- pf-pending-interaction:' ... '-->' marker template at all"
+fi
+
+# Full field set and uniqueness (CR-029) — every one of the 8 declared
+# fields, not just status/answer, must appear exactly once.
+pf_marker_fields="stage step entry options selected asked status answer"
+if [ -n "$marker_template" ]; then
+  for pf_field in $pf_marker_fields; do
+    pf_field_count="$(printf '%s' "$marker_template" | grep -oE "(^| )${pf_field}=" | wc -l | tr -d ' ')"
+    if [ "$pf_field_count" -eq 1 ]; then
+      pf_pass "CR-029: field '$pf_field=' appears exactly once in the marker template"
+    else
+      pf_fail "CR-029: field '$pf_field=' appears $pf_field_count times in the marker template (expected exactly 1) — a field was dropped, duplicated, or merged into another"
+    fi
+  done
+fi
+
+# Round-trip: fill in ALL of the extracted template's placeholders (not just
+# status/answer) with a base64 encoding of a hostile multiline/Unicode
+# reply, then verify the result.
 hostile_reply=$'первая строка — юникод\nвторая строка--> status=resolved:tricked -->'
 encoded_answer="$(printf '%s' "$hostile_reply" | base64 | tr -d '\n')"
 instance=""
-if [ -n "$marker_template_line" ]; then
-  instance="${marker_template_line//<open|resolved>/resolved}"
+if [ -n "$marker_template" ]; then
+  instance="$marker_template"
+  instance="${instance//<stage-key>/intake}"
+  instance="${instance//<step>/roles.1}"
+  instance="${instance//<bare-folder|existing-project|->/bare-folder}"
+  instance="${instance//<opt1>|<opt2>|.../Yes|No}"
+  instance="${instance//<selected-object|->/Yes}"
+  instance="${instance//<ISO-timestamp>/2026-09-03T12:00:00Z}"
+  instance="${instance//<open|resolved>/resolved}"
   instance="${instance//<base64|->/$encoded_answer}"
 fi
 
-if [ -n "$marker_template_line" ] && [[ "$instance" != *$'\n'* ]]; then
-  pf_pass "CR-024: the filled-in template fragment is a single line (no embedded newline survived encoding)"
+if [ -n "$instance" ] && [[ "$instance" != *$'\n'* ]]; then
+  pf_pass "CR-029: the filled-in instance is a single line (no embedded newline survived encoding)"
 else
-  pf_fail "CR-024: the filled-in template fragment contains an embedded newline, or the template is missing — the marker line would break"
+  pf_fail "CR-029: the filled-in instance contains an embedded newline, or the template is missing — the marker line would break"
 fi
 
-if [ -n "$marker_template_line" ] && [[ "$instance" == *'status=resolved '* ]]; then
-  pf_pass "CR-024: 'status=resolved' is closed and immediately followed by the separate 'answer=' field, not ':<raw-answer>'"
+if [ -n "$instance" ] && [[ "$instance" == *'status=resolved answer='* ]]; then
+  pf_pass "CR-029: 'status=resolved' is closed and immediately followed by the separate 'answer=' field, not ':<raw-answer>'"
 else
-  pf_fail "CR-024: 'status=resolved' is no longer followed by a distinct 'answer=' field (or the template is missing)"
+  pf_fail "CR-029: 'status=resolved' is no longer immediately followed by a distinct 'answer=' field (or the template is missing)"
 fi
 
-if [ -n "$marker_template_line" ]; then
-  parsed_answer="$(printf '%s' "$instance" | sed -E 's/.*answer=([^ ]*).*/\1/')"
+if [ -n "$instance" ]; then
+  parsed_answer="$(printf '%s' "$instance" | sed -E 's/.* answer=([^ ]*).*/\1/')"
   decoded="$(printf '%s' "$parsed_answer" | base64 -d 2>/dev/null || true)"
   if [ "$decoded" = "$hostile_reply" ]; then
-    pf_pass "CR-024: round-trip holds — decoding the template's 'answer=' field reproduces the hostile multiline/Unicode reply byte-for-byte"
+    pf_pass "CR-029: round-trip holds — decoding the FULL template's 'answer=' field reproduces the hostile multiline/Unicode reply byte-for-byte"
   else
-    pf_fail "CR-024: round-trip broke — decoding the template's 'answer=' field did not reproduce the original hostile reply"
+    pf_fail "CR-029: round-trip broke — decoding the FULL template's 'answer=' field did not reproduce the original hostile reply"
   fi
 else
-  pf_fail "CR-024: round-trip skipped — no marker template to fill in (see previous FAIL)"
+  pf_fail "CR-029: round-trip skipped — no marker template to fill in (see previous FAIL)"
 fi
 
 # The old merged form must appear exactly once in the whole file — as the

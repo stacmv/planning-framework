@@ -1,0 +1,34 @@
+# @pf-issue [20260902-feat-idea-stage]
+# test/mutations/pf-idea-semantic.tsv — mutation manifest for
+# test/pf-idea-semantic-mutations.sh (Task 40, CR-027 reproducibility finding).
+#
+# One mutation per data row, tab-separated (real TAB bytes — do not
+# realign with spaces): file<TAB>search<TAB>replace<TAB>expected_fail_substring
+#   file      — path relative to repo root, mutated in a throwaway copy only.
+#   search    — literal (not regex) substring; the runner replaces its FIRST
+#               occurrence in the file (bash ${content/search/replace}).
+#               Every search string below was checked unique enough that
+#               "first occurrence" lands on the intended call site — see the
+#               runner header for how that was verified.
+#   replace   — literal replacement text.
+#   expected_fail_substring — literal substring (grep -F) that must appear in
+#               test/pf-idea-semantic-static.sh's output after the mutation.
+#
+# Comment lines (#) and blank lines are skipped by the runner.
+#
+file	search	replace	expected_fail_substring
+skills/pf-close/SKILL.md	clean or marker-only dirty, no carried marker** — run `git checkout PARENT-BRANCH` now	clean or marker-only dirty, no carried marker** — stop here, before showing any confirmation or writing any marker	CR-027: found clean/no-carried-marker paired with stop
+skills/pf-close/SKILL.md	ordinary dirty (not marker-only)** — stop here, before showing any confirmation	ordinary dirty (not marker-only)** — run `git checkout PARENT-BRANCH` now, before showing any confirmation	CR-027: found ordinary-dirty paired with checkout
+skills/pf-close/SKILL.md	or PARENT-BRANCH itself** — no action; proceed	or PARENT-BRANCH itself** — stop here, before showing any confirmation, proceed	CR-027: own-branch condition is no longer paired with 'no action'
+skills/pf-close/SKILL.md	| foreign, clean | checkout PARENT-BRANCH (Task 36) |	| foreign, clean | stop (Task 36) |	CR-027: table row 'foreign, clean' has been paired with 'stop'
+skills/pf-close/SKILL.md	| foreign, dirty | stop (Task 36) |	| foreign, dirty | checkout PARENT-BRANCH (Task 36) |	CR-027: table row 'foreign, dirty' has been paired with 'checkout'
+skills/pf-close/SKILL.md	`issue/<spike-id>` | no action (Task 36) | no action; resumed in place by	`issue/<spike-id>` | no action (Task 36) | checkout PARENT-BRANCH, carried marker applied onto it	CR-027: table row 'issue/<spike-id>' no longer pairs both columns as expected
+skills/pf/SKILL.md	orchestrator_provider != claude	orchestrator_provider == claude	CR-028: Step 0 folder-state type question's paragraph no longer tests != claude locally
+skills/pf/SKILL.md	actor), replace	actor), forbid	CR-028: Step 0 folder-state type question's paragraph no longer says 'replace ... with the adapter'
+skills/pf/SKILL.md	`step=language`	`step=intake-lang`	CR-023: doc_language question's substitution no longer names 'step=language' inside its own paragraph
+skills/pf/SKILL.md	(`step=on-unavailable`)	(`step=on-unavail`)	CR-015: the substitution no longer names step=on-unavailable inside its own paragraph
+skills/pf/SKILL.md	defines the flag), replace every `AskUserQuestion` call in this section	defines the flag), forbid every `AskUserQuestion` call in this section	CR-028: role assignment's paragraph no longer says 'replace ... with the adapter'
+skills/pf-interaction/SKILL.md	status=<open|resolved> answer=<base64|-> -->	status=<open|resolved:<base64|->> -->	CR-029: field 'answer=' appears 0 times
+skills/pf-interaction/SKILL.md	selected=<selected-object|-> asked=<ISO-timestamp>	selected=<selected-object|-> asked=<ISO-timestamp> asked=<ISO-timestamp>	CR-029: field 'asked=' appears 2 times
+skills/pf-interaction/SKILL.md	step=<step> entry=	step=<step>	CR-029: field 'entry=' appears 0 times
+skills/pf-interaction/SKILL.md	instead of one `status=resolved:<answer>` field	instead of one `status=resolved:<answer>` field (never `status=resolved:<other>`)	CR-024: 'status=resolved:' appears 2 times
