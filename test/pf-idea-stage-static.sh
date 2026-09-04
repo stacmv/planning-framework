@@ -89,13 +89,13 @@ for d in "$SKILLS/pf-idea" "$SKILLS/pf-idea-research" \
   "$SKILLS/pf-interaction"; do
   f="$d/SKILL.md"
   if [ ! -f "$f" ]; then
-    pf_fail "TC-001: missing $f"
+    pf_fail "TC-001: expected skill file is missing — $f"
     continue
   fi
   if grep -q '^name:' "$f" && grep -q '^description:' "$f" && grep -q '^version:' "$f"; then
-    pf_pass "TC-001: $(basename "$d")/SKILL.md has name/description/version"
+    pf_pass "TC-001: skill frontmatter valid — $(basename "$d")"
   else
-    pf_fail "TC-001: $(basename "$d")/SKILL.md missing required frontmatter field"
+    pf_fail "TC-001: skill frontmatter missing a required field — $(basename "$d")"
   fi
 done
 

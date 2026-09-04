@@ -73,13 +73,13 @@ assert_hook() {
   local range
   range="$(range_between "$file" "$start" "$end")"
   if [ -z "$range" ]; then
-    pf_fail "$tag: $label — anchor '$start' not found in $(basename "$(dirname "$file")")"
+    pf_fail "TC-020: front-loaded hook site — anchor not found: $label ($start)"
     return
   fi
   if printf '%s' "$range" | grep -q 'pf-interaction' && printf '%s' "$range" | grep -q 'front-loaded'; then
-    pf_pass "$tag: $label — hook present (pf-interaction + front-loaded)"
+    pf_pass "TC-020: front-loaded hook present — $label"
   else
-    pf_fail "$tag: $label — hook missing (pf-interaction and/or front-loaded not found in range)"
+    pf_fail "TC-020: front-loaded hook missing — $label"
   fi
 }
 
@@ -93,13 +93,13 @@ assert_no_hook() {
   local range
   range="$(range_between "$file" "$start" "$end")"
   if [ -z "$range" ]; then
-    pf_fail "$tag: $label — anchor '$start' not found in $(basename "$(dirname "$file")")"
+    pf_fail "TC-020: front-loaded hook site — anchor not found: $label ($start)"
     return
   fi
   if printf '%s' "$range" | grep -q 'pf-interaction'; then
-    pf_fail "$tag: $label — exception row unexpectedly contains a hook reference"
+    pf_fail "TC-020: exception row unexpectedly carries a hook — $label"
   else
-    pf_pass "$tag: $label — exception row correctly has no hook reference"
+    pf_pass "TC-020: exception row correctly has no hook — $label"
   fi
 }
 
