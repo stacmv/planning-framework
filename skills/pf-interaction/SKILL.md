@@ -166,7 +166,7 @@ scope of this issue, BRD Non-Goals), so an unset `orchestrator_provider`
 preserves today's behavior exactly, unchanged, at every call site below.
 
 This is the contract for the two mandatory human stops that survive the
-front-loaded design: the intake batch and the final gate (decision session
+front-loaded design: the intake sequence and the final gate (decision session
 `pf-idea-verdict` Mode 2 for `idea`; front-loaded `pf-close`'s Phase 1 for
 `spike`/feat/improve/bug — see "One final human gate per issue" above). This
 section is the **contract** those call sites reference by name — not a
@@ -185,7 +185,7 @@ without reopening the question from scratch.
    question, write a marker line into the document (not session memory):
    `<!-- pf-pending-interaction: stage=<stage-key> step=<step> options=
    <opt1>|<opt2>|... selected=<selected-object|-> asked=<ISO-timestamp>
-   status=<open|resolved:<answer>> -->`. Placement:
+   status=<open|resolved> answer=<base64|-> -->`. Placement:
    - `verdict.md` (decision session, `stage=decision-session`) — the marker
      is **not** placed "immediately before `## Decision`": Mode 2 runs
      exactly when that heading is absent — it is Mode 2's own eventual
@@ -196,7 +196,22 @@ without reopening the question from scratch.
      appended after it in the normal way, and the marker line is rewritten
      in place, not moved.
    - `open_questions.md` (final gate at front-loaded `pf-close`'s Phase 1,
-     `stage=final-gate`) — its own line, unchanged from before.
+     `stage=final-gate`) — `pf-close`'s Phase 1 explicitly tolerates this
+     file's absence (a spike issue, or any issue that never wrote an
+     `[assumed]`/`unverified-fact` row, routinely reaches the final gate
+     without one — "show an empty ledger, not an error"). If it does not
+     exist yet when the final-gate question is about to be printed, create
+     it first, atomically, with the canonical header and table from
+     "`open_questions.md` row schema (canonical)" above — even with zero
+     data rows — the same lazy-creation this file already follows for its
+     first real row (item 2 of "Front-loaded rule" above); do **not**
+     invent a separate pending-only file that doesn't carry that schema.
+     Append the marker as the file's last line, after the table — the same
+     trailing-line placement `verdict.md` uses above. The marker is an HTML
+     comment past the table, not a table row, so it is never mistaken for
+     one by the empty-ledger check ("show an empty ledger, not an error")
+     `pf-close` Phase 1 already runs. If the file already exists, append or
+     rewrite the marker as its last line exactly as before.
    - the intake draft (`stage=intake`) — see item 5 below for where that
      document lives and when it is created; the marker lives inside it, not
      in the eventual `prompt.md`.
@@ -211,11 +226,53 @@ without reopening the question from scratch.
      "One final human gate per issue" above enumerate — no fourth value).
    - `step` — position within that stage, so a resumed session knows
      exactly where it stopped, not merely that something is pending:
-     - `intake` → `<batch>.<question>` (e.g. `1.2` = batch 1, question 2).
-       Batch/question counts and order are each issue TYPE's own fixed,
-       statically-defined sequence in `~/.claude/skills/pf/SKILL.md`'s
-       intake batches (e.g. idea's Batch 1 has 4 questions, Batch 2 has 3)
-       — not restated here, looked up via `step` on resume.
+     - `intake` → one of, in the fixed order below. This covers every
+       `AskUserQuestion` call the intake sequence makes anywhere in
+       `~/.claude/skills/pf/SKILL.md`'s Step 0, Step 3, and the Idea/Spike
+       branches under "Creating prompt.md" — not only the two content
+       batches:
+       - `type` — the issue-type fork (Step 0's "An idea"/"a project", or
+         Step 3's feat/bug/idea/spike four-option question).
+       - `type-confirm` — the conditional spike-vs-feature disambiguation
+         follow-up ("This sounds like a technical spike…", Step 3 only,
+         fires only when free text was ambiguous). Absent from the
+         sequence when it never fired — a resumed session that finds no
+         marker at this step, with `type` already resolved unambiguously,
+         treats it as never asked, not as still pending.
+       - `language` — the shared `doc_language` question ("What language
+         should the planning documents…"), asked once regardless of type.
+       - `<batch>.<question>` (e.g. `1.2` = batch 1, question 2) — the
+         existing per-type content batches, unchanged. Batch/question
+         counts and order are each issue TYPE's own fixed,
+         statically-defined sequence in `~/.claude/skills/pf/SKILL.md`'s
+         intake batches (e.g. idea's Batch 1 has 4 questions, Batch 2 has
+         3; spike's Batch 1 has 4, Batch 2 up to 4 with some optional) —
+         not restated here, looked up via `step` on resume.
+       - `file-confirm` — Idea branch only, conditional: inserted
+         immediately after whichever Batch 1 question asks for "the idea
+         itself" resolves, only when that answer named a file to extract
+         the idea from ("Idea from a file" — show the extracted text back
+         for confirmation before it goes anywhere). Absent when the idea
+         was typed directly, same absent-means-never-asked rule as
+         `type-confirm`.
+       - `roles.<n>` — role assignment ("Role assignment" in
+         `~/.claude/skills/pf/SKILL.md`), `<n>` the 1-indexed ordinal of
+         the actual question asked in this flow, in whichever order they
+         concretely occur (the profile-or-individually choice, then one
+         write+review question per group or, if "Set per stage…" was
+         picked, per key). Unlike the content batches, this count is not
+         statically fixed per TYPE — it depends on that in-flow choice —
+         so a resumed session infers its position from how many
+         `roles.<n>` steps this issue's history already resolved, not from
+         a pre-registered total.
+       - `on-unavailable` — the `on_unavailable` question, always the last
+         intake question whenever role assignment runs at all.
+
+       `roles.<n>` and `on-unavailable` never appear in the sequence for
+       the Idea branch's Step 0 bare-folder entry ("Bare-folder carve-out
+       (AC-01b)" in `~/.claude/skills/pf/SKILL.md`, which skips role
+       assignment and `on_unavailable` outright); they are always present
+       for the Spike branch and for the Idea branch's Step 3 entry.
      - `decision-session` / `final-gate` → one of `main` (the opening
        question — confirm/choose-other/override, or Proceed/Override/Stop)
        | `choose-other` (`decision-session` only — the second question
@@ -235,12 +292,24 @@ without reopening the question from scratch.
      pending — so a resumed session knows which row's free-text answer it
      is still waiting for, without re-showing the row picker.
    - `asked` — unchanged (ISO-timestamp of the current `step`).
-   - `status` — `open` while the current `step` is unanswered; see item 4
-     for its one closing transition.
+   - `status` — a closed two-value enum, `open` \| `resolved` — never the
+     free-text answer itself; `open` while the current `step` is
+     unanswered. See item 4 for its one closing transition.
+   - `answer` — the free-text reply, standard base64 (RFC 4648, the
+     `+`/`/` alphabet — never the URL-safe `-`/`_` variant, whose `-`
+     could still combine with an adjacent literal `>`). `-` while
+     `status=open` (there is no answer yet). Base64's fixed alphabet
+     cannot itself contain a newline or the sequence `-->` regardless of
+     what the reply text contains — the reason `status` and `answer` are
+     two separate fields instead of one `status=resolved:<answer>` field:
+     decode `answer` to recover the literal reply, never parse it out of
+     `status`.
 
    Question text itself is never duplicated into the marker: for `intake`,
-   the wording is the fixed, statically-defined text of that batch/question
-   named by `step`; for `decision-session`/`final-gate`, it is already
+   the wording is the fixed, statically-defined text of the question named
+   by `step` (a content-batch question, or one of the named pre-/post-batch
+   questions above — `type`, `type-confirm`, `language`, `file-confirm`,
+   `roles.<n>`, `on-unavailable`); for `decision-session`/`final-gate`, it is already
    fixed in the surrounding document text (the recommended verdict and its
    reasoning, or the assumptions/open-questions ledger) exactly as item 4
    already required. `step` plus that surrounding text is sufficient
@@ -258,43 +327,74 @@ without reopening the question from scratch.
    not recompute the recommendation, do not restart the stage from
    scratch, do not re-ask a `step` already resolved). **Closing a marker —
    exactly one strategy:** a valid answer that resolves the current `step`
-   never deletes the marker line; it rewrites `status=open` to
-   `status=resolved:<answer>` in place — the same in-place,
-   audit-preserving edit `open_questions.md`'s `Status` column already uses
-   on override (`~/.claude/skills/pf-idea-verdict/SKILL.md`'s "2. Override"
-   step 5), reused here for the same reason: the record of what was asked
-   and answered stays legible after the fact. When the resolved `step` is
-   not the stage's last one (e.g. `override-select` just resolved and
-   `override-answer` is next), the same rewrite also advances `step` to the
-   next one and sets `status=open` again with `selected` filled in, rather
-   than being removed — the marker line is retired only when its stage
-   fully completes (item 5 covers the one case, `intake`, where that also
-   means the document holding it is retired). Once a marker reads
-   `status=resolved:<answer>` for a stage's last `step`, normal logic
-   resumes exactly as on the Claude path (append "## Decision", etc.).
-5. **Intake (`stage=intake`).** The same protocol also covers the intake
-   batch — pending-state lives in a draft document, not session memory, on
-   the same principle as items 2-4 above. The eventual issue folder name is
-   only decided once its slug is known, and the slug is itself derived from
-   an answer gathered *during* intake (`~/.claude/skills/pf/SKILL.md`'s
-   Idea/Spike branches — "a short kebab-case slug from the idea's topic,
-   decided when `prompt.md` is written"), so the draft cannot start life at
-   the final `docs/issues/open/<issue-id>/prompt.md` path — that path does
-   not exist yet when the first question is asked. Fix the moment and the
-   path: **before** printing intake's first question (batch 1, question 1),
-   create `docs/issues/open/.pf-intake-draft-<type>.md` (`<type>` = `idea`
-   | `spike` | `feat` | `improve` | `bug` — already known before any
-   question is asked; at most one draft per `<type>` open at a time, the
-   same one-open-marker-per-point rule from item 2 applied here to a
-   concurrently-running intake). Each answered question is appended into
-   this draft as it comes in, and the `pf-pending-interaction` marker
-   (`stage=intake`) lives inside it, advanced per item 4 as each question
-   resolves. Once the whole intake batch's last `step` resolves and the
-   slug is known, the draft's accumulated content (its answered-question
-   body, not the now-resolved marker line) becomes the real `prompt.md`
-   written to `docs/issues/open/<issue-id>/prompt.md` — the ordinary write,
-   unchanged — and `.pf-intake-draft-<type>.md` is deleted: this is the one
-   case where retiring a fully-resolved marker's document is expected
-   (item 4), because the draft is a transient stand-in for `prompt.md`, not
-   the pipeline's permanent record of the intake answers — `prompt.md`
-   itself is that record from this point on.
+   never deletes the marker line; it base64-encodes the literal reply text
+   into `answer` and rewrites `status=open` to `status=resolved` in place —
+   the same in-place, audit-preserving *edit* `open_questions.md`'s
+   `Status` column already uses on override
+   (`~/.claude/skills/pf-idea-verdict/SKILL.md`'s "2. Override" step 5),
+   reused here for the same reason: the record of what was asked and
+   answered stays legible after the fact (decode `answer` to read it back —
+   `open_questions.md`'s `Status` column, unlike this marker's `answer`
+   field, stays a closed vocabulary and never itself carries free text).
+   When the resolved `step` is not the stage's last one (e.g.
+   `override-select` just resolved and `override-answer` is next), the
+   same rewrite also advances `step` to the next one and sets
+   `status=open`/`answer=-` again with `selected` filled in, rather than
+   being removed — the marker line is retired only when its stage fully
+   completes (item 5 covers the one case, `intake`, where that also means
+   the document holding it is retired). Once a marker reads
+   `status=resolved` (with `answer` decoded) for a stage's last `step`,
+   normal logic resumes exactly as on the Claude path (append
+   "## Decision", etc.).
+5. **Intake (`stage=intake`).** The same protocol also covers the whole
+   intake sequence (item 2's `step` dictionary above, not only the two
+   content batches) — pending-state lives in a draft document, not session
+   memory, on the same principle as items 2-4 above. Two sub-cases, split
+   by whether `<type>` is already known:
+   - **`step=type` and `step=type-confirm`.** These are what determines
+     `<type>` in the first place, so neither a `<type>`-named draft nor
+     `docs/issues/open/<issue-id>/prompt.md` can exist yet when either is
+     asked — for Step 0's bare-folder entry, `docs/issues/open/` itself may
+     not exist yet either. Before printing the `type` question, create (the
+     parent directory too, if absent) a fixed, type-agnostic pending file,
+     `docs/issues/open/.pf-intake-draft-pending.md`, and write the marker
+     into it — item 2's "at most one open marker per interactive point"
+     rule applied with only one point instead of one-per-`<type>`, since no
+     `<type>` exists yet to key separate points by. Nothing else is written
+     into this file: the `type`/`type-confirm` answers are a routing
+     decision, not `prompt.md` content. Once `type` resolves (and
+     `type-confirm`, if it fired), `<type>` is known and this file is
+     deleted — its job was only to survive a resumption while `<type>` was
+     still undetermined.
+   - **`step=language` onward.** The eventual issue folder name is only
+     decided once its slug is known, and the slug is itself derived from an
+     answer gathered *later* in intake (`~/.claude/skills/pf/SKILL.md`'s
+     Idea/Spike branches — "a short kebab-case slug from the idea's topic,
+     decided when `prompt.md` is written"), so the draft still cannot start
+     life at the final `docs/issues/open/<issue-id>/prompt.md` path even
+     once `<type>` is known — that path does not exist yet when `language`
+     is asked. Fix the moment and the path: **before** printing `step=language`
+     (intake's first question once `<type>` is known — immediately after
+     deleting `.pf-intake-draft-pending.md` above, when that step ran; or
+     immediately, for any type that skips `type-confirm`), create
+     `docs/issues/open/.pf-intake-draft-<type>.md` (`<type>` = `idea` |
+     `spike` | `feat` | `improve` | `bug`; at most one draft per `<type>`
+     open at a time, the same one-open-marker-per-point rule from item 2
+     applied here to a concurrently-running intake — this is what lets two
+     different-`<type>` intakes run concurrently once each has passed
+     `step=type`, unlike the single shared pending file above). Each
+     answered question from `language` onward is appended into this draft
+     as it comes in, and the `pf-pending-interaction` marker (`stage=intake`)
+     lives inside it, advanced per item 4 as each question resolves. Once
+     the sequence's last `step` actually present resolves (`on-unavailable`
+     normally; Batch 2's last question for the Idea branch's Step 0
+     bare-folder entry, since `roles.<n>`/`on-unavailable` are skipped
+     there per item 2's dictionary) and the slug is known, the draft's
+     accumulated content (its answered-question body, not the
+     now-resolved marker line) becomes the real `prompt.md` written to
+     `docs/issues/open/<issue-id>/prompt.md` — the ordinary write,
+     unchanged — and `.pf-intake-draft-<type>.md` is deleted: this is the
+     one case where retiring a fully-resolved marker's document is
+     expected (item 4), because the draft is a transient stand-in for
+     `prompt.md`, not the pipeline's permanent record of the intake
+     answers — `prompt.md` itself is that record from this point on.

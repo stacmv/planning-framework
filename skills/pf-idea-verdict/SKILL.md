@@ -40,30 +40,42 @@ Judge `verdict.md` against the shared "Stage completion" definition in
 `~/.claude/skills/pf-size-tiers/SKILL.md` — a mechanical check, not a recall
 from earlier in this session. Additionally, per the stage table in
 `~/.claude/skills/pf-idea-lenses/SKILL.md` §5, scan `session-log.md` for
-`[pf-check PASSED] verdict.md @ ...` / `[pf-check OPEN] verdict.md @ ...`
-markers and take the **last one by position in the file** (the same
-"last marker wins" rule `~/.claude/skills/pf/SKILL.md` already applies for
-every other stage).
+`[pf-check PASSED] <file> @ ...` / `[pf-check OPEN] <file> @ ...` markers,
+**separately for each of `idea.md`, `research.md`, `critique.md`, and
+`verdict.md`**, and take the **last one by position in the file, per file**
+(the same "last marker wins" rule `~/.claude/skills/pf/SKILL.md` already
+applies for every other stage — applied here once per file, not only to
+`verdict.md`, so this entry check reads the exact same tail-completeness
+criterion §3.5.2 step 8 below already enforces, instead of a narrower one).
+
+Define **tail clean** as: `verdict.md`'s own last marker is `PASSED`, *and*
+none of `idea.md`/`research.md`/`critique.md` has `OPEN` as its own last
+marker (a file with no marker at all is not blocking — these three are not
+normally checked outside an override, per §5's "Почему `/pf-check` только
+после `idea.md` и после `verdict.md`"). This is a single order-independent
+test: it does not matter which of the invalidated files `/pf-check` was run
+on first, or in what order — only each file's own last marker counts.
 
 - **`verdict.md` absent, or exists but not complete** → **Mode 1**.
 - **`verdict.md` complete, "## Decision" present** → nothing to do. Report
   the verdict stage is already complete and confirmed; next step
   `/pf-close`. Do not touch the file.
-- **`verdict.md` complete, "## Decision" absent, last check marker
-  `PASSED`** → **Mode 2**.
-- **`verdict.md` complete, "## Decision" absent, last check marker `OPEN` (or
-  no marker at all yet)** → do **not** write and do **not** open Mode 2.
-  Report status and stop: next step `/pf-check`. This single branch covers
-  both the ordinary post-Mode-1 state (just written, check not run yet) and
-  the post-override state (§3.5.2 below re-marked the tail `OPEN`) — in both
-  cases the correct action is "wait for a fresh `PASSED`", not rewrite or
-  ask again. **If reached via the post-override state**, do not stop at the
-  bare `/pf-check` next step — scan `session-log.md` for every other
-  `[pf-check OPEN]` marker left by the same override (`idea.md`/
-  `research.md`/`critique.md`, not only `verdict.md`) and report the full
-  ordered list exactly as §3.5.2 step 8 below does, each with its own
-  explicit `/pf-check <file>` command (CR-003) — a bare `/pf-check` alone
-  only ever re-checks `verdict.md`.
+- **`verdict.md` complete, "## Decision" absent, tail clean** → **Mode 2**.
+- **`verdict.md` complete, "## Decision" absent, tail not clean** (either
+  `verdict.md`'s own last marker is `OPEN`/absent, or any of `idea.md`/
+  `research.md`/`critique.md` has `OPEN` as its last marker) → do **not**
+  write and do **not** open Mode 2. Report status and stop: next step
+  `/pf-check`. This single branch covers both the ordinary post-Mode-1 state
+  (just written, check not run yet) and the post-override state (§3.5.2
+  below re-marked the tail `OPEN`) — in both cases the correct action is
+  "wait for a fresh `PASSED`", not rewrite or ask again. **If any of
+  `idea.md`/`research.md`/`critique.md` still has `OPEN` as its last
+  marker** (regardless of whether `verdict.md` itself already shows
+  `PASSED` — that alone does not make the tail clean), do not stop at a bare
+  `/pf-check` next step — report the full ordered list of every file whose
+  last marker is `OPEN`, exactly as §3.5.2 step 8 below does, each with its
+  own explicit `/pf-check <file>` command (CR-003) — a bare `/pf-check`
+  alone only ever re-checks `verdict.md`.
 
 ## Mode 1 — write `verdict.md`
 

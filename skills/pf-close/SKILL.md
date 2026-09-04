@@ -100,10 +100,13 @@ To resume:
 
 ## Phase 2: Pre-Close Cleanup
 
-Run on the issue branch.
+Run on the issue branch. **`TYPE: spike` is the exception** — Phase 0 places no restriction on which branch a spike close starts from, so this phase adds a branch guard for it (see step 2 below) before committing anything.
 
 1. Run `git status --porcelain`.
 2. If the output is non-empty (uncommitted changes exist):
+   - **`TYPE: spike` only — verify the branch first (CR-014).** Compute PARENT-BRANCH now, using exactly Phase 3's steps 1-2 below (safe this early — those two steps only read git config and list local branches; they never touch the working tree or check anything out. Phase 3, reached later in this same run, reuses this value instead of recomputing it — the same reuse pattern Phase 4.6 step d already uses for idea). Run `git branch --show-current`:
+     - If it is `issue/<spike-id>` (when that branch exists) or PARENT-BRANCH itself, continue to the `git add -A` step below — a cleanup commit landing on either is harmless: `issue/<spike-id>` is never merged or deleted, so nothing committed there is ever lost, and PARENT-BRANCH is the correct final home anyway.
+     - Otherwise the working tree is dirty on a branch that is neither the spike's own branch nor the parent — **stop**, do not run `git add -A`: "Uncommitted changes on <branch>, which is neither issue/<spike-id> nor the parent branch (<PARENT-BRANCH>). This branch is unrelated to the spike being closed. Commit or stash these changes yourself, switch to issue/<spike-id> (if it exists) or <PARENT-BRANCH>, then re-run /pf-close." Without this guard, Phase 3.5 below would unconditionally switch to PARENT-BRANCH and never revisit this branch again, permanently stranding a `chore: pre-close cleanup` commit on it — the bug CR-014 fixed.
    - Run `git add -A`
    - Run `git commit -m "chore: pre-close cleanup [ISSUE-ID]"`
 3. If the output is empty, skip — nothing to commit.
@@ -113,6 +116,8 @@ Proceed to Phase 3.
 ---
 
 ## Phase 3: Detect Parent Branch
+
+**`TYPE: spike` only:** if Phase 2's branch guard already computed PARENT-BRANCH earlier in this same run (it does so whenever step 2 found uncommitted changes — CR-014), reuse that value and proceed straight to Phase 3.5 below — do not recompute steps 1-2 (step 3 below is `TYPE: idea` only and never applies to spike anyway). Otherwise (Phase 2 found nothing to commit, so its guard never ran, or TYPE is not spike), compute it here as usual:
 
 1. Run `git config branch.issue/ISSUE-ID.merge`. **Self-tracking upstream guard:** if the result is empty, the command fails, or the result equals `refs/heads/issue/ISSUE-ID` itself (a self-tracking upstream set by `git push -u` on the issue branch, never a parent), ignore it and fall through to step 2. Otherwise extract the branch name (strip the `refs/heads/` prefix) and use that as PARENT-BRANCH.
 2. Fallback (the git-config value was ignored or unavailable):
@@ -128,7 +133,7 @@ For feat/improve/bug: Proceed to Phase 4. For `TYPE: spike`: Proceed to Phase 3.
 
 **Applies only to `TYPE: spike`** (`NO-REPO` is unreachable for spike — see Phase 0's type table). Runs between Phase 3 and Phase 4, and **replaces Phase 4 entirely** for this TYPE — do not also run Phase 4 for a spike.
 
-1. Switch to PARENT-BRANCH (already determined by Phase 3) **unconditionally**, **without** `git merge` — regardless of which branch the session currently occupies (PARENT-BRANCH itself, `issue/<spike-id>`, or any other branch). This guarantees the copy in step 2 below, the archive in Phase 5, and the commit in Phase 8 all land on PARENT-BRANCH even when `/pf-close` was invoked from a foreign branch (CR-005) — never on whatever branch the session happened to be standing on.
+1. Switch to PARENT-BRANCH (already determined by Phase 3 — or earlier, by Phase 2's branch guard, when Phase 2 found uncommitted changes) **unconditionally**, **without** `git merge` — regardless of which branch the session currently occupies (PARENT-BRANCH itself, `issue/<spike-id>`, or any other branch). This guarantees the copy in step 2 below, the archive in Phase 5, and the commit in Phase 8 all land on PARENT-BRANCH even when `/pf-close` was invoked from a foreign branch (CR-005) — never on whatever branch the session happened to be standing on.
 2. If the branch `issue/<spike-id>` exists (check with `git branch --list`), run `git checkout issue/<spike-id> -- docs/issues/open/<spike-id>`. This copies only the issue folder's contents from the spike branch onto the current branch (PARENT-BRANCH), touching nothing outside that folder. This is a staged change, not a commit — it is committed by the ordinary Phase 8.
 3. If the branch does not exist (the experiment never required code), skip this step — the documents are already on PARENT-BRANCH.
 4. The `issue/<spike-id>` branch, if it exists, is **never merged and never deleted** — not here, and not anywhere else in `pf-close`. Nothing in this file should run `git merge issue/<spike-id>` or `git branch -d issue/<spike-id>`.

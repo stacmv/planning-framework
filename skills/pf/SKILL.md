@@ -8,6 +8,50 @@ You are the Planning Framework v3.0 orchestrator. When invoked as `/pf`, perform
 
 ## Step 0: Detect folder state
 
+**Resume a pending intake draft — before anything else, even the booleans
+below.** Check `docs/issues/open/` (if it exists) for intake-draft files
+carrying an open `pf-pending-interaction` marker
+(`~/.claude/skills/pf-interaction/SKILL.md`'s "Codex text-REPL adapter",
+item 5): the type-agnostic `.pf-intake-draft-pending.md`, and
+`.pf-intake-draft-<type>.md` for each `<type>` in `feat`/`improve`/`bug`/
+`idea`/`spike`. A file counts as an open draft only if its
+`pf-pending-interaction` marker line reads `status=open` — a marker already
+advanced to `status=resolved` for the stage's last `step` should already have
+been retired per that item, but if one is somehow still found, treat it the
+same as no draft (do not resume it).
+
+- **None found** — proceed to the booleans below exactly as before; this is
+  the ordinary case for every session that isn't resuming an interrupted
+  intake.
+- **Exactly one found** — resume it immediately, before asking Step 0's
+  folder-state question below or running Step 1/Step 2/Step 3: do not
+  recompute `has_pf`/`has_git` first, since `docs/issues/open/` may itself
+  have been created only as a side effect of writing this draft. Re-derive
+  `<type>` (unresolved for `.pf-intake-draft-pending.md`; otherwise the
+  `<type>` named in the filename), re-enter the matching flow at the marker's
+  recorded `step` (Step 0's own question when `step` is `type`/`type-confirm`;
+  otherwise "Creating prompt.md"'s flow for that `<type>`), and re-show the
+  pending question — via `AskUserQuestion` or the Codex text-REPL adapter,
+  whichever this session's own `orchestrator_provider` calls for, same as
+  every other intake question below — following item 4's resumption
+  discipline ("Safe resumption"): do not recompute a recommendation, do not
+  restart the stage from scratch, do not re-ask a `step` already resolved.
+- **More than one found** (only possible among the `<type>`-named drafts —
+  item 5's "at most one draft per `<type>`" rule already limits
+  `.pf-intake-draft-pending.md` to a single file, and two different `<type>`
+  intakes can only both be mid-flight once each has separately passed
+  `step=type`) — resume the one with the earliest `asked` timestamp first;
+  deterministic, so no extra question is needed to choose one (the tool that
+  would ask it may not even exist yet under a non-Claude orchestrator).
+  Mention the rest in this run's output, e.g. "N other intake draft(s)
+  pending: `<type>` (asked `<timestamp>`) — resume with a later `/pf` run" —
+  so they are never silently forgotten — and do not touch them this run.
+
+Whichever draft is resumed, this replaces Step 0's folder-state question and
+the rest of this run's normal routing entirely: an open draft is never
+overwritten by a fresh `type` question, and its document is never re-created
+from scratch.
+
 Before anything else — including Step 1 — determine whether the current working directory already carries a Planning Framework project, so the git-sync in Step 2 is never attempted against a directory that isn't even a git repository yet.
 
 Compute two booleans, **freshly, on every single `/pf` invocation** — never cached from a previous run in this session or elsewhere:
@@ -27,6 +71,14 @@ Compute two booleans, **freshly, on every single `/pf` invocation** — never ca
 > **"What are we working on: an idea (which may or may not become a project) or a project we're starting right away?"**
 > - **An idea** — work it through first: pain, alternatives, risks, verdict. May end in a project, a spike, or the archive.
 > - **A project, right away** — I know what I'm building; scaffold the framework and start as usual.
+
+**Non-Claude orchestrator.** When this session's own orchestrator is not
+Claude (`orchestrator_provider != claude` —
+`~/.claude/skills/pf-interaction/SKILL.md`'s "Codex text-REPL adapter"
+defines the flag; independent of any role's resolved `write` actor), replace
+this call with that adapter (`stage=intake`, `step=type`) — same options,
+same pending-state discipline, using the type-agnostic draft
+`docs/issues/open/.pf-intake-draft-pending.md` per that section's item 5.
 
 `has_git` does not affect *whether* this question is asked — only what happens *after* the "project, right away" answer (git initialization is only needed there; the "idea" answer never touches git at all).
 
@@ -105,6 +157,15 @@ No open issues found.
 > - **Run a technical spike** — answer a technical question with an experiment (`spike`)
 
 Free text via the built-in "Other" option remains available for anything that doesn't literally fit one of the four buttons — this is not a fifth button. It routes exactly as it does today: heuristically, including into `improve` when the text reads as an improvement rather than a new feature — unchanged. **If** the free text instead describes a technical experiment ("check this technically first", "PoC", "figure out experimentally whether…"), do not silently create a `feat`/`improve` issue under it: ask one additional confirming `AskUserQuestion` — **"This sounds like a technical spike — create a `spike` issue instead of a feature?"** (**Yes, spike** / **No, it's a feature**) — before creating the issue of whichever type the answer settles on.
+
+**Non-Claude orchestrator.** When this session's own orchestrator is not
+Claude (`orchestrator_provider != claude` —
+`~/.claude/skills/pf-interaction/SKILL.md`'s "Codex text-REPL adapter"
+defines the flag), replace the "What are we working on?" call above with
+that adapter (`stage=intake`, `step=type`), and the confirming call just
+above (when it fires) with the same adapter (`step=type-confirm`) — same
+options, same pending-state discipline, using the type-agnostic draft
+`docs/issues/open/.pf-intake-draft-pending.md` per that section's item 5.
 
 **Build a feature / Fix a bug** (or free text classified as such, including `improve`) continues the **exact same, unchanged** path as today: "Creating prompt.md" below, feat/improve/bug branch — no additional fork inside that path.
 
@@ -366,6 +427,20 @@ Next step: /pf-brd
 
 Whenever a new issue's `prompt.md` is about to be written (from either path above), first use AskUserQuestion to ask: **"What language should the planning documents for this issue be written in?"** with options English, Russian, and Other (free text). This choice only needs to be asked once per issue.
 
+**Non-Claude orchestrator.** When this session's own orchestrator is not
+Claude (`orchestrator_provider != claude` —
+`~/.claude/skills/pf-interaction/SKILL.md`'s "Codex text-REPL adapter"
+defines the flag), replace this call with that adapter (`stage=intake`,
+`step=language`) — same options, same pending-state discipline. `<type>` is
+already known by this point on every path that reaches this question (Step
+0's bare-folder entry resolved it to `idea`; every other path resolved it in
+Step 3), so use the typed draft `docs/issues/open/.pf-intake-draft-<type>.md`
+per that section's item 5, not the type-agnostic pending file. (The "How big
+is this task?" question just below, and Question 3 near the end of this
+section, belong only to the feat/improve/bug path, which the Idea/Spike
+branches below never reach — out of scope for this adapter, same as the rest
+of that path; see BRD Non-Goals.)
+
 Immediately after, use AskUserQuestion to ask a second question: **"How big is this task?"** with four options, one line each (from `~/.claude/skills/pf-size-tiers/SKILL.md`'s Tiers table), recommending **medium** by default ("today's standard full pipeline — pick this if unsure"):
 
 - **trivial** — One-liner or single obvious fix. 1 user story, ≤3 ACs.
@@ -376,6 +451,19 @@ Immediately after, use AskUserQuestion to ask a second question: **"How big is t
 Immediately after, run the **role-assignment step** below — it replaces the old single "Which role profile?" question with per-stage assignment, applying a profile being one option among others rather than the only path.
 
 ### Role assignment
+
+**Non-Claude orchestrator.** When this session's own orchestrator is not
+Claude (`orchestrator_provider != claude` —
+`~/.claude/skills/pf-interaction/SKILL.md`'s "Codex text-REPL adapter"
+defines the flag), replace every `AskUserQuestion` call in this section —
+Question 1 below and its group write/review questions (`step=roles.<n>`,
+`<n>` the 1-indexed ordinal in the order actually asked), and Question 2
+below (`step=on-unavailable`) — with that adapter, same options, same
+pending-state discipline, appended into this issue's typed draft
+`docs/issues/open/.pf-intake-draft-<type>.md` per that section's item 5. This
+covers every path that reaches this section, including the Idea branch's
+Step 3 entry and the Spike branch further below, which both run this same
+procedure by reference with a restricted key set.
 
 **Question 1 — "How should roles be assigned for this issue?"** Options:
 - **Individually per stage (recommended)** — assign write/review per stage group below, using availability-based recommendations.
@@ -462,6 +550,15 @@ discipline, draft document at `docs/issues/open/.pf-intake-draft-idea.md`
 per that section's item 5.
 
 **Idea from a file (US-03a).** If the user names a file instead of typing the idea directly, `/pf` reads it and decides for itself how to extract the idea from the contents — this is deliberately not prescribed (BRD Non-Goals: "how exactly to extract the idea from a file is not regulated by the skill, the AI decides"). After extraction, show the extracted text back to the user for confirmation with one more `AskUserQuestion` — **"Yes, that's it"** / **"No, let me rephrase"** (free text via "Other") — before it goes anywhere. Only confirmed text is written into `prompt.md`. This is the only point in the whole issue where reading an external file happens at all (potentially from the user's own notes/vault), and it happens as an ordinary read of a path the user named — no special-cased knowledge of any particular tool or storage location anywhere in this flow.
+
+**Non-Claude orchestrator.** Same substitution as the batches above: when
+`orchestrator_provider != claude`, replace this confirmation call with the
+adapter too (`stage=intake`, `step=file-confirm`), appended into
+`docs/issues/open/.pf-intake-draft-idea.md` at the position "immediately
+after whichever Batch 1 question asks for 'the idea itself' resolves"
+(`~/.claude/skills/pf-interaction/SKILL.md`'s "Codex text-REPL adapter" item
+2's `step` dictionary) — absent from the sequence entirely when the idea was
+typed directly rather than read from a file.
 
 **Unreadable/binary/empty file (§5.8).** If the named file can't be read as text (binary, corrupted, missing), do not fail silently: report the read error and ask the user to type the idea directly instead — within the same intake call, re-asking only that one question, not the whole batch.
 
