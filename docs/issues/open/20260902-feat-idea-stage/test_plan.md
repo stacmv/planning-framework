@@ -701,39 +701,39 @@ feat/improve/bug; и требование к ревью — отдельное �
 
 | TC     | Test Case | Type   | Priority | Status | Remarks |
 | ------ | --------- | ------ | -------- | ------ | ------- |
-| TC-001 | Семь новых директорий скиллов существуют с валидным фронтматтером | Auto | High | [ ] | |
-| TC-002 | `/pf` — вопрос «идея или сразу проект» в пустой папке | Auto | High | [ ] | |
+| TC-001 | Семь новых директорий скиллов существуют с валидным фронтматтером | Auto | High | ✓ | |
+| TC-002 | `/pf` — вопрос «идея или сразу проект» в пустой папке | Auto | High | ✓ | |
 | TC-003 | Живая сессия `/pf` — пустая папка и существующий проект | Manual | Critical | [ ] | Manual reason: interactive-agent |
-| TC-004 | Not-a-repo guard и «не закоммичено» на каждой стадии без git | Auto | Critical | [ ] | |
-| TC-005 | Существующий проект без открытых issue — четыре варианта | Auto | High | [ ] | |
-| TC-006 | Таблица завершённых стадий, статус-блок и `pf-help` | Auto | Medium | [ ] | |
-| TC-007 | Intake-батч — переиспользование `doc_language`, лимит вопросов, carve-out | Auto | High | [ ] | |
-| TC-008 | `pf-interaction` — правило front-loaded и единственный финальный гейт | Auto | Critical | [ ] | |
-| TC-009 | `idea.md` — фиксированные секции | Auto | High | [ ] | |
-| TC-010 | `research.md` — дисциплина источников и непроверенные факты | Auto | Critical | [ ] | |
-| TC-011 | `critique.md` — персоны, единый резолв актора, закрытый словарь `Disposition` | Auto | High | [ ] | |
+| TC-004 | Not-a-repo guard и «не закоммичено» на каждой стадии без git | Auto | Critical | ✓ | |
+| TC-005 | Существующий проект без открытых issue — четыре варианта | Auto | High | ✓ | |
+| TC-006 | Таблица завершённых стадий, статус-блок и `pf-help` | Auto | Medium | ✓ | |
+| TC-007 | Intake-батч — переиспользование `doc_language`, лимит вопросов, carve-out | Auto | High | ✓ | |
+| TC-008 | `pf-interaction` — правило front-loaded и единственный финальный гейт | Auto | Critical | ✓ | |
+| TC-009 | `idea.md` — фиксированные секции | Auto | High | ✓ | |
+| TC-010 | `research.md` — дисциплина источников и непроверенные факты | Auto | Critical | ✓ | |
+| TC-011 | `critique.md` — персоны, единый резолв актора, закрытый словарь `Disposition` | Auto | High | ✓ | |
 | TC-012 | Живой прогон `pf-idea-critique` — независимость персон | Manual | High | [ ] | Manual reason: interactive-agent |
-| TC-013 | `verdict.md` — закрытый словарь и содержимое сессии решения | Auto | Critical | [ ] | |
+| TC-013 | `verdict.md` — закрытый словарь и содержимое сессии решения | Auto | Critical | ✓ | |
 | TC-014 | Живой прогон — переопределение допущения в сессии решения | Manual | Critical | [ ] | Manual reason: interactive-agent |
-| TC-015 | `idea_tier` — словарь и таблица линз | Auto | High | [ ] | |
-| TC-016 | Единый источник бюджетов документов; `pf-check` сверяет `idea_tier` | Auto | Medium | [ ] | |
-| TC-017 | `pf-close` — прерогатив idea = подтверждённый `## Decision`, Phase 1 пропущена | Auto | Medium | [ ] | |
-| TC-018 | `hypothesis.md`/`findings.md` — скелеты и гейт записи | Auto | High | [ ] | |
-| TC-019 | `interaction: front-loaded` — опционально и выключено по умолчанию | Auto | Medium | [ ] | |
-| TC-020 | Front-loaded hook-сайты — 13 скиллов, кроме двух исключений | Auto | High | [ ] | |
-| TC-021 | `pf-check` — TYPE до `size_tier`, шесть TARGET-строк, `open_questions.md` как контекст | Auto | Critical | [ ] | |
-| TC-022 | `pf-brd` — hook `idea_ref` | Auto | High | [ ] | |
-| TC-023 | `pf-autopilot` — пять скиллов, остановка перед единственным гейтом, отчёт с допущениями | Auto | Critical | [ ] | |
-| TC-024 | `pf-roles` — шесть новых ключей и carve-out для голой папки | Auto | High | [ ] | |
-| TC-025 | `converge-to-v3.sh` — ветки `idea`/`spike` | Auto | Medium | [ ] | |
-| TC-026 | Зеркало каркаса и счётчик скиллов в документации | Auto | Medium | [ ] | |
-| TC-027 | Неизменность feat/improve/bug и единственный источник порядка стадий | Auto | Critical | [ ] | |
+| TC-015 | `idea_tier` — словарь и таблица линз | Auto | High | ✓ | |
+| TC-016 | Единый источник бюджетов документов; `pf-check` сверяет `idea_tier` | Auto | Medium | ✓ | |
+| TC-017 | `pf-close` — прерогатив idea = подтверждённый `## Decision`, Phase 1 пропущена | Auto | Medium | ✓ | |
+| TC-018 | `hypothesis.md`/`findings.md` — скелеты и гейт записи | Auto | High | ✓ | |
+| TC-019 | `interaction: front-loaded` — опционально и выключено по умолчанию | Auto | Medium | ✓ | |
+| TC-020 | Front-loaded hook-сайты — 13 скиллов, кроме двух исключений | Auto | High | ✓ | |
+| TC-021 | `pf-check` — TYPE до `size_tier`, шесть TARGET-строк, `open_questions.md` как контекст | Auto | Critical | ✓ | |
+| TC-022 | `pf-brd` — hook `idea_ref` | Auto | High | ✓ | |
+| TC-023 | `pf-autopilot` — пять скиллов, остановка перед единственным гейтом, отчёт с допущениями | Auto | Critical | ✓ | |
+| TC-024 | `pf-roles` — шесть новых ключей и carve-out для голой папки | Auto | High | ✓ | |
+| TC-025 | `converge-to-v3.sh` — ветки `idea`/`spike` | Auto | Medium | ✓ | |
+| TC-026 | Зеркало каркаса и счётчик скиллов в документации | Auto | Medium | ✓ | |
+| TC-027 | Неизменность feat/improve/bug и единственный источник порядка стадий | Auto | Critical | ✓ | |
 | TC-028 | Живой прогон — спайк, требующий кода | Manual | High | [ ] | Manual reason: interactive-agent — требуется живая агентная сессия, принимающая решения по ветке/эксперименту, а не просто окружение, недоступное в CI |
 | TC-029 | Реальное ревью в Codex — измерение «совместимость с Codex» | Manual | Medium | [ ] | Manual reason: external-system |
-| TC-030 | Bare-folder idea создаёт только папку issue — и ничего больше | Auto | Critical | [ ] | |
-| TC-031 | `project`/`spike-first`-вердикт — bootstrap + git init + follow-up до архивации | Auto | Critical | [ ] | |
-| TC-032 | Spike close — гейт пустого Run Evidence и ветка без merge | Auto | Critical | [ ] | |
-| TC-033 | `pf-check` никогда не спрашивает `size_tier` для idea/spike | Auto | Critical | [ ] | |
+| TC-030 | Bare-folder idea создаёт только папку issue — и ничего больше | Auto | Critical | ✓ | |
+| TC-031 | `project`/`spike-first`-вердикт — bootstrap + git init + follow-up до архивации | Auto | Critical | ✓ | |
+| TC-032 | Spike close — гейт пустого Run Evidence и ветка без merge | Auto | Critical | ✓ | |
+| TC-033 | `pf-check` никогда не спрашивает `size_tier` для idea/spike | Auto | Critical | ✓ | |
 
 **Manual budget:** 5/5 (large tier: ≤5, hard cap 5) — TC-003, TC-012, TC-014, TC-028, TC-029.
 
