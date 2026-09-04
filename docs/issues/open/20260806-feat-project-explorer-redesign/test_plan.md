@@ -839,10 +839,10 @@ specs.md §4.4 утверждает обратное («существующая
 | TC-009 | Соотношение размеров `h1`/body — 1.3–1.8x | Auto | Medium | ✓ | |
 | TC-010 | `.panel-table` — мягкая тональная заливка вместо жёстких grid-линий | Auto | High | ✓ | |
 | TC-011 | Sans-serif для прозы, monospace только для кода | Auto | Medium | ✓ | |
-| TC-012 | Визуальная приёмка панельной раскладки по референсу | Manual | High | [ ] | Manual reason: human-judgment |
+| TC-012 | Визуальная приёмка панельной раскладки по референсу | Manual | High | ✓ | Прогнано 2026-09-04 на живом инструменте; все 3 шага подтверждены владельцем при сравнении с reference-glog-*.png — см. manual_test_checklist.md |
 | TC-013 | Owner sign-off палитры и типографики до старта `/pf-execute` | Manual | Critical | ✓ | Подтверждено по существующей записи `[owner sign-off]` в session-log.md @ 2026-08-17T15:50:14Z (до первого /pf-execute) — см. manual_test_checklist.md |
 | TC-014 | `:focus-visible` — контраст индикатора и нативные `<button>` | Auto | Medium | ✓ | |
-| TC-015 | Живая проверка табуляции и видимого фокуса по всему приложению | Manual | High | [ ] | Manual reason: environment — нет headless-браузерного харнесса в этом zero-dependency проекте |
+| TC-015 | Живая проверка табуляции и видимого фокуса по всему приложению | Manual | High | ✓ | Прогнано 2026-09-04 через headless Chrome по CDP (вне репозитория, зависимостей проекта не добавлено): 40 focus-остановок, 0 без видимой рамки, действие с клавиатуры подтверждено записью на диск — см. manual_test_checklist.md |
 | TC-016 | `GET /api/inbox` — агрегация across projects, форма ответа | Auto | Critical | ✓ | |
 | TC-017 | Парсинг `Origin` для `manualTests[].issueId` — обязательность и защита | Auto | High | ✓ | |
 | TC-018 | Инбокс — два раздела из одного ответа `/api/inbox` | Auto | High | ✓ | |
