@@ -358,10 +358,14 @@
    * fallback order of `~/.claude/skills/pf-roles/SKILL.md` §4:
    *   1. explicit `roles.<key>` in `prompt.md`;
    *   2. the selected profile's point-specific entry for `<key>`;
-   *   3. tier-default `skip` for `user_docs`/`dev_docs` on `trivial`/`small`;
+   *   3. tier-default `skip` for `user_docs`/`dev_docs` on `trivial`/`small`
+   *      — with or without a `profile:` (a condition on the key and the tier
+   *      alone, checked before level 4);
    *   4. the selected profile's `default` entry;
-   *   5. general default (`write: claude, review: [claude]`) when there is
-   *      no `roles:` and no `profile:` at all.
+   *   5. general default (`write: claude, review: [claude]`) for a key with
+   *      no explicit `roles.<key>` entry on an issue that has no `profile:`
+   *      at all (per key — a `roles:` block covering other keys never blocks
+   *      level 5 for this one).
    *
    * @param {string} key - a pipeline stage key, e.g. "specs", "code", "dev_docs".
    * @param {object} options
@@ -399,13 +403,13 @@
     var record;
     var level;
 
-    if (Object.prototype.hasOwnProperty.call(rolesEntries, key)) {
-      // 1. explicit point-specific roles.<key> in prompt.md.
-      record = parseValue(rolesEntries[key]);
-      level = 1;
-    } else if (profileName) {
+    // Levels 2 and 4 both read the selected profile; a `profile:` that names
+    // nothing in role-profiles.yml is a resolution error the resolver stops
+    // on (never a silent fallback), so the lookup happens once, up front.
+    var profile = null;
+    if (profileName) {
       var profiles = extractProfilesEntries(roleProfilesText);
-      var profile = profiles[profileName];
+      profile = profiles[profileName];
       if (!profile) {
         return {
           ok: false,
@@ -414,28 +418,40 @@
           message: "Profile '" + profileName + "' was not found in role-profiles.yml.",
         };
       }
-      if (Object.prototype.hasOwnProperty.call(profile, key)) {
-        // 2. the selected profile's point-specific entry for <key>.
-        record = parseValue(profile[key]);
-        level = 2;
-      } else if ((key === "user_docs" || key === "dev_docs") && (tier === "trivial" || tier === "small")) {
-        // 3. tier-default skip for user_docs/dev_docs.
-        record = "skip";
-        level = 3;
-      } else if (Object.prototype.hasOwnProperty.call(profile, "default")) {
-        // 4. the selected profile's default entry.
-        record = parseValue(profile["default"]);
-        level = 4;
-      } else {
-        return {
-          ok: false,
-          key: key,
-          error: "no_default",
-          message: "Profile '" + profileName + "' has no point-specific or default entry for '" + key + "'.",
-        };
-      }
+    }
+
+    // §4 is checked strictly top to bottom, first match wins — and level 3
+    // is a condition on the key and the tier alone: it fires for a
+    // profile-less issue too (a legacy or hand-written prompt.md with no
+    // `profile:` field must not fall past the tier default to level 5),
+    // while a profile's generic `default` (level 4) still only wins when
+    // level 3 did not fire. Only level 1 (explicit roles.<key>) and level 2
+    // (the profile's own point-specific entry) can override the tier default.
+    if (Object.prototype.hasOwnProperty.call(rolesEntries, key)) {
+      // 1. explicit point-specific roles.<key> in prompt.md.
+      record = parseValue(rolesEntries[key]);
+      level = 1;
+    } else if (profile && Object.prototype.hasOwnProperty.call(profile, key)) {
+      // 2. the selected profile's point-specific entry for <key>.
+      record = parseValue(profile[key]);
+      level = 2;
+    } else if ((key === "user_docs" || key === "dev_docs") && (tier === "trivial" || tier === "small")) {
+      // 3. tier-default skip for user_docs/dev_docs.
+      record = "skip";
+      level = 3;
+    } else if (profile && Object.prototype.hasOwnProperty.call(profile, "default")) {
+      // 4. the selected profile's default entry.
+      record = parseValue(profile["default"]);
+      level = 4;
+    } else if (profile) {
+      return {
+        ok: false,
+        key: key,
+        error: "no_default",
+        message: "Profile '" + profileName + "' has no point-specific or default entry for '" + key + "'.",
+      };
     } else {
-      // 5. general default — no roles.<key>, no profile: at all.
+      // 5. general default — no roles.<key> for this key, no profile: at all.
       record = { write: "claude", review: ["claude"] };
       level = 5;
     }

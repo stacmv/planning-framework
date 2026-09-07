@@ -232,7 +232,9 @@ function resolveDocRole(docName, ctx) {
  *   * `user_docs.md`/`dev_docs.md` — `resolveRole("user_docs"|"dev_docs", …)`
  *     came back `{ ok: true, skip: true }`, whether from an explicit
  *     `roles.<key>: skip` (level 1/2) or the tier default for
- *     `trivial`/`small` (level 3, pf-roles §4).
+ *     `trivial`/`small` (level 3, pf-roles §4 — reachable with or without a
+ *     `profile:`; it requires only that no explicit `roles.<key>` entry and
+ *     no profile point-specific entry covers the key).
  *   * `code_review.md` — `resolveRole("code", …)` came back `{ ok: true,
  *     review: "skip" }` (`code.review: skip` — review only; authorship of
  *     `code` itself can never be skipped, so the whole-stage `skip` shape
@@ -257,7 +259,10 @@ function roleSkipReason(docName, ctx) {
   if (!resolved.skip) return null;
   const tier = (ctx && ctx.sizeTier) || DEFAULT_SIZE_TIER;
   return resolved.level === 3
-    ? `${key} resolves to skip by default at ${tier} tier (pf-roles SKILL.md §4, level 3) — no roles.${key} override is set`
+    ? // Level 3 fires with or without a `profile:` — the only things that
+      // outrank it are an explicit `roles.<key>` entry and a profile's own
+      // point-specific entry for the key (pf-roles §4, first match wins).
+      `${key} resolves to skip by the ${tier}-tier default (pf-roles SKILL.md §4, level 3) — no explicit roles.${key} entry and no profile point-specific entry for it, with or without a profile`
     : `roles.${key}: skip is set for this issue`;
 }
 
