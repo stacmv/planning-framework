@@ -943,10 +943,10 @@ Criteria этого раздела)
 - Проверка на живых данных: поднять сервер на этом репозитории и убедиться, что ни один открытый issue без `profile:` не порождает ложных «Нет User docs»/«Нет Dev docs».
 
 **Acceptance Criteria:**
-- [ ] TC-001 passes (состав экрана лаунчера и источник данных не изменились)
-- [ ] TC-032 passes (write-allowlist не расширен: ни новых маршрутов, ни новых git-подкоманд)
-- [ ] Сценарий (a) `status.test.js` идёт через реальный путь резолюции (фикстура без `profile:`), а не hand-build, и падает при возврате к level-5-дефолту
-- [ ] На живом репозитории открытый trivial/small-issue без `profile:` не порождает ложных «Нет User docs»/«Нет Dev docs»
+- [x] TC-001 passes (состав экрана лаунчера и источник данных не изменились) — в Status Tracker `test_plan.md` отмечен `✓`, тип Auto; покрывающие сюиты зелёные (`make test` 4/4, 420/420 node)
+- [x] TC-032 passes (write-allowlist не расширен: ни новых маршрутов, ни новых git-подкоманд) — там же `✓`, тип Auto, те же зелёные прогоны
+- [x] Сценарий (a) `status.test.js` идёт через реальный путь резолюции (фикстура без `profile:`), а не hand-build, и падает при возврате к level-5-дефолту — переписан в `9fc3f4b`, добавлен и small-tier вариант; прямая проверка резолвера: trivial/small без профиля дают `skip` на level 3, medium/large доходят до level 5 без skip
+- [x] На живом репозитории открытый trivial/small-issue без `profile:` не порождает ложных «Нет User docs»/«Нет Dev docs» — проверено поднятым сервером: `GET /api/projects/planning-framework/issues` отдаёт `status: "not_applicable"` для `user_docs`/`dev_docs` у trivial/small без профиля, а прогон `issueDocProblem()` на этом реальном ответе не даёт ни одного ложного дефекта (единственные две найденные проблемы настоящие: код-ревью этого issue и отсутствие ревью у `20260902-feat-idea-stage`)
 
 ---
 

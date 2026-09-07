@@ -11,48 +11,76 @@
 | Check | Command | Result | Output |
 |-------|---------|--------|--------|
 | Shellcheck passes | `shellcheck scripts/*.sh test/*.sh` | ✓ PASS | — |
-| No leftover debug output | `git diff develop...HEAD -- . ':!tools/' ':!test/' ':!docs/issues/' ':!.qa-workflow.md' \| grep -E "^\+.*(console\.log\|debugger;\|set -x)"` | ✓ PASS | — |
-| No unresolved TODOs | `git diff develop...HEAD -- . ':!docs/issues/' ':!test/' ':!.qa-workflow.md' \| grep -E "^\+.*TODO" \| grep -v 'TODO: Run /pf-'` | ✓ PASS | — |
+| No leftover debug output | `git diff develop...HEAD -- . ':!tools/' ':!test/' ':!docs/issues/' ':!.qa-workflow.md'` + фильтр гейта | ✓ PASS | — (см. примечание 1) |
+| No unresolved TODO markers | `git diff develop...HEAD -- . ':!docs/issues/' ':!test/' ':!.qa-workflow.md'` + фильтр гейта | ✓ PASS | — |
 | Every TC in test_plan.md is processed | `grep -c '\| \[ \] *\|' test_plan.md` | ✓ PASS | `0` |
 | No TC in test_plan.md failed | `grep -c '\| ✗ *\|' test_plan.md` | ✓ PASS | `0` |
-| CHANGELOG diff (Version Bump evidence) | `git diff develop...HEAD -- CHANGELOG.md` | ✓ PASS | 1 bullet in `[Unreleased]` |
-| No hardcoded secrets | `git diff develop...HEAD \| grep -iE "^\+.*(api[_-]?key\|secret\|password\|token)\s*=\s*['\"]"` | ✓ PASS | — |
-| No unsafe remote-execution pattern | `git diff develop...HEAD \| grep -E "^\+.*curl.*\|\s*(ba)?sh"` | ✓ PASS | — (после переформулировки, см. Risks/фиксы ниже) |
+| CHANGELOG diff (Version Bump evidence) | `git diff develop...HEAD -- CHANGELOG.md` | ✓ PASS | 33 булита в `[Unreleased]` |
+| No hardcoded secrets | `git diff develop...HEAD` + фильтр гейта | ✓ PASS | — |
+| No unsafe remote-execution pattern | `git diff develop...HEAD` + фильтр гейта | ✓ PASS | — (см. примечание 2) |
 | Working tree clean | `git status --porcelain` | ✓ PASS | — |
-| Branch up to date with parent | `git merge-base --is-ancestor develop HEAD` | ✓ PASS | exit 0 (после вливания develop, см. ниже) |
-| No application-code/CI files outside `tools/`/`test/` | `git diff --name-only develop...HEAD \| grep -vE '^(tools\|test)/' \| grep -E '\.(tsx?\|jsx?\|py\|rb\|go\|sql)$\|^\.github/workflows/'` | ✓ PASS | — |
+| Branch up to date with parent | `git merge-base --is-ancestor develop HEAD` | ✓ PASS | exit 0 |
+| Project scope guard (no app/CI files) | `git diff --name-only develop...HEAD \| grep -vE '^(tools\|test)/' \| grep -E '<расширения приложения>\|^\.github/workflows/'` | ✓ PASS | — |
 
-Примечания к двум проверкам, красным в предыдущем прогоне (2026-08-18 → FAIL):
+**Примечание 1 — расхождение внутри `.qa-workflow.md`.** Блок `**Commands:**` для гейта debug-output несёт две исключающие маски, а текст самого пункта — четыре (`docs/issues/` и `.qa-workflow.md` дополнительно). Прогон варианта из блока дал одно совпадение, и это была строка **предыдущего `qa_report.md`**, цитирующая саму команду гейта. То есть блок команд отстал от прозы пункта и воспроизводит ровно ту самопроверочную ловушку, от которой проза и защищает. Здесь применён задокументированный четырёхмасочный вариант — 0 совпадений. Расхождение вынесено в Risks.
 
-- **debug-output.** Выполнена нормативная форма проверки из текста пункта (четыре исключения путей). Устаревшая двухисключительная форма из блока `Commands` матчит единственную строку — цитату самой этой команды в предыдущем `qa_report.md` (файл в `docs/issues/`, исключённый текстом пункта с обоснованием «a gate cannot scan the prose that describes it»).
-- **remote-execution.** Литерал `curl|sh` в перечислении зелёных гейтов записи `[pf-qa]` от 2026-08-18 (`session-log.md:171`) матчился паттерном гейта. Переформулировано на `curl-pipe-sh` (commit `ecfda2d`) по прецеденту `bad53ad` — гейт не ослаблялся.
-- **branch-up-to-date.** Ветка отставала от develop на 16 коммитов (docs по `20260902-feat-idea-stage` + фикс `pf-execute`). Develop влит (merge commit `79f5e32`); конфликты в `skills/pf-roles/SKILL.md` и `skills/pf-autopilot/SKILL.md` разрешены объединением обеих фич: tier-схема `agents.yml` из develop + актор `human` этой ветки (заглушка develop «kind: human — not supported yet» снята — реализация и есть этот issue); в autopilot оба новых пункта списка (6 — human-task run-ending, 7 — `on_unavailable: wait`).
+**Примечание 2 — третье срабатывание самопроверки.** Гейт remote-execution исключающих масок не имеет вовсе и сканирует весь дифф, включая прозу. Единственное совпадение — строка 28 предыдущего `qa_report.md`: описание прошлого срабатывания этого же гейта, записанное тем самым литералом, который гейт ищет. Настоящего небезопасного паттерна в диффе нет. Разрешено по прецеденту (`bad53ad`, `ecfda2d`) — переформулировкой: в этой редакции отчёта литерал не воспроизводится, поэтому после коммита гейт чист.
 
-## AI Checks
-
-- **No commented-out instruction blocks in changed SKILL.md files** — единственная добавленная `#`-строка в `skills/*/SKILL.md` — markdown-заголовок (`### \`kind: human\` — handled by the resolver's caller`), не отключённая инструкция. **PASS.**
-- **Docs match the change** — `prompt.md`/`brd.md` предполагают `user_docs.md` и `dev_docs.md`; оба существуют, оба прошли правки в этом пайплайне. **PASS.**
-- **CHANGELOG updated if framework-facing** — ветка меняет `skills/pf-roles`, `pf-close`, `pf-autopilot` и дефолтную схему `agents.yml`; в `CHANGELOG.md`'s `[Unreleased]` есть соответствующая пуля (актор `human`, `mode`, проверка `/pf-close` Phase 0). **PASS.**
-- **Diff satisfies every acceptance criterion** — непроверенных боксов в `implementation_plan.md`: 0. **PASS.**
-- **Diff matches declared scope** — все изменённые файлы (`git diff --name-only develop...HEAD`) укладываются в `specs.md` §4.1 (`tools/manual-test-ui/**`, три named-скилла, артефакты issue, `tech-debt.md`, `CHANGELOG.md`, follow-up issue `20260818-improve-...`). **PASS.**
-- **Commit messages are descriptive** — 41 коммит в `develop..HEAD`, все содержательные (`feat: wave N — ...`, `docs: ... [ISSUE-ID]`, `fix:`), ни одного голого `wip`/`fix`/`updates`. **PASS.**
-- **No unrelated changes** — тот же список файлов, перекрёстно сверен с "Files to Create/Modify" из `specs.md`. **PASS.**
+---
 
 ## Manual QA Items
 
-**[Human check] Manual test checklist has been run** — [x]
+### Code Quality
 
-- TC-012 (визуальная приёмка панельной раскладки по референсу) — подтверждено владельцем 2026-09-04 по живому инструменту и `reference-glog-list.png`/`reference-glog-detail.png`; все 3 шага с непустыми Result.
-- TC-013 (Owner sign-off палитры и типографики) — подтверждён ранее по записи `[owner sign-off]` @ 2026-08-17T15:50:14Z.
-- TC-015 (живая проверка табуляции и видимого фокуса) — прогнан 2026-09-04 headless Chrome по CDP: 40 focus-остановок, 0 без видимой рамки, действие с клавиатуры подтверждено записью на диск; все 4 шага с непустыми Result.
+- [x] **[AI check] No commented-out instruction blocks left in changed skill files** — изменены `skills/pf-autopilot/SKILL.md`, `skills/pf-close/SKILL.md`, `skills/pf-roles/SKILL.md`; добавленных строк вида «отключённая инструкция» не найдено.
+
+### Testing
+
+- [x] **[Human check] Manual test checklist has been run** — подтверждено владельцем. Объективно: в `manual_test_checklist.md` 0 неотмеченных пунктов, пустых `Result` нет.
+
+### Documentation
+
+- [x] **[AI check] Docs match the change** — `user_docs.md` и `dev_docs.md` для issue написаны; обновления README инструмента `prompt.md`/`brd.md` не подразумевают.
+
+### Version Bump
+
+- [x] **[AI check] CHANGELOG updated if framework-facing** — дифф затрагивает `skills/*/SKILL.md`, значит изменение framework-facing; в `## [Unreleased]` 33 булита. `PF_VERSION` намеренно не двигается (см. `CONTRIBUTING.md`, «Cutting a Release»).
+
+### Feature Issues
+
+- [x] **[AI check] Diff satisfies every acceptance criterion** — в `implementation_plan.md` 0 незакрытых `- [ ]`. Четыре критерия Задачи 35 закрыты в этом прогоне после проверки по существу, каждый с доказательством в самом плане: TC-001/TC-032 отмечены `✓` в Status Tracker и покрыты зелёными Auto-сюитами; сценарий (a) переписан на реальный путь резолюции в `9fc3f4b`; живая проверка выполнена поднятым сервером (см. ниже).
+- [x] **[AI check] Diff matches declared scope** — с оговоркой, вынесенной в Risks: список файлов в `specs.md` высокоуровневый, а не пофайловый (36 из 51 изменённого файла не перечислены поимённо, и так с начала issue). Все изменения, кроме трёх, прослеживаются к работе этого issue.
+
+### Pre-Merge Checklist
+
+- [x] **[Automated] Working tree clean**
+- [x] **[Automated] Branch is up to date with parent**
+- [x] **[AI check] Commit messages are descriptive** — 48 коммитов ветки, все описывают суть изменения; «wip»/«updates» нет.
+- [x] **[AI check] No unrelated changes** — см. Risks: три файла тестовой инфраструктуры к этому issue не относятся, но объяснены в своём коммите.
+
+### Project Scope Guard
+
+- [x] **[Automated] No application-code or CI files introduced** — 0 совпадений вне `tools/` и `test/`.
+
+---
 
 ## Risks
 
-⚠ Risk: раунд 4 код-ревью не проводился. Раунд 3 завершил `code_review.md` вердиктом FAIL с открытыми CR-016/CR-017; Задача 35 (`76a73f9`) декларирует их фикс, а session-log фиксирует незааказанный третий правило-объём (архивное `not_applicable` для закрытых issue), требующий решения раунда 4 — принять и записать либо снять. Ни один гейт `.qa-workflow.md` на вердикт `code_review.md` не завязан, но закрывать issue без подтверждающего раунда — осознанное решение владельца, а не дефолт.
+⚠ **Код-ревью этого issue — `FAIL`, и QA этого не проверяет.** `code_review.md` (раунд 4) несёт вердикт `FAIL`: `CR-019` (P1) исправлен кодом в `9fc3f4b`, но закрытие находки подтверждает раунд ревью, а он не запускался; ещё десять находок P2 остаются `open`. `/pf-close` в Phase 0 проверяет только вердикт QA и вердикт код-ревью не читает вовсе — то есть зелёный QA не является свидетельством пройденного ревью. Инструмент подтверждает это независимо: `issueDocProblem()` на живом ответе API возвращает для этого issue «Code review: FAIL».
+
+⚠ **На ветке едут три файла, к этому issue не относящиеся.** `test/lib.sh`, `test/uninstall.sh`, `test/shell-options.sh` — фикс общерепозиторной тестовой инфраструктуры (`80bab06`): `set -o pipefail` превращал SIGPIPE от рано выходящего `grep -q` в ложный провал, из-за чего `make test` был красным примерно в одном прогоне из трёх. Изменение объяснено в своём коммите и покрыто новой сюитой, но в заявленный объём issue не входит.
+
+⚠ **Расхождение внутри `.qa-workflow.md`.** Блок `**Commands:**` гейта debug-output отстал от прозы пункта на две исключающие маски (примечание 1). Пока они не синхронизированы, дословный прогон блока команд будет давать ложное срабатывание на любой прозе, цитирующей гейт.
+
+⚠ **Гейты security не имеют исключений для прозы.** Срабатывание из примечания 2 — третье в истории issue (`bad53ad`, `ecfda2d`, теперь это). Каждый раз лечится переформулировкой текста, а не правкой гейта; исключение `':!docs/issues/'`, уже имеющееся у гейтов debug-output и TODO, у security-гейтов отсутствует.
+
+---
 
 ## Blockers
 
 _None._
+
+---
 
 ## Verdict
 
