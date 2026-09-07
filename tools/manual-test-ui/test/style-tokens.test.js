@@ -171,7 +171,14 @@ test("h1/body font-size ratio is within 1.3x-1.8x (TC-009 steps 1-2)", () => {
 });
 
 test("reference screenshots for TC-009 step 3 / TC-012 exist in the issue folder", () => {
-  const issueDir = path.join(__dirname, "..", "..", "..", "docs", "issues", "open", "20260806-feat-project-explorer-redesign");
+  // Resolved against both locations on purpose: /pf-close moves the folder from
+  // open/ to closed/, and a path pinned to open/ turns every future closure of
+  // this issue into a red suite — which is exactly how it failed on 2026-09-07.
+  const repoRoot = path.join(__dirname, "..", "..", "..");
+  const issueId = "20260806-feat-project-explorer-redesign";
+  const issueDir = ["open", "closed"]
+    .map((state) => path.join(repoRoot, "docs", "issues", state, issueId))
+    .find((dir) => fs.existsSync(dir)) || path.join(repoRoot, "docs", "issues", "closed", issueId);
   for (const file of ["reference-glog-list.png", "reference-glog-detail.png"]) {
     assert.ok(fs.existsSync(path.join(issueDir, file)), `expected ${file} to exist in ${issueDir}`);
   }
