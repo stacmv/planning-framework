@@ -168,7 +168,7 @@ open+P2→tech-debt.md параллельно deferred-пути; не упомя
 задокументирована ловушка `"type": "module"` в package.json).
 
 [/pf-qa] Verdict: FAIL. Все автоматические/AI-проверки .qa-workflow.md
-зелёные (shellcheck, debug-output, TODO, secrets, curl|sh, working tree,
+зелёные (shellcheck, debug-output, TODO, secrets, curl-pipe-sh, working tree,
 branch-up-to-date, scope guard, CHANGELOG — последний пофикшен в рамках
 этого прогона, commit a9a6f23). TC-013 подтверждён по существующей записи
 owner sign-off в этом же файле (@ 2026-08-17T15:50:14Z, до первого
