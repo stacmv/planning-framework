@@ -926,6 +926,30 @@ Criteria этого раздела)
 
 ---
 
+#### Task 36 (fix CR-019, эскалация code review раунда 4): `lib/docstate.js`/`lib/roles-resolve.js` — tier-дефолт `skip` достижим без `profile:`
+
+**Task Type:** code
+**Mapped Test Cases:** TC-001, TC-032
+
+**Files:**
+- `tools/manual-test-ui/lib/docstate.js`
+- `tools/manual-test-ui/lib/roles-resolve.js`
+- `tools/manual-test-ui/test/status.test.js`
+
+**Implementation Notes:**
+- Корень — порядок уровней в `resolveRole()`: ветка level 3 (tier-дефолт `skip` для `user_docs`/`dev_docs` при `size_tier: trivial/small`) вложена в `else if (profileName)`. Issue без `profile:` и без явных `roles.user_docs/dev_docs` (легаси или hand-written prompt.md) резолвится на level 5 — general default с `skip: false`, tier-дефолт не применяется. Чинить так, чтобы runtime-резолюция совпала с задокументированным порядком `pf-roles/SKILL.md` §4 (tier-дефолт действует и когда ни профиля, ни явной точки нет), не ломая явные `roles.<key>: skip` (level 1) и профильные переопределения (level 2).
+- `docstate.js`'s `roleSkipReason()` — потреблять результат; заодно (CR-021) привести текст level-3-сообщения в соответствие с реальной достижимостью ветки.
+- Тесты: переписать сценарий (a) `status.test.js` с hand-build'а stage-состояния на реальный путь пайплайна — через фикстуру открытого trivial-issue без профиля (`20260105-improve-fixture-trivial` уже есть в `test/helpers/fixtures.js`) `user_docs`/`dev_docs` должны приходить `not_applicable`, не `missing`; добавить small-tier вариант; сценарий (c) (реально отсутствующий документ даёт проблему) сохранить.
+- Проверка на живых данных: поднять сервер на этом репозитории и убедиться, что ни один открытый issue без `profile:` не порождает ложных «Нет User docs»/«Нет Dev docs».
+
+**Acceptance Criteria:**
+- [ ] TC-001 passes (состав экрана лаунчера и источник данных не изменились)
+- [ ] TC-032 passes (write-allowlist не расширен: ни новых маршрутов, ни новых git-подкоманд)
+- [ ] Сценарий (a) `status.test.js` идёт через реальный путь резолюции (фикстура без `profile:`), а не hand-build, и падает при возврате к level-5-дефолту
+- [ ] На живом репозитории открытый trivial/small-issue без `profile:` не порождает ложных «Нет User docs»/«Нет Dev docs»
+
+---
+
 ### Complexity Estimate
 
 **Complex** (6+ задач — фактически 28 задач). Обоснование: issue затрагивает три независимых подсистемы (навигационная оболочка с разбиением `app.js` на три ES-модуля; единый инбокс и полноценная реализация актора `human` с новым YAML-подмножеством, hash-based stale-проверкой и тремя разными путями валидации выполнения; палитра/типографика/a11y с автоматической контрастной проверкой) плюс три независимо редактируемых framework-скилл-файла вне `tools/manual-test-ui`, с ~32 test cases, покрывающими UI, API и skill-файлы одновременно.
