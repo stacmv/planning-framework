@@ -116,4 +116,95 @@ else
   fi
 fi
 
+# ══════════════════════════════════════════════════════════════════════════════
+printf '=== TC-063: per-stage actor:tier roles, aibudget recommendations, on_unavailable\n'
+# ══════════════════════════════════════════════════════════════════════════════
+# (20260825-improve-role-matrix-tiers-availability) Structural audits, same
+# read-only grep-based spirit as TC-009/TC-014 above.
+
+AGENTS_YML="$REPO_ROOT/docs/planning/agents.yml"
+
+if [ ! -f "$ROLES" ]; then
+  pf_fail "TC-063: skills/pf-roles/SKILL.md does not exist"
+else
+  # ─── agents.yml default carries tiers/default_tier/degrade ─────────────────
+  if [ -f "$AGENTS_YML" ] && grep -q "tiers:" "$AGENTS_YML" && grep -q "default_tier:" "$AGENTS_YML" && grep -q "degrade:" "$AGENTS_YML"; then
+    pf_pass "TC-063: docs/planning/agents.yml default carries tiers/default_tier/degrade"
+  else
+    pf_fail "TC-063: docs/planning/agents.yml missing tiers:/default_tier:/degrade:"
+  fi
+
+  if grep -q "tiers:" "$ROLES" && grep -q "default_tier:" "$ROLES"; then
+    pf_pass "TC-063: pf-roles §2 documents tiers:/default_tier: field semantics"
+  else
+    pf_fail "TC-063: pf-roles §2 does not document tiers:/default_tier:"
+  fi
+
+  # ─── on_unavailable documented, with a stated default when absent ──────────
+  if grep -q "on_unavailable" "$ROLES" && grep -qiE "on_unavailable.*(absent|default).*degrade-tier|default.*degrade-tier.*absent" "$ROLES"; then
+    pf_pass "TC-063: pf-roles documents on_unavailable and its default (degrade-tier) when absent"
+  else
+    pf_fail "TC-063: pf-roles does not document on_unavailable's default-when-absent behavior"
+  fi
+
+  # ─── aibudget mentions are guarded by an on-PATH check, never assumed ──────
+  if grep -q "aibudget" "$ROLES"; then
+    if grep -qiE "aibudget.*on \`?PATH\`?|command -v aibudget|on PATH.*aibudget" "$ROLES"; then
+      pf_pass "TC-063: aibudget usage is guarded by an on-PATH availability check"
+    else
+      pf_fail "TC-063: pf-roles mentions aibudget without guarding on PATH availability"
+    fi
+  else
+    pf_fail "TC-063: pf-roles does not mention aibudget at all"
+  fi
+
+  # ─── Recommendation procedure and Availability check sections exist ───────
+  if grep -qi "Recommendation procedure" "$ROLES"; then
+    pf_pass "TC-063: Recommendation procedure section present"
+  else
+    pf_fail "TC-063: Recommendation procedure section not found"
+  fi
+
+  if grep -qi "Availability check" "$ROLES"; then
+    pf_pass "TC-063: Availability check section present"
+  else
+    pf_fail "TC-063: Availability check section not found"
+  fi
+
+  # ─── session-log availability line format documented ───────────────────────
+  if grep -q '\[availability\]' "$ROLES"; then
+    pf_pass "TC-063: [availability] session-log marker format documented"
+  else
+    pf_fail "TC-063: [availability] session-log marker format not found"
+  fi
+fi
+
+if [ ! -f "$PF" ]; then
+  pf_fail "TC-063: skills/pf/SKILL.md does not exist"
+else
+  # ─── the creation flow's role-assignment RECOMMENDATION no longer hardcodes
+  # solo-claude — the name may still legitimately appear as one offered
+  # option/example, so this checks the recommendation phrasing specifically,
+  # not a bare grep for the string "solo-claude".
+  if grep -qE 'recommending \*\*solo-claude\*\*' "$PF"; then
+    pf_fail "TC-063: pf/SKILL.md still recommends solo-claude by default in the creation flow"
+  else
+    pf_pass "TC-063: pf/SKILL.md creation flow no longer hardcodes a solo-claude recommendation"
+  fi
+
+  # ─── "Individually per stage" is offered as the (recommended) default path ─
+  if grep -qi "Individually per stage" "$PF"; then
+    pf_pass "TC-063: pf/SKILL.md offers per-stage individual role assignment at issue creation"
+  else
+    pf_fail "TC-063: pf/SKILL.md does not offer per-stage individual role assignment"
+  fi
+
+  # ─── on_unavailable is asked once per issue at creation time ───────────────
+  if grep -q "on_unavailable" "$PF"; then
+    pf_pass "TC-063: pf/SKILL.md's creation flow records on_unavailable"
+  else
+    pf_fail "TC-063: pf/SKILL.md's creation flow does not record on_unavailable"
+  fi
+fi
+
 pf_summary

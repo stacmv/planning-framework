@@ -297,4 +297,56 @@ else
   pf_fail "TC-026 step 3: numbering-mismatch immunity rule not documented in SKILL.md yet (test-first, expected RED pending Task 14 — SKILL.md and the fixture are both present and the helper ran correctly above, so this is NOT a test-infrastructure defect: it is the rule itself not being written yet)"
 fi
 
+
+# ─── Task-tool availability: optional layer, checkbox ledger (2026-08-25) ────
+# Claude Code >=2.1.233 disables TaskCreate/List/Get/Update by default on newer
+# models, so pf-execute must run without them and say how to get them back.
+printf '
+=== Task tools optional (Claude Code >=2.1.233 default)
+'
+EXEC_SKILL_TT="skills/pf-execute/SKILL.md"
+if [ ! -f "$EXEC_SKILL_TT" ]; then
+  pf_fail "task-tools INFRA: $EXEC_SKILL_TT not found"
+else
+  tt_text="$(cat "$EXEC_SKILL_TT")"
+
+  if printf '%s' "$tt_text" | grep -qF 'select:TaskCreate,TaskList,TaskGet,TaskUpdate'; then
+    pf_pass "task-tools step 1: Phase 1 probes availability via ToolSearch select:TaskCreate,TaskList,TaskGet,TaskUpdate"
+  else
+    pf_fail "task-tools step 1: no ToolSearch availability probe for the Task tools documented in SKILL.md"
+  fi
+
+  if printf '%s' "$tt_text" | grep -qF 'CLAUDE_CODE_ENABLE_TODO_TOOLS=1'; then
+    pf_pass "task-tools step 2: disabled-notice names CLAUDE_CODE_ENABLE_TODO_TOOLS=1 as the way back"
+  else
+    pf_fail "task-tools step 2: disabled-notice does not name CLAUDE_CODE_ENABLE_TODO_TOOLS=1 — user cannot re-enable"
+  fi
+
+  with_n="$(printf '%s' "$tt_text" | grep -c '(with Task tools)')"
+  without_n="$(printf '%s' "$tt_text" | grep -c '(without')"
+  if [ "$with_n" -ge 3 ] && [ "$without_n" -ge 3 ]; then
+    pf_pass "task-tools step 3:instructions carries both forms (with: $with_n, without: $without_n)"
+  else
+    pf_fail "task-tools step 3: with/without forms unbalanced or missing (with: $with_n, without: $without_n; need >=3 each)"
+  fi
+
+  if printf '%s' "$tt_text" | grep -qE 'never an error and never a stop|never a stop'; then
+    pf_pass "task-tools step 4: missing Task tools is explicitly not an error/stop (autopilot-safe)"
+  else
+    pf_fail "task-tools step 4: SKILL.md does not say a missing Task tool is not an error — autopilot could stall"
+  fi
+
+  if printf '%s' "$tt_text" | grep -qE 'only completion ledger'; then
+    pf_pass "task-tools step 5: checkbox-only-ledger invariant stated for the completeness gate"
+  else
+    pf_fail "task-tools step 5: checkbox-only-ledger invariant not stated near the completeness gate"
+  fi
+
+  if printf '%s' "$tt_text" | grep -qE 'mirror — never a ledger|progress mirror'; then
+    pf_pass "task-tools step 6: Task list described as a mirror, not a ledger"
+  else
+    pf_fail "task-tools step 6: Task list not described as a mirror — risks being read as authoritative"
+  fi
+fi
+
 pf_summary

@@ -59,9 +59,28 @@ For `size_tier` small/medium/large, read `docs/issues/open/[ACTIVE-ISSUE-ID]/imp
 3. Reference wireframe/prototype for UI (if applicable)
 4. Check design system for patterns (if available)
 
+### Task-tool availability — check before creating any tasks
+
+Run `ToolSearch` with the query `select:TaskCreate,TaskList,TaskGet,TaskUpdate`. Whether their schemas come back decides which form every task-bookkeeping instruction below takes:
+
+- **Schemas returned — Task tools available.** Proceed exactly as written: the Task list mirrors the plan for progress display.
+- **Nothing returned — Task tools disabled in this session.** This is the default on Claude Code ≥ 2.1.233 for Opus 4.8, Sonnet 5, Fable 5, Mythos 5 and newer models; the tools only exist when the CLI was started with `CLAUDE_CODE_ENABLE_TODO_TOOLS=1` (read at CLI start — setting it mid-session has no effect). Print exactly one line and continue:
+
+  > Task tools disabled in this session (Claude Code ≥2.1.233 default on newer models; set `CLAUDE_CODE_ENABLE_TODO_TOOLS=1` in the CLI environment — e.g. the `env` block of `settings.json` — and restart to bring them back). Continuing with `implementation_plan.md` checkboxes as the task ledger.
+
+  Translate that line per `prompt.md`'s `doc_language` when it is set to something other than English. **This is never an error and never a stop:** do not ask the user anything, do not abort the stage, do not treat a missing tool as a failed prerequisite — autopilot runs this stage unattended and must keep moving.
+
+**Every instruction below that names a Task tool therefore has two forms** — *(with Task tools)* and *(without Task tools)*. The without-form is not a degraded substitute invented here: the checkbox ledger it uses is the one this skill already treats as authoritative (Phase 2 point 6 writes it; the Phase 3.5 completeness gate reads it). Concretely, without Task tools:
+
+- **Task identity** is the `### Task N` heading and its fields in `implementation_plan.md` (for `size_tier: trivial`, the `- [ ] Task N — ...` line in `notes.md`'s "## Tasks" section) — there is no separate task object to create.
+- **"Create tasks"** means building this run's wave plan in the orchestrator's own working notes from the parsed plan. Nothing is called; every guard in the parse step (e.g. the `Task Type: docs` guard) still applies in full.
+- **"Mark a task complete"** is the per-task checkbox write in Phase 2 point 6 — which is unconditional and runs identically either way.
+- **"Read task state"** is re-reading those checkboxes and the plan's task fields.
+- **Dependency and wave ordering** come from the plan's own dependency fields, exactly as they do with Task tools.
+
 ### Create Tasks from Implementation Plan
 
-**If `size_tier: trivial`:** Parse `notes.md`'s "## Tasks" checklist section and use `TaskCreate` to create one task per unchecked `- [ ] Task N — ...` line:
+**If `size_tier: trivial`:** Parse `notes.md`'s "## Tasks" checklist section and create one task per unchecked `- [ ] Task N — ...` line — *(with Task tools)* via `TaskCreate`, *(without)* as an entry in this run's wave plan in the orchestrator's own notes, keyed by that line:
 
 1. **Extract all unchecked task lines** from `notes.md`'s "## Tasks" section
 2. **Identify dependencies** between tasks (what must be done before what)
@@ -78,7 +97,7 @@ For `size_tier` small/medium/large, read `docs/issues/open/[ACTIVE-ISSUE-ID]/imp
    otherwise. Do not add a `Task Type` to the created task's description for
    this tier.
 
-**If `size_tier` is small/medium/large:** Parse the implementation plan and use `TaskCreate` to create a task for each implementation item:
+**If `size_tier` is small/medium/large:** Parse the implementation plan and create a task for each implementation item — *(with Task tools)* via `TaskCreate`, *(without)* as an entry in this run's wave plan, keyed by the item's `### Task N` heading:
 
 1. **Extract all tasks** from `implementation_plan.md`
 2. **`Task Type: docs` guard — check before creating any tasks.** If any task in `implementation_plan.md` carries `**Task Type:** docs`, stop here and surface it to the user as an unsupported task type: `docs` is reserved and not dispatched by this issue's implementation (matching `~/.claude/skills/pf-impl-plan/SKILL.md`'s own "reserved... not used for delegation in this issue" framing for this value). Do not call `TaskCreate` for any task yet — catching this at plan-parse time, before any wave starts, avoids stranding an already-running wave on an undispatchable task (see Phase 2, "Execution Strategy" point 2 for what would otherwise happen at dispatch time).
@@ -129,6 +148,7 @@ Execute tasks using sub-agents for parallel processing:
    Once the task's effective `Task Type` is known (carried value, or the missing-field fallback above), resolve role — same "resolve role" pattern used elsewhere for whole documents, applied here per task instead — per `~/.claude/skills/pf-roles/SKILL.md` §4, for `code` (or, when the task's `Task Type` is `tests`, for `tests`) to get that task's `write` actor:
    - **`write == claude`** — unchanged: dispatch a Claude sub-agent via the `Agent` tool, exactly as today (TC-013 — this must stay a true no-regression case). See "For Each Task — `write: claude` (Sub-Agent Instructions)" below.
    - **`write != claude`** (in this issue, only `codex`) — the task is not dispatched to a sub-agent at all. The orchestrating `pf-execute` session itself calls the resolved actor's write-invocator per `~/.claude/skills/pf-roles/SKILL.md` §7 (for `codex`: `codex-companion.mjs task "<prompt>" --write`). See "For Each Task — `write != claude` (delegated actor)" below (TC-012).
+   - **Tier and availability.** The role resolved above per §4 also carries a tier (§4's "Resolution output"; bare `write: codex` resolves to `codex`'s `default_tier`, same as any other key). Before dispatching this task — either path — run the Availability check (`~/.claude/skills/pf-roles/SKILL.md` §11) for the resolved actor/tier, applying `prompt.md`'s `on_unavailable` if it reports the actor unavailable. Pass the resolved tier per §9's dispatch mapping: the tier name as the `Agent` tool's `model` parameter for a `write == claude` dispatch, or `--model <tier's model id>` on the `codex-companion.mjs task ... --write` call for a delegated dispatch.
 3. **Run each `write: claude` task in its own sub-agent** - This keeps context usage low (~18% vs ~56%)
 4. **Within a wave, run `write != claude` (Codex-delegated) tasks sequentially, after every `write: claude` sub-agent in that wave has finished, and before that wave's commit — never concurrently with the Claude sub-agents.** Today, Claude sub-agents in a wave run concurrently via the `Agent` tool and never commit themselves — only the orchestrator commits at the wave boundary, specifically to avoid a working-tree race. Codex-delegated tasks go through a different, synchronous channel (`Bash` → `codex-companion.mjs task ... --write`), and the joint safety of that channel running at the same time as parallel `Agent`-tool sub-agents has not been validated in this issue. This ordering is a **temporary simplification for this issue**, not a permanent architectural constraint — cross-channel parallel-safety can be investigated separately once the role matrix is in real use.
 5. **Process waves sequentially** - Wave N+1 starts only after Wave N completes
@@ -146,29 +166,30 @@ Dispatch via the `Agent` tool is unchanged (no regression on that mechanism). Th
 1. Work from the task's full content already included in this dispatch prompt — description, files, the "what counts as done" completion criterion, mapped TCs, and dependencies (the five-element minimum from "Create Tasks from Implementation Plan" above). Never fetch it via `TaskGet` — you do not have access to that tool.
 2. Create/modify specified files
 3. Implement functionality to pass mapped TCs
-4. **Self-verify the implementation:**
+4. **Attribute every test you create or modify for this task**, using the `@pf-issue` marker convention (`~/.claude/skills/pf-test/SKILL.md` Phase 3.2, "Attribution: `@pf-issue` markers"): add a per-test marker comment — `@pf-issue [ISSUE-ID] <this task's mapped TC-IDs>` — directly above each test you touch, in the file's own comment syntax. A test file you create from nothing instead opens with the file-level header marker (`@pf-issue [ISSUE-ID]`, within its first ~10 lines), covering every test in it that carries no marker of its own. Tests belonging to other issues — an existing `@pf-issue` marker naming a different ISSUE-ID — are left exactly as found: do not add, remove, or edit them.
+5. **Self-verify the implementation:**
    - Check that code compiles/runs without errors
    - Verify the functionality matches test expectations
    - Ensure design consistency with existing patterns
-5. Return a completion summary as your final message, briefly describing what was done. Do not call `TaskUpdate` — you do not have access to that tool either. The orchestrator reads this final-message summary and calls `TaskUpdate` itself (see "Execution Strategy" point 6 above).
-6. Note any deviations, concerns, or discovered issues in that same final-message summary.
+6. Return a completion summary as your final message, briefly describing what was done. Do not call `TaskUpdate` — you do not have access to that tool either. The orchestrator reads this final-message summary and calls `TaskUpdate` itself (see "Execution Strategy" point 6 above).
+7. Note any deviations, concerns, or discovered issues in that same final-message summary.
 
 **Numbering-mismatch immunity (AC-6.3).** The dispatch prompt above always includes the task's full content — description, files, completion criterion, mapped TCs, dependencies — never a bare task number or identifier alone. This explicitly covers the case where the orchestrator's own internal wave/task dispatch numbering does not match `implementation_plan.md`'s own `Task N` labels: a sub-agent must never be told to go look up "Task 3" by number alone, because that numbering does not always match, and doing so risks executing the wrong task entirely (the exact failure `prompt.md` item 7's second paragraph describes).
 
 ### For Each Task — `write != claude` (delegated actor)
 Not a sub-agent dispatch. The **orchestrating `pf-execute` session itself** performs every step below — sequentially, per delegated task, at the point in the wave described in "Execution Strategy" point 4 above:
 
-1. The orchestrator uses `TaskGet` **itself** (it has this tool as orchestrator — it is the session that ran `TaskCreate` in Phase 1) to read the task's full details. It does not ask the delegated actor to do this.
-2. It builds the write-invocation prompt from: the task's description (from step 1), the relevant slice of `implementation_plan.md` (this task plus its immediate context — dependencies, adjacent tasks), and repo context — targeting the same file(s)/scope a Claude sub-agent would have gotten for this same task (TC-012).
+1. The orchestrator reads the task's full details **itself** — *(with Task tools)* via `TaskGet`, which it holds as orchestrator, being the session that ran `TaskCreate` in Phase 1; *(without)* by re-reading that task's `### Task N` block in `implementation_plan.md`. Either way it does not ask the delegated actor to do this.
+2. It builds the write-invocation prompt from: the task's description (from step 1), the relevant slice of `implementation_plan.md` (this task plus its immediate context — dependencies, adjacent tasks), and repo context — targeting the same file(s)/scope a Claude sub-agent would have gotten for this same task (TC-012). This prompt states the same test-attribution requirement given to a `write: claude` sub-agent (see "For Each Task — `write: claude`" step 4 above, verbatim in substance): every test the delegated actor creates or modifies for this task carries an `@pf-issue [ISSUE-ID] <this task's mapped TC-IDs>` marker comment directly above it (or, for a brand-new test file, a file-level header marker within its first ~10 lines) — per the `@pf-issue` convention in `~/.claude/skills/pf-test/SKILL.md` Phase 3.2 — and any existing marker naming a different ISSUE-ID on a test the actor is not otherwise changing is left untouched.
 3. It calls the resolved actor's write-invocator per `~/.claude/skills/pf-roles/SKILL.md` §7 — for `codex`: `codex-companion.mjs task "<prompt>" --write` (synchronous, for a small/targeted one-or-two-file task) or the `--write --background` + polling form (for a task creating several files from nothing) — the same sync/async judgment call §7 describes.
-4. After the call returns, the orchestrator judges completion **itself**, from the command's result and the actual file state on disk (re-read the target file(s), confirm they match what the task asked for) — never from a completion claim the delegated actor might make in its own output.
-5. The orchestrator itself calls `TaskUpdate` to mark the task complete, with a brief summary of what was done. The delegated actor never calls `TaskUpdate` — it has no access to it.
+4. After the call returns, the orchestrator judges completion **itself**, from the command's result and the actual file state on disk (re-read the target file(s), confirm they match what the task asked for, including that any test file touched carries its `@pf-issue` marker per step 2) — never from a completion claim the delegated actor might make in its own output.
+5. The orchestrator itself marks the task complete, with a brief summary of what was done — *(with Task tools)* by calling `TaskUpdate`; *(without)* by the Phase 2 point 6 checkbox write alone, which happens either way. The delegated actor never calls `TaskUpdate` — it has no access to it, and in a session where the tools are disabled neither does the orchestrator.
 6. Note any deviations, concerns, or discovered issues the same way as for a `write: claude` task (see "If Issues Are Discovered" below).
 
 **Why the orchestrator, not the actor, reads and marks the task.** Historically the `write: claude` path (above) instructed the dispatched Claude sub-agent to call `TaskGet` as its first action and `TaskUpdate` as its last. Per `prompt.md`'s "Учесть при реализации" note (2026-08-06, see also `20260806-improve-codereview-convergence` item 7), that channel does not work in practice: sub-agents were confirmed (via `ToolSearch`, on two separate test sub-agents) to have no access to `TaskGet`/`TaskUpdate` at all. **That breakage is now fixed** — `20260806-improve-codereview-convergence` rewrote those two steps (see the `write: claude` block above: the sub-agent works from the task content already in its dispatch prompt, and returns a completion summary the orchestrator reads before calling `TaskUpdate` itself). Both paths therefore now agree on who holds these tools, and both reach the same place from different directions: a Codex actor invoked via `codex-companion.mjs` is not a Claude sub-agent at all, and has no access to these framework tools whatsoever — not merely "unavailable from sub-agent context" the way the `write: claude` case turned out to be, but genuinely inapplicable, since it isn't a Claude Code sub-agent in the first place. The orchestrating `pf-execute` session already holds `TaskGet`/`TaskUpdate` access (it is what called `TaskCreate` in Phase 1), so for delegated tasks it reads the task before the call and marks it complete after the call returns, instead of asking the actor to do either.
 
 ### If Issues Are Discovered
-- Use `TaskCreate` to add new fix/bug tasks
+- Add new fix/bug tasks — *(with Task tools)* via `TaskCreate`; *(without)* by appending them to `implementation_plan.md` (a `### Task N` block with the same mandatory fields) and to this run's wave plan
 - Set appropriate dependencies so fixes run in correct order
 - Continue with other independent tasks
 
@@ -180,7 +201,9 @@ Before reporting, run `git status --porcelain`. If anything is still uncommitted
 
 ## Phase 3.5: Completeness Gate (blocking, before the completion report)
 
-Before providing the report below, run these checks — mechanical, deterministic scans of `implementation_plan.md` and `test_plan.md`'s Status Tracker, never a matter of judgment about whether coverage looks adequate. This gate belongs only here: per US-4 it is an output gate on *handing this stage's work off* to `/pf-codereview` — not an input gate `/pf-codereview` itself runs — so `/pf-codereview` does not repeat it. **Every check below is a hard stop.** A failing check blocks reporting this stage complete — noting the gap in the summary and moving on anyway is not an option here; that is exactly what did not hold in the source incident (`20260709-feat-dockerize`, finding 4).
+Before providing the report below, run these checks — mechanical, deterministic scans of `implementation_plan.md`, `test_plan.md`'s Status Tracker, and (Check 4) the test files this issue's branch touches, never a matter of judgment about whether coverage looks adequate. This gate belongs only here: per US-4 it is an output gate on *handing this stage's work off* to `/pf-codereview` — not an input gate `/pf-codereview` itself runs — so `/pf-codereview` does not repeat it. **Every check below is a hard stop.** A failing check blocks reporting this stage complete — noting the gap in the summary and moving on anyway is not an option here; that is exactly what did not hold in the source incident (`20260709-feat-dockerize`, finding 4).
+
+**`implementation_plan.md`'s checkboxes are the only completion ledger this gate reads.** Checks 1-4 below scan the plan, `test_plan.md`'s Status Tracker, and the branch's test files — never the Task list, which is a progress mirror when Task tools are enabled and absent entirely when they are not. That is why this gate behaves identically in both kinds of session, and why the per-task checkbox write in Phase 2 point 6 is unconditional.
 
 **Check 1 — every plan checkbox is done (AC-4.1), scoped to Auto TCs.** Mechanically scan `implementation_plan.md` for any remaining `- [ ]` line. For each one found, extract every `TC-\d+` literal it names and look up each one's `Type` column in `test_plan.md`'s Status Tracker (the same cross-reference the reverse-direction check below also uses). This is fail-closed: a still-unchecked line blocks this gate unless it names at least one TC-ID AND every TC-ID it names satisfies all three of — (a) it has a row in the Status Tracker at all, (b) that row's `Type` column is present and non-empty, and (c) that `Type` is exactly `Manual`. Concretely, each of the following still blocks: the line names no TC-ID at all; a named TC-ID has no Status Tracker row (a typo, a rename, or a fabricated ID such as `TC-999`); a named TC-ID's `Type` column is missing or empty; or the line names a mix of `Manual` and non-`Manual` (including `Auto`) TC-IDs together. The single exception — the only shape of unchecked line this check lets through — is one where every TC-ID it names exists in the tracker and every one of them is `Type: Manual` (this plan's own TC-027/TC-009/TC-019/TC-020 lines close only after a live run held post-`/pf-execute`), since Manual TCs close later via `/pf-test`'s manual checklist / `/pf-manual-test`, never here. The carve-out is narrow by construction — one mechanical table lookup per named TC-ID, never "any unchecked line is fine." **This check only works because of the per-task checkbox-write step added to Phase 2, "Execution Strategy" point 6 above — run Check 1 only after every wave has already gone through that write step.** A remaining Auto-TC `- [ ]` found after that point names a genuinely unfinished task; a gate that instead read its own successful writes as still-missing would be a false block, not a real gap.
 
@@ -190,7 +213,9 @@ Before providing the report below, run these checks — mechanical, deterministi
 
 **Check 3 — every TC has a task, reverse direction (AC-4.3).** For every TC row in `test_plan.md`'s Status Tracker, at least one task's `**Mapped Test Cases:**` field in `implementation_plan.md` must name it — a mention anywhere else in the plan's prose does not count. Every test case is mapped to a task via that field, or Check 3 blocks. This is a different gap from Check 2/2b (a requirement nobody picked up, not a task nobody tested) and does not substitute for either.
 
-Every check above is a mechanical, deterministic scan or table lookup — none of them is phrased as "use your judgment whether coverage looks adequate," and none should ever become one.
+**Check 4 — every test file touched by this issue carries `@pf-issue [ISSUE-ID]`** (backing task: this week's plan item on test-to-issue attribution — no BRD/AC ids of its own to cite here). Mechanical: for each file in `git diff --name-only <parent-branch>...HEAD` (the parent branch named in "Commit issue documentation to the current (parent) branch first" above) that looks like a test file per `~/.claude/skills/pf-test/SKILL.md` 3.1's own definition (path/name contains `test`, `spec`, or `__tests__`, or its extension matches `.test.*`, `.spec.*`, `_test.*`), grep it for the literal string `@pf-issue [ISSUE-ID]`. A file with no match is a hard stop, naming the file: a test file this issue touched but left with no `@pf-issue` marker anywhere in it leaves every test in that file unattributed, which is exactly the identification gap this check closes. This is a different concern from Checks 1-3 (which cross-reference `implementation_plan.md`'s own TC mapping): it is a property of the test files themselves, read directly, not of the plan document.
+
+Every check above is a mechanical, deterministic scan, grep, or table lookup — none of them is phrased as "use your judgment whether coverage looks adequate," and none should ever become one.
 
 After all tasks are complete, and the completeness gate above passes, provide:
 
@@ -214,7 +239,7 @@ After all tasks are complete, and the completeness gate above passes, provide:
 ## Important Notes
 
 - **Do NOT run full test suite** - that's the next step
-- **`TaskList` is for high-level wave/task-count bookkeeping only** (e.g. "how many tasks remain in this wave"), not per-task completion tracking — per Phase 2 point 6 above, `TaskList`/`TaskGet` does not reflect real completion for `write: claude` tasks; only each sub-agent's own final summary does.
+- **The Task list, when it exists at all, is a mirror — never a ledger.** `TaskList` is for high-level wave/task-count bookkeeping only (e.g. "how many tasks remain in this wave"), never per-task completion tracking, and in a session where Task tools are disabled (see "Task-tool availability" in Phase 1) there is no list at all — which changes nothing about how this stage runs.
 - **Dependencies are critical** - ensure tasks don't start before their blockers complete
 - **Keep sub-agent context focused** - each sub-agent only needs info for its specific task
 - **Commits happen at wave boundaries, run by the orchestrator only** - never inside a parallel task sub-agent, and never inside a delegated (`write != claude`) actor call either. This is the only point in the pipeline where code (as opposed to planning docs) gets committed, so don't skip it even for a single-wave plan.

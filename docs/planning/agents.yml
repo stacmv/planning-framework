@@ -1,5 +1,23 @@
 actors:
-  claude: { kind: llm, invoke: agent,  model: claude-sonnet-5 }
-  haiku:  { kind: llm, invoke: agent,  model: claude-haiku-4-5-20251001 }
-  codex:  { kind: llm, invoke: codex-companion }
-  gemini: { kind: llm, invoke: cli,    command: "gemini -p {prompt}" }
+  claude:
+    kind: llm
+    invoke: agent
+    tiers: { fable: claude-fable-5, opus: claude-opus-4-8, sonnet: claude-sonnet-5, haiku: claude-haiku-4-5-20251001 }
+    default_tier: sonnet
+    degrade: [fable, opus, sonnet, haiku]    # highest -> lowest; degrade-tier moves right
+  codex:
+    kind: llm
+    invoke: codex-companion
+    tiers: { sol: gpt-5.6-sol, terra: gpt-5.6-terra, luna: gpt-5.6-luna }
+    default_tier: sol
+    degrade: [sol, terra, luna]              # highest -> lowest; degrade-tier moves right
+  haiku:  { kind: llm, invoke: agent, alias: "claude:haiku" }   # legacy alias, resolves to claude:haiku
+  gemini: { kind: llm, invoke: cli, command: "gemini -p {prompt}" }
+executors:   # aibudget executor name -> actor:tier; optional, used only when `aibudget` is on PATH
+  fable: claude:fable
+  opus: claude:opus
+  sonnet: claude:sonnet
+  haiku: claude:haiku
+  codex-sol: codex:sol
+  codex-terra: codex:terra
+  codex-luna: codex:luna
