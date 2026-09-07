@@ -1,14 +1,17 @@
-// TC-012 — strictly read-only: an exhaustive inventory of every mutating
+// TC-032 — strictly read-only: an exhaustive inventory of every mutating
 // action.
 //
 // The whole promise of this tool is "it reads everything, it changes exactly
-// three things": checklist marks/notes, a branch checkout on confirmation,
-// and preparing a test case's data. This suite verifies that promise from
-// two directions:
+// five things": checklist marks/notes, a branch checkout on confirmation,
+// preparing a test case's data, completing a human task (an append-only
+// marker line in the issue's own session-log.md), and reassigning a human
+// task's write actor (a single-substring point-edit of the issue's own
+// prompt.md, plus the same append-only session-log.md marker). This suite
+// verifies that promise from two directions:
 //
 //  1. Source inventory (no server involved): every `req.method === "..."`
 //     check inside `handleApi` in server.js is read straight from the file,
-//     not copied into this suite, so a fourth mutating route added anywhere
+//     not copied into this suite, so a seventh mutating route added anywhere
 //     in that function is caught even if nobody updates this test. Likewise
 //     `lib/git.js` is scanned for the literal argument arrays it passes to
 //     `git`, so a `commit`/`push`/`merge`/`reset`/`clean` slipping in (or a
@@ -16,11 +19,17 @@
 //  2. Behaviour (a real server, a real git repository): every existing
 //     non-GET route is fired at every pipeline document — project-level and
 //     per-issue — with the document's own name in the body, and the whole
-//     repository tree is fingerprinted before and after. Then the three
+//     repository tree is fingerprinted before and after. Then the five
 //     permitted actions are exercised for real and each is shown to touch
 //     only what it is supposed to: the checklist file, the checked-out
-//     issue's own directory, or nothing in the repository at all (prepare
-//     writes outside it, in the OS temp dir).
+//     issue's own directory, nothing in the repository at all (prepare
+//     writes outside it, in the OS temp dir), or — for reassign — exactly
+//     its own issue's prompt.md and session-log.md (its one deliberate
+//     exception to "no route writes a pipeline document", scoped by this
+//     same whole-tree fingerprint). Human-task completion and reassignment
+//     also have their own dedicated coverage in
+//     test/human-task-complete.test.js and test/human-tasks.test.js
+//     respectively — this file adds only the whole-tree scoping check.
 //
 // Run: node --test tools/manual-test-ui/test/readonly.test.js
 "use strict";
@@ -57,7 +66,7 @@ const DECLARED = "20260109-feat-fixture-declared";
 // Step 1 — the route inventory, read from the source
 // ---------------------------------------------------------------------------
 
-test("TC-012 step 1: server.js has exactly three non-GET route families, nowhere else", () => {
+test("TC-032 step 1: server.js has exactly five non-GET route families, nowhere else", () => {
   const src = fs.readFileSync(SERVER_PATH, "utf8");
 
   const startMarker = "async function handleApi(";
@@ -97,12 +106,13 @@ test("TC-012 step 1: server.js has exactly three non-GET route families, nowhere
   const methods = [...handleApiSrc.matchAll(/req\.method\s*===\s*"([A-Z]+)"/g)].map((m) => m[1]);
   const nonGet = methods.filter((m) => m !== "GET");
 
-  // The four routes this tool is allowed to mutate anything through, grouped
-  // into the three families the implementation plan and TC-012 name. Matched
+  // The six route checks this tool is allowed to mutate anything through,
+  // grouped into the five families the implementation plan and TC-032 name
+  // (checklist marks/notes count as one family, two route checks). Matched
   // by the exact path-segment conditions they sit behind, not just by verb,
   // so a same-verb same-count route added under a different name still fails
   // an assertion below (its own regex simply won't be found, or the total
-  // count of non-GET checks will exceed 4).
+  // count of non-GET checks will exceed 6).
   const expectedRoutes = [
     {
       family: "checklist marks (PATCH .../checklist/steps)",
@@ -120,6 +130,14 @@ test("TC-012 step 1: server.js has exactly three non-GET route families, nowhere
       family: "prepare a test case (POST .../issues/:id/prepare)",
       re: /parts\[5\]\s*===\s*"prepare"\s*&&\s*req\.method\s*===\s*"POST"/,
     },
+    {
+      family: "human-task completion (POST .../human-tasks/:key/complete)",
+      re: /parts\[5\]\s*===\s*"human-tasks"\s*&&\s*parts\[7\]\s*===\s*"complete"\s*&&\s*req\.method\s*===\s*"POST"/,
+    },
+    {
+      family: "human-task reassignment (POST .../human-tasks/:key/reassign)",
+      re: /parts\[5\]\s*===\s*"human-tasks"\s*&&\s*parts\[7\]\s*===\s*"reassign"\s*&&\s*req\.method\s*===\s*"POST"/,
+    },
   ];
 
   for (const route of expectedRoutes) {
@@ -129,13 +147,13 @@ test("TC-012 step 1: server.js has exactly three non-GET route families, nowhere
   assert.strictEqual(
     nonGet.length,
     expectedRoutes.length,
-    `expected exactly ${expectedRoutes.length} non-GET route checks (three families: checklist marks/notes, ` +
-      `branch checkout, prepare), found ${nonGet.length}: [${nonGet.join(", ")}]. ` +
-      "A new one has appeared, or one of the expected ones changed verb."
+    `expected exactly ${expectedRoutes.length} non-GET route checks (five families: checklist marks/notes, ` +
+      `branch checkout, prepare, human-task completion, human-task reassignment), found ${nonGet.length}: ` +
+      `[${nonGet.join(", ")}]. A new one has appeared, or one of the expected ones changed verb.`
   );
   assert.deepStrictEqual(
     [...nonGet].sort(),
-    ["PATCH", "PATCH", "POST", "POST"],
+    ["PATCH", "PATCH", "POST", "POST", "POST", "POST"],
     `unexpected verb mix among the non-GET routes: [${nonGet.join(", ")}]`
   );
 });
@@ -144,7 +162,7 @@ test("TC-012 step 1: server.js has exactly three non-GET route families, nowhere
 // Step 4 — git operations available to the server
 // ---------------------------------------------------------------------------
 
-test("TC-012 step 4: lib/git.js only ever runs read-only git commands, plus a plain checkout", () => {
+test("TC-032 step 4: lib/git.js only ever runs read-only git commands, plus a plain checkout", () => {
   const src = fs.readFileSync(GIT_LIB_PATH, "utf8");
 
   const callRe = /tryGit\(cwd,\s*\[([^\]]*)\]\)/g;
@@ -159,7 +177,7 @@ test("TC-012 step 4: lib/git.js only ever runs read-only git commands, plus a pl
   const subcommands = new Set(literalArgsPerCall.map((args) => args[0]));
   assert.deepStrictEqual(
     [...subcommands].sort(),
-    ["checkout", "ls-tree", "rev-parse", "show", "status"].sort(),
+    ["checkout", "config", "diff", "ls-tree", "rev-list", "rev-parse", "show", "status"].sort(),
     `lib/git.js invokes a different set of git subcommands than expected: [${[...subcommands].sort().join(", ")}]`
   );
 
@@ -236,7 +254,7 @@ function buildDocInventory(repo, memRoot) {
   };
 }
 
-test("TC-012 steps 2-3, 5: no existing route can write a pipeline document, and the whole tree proves it", async (t) => {
+test("TC-032 steps 2-3, 5: no existing route can write a pipeline document, and the whole tree proves it", async (t) => {
   const repo = fixtures.makeTempRepo({ issues: [FULL], name: "readonly-negative" });
   const memRoot = fixtures.makeMemoryRoot();
   memRoot.addProject({ projectPath: repo.root });
@@ -265,12 +283,19 @@ test("TC-012 steps 2-3, 5: no existing route can write a pipeline document, and 
     }
   }
 
-  // --- attack B: use the four *real* mutating routes, but aim their bodies
-  // at the pipeline documents by name. Structurally these routes never read
-  // a path from the request (checklist writes always target the resolved
-  // issue's own manual_test_checklist.md, checkout's branch is server-
-  // resolved, prepare's script location is assembled from validated ids) —
-  // this proves that holds by trying anyway.
+  // --- attack B: use the four *real* mutating routes that can never touch a
+  // pipeline document by construction, but aim their bodies at the pipeline
+  // documents by name anyway. Structurally these routes never read a path
+  // from the request (checklist writes always target the resolved issue's
+  // own manual_test_checklist.md, checkout's branch is server-resolved,
+  // prepare's script location is assembled from validated ids) — this proves
+  // that holds by trying anyway. Human-task reassignment is deliberately
+  // NOT exercised here: it is the one route that legitimately writes a
+  // pipeline document (its own issue's prompt.md) by design (AC-05g) — a
+  // successful call would correctly fail this test's whole-tree
+  // `assertSameSnapshot` below, so its scoping (prompt.md + session-log.md,
+  // nothing else) gets its own dedicated positive-control check instead
+  // (TC-032 step 6e, further down).
   const base = `/api/projects/main/issues/${FULL}/checklist`;
   for (const evilId of ["brd.md", "PLANNING.md", "../../../etc/passwd", "../brd.md"]) {
     const stepsRes = await server.patch(`${base}/steps`, { tcId: evilId, step: 1, checked: true, note: "PWNED" });
@@ -304,7 +329,7 @@ test("TC-012 steps 2-3, 5: no existing route can write a pipeline document, and 
   assertSameSnapshot(memBefore, snapshot(memRoot.root), "memory root changed after read-only attempts");
 });
 
-test("TC-012: each mutating action requires either an explicit body or (for checkout) a precondition it cannot fake", async (t) => {
+test("TC-032: each mutating action requires either an explicit body or (for checkout) a precondition it cannot fake", async (t) => {
   const repo = fixtures.makeTempRepo({ issues: [FULL, ONBRANCH], name: "readonly-gating" });
   const config = fixtures.makeConfig({ projects: [{ name: "main", path: repo.root, defaultBranch: repo.defaultBranch }] });
   const server = await startServerFor(t, { configPath: config.configPath });
@@ -344,7 +369,7 @@ test("TC-012: each mutating action requires either an explicit body or (for chec
 // Step 6 — positive control: the three permitted actions, each scoped
 // ---------------------------------------------------------------------------
 
-test("TC-012 step 6a: checklist marks and notes change only manual_test_checklist.md", async (t) => {
+test("TC-032 step 6a: checklist marks and notes change only manual_test_checklist.md", async (t) => {
   const repo = fixtures.makeTempRepo({ issues: [FULL], name: "readonly-positive-checklist" });
   const config = fixtures.makeConfig({ projects: [{ name: "main", path: repo.root, defaultBranch: repo.defaultBranch }] });
   const server = await startServerFor(t, { configPath: config.configPath });
@@ -369,7 +394,7 @@ test("TC-012 step 6a: checklist marks and notes change only manual_test_checklis
   );
 });
 
-test("TC-012 step 6b: checkout on confirmation only ever brings in that issue's own branch content", async (t) => {
+test("TC-032 step 6b: checkout on confirmation only ever brings in that issue's own branch content", async (t) => {
   const repo = fixtures.makeTempRepo({ issues: [ONBRANCH], name: "readonly-positive-checkout" });
   const config = fixtures.makeConfig({ projects: [{ name: "main", path: repo.root, defaultBranch: repo.defaultBranch }] });
   const server = await startServerFor(t, { configPath: config.configPath });
@@ -397,7 +422,7 @@ test("TC-012 step 6b: checkout on confirmation only ever brings in that issue's 
   );
 });
 
-test("TC-012 step 6c: preparing a test case never touches the repository at all", async (t) => {
+test("TC-032 step 6c: preparing a test case never touches the repository at all", async (t) => {
   const repo = fixtures.makeTempRepo({ issues: [DECLARED], name: "readonly-positive-prepare" });
   const config = fixtures.makeConfig({ projects: [{ name: "main", path: repo.root, defaultBranch: repo.defaultBranch }] });
   const server = await startServerFor(t, {
@@ -419,4 +444,147 @@ test("TC-012 step 6c: preparing a test case never touches the repository at all"
   assert.ok(fs.existsSync(path.join(workdir, "case-a", "input.txt")), "expected prepared data outside the repo");
 
   assertSameSnapshot(before, snapshotWorkingTree(repo.root), "the repository changed after a prepare run");
+});
+
+// The agents.yml every fixture below needs to resolve "human" and "claude" as
+// known actors — the same shape human-task-complete.test.js and
+// human-tasks.test.js already use.
+const HUMAN_TASK_AGENTS_YML = ["actors:", "  human: { kind: human }", ""].join("\n");
+
+test("TC-032 step 6d: completing a human task (write/doc path) changes only session-log.md", async (t) => {
+  const issueId = "20260115-feat-fixture-complete";
+  const brdContent = "# BRD — complete fixture\n\nReal body beyond the heading, not a stub.\n";
+  const promptMd = [
+    "---",
+    "doc_language: English",
+    "size_tier: medium",
+    "roles:",
+    "  brd: { write: human }",
+    "---",
+    "",
+    `# ${issueId}`,
+    "",
+    "Type: feat. Fixture for TC-032 step 6d.",
+    "",
+  ].join("\n");
+
+  const repo = fixtures.makeTempRepo({
+    name: "readonly-positive-complete",
+    issues: [],
+    extraFiles: {
+      [`docs/issues/open/${issueId}/prompt.md`]: promptMd,
+      [`docs/issues/open/${issueId}/brd.md`]: brdContent,
+      "docs/planning/agents.yml": HUMAN_TASK_AGENTS_YML,
+    },
+  });
+  const config = fixtures.makeConfig({ projects: [{ name: "main", path: repo.root, defaultBranch: repo.defaultBranch }] });
+  const server = await startServerFor(t, { configPath: config.configPath });
+
+  // brd.md is already committed by makeTempRepo's initial commit, so the
+  // route's own write (an append-only session-log.md marker — it never
+  // rewrites the artifact, only reads and hashes it) is the only thing this
+  // snapshot window can see.
+  const before = snapshotWorkingTree(repo.root);
+
+  const res = await server.post(`/api/projects/main/issues/${issueId}/human-tasks/brd/complete`, {});
+  assert.strictEqual(res.status, 200, `complete failed: ${res.text}`);
+  assert.strictEqual(res.json.status, "done");
+
+  const after = snapshotWorkingTree(repo.root);
+  const diff = diffSnapshots(before, after);
+  assert.deepStrictEqual(diff.removed, [], `complete must not delete anything: ${formatDiff(diff)}`);
+  assert.deepStrictEqual(diff.changed, [], `complete must not rewrite existing files: ${formatDiff(diff)}`);
+  assert.deepStrictEqual(
+    diff.added,
+    [`docs/issues/open/${issueId}/session-log.md`],
+    `expected only session-log.md to appear: ${formatDiff(diff)}`
+  );
+});
+
+test("TC-032 step 6e: reassigning a human task's write actor changes only prompt.md (write: substring) and session-log.md", async (t) => {
+  const issueId = "20260116-feat-fixture-reassign";
+  const promptMd = [
+    "---",
+    "doc_language: English",
+    "size_tier: medium",
+    "roles:",
+    "  specs: { write: human, review: [claude] }",
+    "---",
+    "",
+    `# ${issueId}`,
+    "",
+    "Type: feat. Fixture for TC-032 step 6e.",
+    "",
+  ].join("\n");
+
+  const repo = fixtures.makeTempRepo({
+    name: "readonly-positive-reassign",
+    issues: [],
+    extraFiles: {
+      [`docs/issues/open/${issueId}/prompt.md`]: promptMd,
+      "docs/planning/agents.yml": HUMAN_TASK_AGENTS_YML,
+    },
+  });
+  const config = fixtures.makeConfig({ projects: [{ name: "main", path: repo.root, defaultBranch: repo.defaultBranch }] });
+  const server = await startServerFor(t, { configPath: config.configPath });
+
+  const promptAbs = path.join(repo.root, "docs", "issues", "open", issueId, "prompt.md");
+  const promptBefore = fs.readFileSync(promptAbs, "utf8");
+  const before = snapshotWorkingTree(repo.root);
+
+  const res = await server.post(`/api/projects/main/issues/${issueId}/human-tasks/specs/reassign`, { actor: "claude" });
+  assert.strictEqual(res.status, 200, `reassign failed: ${res.text}`);
+  assert.deepStrictEqual(res.json, { status: "reassigned", actor: "claude" });
+
+  // The point-edit changes exactly the write: substring — everything else on
+  // the line, and the rest of the file, is byte-identical.
+  assert.strictEqual(
+    fs.readFileSync(promptAbs, "utf8"),
+    promptBefore.replace("write: human", "write: claude"),
+    "reassign must change only the write: substring of roles.specs"
+  );
+
+  const after = snapshotWorkingTree(repo.root);
+  const diff = diffSnapshots(before, after);
+  assert.deepStrictEqual(diff.removed, [], `reassign must not delete anything: ${formatDiff(diff)}`);
+  assert.deepStrictEqual(
+    diff.changed,
+    [`docs/issues/open/${issueId}/prompt.md`],
+    `expected only prompt.md to change: ${formatDiff(diff)}`
+  );
+  assert.deepStrictEqual(
+    diff.added,
+    [`docs/issues/open/${issueId}/session-log.md`],
+    `expected only session-log.md to appear: ${formatDiff(diff)}`
+  );
+});
+
+// ---------------------------------------------------------------------------
+// Client-side note — no actor-picker wizard outside the one hand-off action
+// ---------------------------------------------------------------------------
+
+test("TC-032 note: public/*.js carries no actor-picker wizard outside the single hand-off action (AC-05j)", () => {
+  const publicDir = path.join(TOOL_DIR, "public");
+  const files = fs.readdirSync(publicDir).filter((f) => f.endsWith(".js"));
+  assert.ok(files.length > 0, "no public/*.js files found — has the client moved?");
+
+  // Reassignment stays a manual prompt.md edit everywhere except the single
+  // "hand off to agent" action (AC-05j) — the client is never supposed to
+  // offer a general-purpose actor-selection wizard standing in for it. The
+  // human-tasks/reassign UI itself (Tasks 15/23/24) doesn't exist yet when
+  // this check is written, so today it can only confirm the absence holds;
+  // it stays in place so a future actor-picker is caught if it isn't scoped
+  // to that one action.
+  const wizardRe = /actor[-\s]?picker|pick[-\s]?an?[-\s]?actor|select[-\s]?an?[-\s]?actor|choose[-\s]?an?[-\s]?actor/i;
+  const handOffRe = /hand[-\s]?off/i;
+
+  for (const file of files) {
+    const src = fs.readFileSync(path.join(publicDir, file), "utf8");
+    const wizardMatch = wizardRe.exec(src);
+    if (!wizardMatch) continue;
+    assert.ok(
+      handOffRe.test(src),
+      `${file} appears to contain an actor-picker wizard ("${wizardMatch[0]}") outside the single hand-off action (AC-05j) it is supposed to be scoped to`
+    );
+  }
 });

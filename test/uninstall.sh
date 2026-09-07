@@ -1,7 +1,9 @@
 #!/usr/bin/env bash
 # PF3 global uninstaller: removal is isolated under a fresh temporary HOME.
 
-set -euo pipefail
+# No pipefail — see the note above `set -u` in test/lib.sh: an early-exiting
+# reader SIGPIPEs its writer, and pipefail turns that into a false failure.
+set -eu
 
 # shellcheck source=test/lib.sh
 . "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)/lib.sh"

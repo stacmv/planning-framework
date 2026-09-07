@@ -147,7 +147,7 @@ Criteria этого раздела)
 - §4, раздел `### kind: human and code: skip during resolution` — обновить формулировку: `kind: human` больше не «hard-stop condition» в смысле ошибки резолвинга; переформулировать как «структурированный результат, требующий обработки вызывающим кодом», сохранив соседний абзац про `code: skip` без изменений (это по-прежнему настоящий hard-stop).
 
 **Acceptance Criteria:**
-- [ ] TC-027 passes (шаги 1-3 — hard-stop removed, default `agents.yml` entry; шаг 4 требует `lib/roles-resolve.js`, см. Задачу 4)
+- [x] TC-027 passes (шаги 1-3 — hard-stop removed, default `agents.yml` entry; шаг 4 требует `lib/roles-resolve.js`, см. Задачу 4; покрыто `test/pf-roles-human-actor.sh`)
 
 ---
 
@@ -168,7 +168,7 @@ Criteria этого раздела)
 - Это markdown-skill-native алгоритм: `pf-close` выполняет его сам через Read/Bash, без обращения к `tools/manual-test-ui` (который опциональный dev-инструмент со своим `projects.json`) и без JS.
 
 **Acceptance Criteria:**
-- [ ] TC-028 passes (часть про `/pf-close` Phase 0)
+- [x] TC-028 passes (часть про `/pf-close` Phase 0; покрыто `test/pf-roles-human-actor.sh`)
 
 ---
 
@@ -185,7 +185,7 @@ Criteria этого раздела)
 - Добавить явную обработку в Step 2, рядом с существующими пунктами 1-5 (пункт 1 уже упоминает `/pf-close` как одну из стадий цикла) — не отдельный новый Step.
 
 **Acceptance Criteria:**
-- [ ] TC-028 passes (часть про `/pf-autopilot`)
+- [x] TC-028 passes (часть про `/pf-autopilot`; покрыто `test/pf-roles-human-actor.sh`)
 
 ---
 
@@ -216,9 +216,9 @@ Criteria этого раздела)
 - Экспортировать отдельно переиспользуемые примитивы (парсинг одной flow-строки в объект, парсинг списка) — понадобятся `POST .../reassign` (Задача 25) для построчной замены, хотя сама замена там текстовая, не через этот парсер.
 
 **Acceptance Criteria:**
-- [ ] TC-021 passes
-- [ ] TC-022 passes
-- [ ] TC-027 passes (шаг 4 — резолвинг `human: { kind: human, inbox: project-explorer }` возвращает `{ kind: "human", inbox: "project-explorer" }`, без исключения)
+- [x] TC-021 passes
+- [x] TC-022 passes
+- [x] TC-027 passes (шаг 4 — резолвинг `human: { kind: human, inbox: project-explorer }` возвращает `{ kind: "human", inbox: "project-explorer" }`, без исключения)
 
 ---
 
@@ -237,8 +237,8 @@ Criteria этого раздела)
 - Негативный кейс (TC-022): fixture `prompt.md` с одним `<key>` в multi-line block-стиле — парсер не бросает необработанное исключение, результат для этого ключа не содержит вымышленных `write`/`review`.
 
 **Acceptance Criteria:**
-- [ ] TC-021 passes
-- [ ] TC-022 passes
+- [x] TC-021 passes
+- [x] TC-022 passes
 
 ---
 
@@ -259,8 +259,8 @@ Criteria этого раздела)
 - Human-задачи (`humanTasks[]`) — не в этой задаче, см. Задача 7 (зависит от Задачи 4, `lib/roles-resolve.js`).
 
 **Acceptance Criteria:**
-- [ ] TC-016 passes (часть про `manualTests[]`)
-- [ ] TC-017 passes
+- [x] TC-016 passes (часть про `manualTests[]`)
+- [x] TC-017 passes
 
 ---
 
@@ -281,9 +281,9 @@ Criteria этого раздела)
 - Один эндпоинт обслуживает и глобальный экран инбокса (Задача 15), и project-scoped счётчик «Дела» на уровне 2 (Задача 25) — клиент фильтрует один и тот же ответ по `project`, повторного запроса не требуется (`specs.md` §3.4).
 
 **Acceptance Criteria:**
-- [ ] TC-016 passes
-- [ ] TC-020 passes (обязательные поля `humanTasks[]`)
-- [ ] TC-025 passes (пересчёт stale при построении инбокса)
+- [x] TC-016 passes
+- [x] TC-020 passes (обязательные поля `humanTasks[]`)
+- [x] TC-025 passes (пересчёт stale при построении инбокса)
 
 ---
 
@@ -300,9 +300,9 @@ Criteria этого раздела)
 - Проверить форму ответа, `totalCount`, обязательность и непустоту `issueId` в каждом элементе `manualTests[]`, серверный лог-предупреждение для повреждённой строки (TC-017), обязательные поля каждого элемента обоих массивов (TC-020).
 
 **Acceptance Criteria:**
-- [ ] TC-016 passes
-- [ ] TC-017 passes
-- [ ] TC-020 passes
+- [x] TC-016 passes
+- [x] TC-017 passes
+- [x] TC-020 passes
 
 ---
 
@@ -320,7 +320,7 @@ Criteria этого раздела)
 - Позитивный путь (непустой `note`) не задет — существующее поведение сохраняется.
 
 **Acceptance Criteria:**
-- [ ] TC-023 passes (шаги 5-6 — негативный и позитивный кейсы AC-05c)
+- [x] TC-023 passes (шаги 5-6 — негативный и позитивный кейсы AC-05c)
 
 ---
 
@@ -338,7 +338,7 @@ Criteria этого раздела)
 - Операция, зарезолвившаяся в `human`, **никогда** не выполняется автоматически — маршрут только сообщает о задаче, не запускает никакого действия (AC-05a).
 
 **Acceptance Criteria:**
-- [ ] TC-023 passes (шаги 1-4 — очередь вместо авто-выполнения, `mode` blocking/non-blocking)
+- [x] TC-023 passes (шаги 1-4 — очередь вместо авто-выполнения, `mode` blocking/non-blocking)
 
 ---
 
@@ -368,8 +368,8 @@ Criteria этого раздела)
 - Новые обёртки `lib/git.js`: `commitsAhead(cwd, parent, branch)` (`git rev-list --count`), `changedFilesBetween(cwd, parent, branch)` (`git diff --name-only`), `isPathCommitted(cwd, relPath)` (`git status --porcelain -- <path>`, пустой вывод = true), `revParse(cwd, ref)` (`git rev-parse <ref>` — полный SHA, не `--abbrev-ref`), `parentBranchOf(cwd, issueBranch)` (`git config branch.<issueBranch>.merge`, fallback `develop`/`main`). Ни одна не строит аргумент из непровалидированного пользовательского ввода — `issueId` уже прошёл `ISSUE_ID_RE`, `:key` — против ключей `roles:`.
 
 **Acceptance Criteria:**
-- [ ] TC-024 passes
-- [ ] TC-025 passes
+- [x] TC-024 passes
+- [x] TC-025 passes
 
 ---
 
@@ -392,7 +392,7 @@ Criteria этого раздела)
 - Успех: append-only запись о переназначении (ключ, старый актор, новый актор, таймштамп) в `session-log.md` issue. Ответ `200 { status: "reassigned", actor }`.
 
 **Acceptance Criteria:**
-- [ ] TC-026 passes
+- [x] TC-026 passes
 
 ---
 
@@ -410,10 +410,10 @@ Criteria этого раздела)
 - Негативный кейс `empty_result` (Задача 9) уже покрыт в этом же сьюте или отдельно — не дублировать логику проверки, только собрать сценарии из `test_plan.md` шагов.
 
 **Acceptance Criteria:**
-- [ ] TC-023 passes
-- [ ] TC-024 passes
-- [ ] TC-025 passes
-- [ ] TC-026 passes
+- [x] TC-023 passes
+- [x] TC-024 passes
+- [x] TC-025 passes
+- [x] TC-026 passes
 
 ---
 
@@ -432,7 +432,7 @@ Criteria этого раздела)
 - Grep `public/*.js` на отсутствие UI-визарда выбора актора вне действия «отдать агенту» (AC-05j) — назначение остаётся ручной правкой `prompt.md`, кроме единственного action.
 
 **Acceptance Criteria:**
-- [ ] TC-032 passes
+- [x] TC-032 passes
 
 ---
 
@@ -450,8 +450,9 @@ Criteria этого раздела)
 - Каждый элемент даёт как минимум: проект, issue, что конкретно требуется (`testCase` / `stageKey`+`operation`), и куда вести пользователя по клику (переход на соответствующий документ/чек-лист/таб «Дела» нужного проекта и issue) — AC-04c.
 
 **Acceptance Criteria:**
-- [ ] TC-018 passes
-- [ ] TC-020 passes (клиентский рендер обязательных полей)
+- [x] TC-018 passes
+- [x] TC-020 passes (клиентский рендер обязательных полей; навигация по клику
+      теперь ведёт на нужную роль/таб/`ptcId` — CR-005 исправлен Задачей 33)
 
 ---
 
@@ -470,8 +471,8 @@ Criteria этого раздела)
 - Убрать `overflow: hidden` на `body` (сегодня `style.css:25`) — Problem Statement #3/AC-01f. Локальные `overflow-y`/`overflow-x` на внутренних панелях (`.doc-panel` и т.п.) — не баг, оставить.
 
 **Acceptance Criteria:**
-- [ ] TC-005 passes
-- [ ] TC-007 passes
+- [x] TC-005 passes (покрыто `test/style-tokens.test.js`)
+- [x] TC-007 passes
 
 ---
 
@@ -489,7 +490,7 @@ Criteria этого раздела)
 - Учесть, что эта задача выполняется поверх новой разметки Задач 23-27 (`.role-switch`/`.list`/`.notice` и т.п. могут получить новые имена классов) — искать литералы по факту в файле на момент выполнения, не по старым селекторам буквально.
 
 **Acceptance Criteria:**
-- [ ] TC-008 passes
+- [x] TC-008 passes (покрыто `test/style-tokens.test.js` — `textLiterals.length === 0`)
 
 ---
 
@@ -511,7 +512,7 @@ Criteria этого раздела)
 - Пороги — AC-02a-02c: `--text`↔`--surface` ≥7:1 (тёмная тема — около 10:1, не 15-21:1); каждый цвет текста (включая литералы, пока Задача 17 их не заменила — на момент выполнения этой задачи литералы уже устранены Задачей 17, порядок задач это учитывает) ↔`--bg` и ↔`--surface` ≥4.5:1; границы ≥1.5:1; ни чистого чёрного фона, ни чистого белого текста.
 
 **Acceptance Criteria:**
-- [ ] TC-006 passes
+- [x] TC-006 passes
 
 ---
 
@@ -528,7 +529,7 @@ Criteria этого раздела)
 - Проверяется построчным парсером `font-size` для `body`/`html` и `h1` (может быть в `em`/`px`/`calc()`).
 
 **Acceptance Criteria:**
-- [ ] TC-009 passes (шаги 1-2 — числовой диапазон `h1`/body; шаг 3 — файловая проверка референсов — см. раздел «Prerequisite» выше, не эту задачу)
+- [x] TC-009 passes (шаги 1-2 — числовой диапазон `h1`/body, покрыто `test/style-tokens.test.js`; шаг 3 — файловая проверка референсов — см. раздел «Prerequisite» выше, не эту задачу)
 
 ---
 
@@ -547,8 +548,8 @@ Criteria этого раздела)
 - TC-012 (визуальная приёмка по референсу) — manual, требует готовых Задач 23-27 (разметка) и выполненного Prerequisite (референсы GLog v.0.7, см. раздел выше); acceptance здесь фиксирует, что паттерн реализован и владелец подтверждает соответствие референсу на живом экране. Эта проверка происходит **после** реализации, а не до старта `/pf-execute` — в отличие от TC-009/TC-013 она не входит в Prerequisite-раздел и остаётся Acceptance Criteria этой задачи.
 
 **Acceptance Criteria:**
-- [ ] TC-010 passes
-- [ ] TC-012 passes (manual — владелец подтверждает соответствие референсу)
+- [x] TC-010 passes (покрыто `test/style-tokens.test.js` — `color-mix` заливка, контраст ≥4.5:1)
+- [x] TC-012 passes (manual — владелец подтверждает соответствие референсу)
 
 ---
 
@@ -565,7 +566,7 @@ Criteria этого раздела)
 - `code`/`pre`/`.mono`-подобные селекторы — моноширинный стек, ограниченный только этими селекторами (существующая договорённость, AC-02i — не меняется этим issue, только проверяется, что редизайн её не нарушил).
 
 **Acceptance Criteria:**
-- [ ] TC-011 passes
+- [x] TC-011 passes
 
 ---
 
@@ -587,8 +588,8 @@ Criteria этого раздела)
 - TC-015 (живая проверка табуляции по всему приложению) — manual, требует готовых Задач 23-27; acceptance здесь фиксирует статически проверяемую часть (индикатор, `<button>`), живую проверку — после готовности навигации.
 
 **Acceptance Criteria:**
-- [ ] TC-014 passes
-- [ ] TC-015 passes (manual — живая проверка после готовности Задач 23-27)
+- [x] TC-014 passes
+- [x] TC-015 passes (manual — живая проверка после готовности Задач 23-27)
 
 ---
 
@@ -611,9 +612,9 @@ Criteria этого раздела)
 - `.inbox-card` вызывает `GET /api/inbox` (Задача 7) для `totalCount`.
 
 **Acceptance Criteria:**
-- [ ] TC-001 passes
-- [ ] TC-004 passes
-- [ ] TC-019 passes
+- [x] TC-001 passes
+- [x] TC-004 passes
+- [x] TC-019 passes
 
 ---
 
@@ -632,9 +633,11 @@ Criteria этого раздела)
 - Переключение `[Issue ▾]` **не** меняет активный таб документа (снимает P0 `/pf-check`): экспортировать чистую функцию `resolveActiveTab(prevTabId, docsOfNewIssue)`, реализующую правило — если документ есть у новой issue, остаться на том же табе; если документ `missing` у новой issue, тоже остаться на том же табе (рендерится в состоянии `missing`, не переключение на другой документ автоматически). Правило применяется **только** внутри одной роли — смена роли берёт набор вкладок заново, не через `resolveActiveTab`.
 - Таб «Дела» — новый в наборе каждой роли, счётчик — см. Задачу 25.
 
+**Round-2 dogfooding update (as shipped — supersedes the single-role notes above):** `[Роль ▾]` заменён мультивыбор-фильтром `.role-switch` (тот же компонент, что и на уровне 1); `.doc-tabs` строится через `buildTabSet([...])` как объединение ответов `GET .../roles/:role` для КАЖДОЙ выбранной роли (пустой выбор — объединение всех ролей проекта), дедуплицированное по id таба. Переключение (toggle) одной роли теперь идёт через `resolveActiveTab` — сохраняет активный таб, если он остался в объединении; полную замену на ровно одну роль (используется табом «Дела» для перехода к чек-листу тестировщика) даёт отдельная функция `selectRole`, которая продолжает брать свежий первый таб. `brd.md` AC-01b и `specs.md` §2.2 обновлены синхронно.
+
 **Acceptance Criteria:**
-- [ ] TC-002 passes
-- [ ] TC-003 passes
+- [x] TC-002 passes
+- [x] TC-003 passes
 
 ---
 
@@ -647,12 +650,14 @@ Criteria этого раздела)
 - `tools/manual-test-ui/public/workspace.js`
 
 **Implementation Notes:**
-- AC-06a дословно: счётчик — сумма незакрытых дел **по всем ролям и по всем открытым issue текущего проекта**, не только по текущей выбранной issue/роли (project-wide, не issue-wide — исправляет расхождение более ранней редакции `specs.md`, зафиксированное в §3.4).
+- AC-06a дословно (первая редакция): счётчик — сумма незакрытых дел **по всем ролям и по всем открытым issue текущего проекта**, не только по текущей выбранной issue/роли (project-wide, не issue-wide — исправляет расхождение более ранней редакции `specs.md`, зафиксированное в §3.4).
 - Экспортировать `countProjectTodos(inboxResponse, projectName)` — **ровно два параметра, без роли**: отсутствие параметра роли в сигнатуре — сама структурная проверка AC-06b (счётчик физически не может зависеть от роли). Вычисление: клиент запрашивает `GET /api/inbox` (Задача 7, тот же эндпоинт, что и глобальный инбокс) один раз, фильтрует оба массива (`manualTests`, `humanTasks`) по `project === projectName`, суммирует длины. Ни один элемент не несёт поля «роль» (ручной TC — всегда дело тестировщика по построению; human-задача привязана к `stageKey`, не к роли-зрителю), так что фильтрация по проекту уже даёт сумму «по всем ролям».
 - Переключение `[Роль ▾]`/`[Issue ▾]` внутри одного проекта **не** порождает повторный `fetch("/api/inbox")` — переиспользуется один и тот же ответ (AC-06b — счётчик виден **до** переключения, поскольку переключение его вообще не трогает).
 
+**Round-2 dogfooding update (as shipped — supersedes the project-wide notes above):** AC-06a пересмотрен на issue-scoped — содержимое самого таба «Дела» уже фильтровалось по текущей issue, и project-wide число рядом с ним не соответствовало тому, что реально показывал таб. Функция переименована в `countIssueTodos(inboxResponse, projectName, issueId)` — **ровно три параметра, всё ещё без роли** (AC-06b не изменился: структурная гарантия остаётся, просто к ней добавился issue-фильтр). `GET /api/inbox` по-прежнему запрашивается один раз и переиспользуется при переключении роли; но при переключении issue значение пересчитывается заново из того же уже полученного ответа (без повторного `fetch`). `brd.md` AC-06a и `specs.md` §3.4 обновлены синхронно.
+
 **Acceptance Criteria:**
-- [ ] TC-029 passes
+- [x] TC-029 passes
 
 ---
 
@@ -673,7 +678,7 @@ Criteria этого раздела)
 - Каждая строка `text` рендерится как есть, без markdown-разбора — read-only, как и весь остальной `.doc-panel` (Non-Goals: без ручного редактирования документов пайплайна через UI).
 
 **Acceptance Criteria:**
-- [ ] TC-030 passes
+- [x] TC-030 passes
 
 ---
 
@@ -689,16 +694,16 @@ Criteria этого раздела)
 **Implementation Notes:**
 - `public/launcher.js`/`public/workspace.js` — нативные ES-модули (`export`/`import`), не UMD-модули вроде `lib/roles.js`: `require()`/`vm.runInContext` не годятся для `export`-синтаксиса (`SyntaxError` вне модульного контекста); `test/roles.test.js`'s `node:vm`-загрузка `lib/roles.js` не прецедент здесь. Загрузка — динамическим `import()`: `await import(pathToFileURL(path.join(TOOL_DIR, "public", "<file>.js")).href)` (`node:url`'s `pathToFileURL`) — работает из CommonJS-тестового файла без флагов.
 - `test/launcher.test.js`: `resolveLandingRoute` (с записью `pf.lastIssue.<project>` и без неё — TC-004), `formatInboxCardLabel` (включая `totalCount === 0` — TC-019), grep `launcher.js`/`app.js` на обработчик клика `.inbox-card` устанавливающий `#/inbox` (TC-019 шаг 3), состав экрана лаунчера и обработка hash `#/` (TC-001).
-- `test/workspace.test.js`: `resolveActiveTab` (документ есть у обеих issue / отсутствует у новой — TC-003), `.doc-tabs` через `GET .../roles/:role` для двух ролей без пересечения наборов (TC-002, через `test/helpers/server.js`, не через `import()` — это серверный HTTP-вызов), отсутствие захардкоженного списка документов в `workspace.js` (TC-002 шаг 4), `countProjectTodos` — сигнатура ровно из двух аргументов, project-wide сумма, 0 для проекта без дел, отсутствие повторного `fetch` при смене роли/issue (TC-029), `renderChecklistPanel` — порядок блоков, CSS-класс, группировка `looseSections` по `afterTc`/`lineIndex`, orphan `afterTc` не отброшен, no-markdown (TC-030).
+- `test/workspace.test.js`: `resolveActiveTab` (документ есть у обеих issue / отсутствует у новой — TC-003), `.doc-tabs` через `GET .../roles/:role` для двух ролей без пересечения наборов (TC-002, через `test/helpers/server.js`, не через `import()` — это серверный HTTP-вызов), отсутствие захардкоженного списка документов в `workspace.js` (TC-002 шаг 4), `countIssueTodos` — сигнатура ровно из трёх аргументов (project+issue, без роли — round-2 dogfooding: было два аргумента/project-wide, стало issue-scoped, см. Задачу 25), 0 для issue без дел, отсутствие повторного `fetch` при смене роли/issue но пересчёт при смене issue (TC-029), `renderChecklistPanel` — порядок блоков, CSS-класс, группировка `looseSections` по `afterTc`/`lineIndex`, orphan `afterTc` не отброшен, no-markdown (TC-030).
 
 **Acceptance Criteria:**
-- [ ] TC-001 passes
-- [ ] TC-002 passes
-- [ ] TC-003 passes
-- [ ] TC-004 passes
-- [ ] TC-019 passes
-- [ ] TC-029 passes
-- [ ] TC-030 passes
+- [x] TC-001 passes
+- [x] TC-002 passes
+- [x] TC-003 passes
+- [x] TC-004 passes
+- [x] TC-019 passes
+- [x] TC-029 passes
+- [x] TC-030 passes
 
 ---
 
@@ -718,13 +723,156 @@ Criteria этого раздела)
 - Известная недетерминированность `prepare.test.js`/`read-paths.test.js` (BRD Non-Goals) — не путать с регрессией этой issue; при флаке этих двух файлов повторить прогон, не относить на счёт редизайна.
 
 **Acceptance Criteria:**
-- [ ] TC-031 passes
+- [x] TC-031 passes (все шаги; шаг 4 и клиентский путь записи Result/Notes,
+      ранее регрессировавшие — CR-001/CR-006, восстановлены Задачами 29/34)
+
+---
+
+## Задачи из /pf-codereview, раунд 1 (эскалация Phase 3.5 — ≥3 блокирующих находок)
+
+`code_review.md`'s раунд 1 вернул 3×P0 + 3×P1 — порог Phase 3.5 (`~/.claude/skills/pf-codereview/SKILL.md`) для отказа от цикла фиксов в пользу возврата в `/pf-execute`. Задачи 29-34 ниже — каждая напрямую закрывает одну находку `code_review.md` (`CR-NNN`), с `**Mapped Test Cases:**`, указывающими на существующие TC из `test_plan.md`'s Status Tracker (ни одного нового TC-ID не изобретено).
+
+---
+
+#### Task 29 (fix CR-001): `public/workspace.js` — клиентская запись Result/Notes ручных TC
+
+**Task Type:** code
+**Mapped Test Cases:** TC-023, TC-031
+
+**Files:**
+- `tools/manual-test-ui/public/workspace.js`
+
+**Implementation Notes:**
+- `renderTcPanelHtml` сейчас рендерит шаги чек-листа как статичный текст (`☑`/`☐` + note) — заменить на реальные интерактивные элементы: чекбокс/кнопка для `checked`, `<textarea>`/`<input>` для `note`, привязанные к обработчикам, вызывающим существующие серверные маршруты `PATCH .../checklist/steps` и `PATCH .../checklist/notes` (маршруты и `patchStepResult`/`patchNotes` не менялись — не трогать `lib/checklist.js`/`server.js` этой задачей).
+- Новая серверная валидация непустого `note` при `checked: true` (Задача 9, AC-05c) должна быть видна пользователю как понятная ошибка в UI, не проглатываться молча.
+- Обновление после успешного `PATCH` — обновить локальное состояние панели без полной перезагрузки документа (тот же `fetchDoc`/`docCache`-паттерн, что уже используется для чтения — здесь нужна точечная инвалидация одного документа после записи, не всего кэша).
+- TC-031 шаг 4/5 (checkout, точечная запись) — эта задача закрывает именно клиентский путь записи; серверная часть уже покрыта Задачей 28.
+
+**Acceptance Criteria:**
+- [x] TC-023 passes (клиентский путь записи Result/Notes, включая отказ на пустой Result)
+- [x] TC-031 passes (точечная запись — теперь и с клиента)
+
+---
+
+#### Task 30 (fix CR-002): `public/workspace.js` — human-task UI в табе «Дела»
+
+**Task Type:** code
+**Mapped Test Cases:** TC-024, TC-025, TC-026, TC-032
+
+**Files:**
+- `tools/manual-test-ui/public/workspace.js`
+
+**Implementation Notes:**
+- Полноценный UI для таба «Дела» (заглушка «появится отдельной задачей» — убрать): список задач из `GET .../human-tasks` (уже реализован, Задача 10), с полями `stageKey`/`operation`/`instruction`/`status`.
+- Действие «Завершить» — для `operation: "review"` показывает поле ввода `verdict` (текст, может быть «замечаний нет»), для `write`-документных/код-ключей — кнопку подтверждения без дополнительного ввода; вызывает `POST .../human-tasks/:key/complete` (Задача 11, не менять).
+- Действие «Отдать агенту» (AC-05g/AC-05j) — единственное разрешённое действие выбора актора в UI (не общий визард): выпадающий список из `docs/planning/agents.yml`'s `actors:`, вызывает `POST .../human-tasks/:key/reassign` (Задача 12, не менять). Держать явно единственным таким контролом — TC-032's grep-проверка (Задача 14) фиксирует его отсутствие где-либо ещё.
+- После успешного действия — обновить список (новый `GET .../human-tasks`), либо оптимистично убрать выполненную задачу из списка.
+- Обработка ошибок сервера (`422`/`409`) — понятное сообщение пользователю, не проглатывается молча (симметрично Задаче 29).
+
+**Acceptance Criteria:**
+- [x] TC-024 passes (клиентский вызов complete по всем трём веткам валидации)
+- [x] TC-025 passes (клиентское отражение маркера/hash/stale)
+- [x] TC-026 passes (клиентский вызов reassign, включая ограничение multi-line — понятная ошибка в UI)
+- [x] TC-032 passes (единственный actor-контрол — точно там, где заявлено, и нигде больше)
+
+---
+
+#### Task 31 (fix CR-003): `public/style.css` — стили для непокрытой разметки уровня 1/2/инбокса
+
+**Task Type:** code
+**Mapped Test Cases:** TC-001, TC-002, TC-010, TC-012
+
+**Files:**
+- `tools/manual-test-ui/public/style.css`
+
+**Implementation Notes:**
+- Добавить правила (Pine-токены, `.panel`-паттерн — переиспользовать, не изобретать новую систему) для каждого класса, реально строящегося в `launcher.js`/`inbox.js`/`workspace.js`, но сегодня не имеющего ни одного правила в `style.css`: `.doc-panel`, `.project-card`/`.project-card-name`/`.project-card-meta`, `.inbox-item`/`.inbox-item-label`/`.inbox-item-instruction`/`.inbox-item-meta`, `.inbox-tabs`/`.inbox-panels`/`.inbox-section-title`, `.inbox-empty`/`.inbox-error`/`.inbox-loading`, `.workspace-field`/`.workspace-field--issue`/`.workspace-field--role`, `.role-select`/`.issue-select`, `.checklist-body`, `.field-label`.
+- Базовые сброс-стили на `button`/`a`/`select` — по образцу существующего `*{box-sizing}`/`body`, без излишеств.
+- Перед началом — свежий grep всех `className`/`h(tag, className, ...)` вызовов по трём клиентским модулям против `style.css`, чтобы не пропустить что-то ещё, появившееся между написанием этой находки и её фиксом.
+- Задача 20's `.panel`/`.panel-header`/`.panel-table` — не переопределять, расширять тем же паттерном color-mix/токенов.
+
+**Acceptance Criteria:**
+- [x] TC-001 passes (лаунчер визуально оформлен)
+- [x] TC-002 passes (рабочее пространство визуально оформлено)
+- [x] TC-010 passes (панельный паттерн распространён на все новые контейнеры; покрыто `test/css-class-coverage.test.js` + `test/style-tokens.test.js`)
+- [x] TC-012 passes (визуальная приёмка владельцем — теперь возможна без «голой» разметки)
+
+---
+
+#### Task 32 (fix CR-004): `lib/roles-resolve.js`/`skills/pf-close/SKILL.md` — human-review-задачи обнаруживаются, не только human-write
+
+**Task Type:** code
+**Mapped Test Cases:** TC-027, TC-028
+
+**Files:**
+- `tools/manual-test-ui/lib/roles-resolve.js`
+- `tools/manual-test-ui/lib/inbox.js`
+- `skills/pf-close/SKILL.md`
+
+**Implementation Notes:**
+- `resolveRole()` сегодня определяет `kind: "human"` только через `write`-актора — распространить обнаружение и на `review[]` (уже частично сделано в `resolveHumanTaskOperation()`, Задача 11, для пути `complete` — здесь нужно то же на пути **обнаружения/перечисления**, не только завершения).
+- `lib/inbox.js`'s `collectHumanTasks()`/`collectHumanTasksForIssue()` — включить в перечисление review-задачи с `kind: human` в `review[]`, не только write-задачи.
+- `skills/pf-close/SKILL.md`'s Phase 0 human-task check (Задача 2) — расширить выбор ключей: не только «resolved **write** actor is kind: human», но и любой ключ, чей `review[]` резолвится в `kind: human`.
+- Не менять семантику самого `POST .../complete` (Задача 11) — только обнаружение/перечисление ниже по цепочке (инбокс, счётчик «Дела», `/pf-close`).
+
+**Acceptance Criteria:**
+- [x] TC-027 passes (human-review-задачи обнаружимы наравне с human-write — покрыто `roles-resolve.test.js`/`inbox.test.js`, TC-ID метки добавлены)
+- [x] TC-028 passes (`/pf-close` Phase 0 блокируется и на незакрытой review-задаче; покрыто `test/pf-roles-human-actor.sh`)
+
+---
+
+#### Task 33 (fix CR-005): `public/app.js`/`public/workspace.js` — клик по элементу инбокса ведёт на нужную роль/таб
+
+**Task Type:** code
+**Mapped Test Cases:** TC-020
+
+**Files:**
+- `tools/manual-test-ui/public/app.js`
+- `tools/manual-test-ui/public/workspace.js`
+
+**Implementation Notes:**
+- `public/inbox.js` уже строит полный `where` (`roleId`/`doc`/`ptcId` для ручного TC; `tab: "human-tasks"`/`stageKey` для human-задачи) — эта задача учит `app.js`/`workspace.js` его использовать, не переделывает `inbox.js`.
+- `app.js`'s `optionsFor("inbox")` сегодня пробрасывает в навигацию только `target.hash` — расширить, чтобы `where`'s дополнительные поля тоже доходили до смонтированного экрана (например через query-часть hash или через прямую передачу объекта, если навигация остаётся в пределах одного SPA-состояния — выбрать решение, совместимое с уже принятым правилом «переключение секции/таба — только локальное состояние, не отдельный route», Задача 15/24).
+- `workspace.js`'s `mount()` — принять опциональные `initialRole`/`initialTab`/`initialPtcId` и применить их при первом рендере (роль — до `loadShell()`, таб — после первого `buildTabSet()`, аналогично `resolveActiveTab`'s логике, но для начального перехода, не для переключения issue).
+- Клик по human-задаче — таб «Дела» должен стать активным сразу (полезно только после Задачи 30 — до неё таб останется заглушкой, но переключение на него уже должно работать).
+
+**Acceptance Criteria:**
+- [x] TC-020 passes (шаг 3 — клик ведёт на нужную роль/таб/чек-лист целиком, не только на верный проект+issue)
+
+---
+
+#### Task 34 (fix CR-006): `public/workspace.js` — восстановить действие подготовки тестовых данных
+
+**Task Type:** code
+**Mapped Test Cases:** TC-031
+
+**Files:**
+- `tools/manual-test-ui/public/workspace.js`
+
+**Implementation Notes:**
+- Старый `app.js` рендерил checkout-баннер и кнопки `POST .../prepare`/`.../checklist/checkout` для веток `kind: "action"` (`buildRoleContents`'s ответ, `server.js`) — новый `renderDocPanel` не рендерит для этой ветки ничего, кроме заголовочных полей.
+- Восстановить действие: для `item.kind === "action"` — рендерить понятную кнопку/баннер, вызывающую тот же существующий серверный маршрут (не трогать `lib/git.js`/`server.js` — точки входа не изменились, изменилась только визуальная оболочка, симметрично остальному редизайну).
+- Подтверждение перед checkout — сохранить (не убирать существовавшую защиту от случайного переключения ветки).
+
+**Acceptance Criteria:**
+- [x] TC-031 passes (шаг 4 — checkout по подтверждению снова доступен из UI)
+
+**Addendum (найдено при `/pf-user-docs`, не в исходном скоупе TC-031):** старый
+`app.js` (строка 933) рендерил кнопку `Prepare test data for ${tc.id}` для
+каждого TC отдельно, в дополнение к кнопке на уровне всей issue — эта задача
+восстановила только последнюю. Серверный `tc.prepare` уже существовал
+(`server.js`, идентичная форма `parsed.prepare`), клиент его просто не читал.
+Дописано: `buildPrepareActionNode` принимает опциональный `tcId`,
+`renderChecklistBody` вызывает его на каждый TC. 4 новых теста в
+`workspace-ui.test.js`.
 
 ---
 
 ### Dependencies section
 
 **Prerequisite — блокирует сам вызов `/pf-execute`, не отдельную задачу.** См. раздел «Prerequisite» в начале документа: референсные скриншоты GLog v.0.7 и строка owner sign-off в `session-log.md` — это внешний, не-агентный шаг (AC-02k), который должен быть завершён владельцем **до** старта `/pf-execute` для этой issue целиком; он не диспетчеризуется `/pf-execute` как первая из задач ниже, а предшествует самому запуску.
+
+**Задачи 29-34 (эскалация code review, раунд 1) — file-exclusivity.** Задачи 29, 30, 33, 34 все пишут `public/workspace.js` — не могут выполняться в одной волне друг с другом (тот же принцип file-exclusivity, применённый и к волнам 4-13 исходного прохода). Задача 31 (`style.css`) и Задача 32 (`lib/roles-resolve.js`/`lib/inbox.js`/`skills/pf-close/SKILL.md`) не пересекаются ни с `workspace.js`, ни друг с другом — каждая может идти параллельно с одной из workspace.js-задач. Рекомендуемые волны: {29, 31}, {30, 32}, {33}, {34} — либо любая другая группировка, уважающая то же ограничение.
 
 **Task ordering:**
 
@@ -747,6 +895,58 @@ Criteria этого раздела)
 - Все framework-скилл-задачи (1-3) требуют, чтобы `~/.claude/skills/` были синхронизированы через `scripts/update-skills.sh` после мержа этой issue — вне scope самого плана, но нужно для того, чтобы правки реально повлияли на будущие `pf-*`-вызовы в других проектах.
 
 **Known limitation — `write: human` на `code`/`tests` в `/pf-execute` (не закрывается этой issue).** BRD's AC-05j допускает, что `roles.<key>.write: human` может быть вручную выставлен для любого ключа пайплайна, включая `code`/`tests` — не только для `brd`/`specs`/`test_plan`/`implementation_plan`/`user_docs`/`dev_docs`. Эта issue **не добавляет** обработку `write: human` в сам `/pf-execute`: если будущий `prompt.md` выставит `roles.code.write: human` (или `roles.tests.write: human`), текущий двухветочный диспетчер `/pf-execute` (`claude` / не-`claude` через `codex-companion`, `skills/pf-execute/SKILL.md`) этот случай не учитывает. `specs.md`'s G8/§4.1 называет в скоупе только `pf-roles`/`pf-close`/`pf-autopilot`, не `pf-execute` — это осознанно **не** исправляется здесь, а явно фиксируется как пробел для будущей issue, чтобы не быть молча забытым.
+
+---
+
+#### Task 35 (fix CR-016): `server.js`/`status.js`/`lib/docstate.js` — «не применимо» перестаёт читаться как «документа нет»
+
+**Task Type:** code
+**Mapped Test Cases:** TC-001, TC-032
+
+**Files:**
+- `tools/manual-test-ui/server.js`
+- `tools/manual-test-ui/public/status.js`
+- `tools/manual-test-ui/lib/docstate.js`
+- `tools/manual-test-ui/test/status.test.js`
+
+**Implementation Notes:**
+- Корень проблемы — потеря информации, а не неверное условие: `issueStages()` схлопывает результат `classifyIssueDoc()` в булево `done`, из-за чего `not_applicable` становится неотличим от `missing`. Чинить на этом уровне: пробрасывать в `stages[]` полноценный статус (`present`/`not_applicable`/`missing`) рядом с `done` — так потребители смогут различать случаи, а существующая форма ответа не ломается для тех, кто читает только `done`.
+- `public/status.js`'s `issueDocProblem()` — брать первый элемент, который `missing`, а не первый, который `!done`. `not_applicable` не должен порождать ни строки «Нет BRD», ни вклада в `projectCategory() === "problems"`.
+- `lib/docstate.js`'s `applicability()` сейчас возвращает `{ applicable: true }` для любого ключа вне `ISSUE_DOC_STAGES`, а `code_review.md`/`user_docs.md`/`dev_docs.md` там отсутствуют — то есть для них `not_applicable` невозможен в принципе. Добавить эти три ключа и научить `applicability()` учитывать `roles.<key>: skip` из `prompt.md` (для `user_docs`/`dev_docs` — включая tier-дефолт `skip` для trivial/small, `pf-roles/SKILL.md` §4; для `code_review` — `roles.code.review: skip`). Резолвинг ролей уже есть в `lib/roles-resolve.js` — переиспользовать, не писать второй парсер.
+- Не расширять write-поверхность: задача целиком read-only, новых маршрутов и новых git-подкоманд не добавляется (это и проверяет TC-032).
+- Заодно устранить CR-017, если это ничего не удорожает: ветка `state.status === "on_branch"` в `issueStages()` недостижима — `classifyIssueDoc()` возвращает документ с ветки как `{ status: "present", location: "branch" }`. При переходе на проброс полного статуса эта ветка исчезает сама.
+- Тесты: `status.test.js` сегодня не содержит ни одного сценария с `trivial`/`not_applicable`/`skip` — добавить их, иначе фикс нечем удержать. Минимум: (а) trivial-tier issue не даёт «Нет BRD»; (б) issue с `roles.user_docs: skip` не даёт «Нет User docs»; (в) реально отсутствующий документ по-прежнему даёт проблему.
+- Проверка на живых данных, а не только на фикстуре: поднять сервер на этом репозитории и убедиться, что закрытый trivial-tier issue `20260709-bug-pf-skills-absolute-path-references` больше не помечается проблемным при пустом фильтре ролей — именно этим запросом находка и была подтверждена.
+
+**Acceptance Criteria:**
+- [x] TC-001 passes (состав экрана лаунчера и источник данных не изменились)
+- [x] TC-032 passes (write-allowlist не расширен: ни новых маршрутов, ни новых git-подкоманд)
+- [x] `status.test.js` покрывает `not_applicable` и `roles.<key>: skip`, и падает, если вернуть старое поведение
+- [x] На живом репозитории закрытый trivial-tier issue не порождает ложного «Нет BRD», а `planning-framework` не висит в категории «требует внимания» из-за него
+
+---
+
+#### Task 36 (fix CR-019, эскалация code review раунда 4): `lib/docstate.js`/`lib/roles-resolve.js` — tier-дефолт `skip` достижим без `profile:`
+
+**Task Type:** code
+**Mapped Test Cases:** TC-001, TC-032
+
+**Files:**
+- `tools/manual-test-ui/lib/docstate.js`
+- `tools/manual-test-ui/lib/roles-resolve.js`
+- `tools/manual-test-ui/test/status.test.js`
+
+**Implementation Notes:**
+- Корень — порядок уровней в `resolveRole()`: ветка level 3 (tier-дефолт `skip` для `user_docs`/`dev_docs` при `size_tier: trivial/small`) вложена в `else if (profileName)`. Issue без `profile:` и без явных `roles.user_docs/dev_docs` (легаси или hand-written prompt.md) резолвится на level 5 — general default с `skip: false`, tier-дефолт не применяется. Чинить так, чтобы runtime-резолюция совпала с задокументированным порядком `pf-roles/SKILL.md` §4 (tier-дефолт действует и когда ни профиля, ни явной точки нет), не ломая явные `roles.<key>: skip` (level 1) и профильные переопределения (level 2).
+- `docstate.js`'s `roleSkipReason()` — потреблять результат; заодно (CR-021) привести текст level-3-сообщения в соответствие с реальной достижимостью ветки.
+- Тесты: переписать сценарий (a) `status.test.js` с hand-build'а stage-состояния на реальный путь пайплайна — через фикстуру открытого trivial-issue без профиля (`20260105-improve-fixture-trivial` уже есть в `test/helpers/fixtures.js`) `user_docs`/`dev_docs` должны приходить `not_applicable`, не `missing`; добавить small-tier вариант; сценарий (c) (реально отсутствующий документ даёт проблему) сохранить.
+- Проверка на живых данных: поднять сервер на этом репозитории и убедиться, что ни один открытый issue без `profile:` не порождает ложных «Нет User docs»/«Нет Dev docs».
+
+**Acceptance Criteria:**
+- [x] TC-001 passes (состав экрана лаунчера и источник данных не изменились) — в Status Tracker `test_plan.md` отмечен `✓`, тип Auto; покрывающие сюиты зелёные (`make test` 4/4, 420/420 node)
+- [x] TC-032 passes (write-allowlist не расширен: ни новых маршрутов, ни новых git-подкоманд) — там же `✓`, тип Auto, те же зелёные прогоны
+- [x] Сценарий (a) `status.test.js` идёт через реальный путь резолюции (фикстура без `profile:`), а не hand-build, и падает при возврате к level-5-дефолту — переписан в `9fc3f4b`, добавлен и small-tier вариант; прямая проверка резолвера: trivial/small без профиля дают `skip` на level 3, medium/large доходят до level 5 без skip
+- [x] На живом репозитории открытый trivial/small-issue без `profile:` не порождает ложных «Нет User docs»/«Нет Dev docs» — проверено поднятым сервером: `GET /api/projects/planning-framework/issues` отдаёт `status: "not_applicable"` для `user_docs`/`dev_docs` у trivial/small без профиля, а прогон `issueDocProblem()` на этом реальном ответе не даёт ни одного ложного дефекта (единственные две найденные проблемы настоящие: код-ревью этого issue и отсутствие ревью у `20260902-feat-idea-stage`)
 
 ---
 

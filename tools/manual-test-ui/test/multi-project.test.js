@@ -119,20 +119,27 @@ test("TC-017: any configured project and edge configurations", async (t) => {
     const byName = new Map(res.json.map((p) => [p.name, p]));
     assert.deepStrictEqual([...byName.keys()].sort(), ["bare", "main", "other"]);
 
-    // "main" and "other" are real git repositories on "develop", each with
-    // one issue whose checklist is on disk.
+    // "main" and "other" are real git repositories on "develop". Both
+    // FULL and TRIVIAL are open issues on "main" — openIssueCount/
+    // totalIssueCount count every issue dir (`findIssueDirs`), not "has a
+    // manual_test_checklist.md" (dogfooding feedback, 20260806 issue: a
+    // checklist-only count reads a project with real open issues as "0
+    // issue" until one of them reaches `/pf-test`).
     assert.strictEqual(byName.get("main").defaultBranch, "develop");
     assert.strictEqual(byName.get("main").currentBranch, "develop");
-    assert.strictEqual(byName.get("main").issueCount, 1, "FULL has a checklist, TRIVIAL does not");
+    assert.strictEqual(byName.get("main").openIssueCount, 2, "FULL and TRIVIAL are both open, regardless of which has a checklist");
+    assert.strictEqual(byName.get("main").totalIssueCount, 2);
     assert.strictEqual(byName.get("other").defaultBranch, "develop");
-    assert.strictEqual(byName.get("other").issueCount, 1);
+    assert.strictEqual(byName.get("other").openIssueCount, 1);
+    assert.strictEqual(byName.get("other").totalIssueCount, 1);
 
     // "bare" is not a git repository at all: git.getCurrentBranch and
     // git.resolveDefaultBranch fail closed to null rather than throwing, and
     // it has no issues.
     assert.strictEqual(byName.get("bare").currentBranch, null);
     assert.strictEqual(byName.get("bare").defaultBranch, null);
-    assert.strictEqual(byName.get("bare").issueCount, 0);
+    assert.strictEqual(byName.get("bare").openIssueCount, 0);
+    assert.strictEqual(byName.get("bare").totalIssueCount, 0);
 
     // Each name really is backed by its *own* directory, not by whichever
     // project happened to be configured first: every project's own

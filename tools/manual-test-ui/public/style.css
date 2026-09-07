@@ -1,14 +1,15 @@
 :root {
-  --bg: #0f1115;
-  --panel: #171a21;
-  --panel-2: #12151b;
-  --border: #2a2e38;
-  --text: #e6e8ec;
-  --muted: #8b91a0;
-  --accent: #4f8cff;
-  --pass: #35c266;
-  --fail: #e0554f;
-  --warn: #d9a441;
+  --bg: #16241b;
+  --surface: #1e3126;
+  --border: #3c5c46;
+  --text: #c6d5c8;
+  --muted: #96ac9c;
+  --ok: #6ec97f;
+  --fail: #f08d84;
+  --warn: #e0b95c;
+  --held: #b6a0ef;
+  --accent: #5cc4d4;
+  --accent-ink: #16241b;
   font-family: -apple-system, "Segoe UI", Roboto, sans-serif;
 }
 
@@ -21,8 +22,34 @@ body {
   background: var(--bg);
   color: var(--text);
   font-size: 14px;
-  /* The page itself never scrolls — in either direction. Only the panes do. */
-  overflow: hidden;
+}
+
+/* Minimal element reset, same spirit as the `*{box-sizing}`/`body` rules
+   above: every `<button>`/`<select>` in this tool (`.role-btn`, `.doc-tab`,
+   `.issue-select`, …) inherits the interface font/size/color
+   instead of the browser's native control chrome, and `<a>` (`.inbox-card`,
+   `.project-card`, `.workspace-back`, …) reads in the accent color by
+   default. Each of those classes still sets its own colors/borders/padding —
+   this only removes the browser-default starting point. */
+button, select {
+  font-family: inherit;
+  font-size: inherit;
+  color: inherit;
+}
+
+a {
+  color: var(--accent);
+}
+
+/* The single mount point every screen (launcher/workspace/inbox) renders
+   into (`public/index.html`'s `#app.app-root` — `public/app.js` swaps its
+   children on every hashchange). Page-level padding/max-width lives here,
+   once, rather than duplicated per screen — `.inbox.js`'s `mount()` has no
+   wrapping element of its own to hold it. */
+.app-root {
+  max-width: 1100px;
+  margin: 0 auto;
+  padding: 20px 24px 48px;
 }
 
 .shell {
@@ -30,6 +57,20 @@ body {
   flex-direction: column;
   height: 100%;
   min-height: 0;
+}
+
+/* --------------------------------------------------------- focus visible */
+/* `:focus-visible`, not bare `:focus` (specs.md §6, US-03): the outline must
+   show for keyboard/programmatic focus but stay hidden on a mouse click.
+   Applies to every interactive element in the app — no `.role-switch` /
+   `.inbox-card` / `.project-grid` / `.workspace-header` / `.doc-tabs`-scoped
+   duplicate needed, since tabindex order there is plain DOM order (never
+   reordered via CSS), so one global rule already reaches all of them in the
+   right order. `--accent`'s contrast against `--bg`/`--surface` is covered
+   by `test/contrast.test.js` (Task 18/AC-02b). */
+:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
 }
 
 /* ------------------------------------------------------------- role tabs */
@@ -44,7 +85,7 @@ body {
   gap: 16px;
   flex-wrap: wrap;
   padding: 10px 20px;
-  background: var(--panel);
+  background: var(--surface);
   border-bottom: 1px solid var(--border);
 }
 
@@ -56,7 +97,7 @@ body {
 }
 
 .brand h1 {
-  font-size: 15px;
+  font-size: calc(1em * 1.5);
   margin: 0;
   white-space: nowrap;
 }
@@ -92,7 +133,7 @@ body {
 .role-tab.active {
   background: var(--accent);
   border-color: var(--accent);
-  color: #fff;
+  color: var(--text);
   font-weight: 600;
 }
 
@@ -107,7 +148,7 @@ body {
 .sidebar {
   width: 288px;
   flex: 0 0 288px;
-  background: var(--panel);
+  background: var(--surface);
   border-right: 1px solid var(--border);
   padding: 16px;
   overflow-y: auto;
@@ -124,7 +165,11 @@ body {
   overflow-x: hidden;
 }
 
-.panel { margin-bottom: 20px; }
+.panel {
+  margin-bottom: 20px;
+  border: 1px solid var(--border);
+  padding: 12px;
+}
 
 .panel h2 {
   font-size: 11px;
@@ -132,6 +177,97 @@ body {
   letter-spacing: 0.06em;
   color: var(--muted);
   margin: 0 0 8px;
+}
+
+/* The label for a panel's contents — distinct from the data below it. */
+.panel .panel-header {
+  color: var(--accent);
+  font-weight: 600;
+  font-size: 15px;
+  margin: 0 0 8px;
+}
+
+/* Tables/lists living inside a .panel: alternating tint is the row
+   separator, not a grid of borders between every row. */
+.panel-table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.panel-table th {
+  text-align: left;
+  color: var(--muted);
+  font-weight: normal;
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  padding: 6px 8px;
+  border-bottom: 1px solid var(--border);
+}
+
+.panel-table td {
+  padding: 8px;
+  vertical-align: top;
+  overflow-wrap: anywhere;
+}
+
+.panel-table tbody tr:nth-child(odd),
+.panel-table > li:nth-child(odd) {
+  background: color-mix(in srgb, var(--surface) 85%, var(--accent));
+}
+
+/* `looseSections` → "Дополнительные заметки" (specs.md §2.4, AC-07b):
+   deliberately NOT `.panel` — a dashed border instead of `.panel`'s solid
+   one, and a background tinted from `--warn` (not `--accent`, the tint
+   `.panel-table` itself uses) so this never reads as an accented header of
+   an ordinary TC panel, but as its own, visually distinct "not a test case"
+   block. */
+.loose-sections {
+  margin-bottom: 20px;
+  border: 1px dashed var(--border);
+  padding: 12px;
+  background: color-mix(in srgb, var(--surface) 92%, var(--warn));
+}
+
+.loose-sections-title {
+  color: var(--warn);
+  font-weight: 600;
+  font-size: 15px;
+  margin: 0 0 4px;
+}
+
+.loose-sections-caption {
+  color: var(--muted);
+  font-size: 12px;
+  margin: 0 0 10px;
+}
+
+.loose-group {
+  margin-bottom: 10px;
+}
+
+.loose-group:last-child {
+  margin-bottom: 0;
+}
+
+.loose-group-heading {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--muted);
+  margin: 0 0 4px;
+}
+
+.loose-items {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.loose-item {
+  font-size: 13px;
+  padding: 2px 0;
+  white-space: pre-wrap;
 }
 
 /* ----------------------------------------------------------------- lists */
@@ -154,7 +290,7 @@ body {
 }
 
 .list li:hover { background: #1f232c; }
-.list li.active { background: var(--accent); color: #fff; }
+.list li.active { background: var(--accent); color: var(--text); }
 
 .list li .meta {
   font-size: 11px;
@@ -164,7 +300,7 @@ body {
   align-items: center;
   gap: 4px;
 }
-.list li.active .meta { color: #dbe6ff; }
+.list li.active .meta { color: var(--text); }
 
 .list li.note {
   color: var(--muted);
@@ -205,13 +341,13 @@ body {
   color: var(--muted);
   white-space: nowrap;
 }
-.badge.closed { border-color: var(--pass); color: var(--pass); }
-.badge.ok { border-color: var(--pass); color: var(--pass); }
+.badge.closed { border-color: var(--ok); color: var(--ok); }
+.badge.ok { border-color: var(--ok); color: var(--ok); }
 .badge.fail { border-color: var(--fail); color: var(--fail); }
 .badge.on-branch { border-color: var(--warn); color: var(--warn); }
 .badge.missing { border-color: var(--border); color: var(--muted); }
 .badge.na { border-color: var(--border); color: var(--muted); font-style: italic; }
-.list li.active .badge { border-color: rgba(255,255,255,0.5); color: #fff; }
+.list li.active .badge { border-color: rgba(255,255,255,0.5); color: var(--text); }
 
 /* ------------------------------------------------------------ intro pane */
 
@@ -268,7 +404,7 @@ dl.facts dd {
   margin-top: 6px;
   font-size: 12px;
   color: var(--muted);
-  background: var(--panel-2);
+  background: var(--surface);
   border: 1px solid var(--border);
   border-radius: 5px;
   padding: 2px 6px;
@@ -287,7 +423,7 @@ dl.facts dd {
   border: 1px solid var(--border);
   border-left-width: 3px;
   border-radius: 8px;
-  background: var(--panel-2);
+  background: var(--surface);
   padding: 10px 14px;
   margin: 12px 0 0;
   max-width: 80ch;
@@ -296,14 +432,14 @@ dl.facts dd {
 .notice p { margin: 0 0 6px; line-height: 1.45; overflow-wrap: anywhere; }
 .notice p:last-child { margin-bottom: 0; }
 .notice.info { border-left-color: var(--accent); }
-.notice.warn { border-left-color: var(--warn); color: #f0d9a0; }
-.notice.error { border-left-color: var(--fail); color: #f2b5b1; }
+.notice.warn { border-left-color: var(--warn); color: var(--warn); }
+.notice.error { border-left-color: var(--fail); color: var(--fail); }
 .notice.muted-notice { border-left-color: var(--border); color: var(--muted); }
 
 .checkout-banner {
   background: #2a2210;
   border: 1px solid var(--warn);
-  color: #f0d9a0;
+  color: var(--warn);
   border-radius: 8px;
   padding: 12px 16px;
   margin-top: 12px;
@@ -316,7 +452,7 @@ dl.facts dd {
 
 .btn {
   background: var(--warn);
-  color: #1a1508;
+  color: var(--bg);
   border: none;
   border-radius: 6px;
   padding: 7px 14px;
@@ -349,7 +485,7 @@ dl.facts dd {
 .stack > * + * { margin-top: 14px; }
 
 .sub-card {
-  background: var(--panel);
+  background: var(--surface);
   border: 1px solid var(--border);
   border-radius: 10px;
   padding: 14px 18px;
@@ -368,7 +504,7 @@ dl.facts dd {
 .prepare-result:empty { display: none; }
 
 .prepare-result {
-  background: var(--panel);
+  background: var(--surface);
   border: 1px solid var(--border);
   border-radius: 10px;
   padding: 14px 18px;
@@ -384,7 +520,7 @@ dl.facts dd {
 }
 
 pre.output {
-  background: var(--panel-2);
+  background: var(--surface);
   border: 1px solid var(--border);
   border-radius: 6px;
   padding: 10px 12px;
@@ -426,7 +562,7 @@ pre.output {
 }
 
 .md-body code {
-  background: var(--panel-2);
+  background: var(--surface);
   border: 1px solid var(--border);
   border-radius: 4px;
   padding: 1px 5px;
@@ -435,7 +571,7 @@ pre.output {
 
 /* Code blocks keep their lines intact and scroll on their own. */
 .md-body pre {
-  background: var(--panel-2);
+  background: var(--surface);
   border: 1px solid var(--border);
   border-radius: 8px;
   padding: 12px 14px;
@@ -453,7 +589,7 @@ pre.output {
 
 /* Frontmatter is a definition list, and must not read as document content. */
 .md-frontmatter {
-  background: var(--panel-2);
+  background: var(--surface);
   border: 1px solid var(--border);
   border-radius: 8px;
   padding: 10px 14px;
@@ -501,7 +637,7 @@ pre.output {
 }
 
 .md-body th {
-  background: var(--panel);
+  background: var(--surface);
   text-align: left;
   font-weight: 600;
 }
@@ -526,7 +662,7 @@ pre.output {
 .tc-container { margin-top: 16px; }
 
 .tc-card {
-  background: var(--panel);
+  background: var(--surface);
   border: 1px solid var(--border);
   border-radius: 10px;
   padding: 16px 20px;
@@ -601,7 +737,7 @@ table.steps tr:last-child td { border-bottom: none; }
 .note-input {
   width: 100%;
   min-width: 140px;
-  background: var(--panel-2);
+  background: var(--surface);
   border: 1px solid var(--border);
   border-radius: 5px;
   color: var(--text);
@@ -609,8 +745,11 @@ table.steps tr:last-child td { border-bottom: none; }
   font-size: 13px;
 }
 
+/* No `outline: none` here (Task 22, specs.md §6): a scoped `:focus` rule at
+   specificity 0,2,0 would outrank the global `:focus-visible` rule above
+   (0,1,0) and silently swallow the keyboard focus ring on this element. The
+   accent border-color still highlights on any focus, keyboard or mouse. */
 .note-input:focus {
-  outline: none;
   border-color: var(--accent);
 }
 
@@ -627,7 +766,7 @@ table.steps tr:last-child td { border-bottom: none; }
 .tc-notes textarea {
   width: 100%;
   min-height: 44px;
-  background: var(--panel-2);
+  background: var(--surface);
   border: 1px solid var(--border);
   border-radius: 5px;
   color: var(--text);
@@ -637,8 +776,8 @@ table.steps tr:last-child td { border-bottom: none; }
   resize: vertical;
 }
 
+/* Same reasoning as .note-input:focus above — no outline: none here. */
 .tc-notes textarea:focus {
-  outline: none;
   border-color: var(--accent);
 }
 
@@ -648,7 +787,7 @@ table.steps tr:last-child td { border-bottom: none; }
   position: fixed;
   bottom: 20px;
   right: 20px;
-  background: var(--panel);
+  background: var(--surface);
   border: 1px solid var(--border);
   border-radius: 8px;
   padding: 8px 14px;
@@ -657,7 +796,802 @@ table.steps tr:last-child td { border-bottom: none; }
   z-index: 10;
 }
 .toast.error { border-color: var(--fail); color: var(--fail); }
-.toast.ok { border-color: var(--pass); color: var(--pass); }
+.toast.ok { border-color: var(--ok); color: var(--ok); }
+
+/* ------------------------------------------------------------- launcher */
+/* Level 1 (`public/launcher.js`, test_plan.md TC-001): role switch, the
+   single global inbox entry point, and the project grid — one screen. */
+
+.launcher {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.role-switch {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+/* Same pill shape as the (unrelated, top-bar) `.role-tab` above — this is
+   the level-1 role picker, `.role-tab` is dead markup (CR-008) from the
+   previous layout, not something this reuses directly. */
+.role-btn {
+  background: transparent;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  color: var(--text);
+  padding: 7px 18px;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.role-btn:hover { background: color-mix(in srgb, var(--surface) 80%, var(--accent)); }
+
+.role-btn.active {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: var(--accent-ink);
+  font-weight: 600;
+}
+
+.inbox-card {
+  display: block;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-left: 3px solid var(--accent);
+  border-radius: 10px;
+  padding: 14px 18px;
+  text-decoration: none;
+}
+
+.inbox-card:hover { background: color-mix(in srgb, var(--surface) 88%, var(--accent)); }
+
+.inbox-card-label {
+  color: var(--accent);
+  font-weight: 600;
+  font-size: 15px;
+}
+
+/* Three labeled sections (`status.js`'s `projectCategory`, dogfooding round
+   2) replacing the old bare "N требует внимания" — same `.project-grid`
+   layout repeated per section, not a new grid concept. */
+.project-sections { display: flex; flex-direction: column; gap: 24px; }
+
+.project-section { display: flex; flex-direction: column; }
+
+.project-section-title {
+  color: var(--text);
+  font-weight: 600;
+  font-size: 14px;
+  margin: 0 0 10px;
+}
+
+.project-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 12px;
+}
+
+.project-card {
+  display: block;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 14px 16px;
+  color: var(--text);
+  text-decoration: none;
+}
+
+.project-card:hover { border-color: var(--accent); }
+
+.project-card-name {
+  color: var(--accent);
+  font-weight: 600;
+  font-size: 15px;
+  margin-bottom: 4px;
+  overflow-wrap: anywhere;
+}
+
+.project-card-issues {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  color: var(--muted);
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+}
+.project-card-issues li + li { margin-top: 4px; }
+.project-card-issue-id { color: var(--text); font-weight: 600; }
+.project-card-issue-meta { color: var(--muted); }
+
+.project-card-problem {
+  color: var(--warn);
+  font-size: 12px;
+}
+
+/* --------------------------------------------------------------- inbox */
+/* Global inbox screen (`public/inbox.js`, test_plan.md TC-018/TC-019/TC-020):
+   grouped by project (`groupByProject`) — `.inbox-project` is one project's
+   heading + issue-summary table (dogfooding decision, replacing the
+   original flat two-section/tab-switch list across every project at once —
+   the earlier `.inbox-tabs`/`.inbox-panels` rules for that are gone with
+   it, not left as dead CSS). Each section within an issue's own group is
+   still the same `.panel`-style block of `.inbox-item` rows this screen
+   always used. */
+
+.inbox-projects { display: flex; flex-direction: column; gap: 28px; }
+
+.inbox-project {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 14px 18px;
+}
+
+.inbox-project-heading { margin-bottom: 10px; }
+
+.inbox-project-link {
+  color: var(--accent);
+  font-weight: 600;
+  font-size: 16px;
+  text-decoration: none;
+}
+.inbox-project-link:hover { text-decoration: underline; }
+
+.inbox-project-table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.inbox-project-table th {
+  text-align: left;
+  color: var(--muted);
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  font-weight: 600;
+  padding: 6px 10px;
+  border-bottom: 1px solid var(--border);
+}
+
+.inbox-project-table td {
+  padding: 8px 10px;
+  border-bottom: 1px solid var(--border);
+  font-variant-numeric: tabular-nums;
+}
+
+.inbox-project-issue-link {
+  color: var(--text);
+  text-decoration: none;
+  font-weight: 600;
+}
+.inbox-project-issue-link:hover { color: var(--accent); text-decoration: underline; }
+
+/* `renderIssueGroup` (`public/inbox.js`) — one issue's own block: heading
+   + the same two `.inbox-section`-style panels, reused by the project-
+   inbox screen (one block per issue) and the workspace "Дела" tab (one
+   block, this issue only). Deliberately a plain heading + gap, not another
+   `.panel`-style border — it already sits inside a bordered panel on both
+   call sites, and a border-in-a-border reads as visual noise. */
+.issue-group + .issue-group { margin-top: 24px; }
+
+.issue-group-title {
+  color: var(--text);
+  font-weight: 600;
+  font-size: 14px;
+  margin: 0 0 10px;
+}
+
+.issue-group-panels { display: flex; flex-direction: column; gap: 14px; }
+
+.inbox-section {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 14px 18px;
+}
+
+.inbox-section-title {
+  color: var(--accent);
+  font-weight: 600;
+  font-size: 15px;
+  margin: 0 0 10px;
+}
+
+.inbox-empty, .inbox-loading { color: var(--muted); margin: 0; }
+.inbox-error { color: var(--fail); margin: 0; }
+
+.inbox-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.inbox-list li + li { margin-top: 8px; }
+
+.inbox-item {
+  display: block;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 10px 14px;
+  color: var(--text);
+  text-decoration: none;
+}
+
+.inbox-item:hover { border-color: var(--accent); }
+
+.inbox-item-label {
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+
+.inbox-item-instruction {
+  color: var(--text);
+  font-size: 13px;
+  margin-top: 4px;
+  overflow-wrap: anywhere;
+}
+
+.inbox-item-meta {
+  color: var(--muted);
+  font-size: 11px;
+  margin-top: 4px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* ----------------------------------------------------------- workspace */
+/* Level 2 (`public/workspace.js`, test_plan.md TC-002/TC-003): no persistent
+   sidebar (AC-01b) — `.workspace-header` holds the Issue/Role dropdowns,
+   `.doc-tabs` holds exactly the current role's documents plus "Дела", and
+   `.doc-panel` is the one visible content panel for whichever tab is active. */
+
+.workspace {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+/* `.workspace-header` + `.doc-tabs` stick together as one unit while the
+   active document/checklist scrolls underneath — the page still scrolls as
+   a whole (no `overflow: hidden` reintroduced, TC-005), only this wrapper
+   pins. `background: var(--bg)` matters here: without an opaque background
+   the scrolling content would show through behind the sticky header. */
+.workspace-sticky {
+  position: sticky;
+  top: 0;
+  z-index: 5;
+  background: var(--bg);
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.workspace-header {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  flex-wrap: wrap;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 12px 16px;
+}
+
+.workspace-back {
+  color: var(--accent);
+  font-size: 13px;
+  text-decoration: none;
+  white-space: nowrap;
+}
+.workspace-back:hover { text-decoration: underline; }
+
+.workspace-project {
+  font-weight: 600;
+  font-size: 15px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* `project-picker.js`'s `renderProjectSelector` — the unified header's
+   project control (dogfooding round 2). The trigger looks like
+   `.workspace-project` (same role, now also clickable); the panel opens
+   as a dropdown *over* the current screen, not a navigation, so it needs
+   its own scroll/elevation — `.project-selector` is the positioning
+   context the absolutely-positioned panel anchors to. */
+.project-selector { position: relative; }
+
+.project-selector-trigger {
+  background: transparent;
+  border: none;
+  color: var(--text);
+  font-weight: 600;
+  font-size: 15px;
+  cursor: pointer;
+  padding: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 240px;
+}
+.project-selector-trigger:hover { color: var(--accent); }
+
+.project-selector-panel {
+  position: absolute;
+  top: calc(100% + 8px);
+  left: 0;
+  z-index: 10;
+  width: min(480px, 90vw);
+  max-height: 70vh;
+  overflow-y: auto;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 16px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35);
+}
+
+.workspace-field {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+/* The role filter (`.role-switch`, dogfooding round 2 — replacing the old
+   single `[Роль ▾]` dropdown) sits at the header's trailing edge, after the
+   Issue select. */
+.workspace-header .role-switch { margin-left: auto; }
+
+.field-label {
+  color: var(--muted);
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  white-space: nowrap;
+}
+
+.issue-select {
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  color: var(--text);
+  padding: 5px 8px;
+}
+
+.issue-select:disabled { opacity: 0.6; cursor: default; }
+
+.workspace-field--issue .issue-select { min-width: 160px; }
+
+/* Issue vs. project document groups (mockup Variant A) — one flex row of
+   `.tab-group`s, each its own labeled `.doc-tabs` pill row, separated by a
+   thin `.group-divider`. */
+.doc-tabs-groups {
+  display: flex;
+  align-items: flex-start;
+  gap: 14px;
+  flex-wrap: wrap;
+}
+
+.tab-group {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.group-label {
+  color: var(--muted);
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.group-divider {
+  width: 1px;
+  align-self: stretch;
+  background: var(--border);
+  margin: 0 2px;
+}
+
+.doc-tabs {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.doc-tab--missing {
+  color: var(--muted);
+  border-style: dashed;
+}
+
+.doc-tab {
+  background: transparent;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  color: var(--text);
+  padding: 7px 16px;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.doc-tab:hover { background: color-mix(in srgb, var(--surface) 80%, var(--accent)); }
+
+.doc-tab--active {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: var(--accent-ink);
+  font-weight: 600;
+}
+
+/* The one visible content panel for whichever `.doc-tab` is active — the
+   same bordered/padded block the rest of the app uses for a distinct area
+   (`.panel`, `.sub-card`), AC-02f's "each area its own panel, not one
+   solid canvas". */
+.doc-panel {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 18px 22px;
+}
+
+.checklist-body { margin-top: 4px; }
+
+.checklist-meta { margin-bottom: 12px; }
+
+/* ------------------------------------------------- checklist write UI */
+/* Task 29's interactive Result/Notes editing, layered onto the read-only
+   checklist body `renderChecklistBody` (public/workspace.js) builds:
+   `.checklist-meta-wrap` wraps the same meta HTML `.checklist-meta` styled
+   above, `.tc-wrap` is one TC's read-only `.tc-info-wrap` panel plus its
+   `.checklist-steps-table`/`.tc-notes-editor`, and `.loose-sections-wrap`
+   wraps the same loose-sections HTML `.loose-sections` above already styles
+   — none of these wrapper divs need their own visual treatment beyond
+   spacing, since the elements they wrap already carry `.panel`/`.loose-sections`
+   styling from innerHTML. */
+
+.checklist-meta-wrap { margin-bottom: 12px; }
+
+.tc-wrap { margin-bottom: 16px; }
+
+.tc-info-wrap { margin-bottom: 0; }
+
+.loose-sections-wrap { margin-top: 4px; }
+
+/* The interactive steps table — same `.panel-table` look the rest of the
+   app uses for tabular data (striped rows, muted uppercase headers), plus
+   the fixed-width Result column that holds the checkbox/textarea/button
+   stack below. */
+.checklist-steps-table { margin-top: 8px; }
+
+.checklist-steps-table .step-result-cell {
+  min-width: 220px;
+}
+
+.checklist-step-row td {
+  border-bottom: 1px solid var(--border);
+}
+
+.checklist-step-row:last-child td {
+  border-bottom: none;
+}
+
+.step-check-label {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  cursor: pointer;
+  margin-bottom: 6px;
+}
+
+.step-checkbox {
+  width: 16px;
+  height: 16px;
+  cursor: pointer;
+}
+
+.step-note-input {
+  display: block;
+  width: 100%;
+  min-width: 160px;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 5px;
+  color: var(--text);
+  padding: 6px 8px;
+  font-size: 13px;
+  font-family: inherit;
+  resize: vertical;
+  margin-bottom: 6px;
+}
+
+/* Same reasoning as .note-input:focus/.tc-notes textarea:focus above — no
+   outline: none here, so the global :focus-visible ring still shows. */
+.step-note-input:focus,
+.tc-notes-input:focus {
+  border-color: var(--accent);
+}
+
+.step-save-btn {
+  background: var(--accent);
+  border: none;
+  border-radius: 6px;
+  color: var(--bg);
+  padding: 5px 12px;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.step-save-btn:hover { filter: brightness(1.08); }
+.step-save-btn:disabled { opacity: 0.55; cursor: default; filter: none; }
+
+/* Save status text: plain (Saving…/Saved) reads in --ok, the same
+   "error" class `setChecklistStatus` (public/workspace.js) toggles on the
+   span switches it to --fail — same success/error split the .toast classes
+   above already use. */
+.step-save-status,
+.tc-notes-status {
+  display: inline-block;
+  margin-left: 8px;
+  font-size: 12px;
+  color: var(--ok);
+}
+
+.step-save-status.error,
+.tc-notes-status.error {
+  color: var(--fail);
+}
+
+/* The TC-level free-text Notes editor, directly below its read-only
+   .tc-info-wrap panel — same textarea/button/status pattern as the steps
+   table's per-row Result editor above. */
+.tc-notes-editor {
+  margin-top: 10px;
+  padding-top: 10px;
+  border-top: 1px dashed var(--border);
+}
+
+.tc-notes-editor strong {
+  display: block;
+  color: var(--muted);
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  margin-bottom: 4px;
+}
+
+.tc-notes-input {
+  display: block;
+  width: 100%;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 5px;
+  color: var(--text);
+  padding: 8px;
+  font-size: 13px;
+  font-family: inherit;
+  resize: vertical;
+  margin-bottom: 6px;
+}
+
+.tc-notes-save-btn {
+  background: var(--accent);
+  border: none;
+  border-radius: 6px;
+  color: var(--bg);
+  padding: 5px 12px;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.tc-notes-save-btn:hover { filter: brightness(1.08); }
+.tc-notes-save-btn:disabled { opacity: 0.55; cursor: default; filter: none; }
+
+/* ------------------------------------------------- "Дела" (human tasks) */
+/* The task queue in the "Дела" tab (public/workspace.js's `buildHumanTaskRow`/
+   `renderHumanTasksBody`) — one row per queued human task, each with a
+   "Завершить" (complete) action and an "Отдать агенту" (reassign) action.
+   Rows reuse `.panel`'s card look (border + `--surface`) instead of a table,
+   since each row's content (instruction text, two action groups) doesn't fit
+   the fixed-column `.panel-table` shape the rest of the app uses for tabular
+   data. */
+
+/* `.human-tasks-body` is the tab's whole content wrapper (loading text, the
+   error `.notice`, or the list below) — no layout of its own, just a hook
+   the coverage guard and `loadAndRenderHumanTasks` share for "this is the
+   pane that gets cleared and re-rendered". `.manual-tests-body` is the same
+   pattern for this issue's manual-tests half, above it. */
+.human-tasks-body { margin-top: 4px; }
+.manual-tests-body { margin-bottom: 18px; }
+
+.human-tasks-list { display: flex; flex-direction: column; gap: 10px; margin-top: 10px; }
+
+.human-tasks-empty { margin-top: 10px; }
+
+.human-task-row {
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface);
+  padding: 12px 14px;
+}
+
+.human-task-header {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.human-task-key { font-weight: 600; }
+
+.human-task-operation { color: var(--muted); font-size: 13px; }
+
+.human-task-instruction {
+  color: var(--muted);
+  margin: 8px 0 0;
+  line-height: 1.45;
+  max-width: 80ch;
+}
+
+/* Same `.action-row` layout the doc-panel toolbar above uses (flex, wrap,
+   gap) — the complete and reassign action groups sit side by side and wrap
+   to their own line on narrow viewports. */
+.human-task-actions {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  flex-wrap: wrap;
+  margin-top: 10px;
+}
+
+.human-task-complete-wrap,
+.human-task-reassign-wrap {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.human-task-verdict-input {
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 5px;
+  color: var(--text);
+  padding: 6px 8px;
+  font-size: 13px;
+  font-family: inherit;
+  min-width: 160px;
+}
+
+.human-task-verdict-input:focus { border-color: var(--accent); }
+
+.human-task-actor-select {
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 5px;
+  color: var(--text);
+  padding: 5px 8px;
+  font-size: 13px;
+  font-family: inherit;
+}
+
+.human-task-actor-select:disabled { opacity: 0.55; cursor: default; }
+
+.human-task-complete-btn,
+.human-task-reassign-btn {
+  background: var(--accent);
+  border: none;
+  border-radius: 6px;
+  color: var(--bg);
+  padding: 5px 12px;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.human-task-complete-btn:hover,
+.human-task-reassign-btn:hover { filter: brightness(1.08); }
+.human-task-complete-btn:disabled,
+.human-task-reassign-btn:disabled { opacity: 0.55; cursor: default; filter: none; }
+
+/* Same success/error split as `.step-save-status`/`.tc-notes-status` above:
+   plain reads in --ok, `setActionStatus` (public/workspace.js) toggling
+   "error" on the span switches it to --fail. */
+.human-task-complete-status,
+.human-task-reassign-status {
+  display: inline-block;
+  font-size: 12px;
+  color: var(--ok);
+}
+
+.human-task-complete-status.error,
+.human-task-reassign-status.error {
+  color: var(--fail);
+}
+
+/* ------------------------------------------------------- project inbox */
+/* `public/project-inbox.js` — `#/p/<project>` (mount(), the project screen)
+   and `#/p/<project>/inbox` (mountInbox(), the dedicated inbox screen —
+   dogfooding round 2, Task 61). Both reuse `.workspace-header` (unified
+   header) and `.project-section`/`.project-section-title` (issue sections);
+   `.project-inbox-section` is the dedicated inbox screen's own single
+   breakdown block, reusing `.issue-group`/`.inbox-section` from the inbox
+   styles above; `.issue-card-grid`/`.issue-card*` are the project screen's
+   per-issue cards. */
+
+.project-inbox { display: flex; flex-direction: column; gap: 24px; }
+
+.project-inbox-section { display: flex; flex-direction: column; gap: 12px; }
+
+.issue-card-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 12px;
+}
+
+.issue-card {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 14px 16px;
+  color: var(--text);
+  text-decoration: none;
+}
+
+.issue-card:hover { border-color: var(--accent); }
+
+.issue-card-title-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.issue-card-id {
+  color: var(--accent);
+  font-weight: 600;
+  font-size: 13px;
+  overflow-wrap: anywhere;
+}
+
+.issue-card-feature { color: var(--muted); font-size: 12px; }
+
+.issue-stage-strip {
+  display: flex;
+  gap: 4px;
+  flex-wrap: wrap;
+}
+
+.issue-stage {
+  font-size: 10px;
+  padding: 2px 6px;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+  color: var(--muted);
+  white-space: nowrap;
+}
+
+.issue-stage--done {
+  border-color: var(--ok);
+  color: var(--ok);
+}
+
+.issue-card-attention {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text);
+  margin-top: auto;
+}
 
 /* ----------------------------------------------------------- narrow view */
 /* At 1024×640 the three areas keep their own space and none of them overlaps

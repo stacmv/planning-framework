@@ -66,7 +66,17 @@
 #   pf_check_manual_budget <count> <tier>       — check if count within budget
 #   pf_validate_test_plan_structure <test_plan> — check for parseable Status Tracker
 
-set -uo pipefail
+# `-u` only: pipefail is deliberately NOT set. Nearly every assertion in these
+# suites reads `printf '%s' "$text" | grep -q ...`, and a reader that exits on
+# its first match closes the pipe under a writer that still has more to write —
+# EPIPE, then SIGPIPE, then exit 141. pipefail promotes that 141 to the
+# pipeline's status, so a pipeline that DID match reports failure, at random.
+# Measured 2026-09-07: ~0.6% of calls against a 38 KB input, which across the
+# ~236 early-exiting pipelines under test/ made `make test` fail about one run
+# in three on an unchanged tree. What these pipelines assert is the reader's
+# verdict; a producer that genuinely failed yields empty output and fails the
+# assertion on its own. test/shell-options.sh guards this and explains it.
+set -u
 
 PF_LIB_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)"
 REPO_ROOT="$(cd "$PF_LIB_DIR/.." && pwd -P)"

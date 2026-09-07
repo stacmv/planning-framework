@@ -35,6 +35,16 @@ Run all checks in order. Stop immediately if any check fails.
 
    **`NO-REPO` branch (idea only):** if step 5 set `NO-REPO`, Phase 2 ("Pre-Close Cleanup"), Phase 3 ("Detect Parent Branch"), and Phase 3.5/4 (merge or spike-copy, both require git) are **skipped entirely** — proceed directly to Phase 4.6.
 
+4. **All human-role pipeline stages are done:** Read `docs/issues/open/ISSUE-ID/prompt.md` and resolve `roles.<key>` for every pipeline key (`brd`, `specs`, `test_plan`, `implementation_plan`, `code`, `tests`, `user_docs`, `dev_docs`, plus `analysis`/`notes` when the issue uses them) using the resolution algorithm in `~/.claude/skills/pf-roles/SKILL.md` §4 — the same fallback-order algorithm every other `pf-*` skill already runs to resolve a single key for its own stage, just run here once per key instead of once for the stage at hand.
+
+   - Select the keys whose resolved `write` actor is `kind: human`, OR whose `review[]` list names at least one actor that resolves to `kind: human` (per `agents.yml`, §2 of that skill) — a human-review task blocks closure exactly like a human-write task does; do not check `write` only.
+   - For each selected key, check `docs/issues/open/ISSUE-ID/session-log.md` for a marker line of the form `[human-task done] <key> @ <ts> content-hash=<sha256>`.
+     - No such marker for `<key>` → that key is **not done**.
+     - Marker present, but its `sha256` does not match a freshly computed SHA-256 of the current on-disk content of whatever file/state resolves for that key (the pipeline document for a documentation key — `docs/issues/open/ISSUE-ID/<key>.md` for `brd`/`specs`/`test_plan`/`implementation_plan`/`user_docs`/`dev_docs`/`analysis`/`notes`; the relevant artifact for `code`/`tests`, per wherever that key's human workflow defines it) → also **not done** (stale — the content changed since the marker was recorded).
+   - If at least one resolved-`human` key is not done, stop: "Human-authored stage(s) not complete or stale: <key list>. Complete the human task(s) and record `[human-task done] <key> @ <ts> content-hash=<sha256>` in session-log.md before closing."
+
+   **This check is skill-native.** `/pf-close` performs it itself, right here, via `Read`/`Bash` — it does not depend on `tools/manual-test-ui` (an optional, separate dev tool with its own `projects.json`) and involves no JavaScript.
+
 ---
 
 ## Phase 1: Confirm with User

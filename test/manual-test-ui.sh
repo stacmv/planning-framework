@@ -117,9 +117,15 @@ fi
 ui_rc=0
 ui_out="$(cd "$REPO_ROOT" && node --test --test-reporter=tap "$UI_GLOB" 2>&1)" || ui_rc=$?
 
+# Matched with here-strings, never `printf ... | grep -q`: lib.sh runs under
+# `set -o pipefail`, and `grep -q` exits the moment it matches. On a large,
+# multi-line $ui_out (the TAP dump is ~100 KB / 2500 lines, and
+# checklist-ru.test.js first appears around line 180) the still-writing printf
+# then takes SIGPIPE and the pipeline yields 141 — a *successful* match
+# reported as failure. A here-string has no upstream writer to kill.
 if [ "$ui_rc" -eq 0 ] &&
-  printf '%s\n' "$ui_out" | grep -qF -- 'checklist-ru.test.js' &&
-  printf '%s\n' "$ui_out" | grep -qE '^# fail 0$'; then
+  grep -qF -- 'checklist-ru.test.js' <<<"$ui_out" &&
+  grep -qE '^# fail 0$' <<<"$ui_out"; then
   pf_pass "step 4: the manual-test-ui node suites run and exit 0"
 else
   pf_fail "step 4: the manual-test-ui node suites did not run clean (exit $ui_rc)"
@@ -522,7 +528,8 @@ fi
 # "Cannot find module".
 #
 # The fixture repository carries a checklist so that the answer proves the
-# server walked git (issueCount counts issues whose checklist exists), not
+# server walked git (openIssueCount/totalIssueCount are derived from the issue
+# directories it finds on disk), not
 # merely echoed the configuration back.
 #
 # The two pf_pass/pf_fail checkpoints below this fixture setup are labelled
@@ -635,9 +642,13 @@ wait "$tc015_pid" 2>/dev/null
 # Printed unconditionally, even when step 1 failed and $tc015_body is empty:
 # an Auto-TC label that is silently skipped leaves TC-004 step 2 unmapped in
 # /pf-test.
+# `openIssueCount`/`totalIssueCount`, not the former `issueCount`: the Project
+# Explorer redesign split the single count in two (server.js's own comment
+# records why). Same here-string rule as step 4 above.
 if [ "$tc015_up" -eq 1 ] &&
-  printf '%s' "$tc015_body" | grep -qF -- "\"name\":\"$TC015_PROJECT\"" &&
-  printf '%s' "$tc015_body" | grep -qF -- '"issueCount":1'; then
+  grep -qF -- "\"name\":\"$TC015_PROJECT\"" <<<"$tc015_body" &&
+  grep -qF -- '"openIssueCount":1' <<<"$tc015_body" &&
+  grep -qF -- '"totalIssueCount":1' <<<"$tc015_body"; then
   pf_pass "TC-004 step 2: server listed the fixture project"
 else
   pf_fail "TC-004 step 2: server did not list the fixture project"

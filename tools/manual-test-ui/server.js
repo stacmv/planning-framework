@@ -23,8 +23,10 @@ const paths = require("./lib/paths");
 const instructions = require("./lib/instructions");
 const memory = require("./lib/memory");
 const roles = require("./lib/roles");
+const rolesResolve = require("./lib/roles-resolve");
 const docstate = require("./lib/docstate");
 const prepare = require("./lib/prepare");
+const inbox = require("./lib/inbox");
 
 const TOOL_DIR = __dirname;
 const PUBLIC_DIR = path.join(TOOL_DIR, "public");
@@ -243,9 +245,72 @@ function readChecklistContent(entry) {
   return null;
 }
 
-function issueSummary(entry) {
+// A simplified stand-in for /pf's own stage-completion judgment
+// (skills/pf-size-tiers/SKILL.md: stub-marker detection, "every preceding
+// stage is itself complete") — deliberately not replicated here. This is
+// "does the file exist, or does it legitimately not apply" per
+// `classifyIssueDoc` (already used for doc-tabs), nothing more nuanced: no
+// stub-marker check, no recursive "preceding stage" gate.
+//
+// `status` (CR-016 fix) carries `classifyIssueDoc`'s real
+// "present"/"not_applicable"/"missing" verdict — tier-based pipeline
+// exclusion, `roles.<key>: skip` (explicit or tier-default), and the
+// closed-issue archive rule are all folded into it via `docstate.js`'s
+// `applicability()`. `done` stays a boolean roll-up (`status === "present"`)
+// for any caller that only needs "is this document there", but a consumer
+// that must not conflate "legitimately not applicable" with "missing" reads
+// `status`, not `done` — see `public/status.js`'s `issueDocProblem()`.
+const STAGE_DOCS = [
+  { key: "brd", doc: "brd.md" },
+  { key: "specs", doc: "specs.md" },
+  { key: "test_plan", doc: "test_plan.md" },
+  { key: "implementation_plan", doc: "implementation_plan.md" },
+  { key: "code_review", doc: "code_review.md" },
+  { key: "testing", doc: "manual_test_checklist.md" },
+  { key: "user_docs", doc: "user_docs.md" },
+  { key: "dev_docs", doc: "dev_docs.md" },
+  { key: "qa", doc: "qa_report.md" },
+];
+
+function issueStages(ctx) {
+  return STAGE_DOCS.map(({ key, doc }) => {
+    const state = docstate.classifyIssueDoc(ctx, doc);
+    // `classifyIssueDoc` never actually returns a literal "on_branch"
+    // status — a document living only on the issue's own branch comes back
+    // as `{ status: "present", location: "branch" }` (CR-017) — so `done`
+    // is exactly "is this document present", nothing more.
+    return { key, status: state.status, done: state.status === "present" };
+  });
+}
+
+// The standalone `**PASS**`/`**FAIL**` line `/pf-codereview`/`/pf-qa` always
+// write under a document's `## Verdict` heading (confirmed against this
+// repo's own code_review.md/qa_report.md files) — the same convention
+// those skills' own text requires so `/pf-close` can find it with a plain
+// text search. Deliberately disk-only: a doc that exists only on the
+// issue's own branch (`classifyIssueDoc`'s `location: "branch"`, `path:
+// null`) is skipped rather than read via `git show` — a minor scope
+// simplification, matching `issueStages`' own "simplified stand-in, not a
+// full replica" note above.
+const VERDICT_RE = /^\*\*(PASS|FAIL)\*\*\s*$/m;
+
+function docVerdict(ctx, docName) {
+  const state = docstate.classifyIssueDoc(ctx, docName);
+  if (state.status !== "present" || !state.path) return null;
+  let content;
+  try {
+    content = fs.readFileSync(state.path, "utf8");
+  } catch {
+    return null;
+  }
+  const match = VERDICT_RE.exec(content);
+  return match ? match[1] : null;
+}
+
+function issueSummary(entry, projectRoot) {
   const content = readChecklistContent(entry);
   const parsed = content ? parseChecklist(content) : null;
+  const ctx = projectRoot ? docstate.buildIssueContext(projectRoot, entry.issueId, entry.status) : null;
   return {
     issueId: entry.issueId,
     status: entry.status,
@@ -254,6 +319,9 @@ function issueSummary(entry) {
     feature: parsed ? parsed.meta["Feature Name"] || "" : "",
     date: parsed ? parsed.meta["Date"] || "" : "",
     summary: parsed ? summarize(parsed) : { totalSteps: 0, passedSteps: 0, totalTcs: 0 },
+    stages: ctx ? issueStages(ctx) : [],
+    codeReviewVerdict: ctx ? docVerdict(ctx, "code_review.md") : null,
+    qaVerdict: ctx ? docVerdict(ctx, "qa_report.md") : null,
   };
 }
 
@@ -809,9 +877,381 @@ async function handlePrepare(req, res, projectName, projectRoot, entry) {
   });
 }
 
+// ---------------------------------------------------------------------------
+// Completing a human task
+// ---------------------------------------------------------------------------
+//
+// POST .../human-tasks/:key/complete — the one write this route performs is
+// an append-only marker line in the issue's own session-log.md
+// (`[human-task done] <key> @ <ts> content-hash=<hash>`), recording that a
+// human has finished the `roles.<key>` task `GET .../human-tasks`
+// queues/reports on. Three shapes of verification, one per operation/key-kind:
+//   * review  — the caller supplies a non-empty verdict; nothing else is
+//     checked (a reviewer's word is the artifact here, not a file).
+//   * write, one of the six document keys — the mapped file must exist, be
+//     real (`docstate.isRealDocument`) and be fully committed
+//     (`git.isPathCommitted`); contentHash is its sha256.
+//   * write, code/tests — the issue branch must be ahead of its parent
+//     branch and touch at least one path outside docs/issues/ (for `tests`,
+//     that path must also look like a test file, `test/*.test.js`);
+//     contentHash is the branch HEAD's sha1 (`git.revParse`), never a file
+//     hash.
+//
+// `:key` is checked against the 8 known PIPELINE_KEYS (`inbox.PIPELINE_KEYS`)
+// before anything else — before any git command sees it — so an unknown key
+// can never reach a git argument.
+const TEST_FILE_RE = /(^|\/)test\/[^/]+\.test\.js$/;
+
+// Append `[human-task done] <key> @ <ISO-8601 UTC ts> content-hash=<hash>` to
+// the issue's session-log.md — append-only, never touching a byte of what's
+// already there (the same marker `lib/inbox.js`'s `findLastMarker()` reads
+// back). Creates the file if it does not exist yet rather than failing: a
+// human task can be the very first thing recorded in a fresh issue's log.
+function appendHumanTaskMarker(projectRoot, issueRel, key, contentHash) {
+  const sessionLogPath = path.join(projectRoot, ...issueRel.split("/"), "session-log.md");
+  let existing = "";
+  try {
+    existing = fs.readFileSync(sessionLogPath, "utf8");
+  } catch {
+    existing = "";
+  }
+  const ts = new Date().toISOString();
+  const separator = existing && !existing.endsWith("\n") ? "\n" : "";
+  const line = `[human-task done] ${key} @ ${ts} content-hash=${contentHash}\n`;
+  fs.writeFileSync(sessionLogPath, existing + separator + line, "utf8");
+}
+
+// POST .../issues/:id/human-tasks/:key/complete  { verdict? }
+async function handleHumanTaskComplete(req, res, projectRoot, entry, defaultBranch, key) {
+  if (!inbox.PIPELINE_KEYS.includes(key)) {
+    return sendJson(res, 404, {
+      error: "unknown_key",
+      message: `No such pipeline key. Known keys: ${inbox.PIPELINE_KEYS.join(", ")}.`,
+    });
+  }
+
+  let body;
+  try {
+    body = await readJsonBody(req);
+  } catch {
+    return sendJson(res, 400, { error: "invalid_json_body", message: "The request body is not valid JSON." });
+  }
+  if (body === null || typeof body !== "object" || Array.isArray(body)) {
+    return sendJson(res, 400, { error: "invalid_json_body", message: "The request body must be a JSON object." });
+  }
+
+  const resolved = inbox.resolveHumanTaskOperation(projectRoot, entry.issueId, entry.status, defaultBranch, key);
+  if (!resolved) return sendJson(res, 404, { error: "issue_not_found" });
+  if (!resolved.operation) {
+    return sendJson(res, 404, {
+      error: "not_a_human_task",
+      message: `roles.${key} does not resolve to a human actor for this issue.`,
+    });
+  }
+
+  // The content-identifier this key currently carries — the SAME value
+  // GET .../human-tasks compares a marker against
+  // (`inbox.currentContentIdentifier`). Writing anything else into the
+  // marker would make a just-completed task show right back up as "stale".
+  // `fallbackSeed` only matters when there is no current content to hash
+  // (e.g. a review of a key whose artifact doesn't exist on disk) — in that
+  // case the next read will find no current content either and treat the
+  // task as stale regardless of what was written here.
+  function currentHash(fallbackSeed) {
+    const id = inbox.currentContentIdentifier(projectRoot, entry.issueId, key, resolved.artifactPath);
+    return id !== null ? id : inbox.sha256Hex(fallbackSeed);
+  }
+
+  if (resolved.operation === "review") {
+    const verdict = typeof body.verdict === "string" ? body.verdict.trim() : "";
+    if (!verdict) {
+      return sendJson(res, 422, {
+        error: "invalid_verdict",
+        message: "A non-empty verdict is required to complete a review task.",
+      });
+    }
+    const contentHash = currentHash(`${key}:${verdict}`);
+    appendHumanTaskMarker(projectRoot, resolved.issueRel, key, contentHash);
+    return sendJson(res, 200, { status: "done", contentHash });
+  }
+
+  // operation === "write"
+  if (key === "code" || key === "tests") {
+    const issueBranch = `issue/${entry.issueId}`;
+    if (!git.branchExists(projectRoot, issueBranch)) {
+      return sendJson(res, 422, { error: "artifact_missing", message: `No ${issueBranch} branch exists yet.` });
+    }
+    const parentBranch = git.parentBranchOf(projectRoot, issueBranch);
+    const ahead = git.commitsAhead(projectRoot, parentBranch, issueBranch);
+    if (!(ahead > 0)) {
+      return sendJson(res, 422, {
+        error: "artifact_missing",
+        message: `${issueBranch} has no commits ahead of ${parentBranch} yet.`,
+      });
+    }
+    const changed = git.changedFilesBetween(projectRoot, parentBranch, issueBranch);
+    const outsideDocs = changed.filter((p) => !p.startsWith("docs/issues/"));
+    const qualifies = key === "tests" ? outsideDocs.some((p) => TEST_FILE_RE.test(p)) : outsideDocs.length > 0;
+    if (!qualifies) {
+      return sendJson(res, 422, {
+        error: "artifact_missing",
+        message:
+          key === "tests"
+            ? `No test/*.test.js file outside docs/issues/ was changed on ${issueBranch}.`
+            : `No file outside docs/issues/ was changed on ${issueBranch}.`,
+      });
+    }
+    const contentHash = git.revParse(projectRoot, issueBranch);
+    appendHumanTaskMarker(projectRoot, resolved.issueRel, key, contentHash);
+    return sendJson(res, 200, { status: "done", contentHash });
+  }
+
+  // The six document keys (brd, specs, test_plan, implementation_plan,
+  // user_docs, dev_docs).
+  const artifactPath = resolved.artifactPath;
+  const abs = path.join(projectRoot, ...artifactPath.split("/"));
+  let content;
+  try {
+    content = fs.readFileSync(abs, "utf8");
+  } catch {
+    return sendJson(res, 422, { error: "artifact_missing", message: `${artifactPath} does not exist yet.` });
+  }
+  if (!docstate.isRealDocument(content)) {
+    return sendJson(res, 422, { error: "artifact_missing", message: `${artifactPath} is empty or still a stub.` });
+  }
+  if (!git.isPathCommitted(projectRoot, artifactPath)) {
+    return sendJson(res, 422, {
+      error: "artifact_not_committed",
+      message: `${artifactPath} has uncommitted changes — commit it first.`,
+    });
+  }
+  const contentHash = inbox.sha256Hex(content);
+  appendHumanTaskMarker(projectRoot, resolved.issueRel, key, contentHash);
+  return sendJson(res, 200, { status: "done", contentHash });
+}
+
+// ---------------------------------------------------------------------------
+// Reassigning a human task's write actor
+// ---------------------------------------------------------------------------
+//
+// POST .../human-tasks/:key/reassign — the one write this route performs is a
+// single-substring text edit of `prompt.md`'s `roles.<key>` entry (AC-05g,
+// specs.md §4.3): NOT a parse-mutate-serialize round trip — a full YAML
+// rewrite risks corrupting the formatting/comments the rest of `roles:`
+// relies on, and a real YAML writer is out of scope for this zero-dependency
+// tool. Instead, a targeted single-line replacement of just the `write: <old>`
+// substring, leaving the file byte-identical everywhere else (line endings,
+// indentation, adjacent comments, key order). Only the single-line flow-style
+// `<key>: { write: ..., review: [...] }` shape `lib/roles-resolve.js` itself
+// reads (see that module's own comment) is supported — a `roles.<key>` entry
+// split across multiple lines (block-style YAML) is an explicitly accepted
+// limitation: refused with an error, file left untouched, never a silent
+// no-op and never a partial/corrupting edit.
+
+// A bare `roles:` block-opening line — no inline value, i.e. its children are
+// one level of indentation deeper (mirrors lib/roles-resolve.js's
+// parseIndentTree: a key with children and no inline value is a block, not a
+// flow scalar).
+const ROLES_BLOCK_LINE_RE = /^([ \t]*)roles:\s*$/;
+
+// A line's content with any trailing "\r" removed, for matching only — the
+// original line (with its "\r" intact, if any) is always what gets written
+// back, so CRLF files round-trip byte-identical.
+function stripTrailingCR(line) {
+  return line.endsWith("\r") ? line.slice(0, -1) : line;
+}
+
+/**
+ * Locate the single line, if any, that carries `<key>: { ... }` inside the
+ * `roles:` block of `promptText`'s YAML frontmatter — the same frontmatter
+ * `lib/roles-resolve.js`'s `extractFrontmatterText`/`resolveRole` reads
+ * `roles:` from; nowhere else in the file is searched.
+ *
+ * @returns {{lineIndex: number, lineText: string}|null} `null` when there is
+ *   no `roles:` block, no entry for `key` inside it, or the entry for `key`
+ *   exists but does not fit on one line (multi-line block-style — the
+ *   documented limitation).
+ */
+function findRolesKeyLine(promptText, key) {
+  const lines = String(promptText).split("\n");
+  if (stripTrailingCR(lines[0]) !== "---") return null;
+  let frontmatterEnd = -1;
+  for (let i = 1; i < lines.length; i++) {
+    const s = stripTrailingCR(lines[i]);
+    if (s === "---" || s === "...") {
+      frontmatterEnd = i;
+      break;
+    }
+  }
+  if (frontmatterEnd === -1) return null;
+
+  let rolesIndent = -1;
+  let rolesLine = -1;
+  for (let i = 1; i < frontmatterEnd; i++) {
+    const m = ROLES_BLOCK_LINE_RE.exec(stripTrailingCR(lines[i]));
+    if (m) {
+      rolesIndent = m[1].length;
+      rolesLine = i;
+      break;
+    }
+  }
+  if (rolesLine === -1) return null;
+
+  const escapedKey = key.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  const keyLineRe = new RegExp(`^([ \\t]*)${escapedKey}:\\s*(\\{.*\\})\\s*$`);
+  for (let i = rolesLine + 1; i < frontmatterEnd; i++) {
+    const raw = lines[i];
+    const line = stripTrailingCR(raw);
+    const indentMatch = /^([ \t]*)\S/.exec(line);
+    const indent = indentMatch ? indentMatch[1].length : Infinity; // blank line: keep scanning
+    if (line.trim() !== "" && indent <= rolesIndent) break; // roles: block ended
+    if (keyLineRe.test(line)) return { lineIndex: i, lineText: raw };
+  }
+  return null;
+}
+
+/**
+ * Replace only the `write: <old>` substring of one line with `write: <new>`
+ * — nothing else on the line (`review`, `mode`, whitespace, the trailing
+ * comma/brace) is touched.
+ *
+ * @returns {{newLine: string, oldValue: string}|null} `null` when the line
+ *   has no `write:` field to replace (e.g. a review-only entry).
+ */
+function replaceWriteField(lineText, newActor) {
+  const re = /\bwrite\s*:\s*("(?:[^"\\]|\\.)*"|'(?:[^'\\]|\\.)*'|[^,}]+?)(?=\s*[,}])/;
+  const m = re.exec(lineText);
+  if (!m) return null;
+  const oldValue = m[1].trim();
+  const before = lineText.slice(0, m.index);
+  const after = lineText.slice(m.index + m[0].length);
+  return { newLine: `${before}write: ${newActor}${after}`, oldValue };
+}
+
+/**
+ * The whole point-edit: find `roles.<key>`'s single-line flow-style entry in
+ * `promptText` and swap its `write:` value, leaving every other byte of the
+ * file untouched.
+ *
+ * @returns {{ok: true, newText: string, oldValue: string}|{ok: false}}
+ */
+function replacePromptRolesWrite(promptText, key, newActor) {
+  const found = findRolesKeyLine(promptText, key);
+  if (!found) return { ok: false };
+  const replaced = replaceWriteField(found.lineText, newActor);
+  if (!replaced) return { ok: false };
+  const lines = promptText.split("\n");
+  lines[found.lineIndex] = replaced.newLine;
+  return { ok: true, newText: lines.join("\n"), oldValue: replaced.oldValue };
+}
+
+// `docs/planning/agents.yml`'s raw text for one project — disk first (the
+// common case), falling back to `git show <defaultBranch>:...` when it isn't
+// on disk right now, exactly like `lib/inbox.js`'s own reads of this same
+// file. Never fabricated: an unreadable/nonexistent file on both paths comes
+// back as `""`, which `rolesResolve.resolveActor` already treats as "nothing
+// explicit — fall back to the shipped default actors" rather than throwing.
+function readAgentsYamlText(projectRoot, defaultBranch) {
+  const abs = path.join(projectRoot, "docs", "planning", "agents.yml");
+  try {
+    return fs.readFileSync(abs, "utf8");
+  } catch {
+    if (!defaultBranch) return "";
+    return git.showFile(projectRoot, defaultBranch, "docs/planning/agents.yml") || "";
+  }
+}
+
+// Append `[human-task reassigned] <key> @ <ISO-8601 UTC ts> from=<old> to=<new>`
+// to the issue's session-log.md — append-only, never touching a byte of
+// what's already there, symmetric to `appendHumanTaskMarker` above.
+function appendReassignMarker(projectRoot, issueRel, key, oldActor, newActor) {
+  const sessionLogPath = path.join(projectRoot, ...issueRel.split("/"), "session-log.md");
+  let existing = "";
+  try {
+    existing = fs.readFileSync(sessionLogPath, "utf8");
+  } catch {
+    existing = "";
+  }
+  const ts = new Date().toISOString();
+  const separator = existing && !existing.endsWith("\n") ? "\n" : "";
+  const line = `[human-task reassigned] ${key} @ ${ts} from=${oldActor} to=${newActor}\n`;
+  fs.writeFileSync(sessionLogPath, existing + separator + line, "utf8");
+}
+
+// POST .../issues/:id/human-tasks/:key/reassign  { actor }
+async function handleHumanTaskReassign(req, res, projectRoot, entry, defaultBranch, key) {
+  if (!inbox.PIPELINE_KEYS.includes(key)) {
+    return sendJson(res, 404, {
+      error: "unknown_key",
+      message: `No such pipeline key. Known keys: ${inbox.PIPELINE_KEYS.join(", ")}.`,
+    });
+  }
+
+  let body;
+  try {
+    body = await readJsonBody(req);
+  } catch {
+    return sendJson(res, 400, { error: "invalid_json_body", message: "The request body is not valid JSON." });
+  }
+  if (body === null || typeof body !== "object" || Array.isArray(body)) {
+    return sendJson(res, 400, { error: "invalid_json_body", message: "The request body must be a JSON object." });
+  }
+
+  const actor = typeof body.actor === "string" ? body.actor.trim() : "";
+  if (!actor) {
+    return sendJson(res, 422, { error: "invalid_actor", message: "A non-empty actor name is required." });
+  }
+
+  // The actor must be a name agents.yml (explicit or shipped-default) can
+  // resolve — not just any string (specs.md §4.3). Deliberately NOT gated on
+  // roles.<key> currently resolving to a human actor: TC-022's multi-line
+  // block-style fixture (TC-026 step 6) doesn't resolve to `kind: human`
+  // either — parseIndentTree drops an unparseable point-entry and the whole
+  // five-level fallback (lib/roles-resolve.js's resolveRole) falls through
+  // to whatever default applies, human or not. A gate keyed on "is this
+  // currently a human task" would make that very fixture 404 before ever
+  // reaching the format check TC-026 step 6 actually exercises. This route's
+  // only job is the point-edit itself: any known actor, onto any known
+  // pipeline key, expressed in the one text shape it can safely rewrite.
+  const agentsText = readAgentsYamlText(projectRoot, defaultBranch);
+  const actorCheck = rolesResolve.resolveActor(actor, agentsText);
+  if (!actorCheck.ok) {
+    return sendJson(res, 422, {
+      error: "unknown_actor",
+      message: `"${actor}" is not a known actor in docs/planning/agents.yml.`,
+    });
+  }
+
+  const issueRel = `docs/issues/${entry.status}/${entry.issueId}`;
+  const promptRelPath = `${issueRel}/prompt.md`;
+  const promptAbsPath = path.join(projectRoot, ...promptRelPath.split("/"));
+  let promptText;
+  try {
+    promptText = fs.readFileSync(promptAbsPath, "utf8");
+  } catch {
+    return sendJson(res, 422, { error: "artifact_missing", message: `${promptRelPath} does not exist yet.` });
+  }
+
+  const edit = replacePromptRolesWrite(promptText, key, actor);
+  if (!edit.ok) {
+    return sendJson(res, 409, {
+      error: "unsupported_roles_format",
+      message:
+        `roles.${key} in ${promptRelPath} is not written in the single-line flow-style this tool can edit ` +
+        `("${key}: { write: ..., review: [...] }") — reassign it manually by editing prompt.md.`,
+    });
+  }
+
+  fs.writeFileSync(promptAbsPath, edit.newText, "utf8");
+  appendReassignMarker(projectRoot, issueRel, key, edit.oldValue, actor);
+
+  return sendJson(res, 200, { status: "reassigned", actor });
+}
+
 async function handleApi(req, res, parts, projects, query) {
   // parts = pathname split on "/", filtered — e.g.
   // ["api","roles"]
+  // ["api","inbox"]
   // ["api","projects"]
   // ["api","projects",":name","docs"]           ?path=<relative path>
   // ["api","projects",":name","instructions"]
@@ -824,6 +1264,7 @@ async function handleApi(req, res, parts, projects, query) {
   // ["api","projects",":name","issues",":id","checklist","checkout"]
   // ["api","projects",":name","issues",":id","docs"]             ?path=<relative path>
   // ["api","projects",":name","issues",":id","roles",":role"]
+  // ["api","projects",":name","issues",":id","human-tasks"]
   // ["api","projects",":name","issues",":id","prepare"]          POST {confirm, tcId?}
 
   // GET /api/roles — the role table itself. Project- and issue-independent:
@@ -833,14 +1274,34 @@ async function handleApi(req, res, parts, projects, query) {
     return sendJson(res, 200, { roles: roles.listRoles() });
   }
 
+  // GET /api/inbox — the "things to do" across every configured project, not
+  // scoped to whichever one the tool happens to be pointed "at" (specs.md
+  // §3.2, AC-04a): every pending manual test case plus every open issue's
+  // `roles.<key>` pair resolved to `kind: human` and not yet done
+  // (`lib/inbox.js`'s `collectManualTests`/`collectHumanTasks`).
+  if (parts.length === 2 && parts[1] === "inbox" && req.method === "GET") {
+    const manualTests = inbox.collectManualTests(projects);
+    const humanTasks = inbox.collectHumanTasks(projects);
+    return sendJson(res, 200, { manualTests, humanTasks, totalCount: manualTests.length + humanTasks.length });
+  }
+
   if (parts.length === 2 && parts[1] === "projects" && req.method === "GET") {
     const list = [...projects.entries()].map(([name, p]) => {
       const defaultBranch = git.resolveDefaultBranch(p.root, p.configuredDefaultBranch);
+      // `openIssueCount`/`totalIssueCount` — every issue dir under
+      // docs/issues/{open,closed} (`findIssueDirs`), not "has a
+      // manual_test_checklist.md yet" (the previous `issueCount` here,
+      // `findChecklists(...).filter(checklistStatus !== "missing").length`
+      // — that undercounts to 0 for a project with real open issues that
+      // simply haven't reached `/pf-test` yet, reading as "nothing here"
+      // when there is). Dogfooding feedback, 20260806 issue.
+      const issueDirs = findIssueDirs(p.root, defaultBranch);
       return {
         name,
         currentBranch: git.getCurrentBranch(p.root),
         defaultBranch,
-        issueCount: findChecklists(p.root, defaultBranch).filter((e) => e.checklistStatus !== "missing").length,
+        openIssueCount: issueDirs.filter((e) => e.status === "open").length,
+        totalIssueCount: issueDirs.length,
       };
     });
     return sendJson(res, 200, list);
@@ -902,7 +1363,7 @@ async function handleApi(req, res, parts, projects, query) {
   const defaultBranch = git.resolveDefaultBranch(projectRoot, project.configuredDefaultBranch);
 
   if (parts.length === 4 && parts[3] === "issues" && req.method === "GET") {
-    const list = findChecklists(projectRoot, defaultBranch).map(issueSummary);
+    const list = findChecklists(projectRoot, defaultBranch).map((entry) => issueSummary(entry, projectRoot));
     return sendJson(res, 200, { currentBranch: git.getCurrentBranch(projectRoot), defaultBranch, issues: list });
   }
 
@@ -936,6 +1397,34 @@ async function handleApi(req, res, parts, projects, query) {
       });
     }
     return sendJson(res, 200, buildRoleContents(projectName, projectRoot, entry, roleId));
+  }
+
+  // GET .../issues/:id/human-tasks — every `roles.<key>` pair of this issue
+  // resolving to `kind: "human"` (lib/roles-resolve.js) and not yet done
+  // (lib/inbox.js's collectHumanTasksForIssue, the same marker/content-hash
+  // logic GET /api/inbox's humanTasks[] already uses, scoped to one issue).
+  // Pure read/report — this route NEVER performs the resolved operation
+  // itself (AC-05a): no write, no side effect, just the queue.
+  if (parts.length === 6 && parts[5] === "human-tasks" && req.method === "GET") {
+    return sendJson(res, 200, inbox.collectHumanTasksForIssue(projectRoot, entry.issueId, entry.status, defaultBranch));
+  }
+
+  // POST .../issues/:id/human-tasks/:key/complete  { verdict? } — mark this
+  // issue's roles.<key> human task done. See handleHumanTaskComplete for the
+  // three verification paths (review / write-doc / write-code).
+  if (parts.length === 8 && parts[5] === "human-tasks" && parts[7] === "complete" && req.method === "POST") {
+    const key = decodeURIComponent(parts[6]);
+    return handleHumanTaskComplete(req, res, projectRoot, entry, defaultBranch, key);
+  }
+
+  // POST .../issues/:id/human-tasks/:key/reassign  { actor } — edit
+  // roles.<key>.write in prompt.md via a targeted single-line text
+  // replacement (AC-05g). See handleHumanTaskReassign for the
+  // byte-identical-except-one-substring mechanism and its documented
+  // multi-line block-style limitation.
+  if (parts.length === 8 && parts[5] === "human-tasks" && parts[7] === "reassign" && req.method === "POST") {
+    const key = decodeURIComponent(parts[6]);
+    return handleHumanTaskReassign(req, res, projectRoot, entry, defaultBranch, key);
   }
 
   if (parts[5] !== "checklist") {
@@ -1002,6 +1491,13 @@ async function handleApi(req, res, parts, projects, query) {
     const { tcId, step, checked, note } = body;
     if (typeof tcId !== "string" || typeof step !== "number") {
       return sendJson(res, 400, { error: "tcId (string) and step (number) are required" });
+    }
+    // A step marked passed with no explanation of what was actually verified
+    // is worse than an unchecked box — it looks done but records nothing.
+    // Unchecking never requires text: clearing a mistaken check is always
+    // allowed to leave the note blank.
+    if (checked === true && !String(note || "").trim()) {
+      return sendJson(res, 422, { error: "empty_result" });
     }
     try {
       const content = fs.readFileSync(entry.checklistPath, "utf8");
