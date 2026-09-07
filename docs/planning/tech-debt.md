@@ -62,6 +62,25 @@ state, so a remnant can always be traced back to the review that produced it.
 - `CR-013` (P2, 20260806-feat-project-explorer-redesign) — `renderChecklistPanel`
   больше не вызывается из продуктового кода, живо только ради тестов. —
   state: `open`
+- `CR-018` (P2, 20260806-feat-project-explorer-redesign) — `public/attention.js`'s
+  `attentionForRoles(...)` принимает четвёртый параметр `missingDocsByIssue`,
+  который не передаёт ни один из двух вызывающих (`project-inbox.js`,
+  `project-picker.js`): и параметр, и его обработка внутри мертвы, а JSDoc при
+  этом утверждает, что экран списка issue его поставляет. — state: `open`
+- `CR-020` (P2, 20260806-feat-project-explorer-redesign) — после merge `79f5e32`
+  фолбэк-константа `DEFAULT_AGENTS_YAML` в `lib/roles-resolve.js` разошлась с §2
+  `skills/pf-roles/SKILL.md`: дефолтный `agents.yml` стал tiered
+  (`tiers:`/`default_tier:`/`degrade:` плюс запись `human:`), а константа
+  осталась плоской. Проект без `docs/planning/agents.yml` на диске с
+  `roles.<key>: { write: human }` даёт `unknown_actor` вместо `kind: "human"`, и
+  human-очередь проекта молча пуста. Рядом (предсуществующее): `agents.yml`
+  самого репозитория записи `human` тоже не содержит. — state: `open`
+- `CR-021` (P2, 20260806-feat-project-explorer-redesign) — сообщение level-3 в
+  `docstate.js`'s `roleSkipReason()` описывало случай, для level 3 недостижимый.
+  Исправлено в `9fc3f4b` вместе с корневой причиной (`CR-019`), но раунд ревью,
+  который переводит строку ledger в терминальное состояние, не запускался —
+  поэтому в `code_review.md` строка осталась `open`. — state: `fixed`, ledger не
+  обновлён
 - `TD-SIGPIPE` (обнаружено 2026-09-04 при /pf-autopilot по
   20260806-feat-project-explorer-redesign) — конструкция
   `printf '%s\n' "$var" | grep -q ...` под `set -o pipefail` (его ставит
