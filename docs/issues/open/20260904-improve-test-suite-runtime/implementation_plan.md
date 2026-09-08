@@ -27,9 +27,9 @@
 - Других потребителей `snapshot_tree` нет
 
 **Acceptance Criteria:**
-- [ ] `snapshot_tree` использует `xargs -0 sha256sum` для файлов, не запуская subshell на каждый файл
-- [ ] Формат манифеста (префикс `f/d/l`, хеш) не изменился
-- [ ] `make test` проходит, все `assert_tree_identical` зелёные
+- [x] `snapshot_tree` использует `xargs -0 sha256sum` для файлов, не запуская subshell на каждый файл
+- [x] Формат манифеста (префикс `f/d/l`, хеш) не изменился
+- [x] `make test` проходит, все `assert_tree_identical` зелёные
 
 ---
 
@@ -45,10 +45,10 @@
 - `docs-refs.sh:220-231` удаляется; `shellcheck` из вызова убирается
 
 **Acceptance Criteria:**
-- [ ] `make lint` существует и гоняет `shellcheck scripts/*.sh test/*.sh`
-- [ ] `make lint` завершается ошибкой, если `shellcheck` недоступен
-- [ ] `make test` больше не запускает `shellcheck`
-- [ ] `test/docs-refs.sh` не содержит вызова `shellcheck`
+- [x] `make lint` существует и гоняет `shellcheck scripts/*.sh test/*.sh`
+- [x] `make lint` завершается ошибкой, если `shellcheck` недоступен
+- [x] `make test` больше не запускает `shellcheck`
+- [x] `test/docs-refs.sh` не содержит вызова `shellcheck`
 
 ---
 
@@ -64,9 +64,9 @@
 - Проверяется `grep -rn 'pf_repo_copy' test/*.sh` на отсутствие других потребителей
 
 **Acceptance Criteria:**
-- [ ] `pf_repo_copy_reset` создана в `test/lib.sh`
-- [ ] `test/pf-idea-semantic-mutations.sh` использует `pf_repo_copy` один раз, затем `pf_repo_copy_reset`
-- [ ] `make test` проходит, S-5 invariant не нарушен
+- [x] `pf_repo_copy_reset` создана в `test/lib.sh`
+- [x] `test/pf-idea-semantic-mutations.sh` использует `pf_repo_copy` один раз, затем `pf_repo_copy_reset`
+- [x] `make test` проходит, S-5 invariant не нарушен
 
 ---
 
