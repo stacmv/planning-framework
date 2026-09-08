@@ -46,7 +46,7 @@ test:
 		echo 0 > /tmp/pf-test.rc; \
 	else \
 		rm -f /tmp/pf-suite-*.log /tmp/pf-suite-*.rc; \
-		cat /tmp/pf-suites.txt | xargs -0 -P 4 bash -c 'name=$$(basename "$$1" .sh); bash "$$1" > /tmp/pf-suite-$$name.log 2>&1; echo $$? > /tmp/pf-suite-$$name.rc' _; \
+		cat /tmp/pf-suites.txt | xargs -P 4 bash -c 'name=$$(basename "$$1" .sh); bash "$$1" > /tmp/pf-suite-$$name.log 2>&1; echo $$? > /tmp/pf-suite-$$name.rc' _; \
 		rc=0; \
 		for f in /tmp/pf-suite-*.rc; do \
 			[ -f "$$f" ] && [ "$$(cat "$$f")" -ne 0 ] && rc=1; \
