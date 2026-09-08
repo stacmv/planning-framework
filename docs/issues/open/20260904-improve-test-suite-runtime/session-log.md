@@ -15,3 +15,4 @@ improve; обоснование обязательности меры 4; make li
 @ 2026-09-08T11:52:42Z
 
 [pf-check PASSED] brd.md @ 2026-09-08T11:52:42Z
+[pf-check PASSED] test_plan.md @ 2026-09-08T12:15:00Z

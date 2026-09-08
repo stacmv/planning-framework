@@ -301,7 +301,7 @@ This test plan verifies all 9 acceptance criteria for the test suite runtime imp
 | TC-007 | Existing invariants not broken | Auto | Critical | | |
 | TC-008 | Environment hypothesis measured | Manual | Medium | | Manual reason: human-judgment |
 | TC-009 | Parallel output TC-ID matching intact | Auto | High | | |
-| TC-010 | Escalation if budget not achieved | Manual | High | | Manual reason: missing-harness |
+| TC-010 | Escalation if budget not achieved | Manual | High | | Manual reason: cost |
 
 ---
 
