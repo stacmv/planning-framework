@@ -101,7 +101,7 @@ test-ui:
 	node tools/manual-test-ui/server.js $(if $(PORT),--port $(PORT),)
 
 lint:
-	@shellcheck scripts/*.sh test/*.sh || exit 1
+	shellcheck scripts/*.sh test/*.sh || exit 1
 
 install:
 	sh scripts/install.sh

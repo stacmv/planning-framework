@@ -353,7 +353,7 @@ snapshot_tree() {
     find . -name .git -prune -o -type f -print0 |
       LC_ALL=C sort -z |
       xargs -0 sha256sum |
-      awk '{sub(/\*/, "", $2); print "f", $2, $1}'
+      awk '{sub(/\*/, "", $2); sub(/^\.\//, "", $2); print "f", $2, $1}'
   )
 }
 

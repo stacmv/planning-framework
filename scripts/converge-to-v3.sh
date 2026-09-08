@@ -960,12 +960,8 @@ t6_mirror_templates() {
   # Create all unique parent directories in one batch (reduces fork overhead)
   printf '%s\n' "${files[@]}" | xargs -0 dirname | sort -uz | xargs -0 mkdir -p
 
-  # Now copy files (collision protection preserved per-file)
-  for rel in "${files[@]}"; do
-    rel="${rel#./}"
-    [ -d "$dst/$rel" ] && rm -rf -- "${dst:?}/$rel"
-    cp -f "$TEMPLATES_SRC/$rel" "$dst/$rel"
-  done
+  # Copy files via tar-pipe (single process tree, no per-file fork)
+  printf '%s\n' "${files[@]}" | tar --no-recursion -cf - -T - | tar -C "$dst" -xf -
 
   while IFS= read -r -d '' rel; do
     rel="${rel#./}"
@@ -1001,9 +997,12 @@ t7_skills() {
     skill_names+=("$(basename "$src")")
   done
 
-  # Copy all at once using brace expansion or loop with single cp
+  # Copy all at once using brace expansion (exactly ONE cp -r fork)
+  local brace_srcs
+  printf -v brace_srcs '%s/.,' "$SKILLS_SRC"/*/
+  brace_srcs="${brace_srcs%,,}"
+  cp -r $brace_srcs "$skills_dir/"
   for name in "${skill_names[@]}"; do
-    cp -r "$SKILLS_SRC/$name/." "$skills_dir/$name/"
     REPORT_SKILLS+=("$name")
   done
 
