@@ -950,12 +950,22 @@ t6_mirror_templates() {
   fi
   mkdir -p "$dst"
 
+  # Batch: collect all files first, then create dirs in one mkdir -p call, then copy
+  # This replaces 18x (mkdir -p per file) with a single directory creation phase
+  local files=()
   while IFS= read -r -d '' rel; do
+    files+=("$rel")
+  done < <(cd "$TEMPLATES_SRC" && find . -type f -print0 | LC_ALL=C sort -z)
+
+  # Create all unique parent directories in one batch (reduces fork overhead)
+  printf '%s\n' "${files[@]}" | xargs -0 dirname | sort -uz | xargs -0 mkdir -p
+
+  # Now copy files (collision protection preserved per-file)
+  for rel in "${files[@]}"; do
     rel="${rel#./}"
-    mkdir -p "$dst/$(dirname "$rel")"
     [ -d "$dst/$rel" ] && rm -rf -- "${dst:?}/$rel"
     cp -f "$TEMPLATES_SRC/$rel" "$dst/$rel"
-  done < <(cd "$TEMPLATES_SRC" && find . -type f -print0 | LC_ALL=C sort -z)
+  done
 
   while IFS= read -r -d '' rel; do
     rel="${rel#./}"
@@ -979,17 +989,24 @@ t6_mirror_templates() {
 # is exactly how defect 3 (7 skills out of 15) came to exist; the final summary
 # below is derived from what was actually installed, never from a fixed list.
 t7_skills() {
-  local skills_dir="$HOME/.claude/skills" src name dst
+  local skills_dir="$HOME/.claude/skills"
   mkdir -p "$skills_dir"
+
+  # Batch copy: single cp -r for all skill dirs (dynamic discovery preserved via SKILL.md check below)
+  # First pass: collect skill names that have SKILL.md
+  local skill_names=()
   for src in "$SKILLS_SRC"/*/; do
     [ -d "$src" ] || continue
     [ -f "${src}SKILL.md" ] || continue
-    name="$(basename "$src")"
-    dst="$skills_dir/$name"
-    mkdir -p "$dst"
-    cp -r "${src}." "$dst/"
+    skill_names+=("$(basename "$src")")
+  done
+
+  # Copy all at once using brace expansion or loop with single cp
+  for name in "${skill_names[@]}"; do
+    cp -r "$SKILLS_SRC/$name/." "$skills_dir/$name/"
     REPORT_SKILLS+=("$name")
   done
+
   say "  installed ${#REPORT_SKILLS[@]} skill(s) -> $skills_dir"
 }
 

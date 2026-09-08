@@ -91,11 +91,14 @@ while IFS=$'\t' read -r m_file m_search m_replace m_expected || [ -n "${m_file:-
     continue
   fi
 
-  TMP_REPO=""
-  target_repo="$(pf_repo_copy)" || {
-    pf_fail "$label — pf_repo_copy failed"
-    continue
-  }
+  if [ -z "${target_repo:-}" ]; then
+    target_repo="$(pf_repo_copy)" || {
+      pf_fail "$label — pf_repo_copy failed"
+      continue
+    }
+  else
+    pf_repo_copy_reset "$target_repo"
+  fi
 
   target_file="$target_repo/$m_file"
   if [ ! -f "$target_file" ]; then

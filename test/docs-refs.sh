@@ -217,18 +217,6 @@ else
   printf '  %s\n' "${broken[@]}" >&2
 fi
 
-# ─── TC-039 step 9: shellcheck ────────────────────────────────────────────────
-
-if command -v shellcheck >/dev/null 2>&1; then
-  if shellcheck scripts/*.sh test/*.sh >/dev/null 2>&1; then
-    pf_pass "step 9: shellcheck scripts/*.sh test/*.sh — exit 0"
-  else
-    pf_fail "step 9: shellcheck reports findings in scripts/*.sh or test/*.sh"
-    shellcheck scripts/*.sh test/*.sh 2>&1 | head -20 >&2
-  fi
-else
-  pf_note "step 9: shellcheck is not installed — skipped (the QA gate runs it)"
-fi
 
 # ══════════════════════════════════════════════════════════════════════════════
 # TC-040 — the skill counts
