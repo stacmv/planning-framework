@@ -1001,6 +1001,7 @@ t7_skills() {
   local brace_srcs
   printf -v brace_srcs '%s/.,' "$SKILLS_SRC"/*/
   brace_srcs="${brace_srcs%,,}"
+  # shellcheck disable=SC2086  # brace_srcs is intentionally unquoted (brace expansion)
   cp -r $brace_srcs "$skills_dir/"
   for name in "${skill_names[@]}"; do
     REPORT_SKILLS+=("$name")
