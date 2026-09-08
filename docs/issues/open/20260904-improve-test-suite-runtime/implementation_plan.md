@@ -82,9 +82,9 @@
 - Семантика `mirror-not-overlay` (stale-delete) не трогается; защита от коллизий файл/каталог сохранена
 
 **Acceptance Criteria:**
-- [ ] `t7_skills` использует один `cp -r` вместо цикла с `mkdir`+`cp`
-- [ ] `t6_mirror_templates` использует батч-операции (tar-pipe или батч `mkdir`), не per-file форки
-- [ ] `make test` проходит — все T1–T11Invariant остаются зелёными
+- [x] `t7_skills` использует один `cp -r` вместо цикла с `mkdir`+`cp`
+- [x] `t6_mirror_templates` использует батч-операции (tar-pipe или батч `mkdir`), не per-file форки
+- [x] `make test` проходит — все T1–T11Invariant остаются зелёными
 
 ---
 
