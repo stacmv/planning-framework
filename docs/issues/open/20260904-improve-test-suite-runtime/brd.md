@@ -235,3 +235,17 @@ issue нет.
   AC-01; фактическое замеренное время зафиксировано в issue, а
   дальнейшая оптимизация оформлена отдельным follow-up issue, а не
   расширением скоупа этого.
+
+## Hypothesis Measurement Protocol (Task 6)
+
+**Hypothesis:** Placing `$TMPDIR` on Windows 11 Dev Drive (ReFS) or adding the test directory to Windows Defender exclusions reduces `make test` runtime. The dominant `sys` time (vs `user`) in the profiling data suggests I/O syscalls are a bottleneck.
+
+**Measurement protocol (per AC-07):**
+1. Run `make test` and record wall-clock time — this is baseline T1
+2. Apply the environment change (Dev Drive for TMPDIR, or Defender exclusion for `D:\dev\planning-framework`)
+3. Run `make test` again — record wall-clock time T2
+4. Compare: if T2 < T1 by more than ~15% (noise margin), hypothesis confirmed
+
+**If confirmed:** recommended setting: either move `TMPDIR` to a Dev Drive path, or add `D:\dev\planning-framework` to Windows Security → Virus & threat protection → Manage settings → Exclusions →Folders
+
+**Result:** Pending measurement by developer on Windows 11 host. This document records the protocol; the actual measurement is performed manually outside the repo.
