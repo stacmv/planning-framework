@@ -220,6 +220,19 @@ pf_setup_case() {
 # gate (.qa-workflow.md).
 pf_repo_copy() {
   local parent
+  # S-5 guard. In a linked git worktree `.git` is a file holding `gitdir: …`
+  # that points back at the real repository, and `cp -a` copies the pointer, not
+  # a repository. Every git command run in the "copy" — including the commits
+  # TC-041 makes deliberately — would then land in the REAL repo: stray commits
+  # on the branch under test and a dirty working tree, with S-5 still green.
+  # Making the copy self-contained is not cheap (the branch is checked out by
+  # another worktree and the common git dir would need rewriting), so refuse.
+  if [ ! -d "$REPO_ROOT/.git" ]; then
+    printf 'FATAL: %s is a git worktree (or not a git repository): .git is not a directory.\n' "$REPO_ROOT" >&2
+    printf '       A cp -a copy would still point at the real repository, so this suite\n' >&2
+    printf '       would commit into it. Run the suite from the main working tree.\n' >&2
+    exit 1
+  fi
   parent="$(pf_mktemp_d)" || exit 1
   TMP_REPO="$parent/$(basename "$REPO_ROOT")"
   cp -a "$REPO_ROOT" "$TMP_REPO"

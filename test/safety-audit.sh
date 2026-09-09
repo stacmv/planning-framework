@@ -111,4 +111,23 @@ else
   printf '%s\n' "$rogue" >&2
 fi
 
+# ─── Step 7: pf_repo_copy refuses to run from a git worktree (S-5) ────────────
+# In a linked git worktree, `.git` is a FILE holding `gitdir: …`, pointing back
+# at the real repository. `cp -a` copies that pointer, so every `git` command
+# run "inside the copy" — including the commits TC-041 makes on purpose —
+# actually lands in the real repository: S-5 is silently defeated and the branch
+# under test collects stray commits. Observed for real: two
+# `test(TC-041): inject a stray marker into a skill` commits ended up on the
+# issue branch, and skills/pf-check/SKILL.md was left modified in the tree.
+# The copy cannot be made self-contained cheaply (the branch is checked out by
+# another worktree, and the common git dir would have to be rewritten), so the
+# contract is: fail loudly instead of corrupting the repository.
+
+if grep -q 'is a git worktree' "$TEST_DIR/lib.sh" &&
+  grep -qE 'pf_repo_copy\(\)' "$TEST_DIR/lib.sh"; then
+  pf_pass "step 7: pf_repo_copy refuses to copy a git worktree instead of defeating S-5"
+else
+  pf_fail "step 7: pf_repo_copy has no git-worktree guard — a copy would still point at the real repo"
+fi
+
 pf_summary
