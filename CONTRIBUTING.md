@@ -108,6 +108,11 @@ Enhance setup scripts and automation:
    # Run the test suite
    make test
 
+   # Run the linter — a SEPARATE target on purpose: shellcheck used to run
+   # inside test/docs-refs.sh, where it cost ~88s of every run and duplicated
+   # the QA gate's own shellcheck step. Both targets must be run.
+   make lint
+
    # Try the framework end-to-end on a throwaway project
    mkdir ../test-project
    make converge TARGET=../test-project
