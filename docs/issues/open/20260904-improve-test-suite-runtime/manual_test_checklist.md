@@ -1,45 +1,70 @@
 # Manual Test Checklist
 
-**Feature Name:** Ускорение прогона `make test` (20260904-improve-test-suite-runtime)
+**Feature Name:** Ускорение прогона автотестов проекта
 **Issue ID:** 20260904-improve-test-suite-runtime
-**Date:** 2026-09-08
+**Date:** 2026-09-09
 **Tester:**
 
 ---
 
-## How to use
+## Как пользоваться
 
-This checklist walks you through testing a specific feature by hand.
+Этот чек-лист проводит вас по ручной проверке одной задачи.
 
-1. Read through each test section before you start so you know what to expect.
-2. Set up any prerequisites listed at the top of each test — if you cannot complete a prerequisite, stop and ask the developer before continuing.
-3. Follow the steps in order. After each step, check the "Expected Result" column and write what actually happened in the "Result" column.
-4. Mark the checkbox `[x]` if the step behaved as expected, or leave it `[ ]` if something was wrong.
-5. Use the Notes line at the bottom of each test to record anything unusual, even if the test passed.
-6. When you finish all tests, hand this document back to the developer.
+1. Прочитайте каждый раздел целиком до начала работы, чтобы понимать, чего ожидать.
+2. Выполните предусловия в начале каждой проверки. Если какое-то предусловие выполнить не получается — остановитесь и спросите разработчика, прежде чем продолжать.
+3. Выполняйте шаги по порядку. После каждого шага сверьтесь с колонкой «Ожидаемый результат» и запишите, что произошло на самом деле, в колонку «Результат».
+4. Ставьте `[x]`, если шаг отработал как ожидалось, и оставляйте `[ ]`, если что-то пошло не так.
+5. В строке «Примечания» внизу каждой проверки записывайте всё необычное — даже если проверка прошла успешно.
+6. Закончив все проверки, верните документ разработчику.
 
 ---
 
-## TC-008: Environment hypothesis is measured
+## TC-008: Замер влияния настроек окружения на скорость прогона
 
-**Prerequisites:**
-- Windows 11 machine with access to Dev Drive (optional)
-- Access to Windows Security → Virus & threat protection → Manage settings → Exclusions
-- Prepared data: none
+Проверка относится только к машине с Windows 11. На Linux и macOS она неприменима: описанные ниже настройки там отсутствуют.
 
-**Test Data:** none
+**Предусловия:**
+- Машина с Windows 11
+- Доступ к Dev Drive (по желанию) либо к настройкам «Безопасность Windows → Защита от вирусов и угроз → Управление настройками → Исключения»
+- Подготовленные данные: не требуются
 
-**Steps:**
+**Требуемые данные:** не требуются
 
-| Step | Action | Expected Result | Result |
+**Шаги:**
+
+| Шаг | Действие | Ожидаемый результат | Результат |
 |------|--------|-----------------|--------|
-| 1 | Identify measurement approach: either (a) move `TMPDIR` to a Windows Dev Drive path, or (b) add `D:\dev\planning-framework` to Windows Defender exclusions | Approach defined | [ ] |
-| 2 | Record current `make test` wall-clock time (run `time make test` and note the real time in seconds) | Timing data collected (T1 baseline) | [ ] |
-| 3 | Apply the environment change: (a) set `TMPDIR=/path/to/dev-drive` and run `make test` again, OR (b) add the exclusion and run `make test` again | Change applied | [ ] |
-| 4 | Record the new `make test` wall-clock time (T2) | Timing data collected (T2) | [ ] |
-| 5 | Compare: if T2 < T1 by more than ~15%, the hypothesis is confirmed. Otherwise not confirmed. Record the result in the issue's `brd.md` (replace "Pending" with "confirmed" or "not confirmed") | Result written to brd.md | [ ] |
-| 6 | If hypothesis is confirmed: add the recommended setting note to `brd.md` under Hypothesis Measurement Protocol section | Note present | [ ] |
+| 1 | Выберите, что будете менять: либо перенос временного каталога (`TMPDIR`) на Dev Drive, либо добавление рабочего каталога проекта в исключения антивируса | Способ выбран | [ ] |
+| 2 | Замерьте текущее время полного прогона: `time make test`, запишите значение real в секундах | Базовое время записано (T1) | [ ] |
+| 3 | Примените выбранное изменение и прогоните `make test` ещё раз | Изменение применено, прогон выполнен | [ ] |
+| 4 | Запишите новое время прогона (T2) | Время записано | [ ] |
+| 5 | Сравните: если T2 меньше T1 более чем на 15%, гипотеза подтвердилась, иначе — нет. Запишите вывод разработчику | Вывод сформулирован | [ ] |
+| 6 | Если гипотеза подтвердилась — укажите, какая именно настройка помогла | Рекомендация записана | [ ] |
 
-**Notes:**
+**Примечания:** На момент 2026-09-09 проверка не проводилась: работа шла на Ubuntu, где этих настроек нет. Полный прогон там занимает около 15-20 секунд, поэтому потребности в дополнительном ускорении нет.
+
+---
+
+## TC-010: Поведение, если прогон всё равно длиннее 7 минут
+
+Это проверка «плана Б»: она нужна только в случае, когда после всех улучшений полный прогон всё ещё занимает больше 7 минут. Проверка подтверждает, что такая ситуация не будет замолчана.
+
+**Предусловия:**
+- Замеренное время полного прогона превышает 7 минут (420 секунд)
+- Подготовленные данные: не требуются
+
+**Требуемые данные:** не требуются
+
+**Шаги:**
+
+| Шаг | Действие | Ожидаемый результат | Результат |
+|------|--------|-----------------|--------|
+| 1 | Замерьте время полного прогона: `time make test` | Время больше 420 секунд | [ ] |
+| 2 | Убедитесь, что задача не помечена выполненной по критерию «укладывается в 5-7 минут» | Задача остаётся открытой | [ ] |
+| 3 | Убедитесь, что фактически замеренное время записано в документах задачи | Время записано | [ ] |
+| 4 | Убедитесь, что заведена отдельная задача на дальнейшее ускорение | Продолжение зафиксировано | [ ] |
+
+**Примечания:** Предусловие не наступило — замер 2026-09-09 дал 18.85 секунды при допустимых 420. Проверка неприменима к текущему состоянию; она останется актуальной, если на другой машине прогон окажется длиннее 7 минут.
 
 ---

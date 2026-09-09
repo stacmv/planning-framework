@@ -292,18 +292,18 @@ This test plan verifies all 9 acceptance criteria for the test suite runtime imp
 
 | TC | Test Case | Type | Priority | Status | Remarks |
 |---|---|---|---|---|---|
-| TC-001 | make test runtime 5-7 min | Auto | Critical | | Auto harness: timing wrapper with `date +%s` before/after, assert delta ≤ 420s and exit 0 |
-| TC-002 | Suite and assertion count not reduced | Auto | Critical | | |
-| TC-003 | make lint exists and includes shellcheck | Auto | Critical | | |
-| TC-004 | shellcheck not invoked inside make test | Auto | Critical | | |
-| TC-005 | make lint is separate from make test | Auto | High | | |
-| TC-006 | All 6 acceleration measures implemented | Auto | Critical | | |
-| TC-007 | Existing invariants not broken | Auto | Critical | | |
+| TC-001 | make test runtime 5-7 min | Auto | Critical | ✓ | Auto harness: timing wrapper with `date +%s` before/after, assert delta ≤ 420s and exit 0. Прогон 2026-09-09: 18.85 с, exit 0 (бюджет 420 с). Три прогона подряд 14.9-22.0 с при load ~8; на спокойной машине 10.7-11.8 с. База develop — 194 с |
+| TC-002 | Suite and assertion count not reduced | Auto | Critical | ✓ | 28 сьютов (было 28), 1151 ассерт против 1148 на develop; посьютные числа совпадают, кроме docs-refs.sh -1 (shellcheck ушёл в make lint), safety-audit.sh +2, qa-gates.sh +1 |
+| TC-003 | make lint exists and includes shellcheck | Auto | Critical | ✓ | make lint: OK. Ветка отсутствия проверена реально: с PATH без shellcheck — «shellcheck not found», exit 2, не молчаливый пропуск |
+| TC-004 | shellcheck not invoked inside make test | Auto | Critical | ✓ | В выводе make test нет вызовов shellcheck; в docs-refs.sh осталась только директива `# shellcheck source=` |
+| TC-005 | make lint is separate from make test | Auto | High | ✓ | Цель lint не упоминается в рецепте test, объявлена в .PHONY отдельно |
+| TC-006 | All 6 acceleration measures implemented | Auto | Critical | ✓ | Меры 1-5 в коде; мера 6 — задокументированный протокол замера, сам замер это TC-008 (Windows-only). Плюс меры 7 и 8, добавленные 09.09 |
+| TC-007 | Existing invariants not broken | Auto | Critical | ✓ | converge-fresh 161, converge-safety 163, safety-audit 10, make test-migration 193 — всё зелёное; S-5 и assert_repo_untouched на месте |
 | TC-008 | Environment hypothesis measured | Manual | Medium | | Manual reason: human-judgment |
-| TC-009 | Parallel output TC-ID matching intact | Auto | High | | |
+| TC-009 | Parallel output TC-ID matching intact | Auto | High | ✓ | 27 блоков вывода, у каждого summary совпадает со своим заголовком — строки не перемешаны; порядок алфавитный, как при последовательном прогоне |
 | TC-010 | Escalation if budget not achieved | Manual | High | | Manual reason: cost |
-| TC-011 | Mutation replace stays literal, never glob | Auto | Critical | | Added 2026-09-09 — safety-audit.sh step 8 |
-| TC-012 | pf_repo_copy refuses to run in a git worktree | Auto | Critical | | Added 2026-09-09 — safety-audit.sh step 7 |
+| TC-011 | Mutation replace stays literal, never glob | Auto | Critical | ✓ | Added 2026-09-09 — safety-audit.sh step 8. safety-audit step 8; проверен в обе стороны — краснеет при возврате глоб-подстановки |
+| TC-012 | pf_repo_copy refuses to run in a git worktree | Auto | Critical | ✓ | Added 2026-09-09 — safety-audit.sh step 7. safety-audit step 7; проверен в обе стороны — краснеет при удалении гарда даже с сохранённым комментарием |
 
 ---
 

@@ -59,7 +59,9 @@ issue on Linux.
 
 ## Verdict
 
-**PASS** — after round 5.
+**PASS**
+
+After round 5.
 
 Round 4 (Codex): one P1 + three P2, all fixed. Round 5 (Codex, re-review of the
 fix diff): no P0/P1; two P2, both fixed rather than deferred. No finding is left
