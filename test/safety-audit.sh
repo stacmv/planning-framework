@@ -130,4 +130,19 @@ else
   pf_fail "step 7: pf_repo_copy has no git-worktree guard — a copy would still point at the real repo"
 fi
 
+# ─── Step 8: no glob substitution where a literal replace is meant ────────────
+# `${var/$search/$replace}` treats $search as a GLOB pattern. Manifest-driven
+# mutation text routinely contains markdown `**`, and bash then backtracks over
+# the whole file: one such row measured 57.9 s, and three of them accounted for
+# 137 s of a 145 s suite — 84% of the entire `make test` wall clock, for a
+# substitution that costs ~0 s done literally (awk index()).
+
+glob_sub="$(grep -nE '^[^#]*\$\{content/\$' "$TEST_DIR"/*.sh 2>/dev/null || true)"
+if [ -n "$glob_sub" ]; then
+  pf_fail "step 8: a suite uses \${content/\$var/...} — glob substitution on mutation text, catastrophically slow"
+  printf '%s\n' "$glob_sub" >&2
+else
+  pf_pass "step 8: no suite uses glob pattern substitution for a literal mutation replace"
+fi
+
 pf_summary
