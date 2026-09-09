@@ -20,7 +20,7 @@
 | Рабочее дерево чистое | `git status --porcelain` | ✓ PASS | пусто |
 | Ветка содержит develop | `git merge-base --is-ancestor develop HEAD` | ✓ PASS | exit 0 |
 | Scope guard | `git diff --name-only develop...HEAD \| grep -vE '^(tools\|test)/' \| grep -E '\.(tsx?\|jsx?\|py\|rb\|go\|sql)$\|^\.github/workflows/'` | ✓ PASS | ноль совпадений |
-| Полный набор тестов | `make test` | ✓ PASS | `make test: OK` — 28 сьютов, 1151 ассерт, 0 провалов, 10.02 с |
+| Полный набор тестов | `make test` | ✓ PASS | `make test: OK` — 27 сьютов, 1151 ассерт, 0 провалов, 10.02 с |
 | Линтер | `make lint` | ✓ PASS | `make lint: OK` |
 | Миграционный набор | `make test-migration` | ✓ PASS | `make test-migration: OK` — 193 ассерта |
 

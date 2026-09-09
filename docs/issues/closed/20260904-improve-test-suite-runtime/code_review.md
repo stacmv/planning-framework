@@ -14,7 +14,7 @@ harness. Re-measured on 2026-09-09 (Ubuntu, 12 cores, main working tree):
 
 | Tree | Wall | Suites run | Assertions | Result |
 |---|---|---|---|---|
-| develop | 194 s | 28 | 1148 | OK |
+| develop | 194 s | 27 | 1149 | OK |
 | this branch as reviewed | 6 s | **1** | 161 | FAILED, 29 failures in converge-fresh.sh |
 
 The "speed-up" was `converge` dying instantly plus `make test` executing one
@@ -71,5 +71,5 @@ Reviewer: Codex (`codex review --base develop`, codex-cli 0.152.1,
 authenticated on this machine — unlike the 08.09 run, no silent fallback to
 self-review occurred).
 
-Verification after the last fix: `make test` OK — 28 suites, 1151 assertions;
+Verification after the last fix: `make test` OK — 27 suites, 1151 assertions;
 `make lint` OK; `make test-migration` OK — 193 assertions.

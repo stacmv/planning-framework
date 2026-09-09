@@ -293,7 +293,7 @@ This test plan verifies all 9 acceptance criteria for the test suite runtime imp
 | TC | Test Case | Type | Priority | Status | Remarks |
 |---|---|---|---|---|---|
 | TC-001 | make test runtime 5-7 min | Auto | Critical | ✓ | Auto harness: timing wrapper with `date +%s` before/after, assert delta ≤ 420s and exit 0. Прогон 2026-09-09: 18.85 с, exit 0 (бюджет 420 с). Три прогона подряд 14.9-22.0 с при load ~8; на спокойной машине 10.7-11.8 с. База develop — 194 с |
-| TC-002 | Suite and assertion count not reduced | Auto | Critical | ✓ | 28 сьютов (было 28), 1151 ассерт против 1148 на develop; посьютные числа совпадают, кроме docs-refs.sh -1 (shellcheck ушёл в make lint), safety-audit.sh +2, qa-gates.sh +1 |
+| TC-002 | Suite and assertion count not reduced | Auto | Critical | ✓ | 27 сьютов (было 27), 1151 ассерт против 1149 на develop (на develop после мерджа 1150 — один шаг qa-gates исполняется только на issue-ветке); посьютные числа совпадают, кроме docs-refs.sh -1 (shellcheck ушёл в make lint), safety-audit.sh +2, qa-gates.sh +1 |
 | TC-003 | make lint exists and includes shellcheck | Auto | Critical | ✓ | make lint: OK. Ветка отсутствия проверена реально: с PATH без shellcheck — «shellcheck not found», exit 2, не молчаливый пропуск |
 | TC-004 | shellcheck not invoked inside make test | Auto | Critical | ✓ | В выводе make test нет вызовов shellcheck; в docs-refs.sh осталась только директива `# shellcheck source=` |
 | TC-005 | make lint is separate from make test | Auto | High | ✓ | Цель lint не упоминается в рецепте test, объявлена в .PHONY отдельно |
