@@ -220,11 +220,69 @@ pf_setup_case() {
 # gate (.qa-workflow.md).
 pf_repo_copy() {
   local parent
+  # S-5 guard. In a linked git worktree `.git` is a file holding `gitdir: …`
+  # that points back at the real repository, and `cp -a` copies the pointer, not
+  # a repository. Every git command run in the "copy" — including the commits
+  # TC-041 makes deliberately — would then land in the REAL repo: stray commits
+  # on the branch under test and a dirty working tree, with S-5 still green.
+  # Making the copy self-contained is not cheap (the branch is checked out by
+  # another worktree and the common git dir would need rewriting), so refuse.
+  if [ ! -d "$REPO_ROOT/.git" ]; then
+    printf 'FATAL: %s is a git worktree (or not a git repository): .git is not a directory.\n' "$REPO_ROOT" >&2
+    printf '       A cp -a copy would still point at the real repository, so this suite\n' >&2
+    printf '       would commit into it. Run the suite from the main working tree.\n' >&2
+    exit 1
+  fi
   parent="$(pf_mktemp_d)" || exit 1
   TMP_REPO="$parent/$(basename "$REPO_ROOT")"
   cp -a "$REPO_ROOT" "$TMP_REPO"
   printf '%s' "$TMP_REPO"
 }
+
+# pf_repo_copy_reset <copy> — resets an existing repo copy to pristine state
+# in ~1-2s, vs ~17s for a full cp -a. Uses git checkout + git clean so the
+# result is byte-identical to the original (same approach as pf_repo_copy).
+pf_repo_copy_reset() {
+  local copy="${1:?pf_repo_copy_reset: copy path required}"
+  # The reset is `git checkout -- .` + `git clean -fd`, which restores the copy
+  # to HEAD — not to the state pf_repo_copy actually copied. With a dirty source
+  # tree the first case would test the uncommitted work and every later case
+  # would test HEAD: order-dependent results, and the uncommitted
+  # scripts//skills/ edits under development would stop being tested at all,
+  # which is exactly why prompt.md rejected `git clone --local`.
+  #
+  # Editing and re-running is the normal development loop, so a dirty tree is
+  # not an error here — it just makes the fast path unusable. Fall back to a
+  # fresh copy (~0.16s, vs ~0.02s for a reset) and SAY SO: a silent fallback
+  # would be the very failure mode this suite exists to catch.
+  # Computed once per process: `git status` on this repo costs ~0.15s, and
+  # paying it on every case was 2.4s of the suite on its own.
+  if [ -z "${PF_SRC_DIRTY:-}" ]; then
+    if [ -n "$(git -C "$REPO_ROOT" status --porcelain 2>/dev/null)" ]; then
+      PF_SRC_DIRTY=yes
+    else
+      PF_SRC_DIRTY=no
+    fi
+  fi
+  if [ "$PF_SRC_DIRTY" = yes ]; then
+    if [ -z "${PF_RESET_FALLBACK_ANNOUNCED:-}" ]; then
+      printf '  ----  repo has uncommitted changes: using a fresh copy per case, not a reset\n'
+      PF_RESET_FALLBACK_ANNOUNCED=1
+    fi
+    rm -rf "$copy"
+    local parent
+    parent="$(pf_mktemp_d)" || exit 1
+    cp -a "$REPO_ROOT" "$parent/$(basename "$REPO_ROOT")"
+    mv "$parent/$(basename "$REPO_ROOT")" "$copy"
+    return 0
+  fi
+  git -C "$copy" checkout -- . 2>/dev/null || true
+  # `-fd`, not `-fdx`: ignored files (e.g. a project's .claude/) were copied by
+  # pf_repo_copy and are part of the baseline the first case ran against, so
+  # -x would delete them and give later cases a different tree.
+  git -C "$copy" clean -fd -q 2>/dev/null || true
+}
+
 
 # ─── The single gateway to the convergence script (S-1) ───────────────────────
 
@@ -325,19 +383,32 @@ snapshot_tree() {
       printf 'MISSING %s\n' "$dir"
       exit 0
     }
-    find . -name .git -prune -o -print0 |
+
+    # Dirs — no hash needed
+    find . -name .git -prune -o -type d -print0 |
       LC_ALL=C sort -z |
       while IFS= read -r -d '' p; do
-        if [ -L "$p" ]; then
-          printf 'l %s -> %s\n' "$p" "$(readlink "$p")"
-        elif [ -d "$p" ]; then
-          printf 'd %s\n' "$p"
-        elif [ -f "$p" ]; then
-          printf 'f %s %s\n' "$p" "$(sha256sum <"$p" | cut -d' ' -f1)"
-        else
-          printf '? %s\n' "$p"
-        fi
+        printf 'd %s\n' "$p"
       done
+
+    # Symlinks — readlink is a simple builtin, no subshell needed
+    find . -name .git -prune -o -type l -print0 |
+      LC_ALL=C sort -z |
+      while IFS= read -r -d '' p; do
+        printf 'l %s -> %s\n' "$p" "$(readlink "$p")"
+      done
+
+    # Files — one hashing pass, no per-file subshell. `-exec … +` rather than
+    # `xargs -0`: xargs without the GNU-only `-r` still runs sha256sum once on
+    # an empty list, which hashes stdin and emits a phantom `-` entry, so an
+    # empty tree and a tree holding one file named `-` produced equal
+    # manifests. Fields are cut by POSITION, not by `$2`: sha256sum writes
+    # `<64 hex><space><mode><path>`, so a filename containing spaces survives
+    # (splitting on whitespace truncated it). Sorting the finished lines keeps
+    # the manifest deterministic, since `-exec … +` has no ordering of its own.
+    find . -name .git -prune -o -type f -exec sha256sum {} + 2>/dev/null |
+      awk '{ h = substr($0, 1, 64); p = substr($0, 67); sub(/^\.\//, "", p); print "f", p, h }' |
+      LC_ALL=C sort
   )
 }
 

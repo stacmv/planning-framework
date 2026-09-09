@@ -91,11 +91,14 @@ while IFS=$'\t' read -r m_file m_search m_replace m_expected || [ -n "${m_file:-
     continue
   fi
 
-  TMP_REPO=""
-  target_repo="$(pf_repo_copy)" || {
-    pf_fail "$label — pf_repo_copy failed"
-    continue
-  }
+  if [ -z "${target_repo:-}" ]; then
+    target_repo="$(pf_repo_copy)" || {
+      pf_fail "$label — pf_repo_copy failed"
+      continue
+    }
+  else
+    pf_repo_copy_reset "$target_repo"
+  fi
 
   target_file="$target_repo/$m_file"
   if [ ! -f "$target_file" ]; then
@@ -111,7 +114,25 @@ while IFS=$'\t' read -r m_file m_search m_replace m_expected || [ -n "${m_file:-
       continue
       ;;
   esac
-  mutated="${content/$m_search/$m_replace}"
+  # NOT `${content/$m_search/$m_replace}`. That form is a GLOB pattern, not a
+  # literal: `*`, `?`, `[` in the search text are wildcards. Several manifest
+  # rows quote markdown bold (`**`), so bash backtracked over a 68 KB string —
+  # 57.9 s for ONE row, measured. Three such rows cost 137 s of the 145 s this
+  # suite took, which was 84% of the entire `make test` wall clock. index() is
+  # a literal search and costs ~0 s. Keep it literal.
+  mutated="$(m_search="$m_search" m_replace="$m_replace" awk '
+    BEGIN { s = ENVIRON["m_search"]; r = ENVIRON["m_replace"] }
+    {
+      if (!done) {
+        i = index($0, s)
+        if (i > 0) {
+          $0 = substr($0, 1, i - 1) r substr($0, i + length(s))
+          done = 1
+        }
+      }
+      print
+    }
+  ' "$target_file")"
   if [ "$mutated" = "$content" ]; then
     pf_fail "$label — mutation had no effect (search == replace?)"
     continue

@@ -111,4 +111,51 @@ else
   printf '%s\n' "$rogue" >&2
 fi
 
+# ─── Step 7: pf_repo_copy refuses to run from a git worktree (S-5) ────────────
+# In a linked git worktree, `.git` is a FILE holding `gitdir: …`, pointing back
+# at the real repository. `cp -a` copies that pointer, so every `git` command
+# run "inside the copy" — including the commits TC-041 makes on purpose —
+# actually lands in the real repository: S-5 is silently defeated and the branch
+# under test collects stray commits. Observed for real: two
+# `test(TC-041): inject a stray marker into a skill` commits ended up on the
+# issue branch, and skills/pf-check/SKILL.md was left modified in the tree.
+# The copy cannot be made self-contained cheaply (the branch is checked out by
+# another worktree, and the common git dir would have to be rewritten), so the
+# contract is: fail loudly instead of corrupting the repository.
+
+# This EXERCISES the guard rather than grepping for its wording: a fake repo
+# root whose `.git` is a file (exactly what a linked worktree has) is built in a
+# temp dir, lib.sh is sourced there so its REPO_ROOT resolves to that fake root,
+# and pf_repo_copy is called. Grepping for the comment text would keep passing
+# after someone deleted the guard but left the comment behind.
+wt_probe="$(mktemp -d)"
+mkdir -p "$wt_probe/test"
+cp "$TEST_DIR/lib.sh" "$wt_probe/test/lib.sh"
+printf 'gitdir: /nonexistent/.git/worktrees/probe\n' >"$wt_probe/.git"
+wt_out="$(bash -c '. "$1/test/lib.sh"; pf_repo_copy' _ "$wt_probe" 2>&1)"
+wt_rc=$?
+rm -rf "$wt_probe"
+
+if [ "$wt_rc" -ne 0 ] && printf '%s' "$wt_out" | grep -qi 'worktree'; then
+  pf_pass "step 7: pf_repo_copy refuses to run where .git is a file (exit $wt_rc) instead of defeating S-5"
+else
+  pf_fail "step 7: pf_repo_copy did not refuse a worktree-shaped repo root (exit $wt_rc) — a copy would still point at the real repo"
+  printf '%s\n' "$wt_out" | head -5 >&2
+fi
+
+# ─── Step 8: no glob substitution where a literal replace is meant ────────────
+# `${var/$search/$replace}` treats $search as a GLOB pattern. Manifest-driven
+# mutation text routinely contains markdown `**`, and bash then backtracks over
+# the whole file: one such row measured 57.9 s, and three of them accounted for
+# 137 s of a 145 s suite — 84% of the entire `make test` wall clock, for a
+# substitution that costs ~0 s done literally (awk index()).
+
+glob_sub="$(grep -nE '^[^#]*\$\{content/\$' "$TEST_DIR"/*.sh 2>/dev/null || true)"
+if [ -n "$glob_sub" ]; then
+  pf_fail "step 8: a suite uses \${content/\$var/...} — glob substitution on mutation text, catastrophically slow"
+  printf '%s\n' "$glob_sub" >&2
+else
+  pf_pass "step 8: no suite uses glob pattern substitution for a literal mutation replace"
+fi
+
 pf_summary

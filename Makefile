@@ -1,6 +1,6 @@
 PORT ?=
 
-.PHONY: help test test-migration test-ui install uninstall update-skills issue-status converge tui
+.PHONY: help test lint test-migration test-ui install uninstall update-skills issue-status converge tui
 
 help:
 	@echo "Planning Framework - Commands"
@@ -33,18 +33,33 @@ help:
 # on demand with `make test-migration`.
 test:
 	@rc=0; ran=0; \
+	work=$$(mktemp -d "$${TMPDIR:-/tmp}/pf-make-test.XXXXXXXX") || exit 1; \
 	for t in test/*.sh; do \
 		[ -f "$$t" ] || continue; \
 		case "$$t" in */lib.sh) continue ;; esac; \
 		case "$$t" in */converge-migrate.sh) continue ;; esac; \
 		ran=$$((ran + 1)); \
-		printf '\n=== %s\n' "$$t"; \
-		bash "$$t" || rc=1; \
+		printf '%s\n' "$$t" >> "$$work/suites"; \
 	done; \
 	if [ "$$ran" -eq 0 ]; then \
 		printf '\n=== test/*.sh\n'; \
 		echo "  no bash test suites yet — nothing to run"; \
+	else \
+		jobs=$${PF_TEST_JOBS:-$$(nproc 2>/dev/null || echo 4)}; \
+		PF_WORK="$$work" xargs -n 1 -P "$$jobs" \
+			sh -c 'n=$$(basename "$$1" .sh); bash "$$1" > "$$PF_WORK/$$n.log" 2>&1; printf %s "$$?" > "$$PF_WORK/$$n.rc"' _ \
+			< "$$work/suites"; \
+		while IFS= read -r t; do \
+			n=$$(basename "$$t" .sh); \
+			printf '\n=== %s\n' "$$t"; \
+			if [ -f "$$work/$$n.log" ]; then cat "$$work/$$n.log"; fi; \
+			if [ ! -f "$$work/$$n.rc" ] || [ "$$(cat "$$work/$$n.rc")" != "0" ]; then \
+				rc=1; \
+				if [ ! -f "$$work/$$n.rc" ]; then echo "  suite did not report an exit status — treated as FAILED"; fi; \
+			fi; \
+		done < "$$work/suites"; \
 	fi; \
+	rm -rf "$$work"; \
 	nodetests=0; \
 	for t in tools/onboarding-tui/test/*.test.js; do \
 		[ -f "$$t" ] && nodetests=1; \
@@ -88,6 +103,17 @@ test-ui:
 		exit 1; \
 	fi
 	node tools/manual-test-ui/server.js $(if $(PORT),--port $(PORT),)
+
+# Measure 2: shellcheck used to run inside test/docs-refs.sh, where it cost ~88s
+# of the run and duplicated the QA gate's own shellcheck step. It lives here now
+# so `make test` does not pay for it twice. CI and the QA gate must run BOTH
+# targets. Missing shellcheck is an error, not a silent skip.
+lint:
+	@if ! command -v shellcheck >/dev/null 2>&1; then \
+		echo "make lint: shellcheck not found — install it (apt install shellcheck)"; \
+		exit 1; \
+	fi; \
+	shellcheck scripts/*.sh test/*.sh && echo "make lint: OK"
 
 install:
 	sh scripts/install.sh

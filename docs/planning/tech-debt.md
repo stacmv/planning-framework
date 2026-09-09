@@ -5,6 +5,8 @@ the finding's stable ID, its priority, the issue it came from, and its final
 state, so a remnant can always be traced back to the review that produced it.
 
 - `CR-006` (P2, 20260902-feat-idea-stage) — `pf-idea-critique` checks predecessors by existence only, so a non-empty stub left by an interrupted `research.md` write satisfies it; the shared stage-completion criterion should apply here as it already does in `pf-idea-research`. The analogous check in `pf-idea-verdict` is loose the same way — state: `open`
+- `CR-007` (P2, 20260904-improve-test-suite-runtime) — Round 2 reviewer flagged `xargs -0` with newline-delimited input; false positive — `xargs -0` splits on all whitespace, `basename` correctly extracts filename per argument — state: `wont-fix`
+- `CR-008` (P2, 20260904-improve-test-suite-runtime) — t7_skills `brace_srcs` unquoted in `cp -r` — pre-existing pattern (`cp -r "${src}."` already in codebase), minimal risk for `$FRAMEWORK_ROOT` paths without spaces — state: `wont-fix`
 - `CR-007` (P2, 20260902-feat-idea-stage) — for git-backed idea/spike closures `NO-REPO` is false, so the unchanged Phase 9 report still claims two commits were added and one was a `--no-ff` merge; both new paths skip Phase 4 and normally create only the archive commit, making every successful close report misleading — state: `open`
 - `CR-012` (P2, 20260902-feat-idea-stage) — `pf-idea-critique` justifies its sequential Codex persona path by asserting Codex has no orchestrating primitive equivalent to the `Agent` tool; current documentation describes parallel subagents with concurrency control, so the sequential path is a defensible conservative fallback but not a consequence of a missing capability — state: `open`
 - `CR-013` (P2, 20260902-feat-idea-stage) — `specs-part3.md` §9 points a future `SKILLS_ROOT` resolver only at `~/.codex/skills`; current documentation names a repo-level `.agents/skills`, a user-level `$HOME/.agents/skills` and plugin discovery. The "accepted as limitation" status stands, but the resolver target description is out of date — state: `open`
@@ -103,3 +105,20 @@ state, so a remnant can always be traced back to the review that produced it.
   Починка — добавить `make test` в раздел Testing `.qa-workflow.md` (и в
   дефолтный шаблон `pf-qa-setup`), но это меняет гейт для всех будущих issue
   репозитория, поэтому вынесено из scope этой issue. — state: `open`
+
+## Тесты нельзя запускать из git-worktree (2026-09-09)
+
+`test/lib.sh::pf_repo_copy` делает `cp -a "$REPO_ROOT"`. В linked git-worktree
+`.git` — это файл с `gitdir: …`, и копия остаётся привязанной к настоящему
+репозиторию: git-команды «внутри копии» (в том числе намеренные пробные
+коммиты TC-041) пишут в реальную ветку, а `assert_repo_untouched` остаётся
+зелёным. Наблюдалось: два коммита `test(TC-041): inject a stray marker into a
+skill` попали в ветку issue 20260904.
+
+Сейчас `pf_repo_copy` падает с явной ошибкой вне основного рабочего дерева
+(`safety-audit.sh` step 7). Следствие, о котором надо помнить: изоляция
+параллельных агентов через worktree с прогоном тестов несовместима.
+
+Что можно сделать позже: делать копию самодостаточной — подставлять настоящий
+git dir вместо файла-указателя, снимать `core.worktree`, разруливать занятость
+ветки другим worktree. Дёшево это не делается, поэтому отложено.

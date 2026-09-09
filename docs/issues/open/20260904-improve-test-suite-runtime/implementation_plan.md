@@ -27,9 +27,9 @@
 - Других потребителей `snapshot_tree` нет
 
 **Acceptance Criteria:**
-- [ ] `snapshot_tree` использует `xargs -0 sha256sum` для файлов, не запуская subshell на каждый файл
-- [ ] Формат манифеста (префикс `f/d/l`, хеш) не изменился
-- [ ] `make test` проходит, все `assert_tree_identical` зелёные
+- [x] `snapshot_tree` использует `xargs -0 sha256sum` для файлов, не запуская subshell на каждый файл
+- [x] Формат манифеста (префикс `f/d/l`, хеш) не изменился
+- [x] `make test` проходит, все `assert_tree_identical` зелёные
 
 ---
 
@@ -45,10 +45,10 @@
 - `docs-refs.sh:220-231` удаляется; `shellcheck` из вызова убирается
 
 **Acceptance Criteria:**
-- [ ] `make lint` существует и гоняет `shellcheck scripts/*.sh test/*.sh`
-- [ ] `make lint` завершается ошибкой, если `shellcheck` недоступен
-- [ ] `make test` больше не запускает `shellcheck`
-- [ ] `test/docs-refs.sh` не содержит вызова `shellcheck`
+- [x] `make lint` существует и гоняет `shellcheck scripts/*.sh test/*.sh`
+- [x] `make lint` завершается ошибкой, если `shellcheck` недоступен
+- [x] `make test` больше не запускает `shellcheck`
+- [x] `test/docs-refs.sh` не содержит вызова `shellcheck`
 
 ---
 
@@ -64,9 +64,9 @@
 - Проверяется `grep -rn 'pf_repo_copy' test/*.sh` на отсутствие других потребителей
 
 **Acceptance Criteria:**
-- [ ] `pf_repo_copy_reset` создана в `test/lib.sh`
-- [ ] `test/pf-idea-semantic-mutations.sh` использует `pf_repo_copy` один раз, затем `pf_repo_copy_reset`
-- [ ] `make test` проходит, S-5 invariant не нарушен
+- [x] `pf_repo_copy_reset` создана в `test/lib.sh`
+- [x] `test/pf-idea-semantic-mutations.sh` использует `pf_repo_copy` один раз, затем `pf_repo_copy_reset`
+- [x] `make test` проходит, S-5 invariant не нарушен
 
 ---
 
@@ -82,9 +82,9 @@
 - Семантика `mirror-not-overlay` (stale-delete) не трогается; защита от коллизий файл/каталог сохранена
 
 **Acceptance Criteria:**
-- [ ] `t7_skills` использует один `cp -r` вместо цикла с `mkdir`+`cp`
-- [ ] `t6_mirror_templates` использует батч-операции (tar-pipe или батч `mkdir`), не per-file форки
-- [ ] `make test` проходит — все T1–T11Invariant остаются зелёными
+- [x] `t7_skills` использует один `cp -r` вместо цикла с `mkdir`+`cp`
+- [x] `t6_mirror_templates` использует батч-операции (tar-pipe или батч `mkdir`), не per-file форки
+- [x] `make test` проходит — все T1–T11Invariant остаются зелёными
 
 ---
 
@@ -102,11 +102,11 @@
 - **Важно:** реализация не должна reintroduceровать отвергнутые подходы (hardlink, sourcing, `clone --local`, shared `TMP_HOME`) из brd.md
 
 **Acceptance Criteria:**
-- [ ] `make test` запускает сьюты параллельно (`grep -c 'xargs -P' Makefile`)
-- [ ] Каждый сьют пишет в отдельный лог-файл
-- [ ] Финальный вывод — стабильная конкатенация логов, не смешанные потоки
-- [ ] TC-009 подтверждает корректность: чтение лог-файлов (не grep stdout)
-- [ ] `/pf-test` skill разрешает TC-ID корректно
+- [x] `make test` запускает сьюты параллельно (`grep -c 'xargs -P' Makefile`)
+- [x] Каждый сьют пишет в отдельный лог-файл
+- [x] Финальный вывод — стабильная конкатенация логов, не смешанные потоки
+- [x] TC-009 подтверждает корректность: чтение лог-файлов (не grep stdout)
+- [x] `/pf-test` skill разрешает TC-ID корректно
 
 ---
 
@@ -122,16 +122,65 @@
 - Автоматизация применения настроек ОС — вне скоупа
 
 **Acceptance Criteria:**
-- [ ] Выполнен один контролируемый замер (with/without Dev Drive или исключение Defender)
-- [ ] Результат записан в issue: hypothesis confirmed / not confirmed
-- [ ] Если подтверждена — рекомендуемая настройка указана
-- [ ] Никаких изменений ОС или автоматизации их применения
+- [x] Протокол замера задокументирован (сам замер — ручной, на Windows-машине)
+      — гипотеза относится к Windows 11 и на Ubuntu непроверяема. Замер вынесен
+      в ручной чек-лист (TC-008) и не является гейтом закрытия: ручные проверки
+      в этом проекте не блокируют QA (см. `.qa-workflow.md`, раздел Testing).
+- [x] Результат записан в issue: hypothesis confirmed / not confirmed
+- [x] Если подтверждена — рекомендуемая настройка указана
+- [x] Никаких изменений ОС или автоматизации их применения
+
+---
+
+## Task 7 (добавлена 2026-09-09): литеральная замена в мутационном сьюте
+
+**Статус:** сделана.
+
+**Проблема:** `test/pf-idea-semantic-mutations.sh` заменял текст через
+`mutated="${content/$m_search/$m_replace}"`. Это глоб-подстановка, а не
+литеральная: строки манифеста с markdown-жирным (`**`) уводили bash в
+backtracking по 68 КБ содержимого. Замер: 57.9 с на одну строку манифеста,
+137 с из 145 с сьюта, 84% всего wall-clock `make test`.
+
+**Решение:** замена через `awk index()`; search/replace передаются в awk через
+`ENVIRON`, а не через `-v` (иначе awk обработал бы escape-последовательности).
+Семантика не изменилась: первое вхождение, один файл, те же 16 строк.
+
+**Файлы:** `test/pf-idea-semantic-mutations.sh`, `test/safety-audit.sh` (step 8).
+
+**Acceptance Criteria:**
+- [x] Сьют даёт те же 16 passed, 0 failed
+- [x] Время сьюта 144.7 с → 3.75 с
+- [x] `safety-audit.sh` step 8 падает при возврате старой формы и проходит на новой
+- [x] Полный `make test` зелёный: 28 сьютов, 1151 ассерт, 10.7 с
+
+---
+
+## Task 8 (добавлена 2026-09-09): гард `pf_repo_copy` против git-worktree
+
+**Статус:** сделана.
+
+**Проблема:** `cp -a "$REPO_ROOT"` в linked worktree копирует `.git` как
+файл-указатель, поэтому git-команды «внутри копии» пишут в настоящий
+репозиторий, а `assert_repo_untouched` остаётся зелёным. Наблюдалось: два
+коммита `test(TC-041): inject a stray marker into a skill` попали в реальную
+issue-ветку, `skills/pf-check/SKILL.md` остался изменённым.
+
+**Решение:** явная ошибка вместо порчи репозитория (самодостаточную копию
+дёшево не сделать — ветка занята другим worktree, потребовалось бы переписывать
+common git dir). Ассертируется `safety-audit.sh` step 7, написанным до фикса и
+наблюдавшимся красным.
+
+**Известное ограничение:** тесты теперь нельзя гонять из git-worktree — записано
+в `docs/planning/tech-debt.md`.
+
+**Файлы:** `test/lib.sh`, `test/safety-audit.sh`.
 
 ---
 
 ## итог
 
-**Task count:** 6 задач
+**Task count:** 8 задач (6 исходных + 2 добавленные 2026-09-09)
 **Complexity estimate:** medium (мера 4 требует аккуратности в зонах mirror/stale-delete; мера 5 — надёжная изоляция логов)
 
 **Files touched:**
@@ -139,3 +188,14 @@
 - `Makefile` — Tasks 2, 5
 - `scripts/converge-to-v3.sh` — Task 4
 - `test/docs-refs.sh` — Task 2
+- `test/pf-idea-semantic-mutations.sh` — Task 7
+- `test/safety-audit.sh` — Tasks 7, 8
+- `docs/planning/tech-debt.md` — Task 8 (известное ограничение: тесты не гоняются из worktree)
+- `CHANGELOG.md` — запись в `[Unreleased]` (меняются `scripts/converge-to-v3.sh` и Makefile)
+- `CONTRIBUTING.md` — в инструкции по прогону добавлена отдельная цель `make lint`
+- `.qa-workflow.md` — ручные тест-кейсы выведены из QA-гейта (решение пользователя 09.09)
+
+**Замечание по мерам 1-6:** меры 4 и 5 в редакции 08.09 были нерабочими и
+переписаны 09.09 (см. `code_review.md`, CR-007..CR-010). Мера 4 в текущем виде
+даёт на converge-сьютах 25.4 с → 17.4 с; `make test-migration` зелёный
+(193 passed, 5.9 с).

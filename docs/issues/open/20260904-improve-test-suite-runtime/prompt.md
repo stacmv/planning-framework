@@ -3,6 +3,8 @@ doc_language: Russian
 size_tier: small
 profile: claude-writes-codex-reviews
 on_unavailable: degrade-tier
+roles:
+  code: { write: claude, review: [codex] }
 ---
 
 Сократить полный прогон `make test` в этом репозитории с текущих ~23+ минут
