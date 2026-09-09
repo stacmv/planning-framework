@@ -1,6 +1,6 @@
 ---
 doc_language: Russian
-size_tier: trivial
+size_tier: small
 profile: claude-writes-codex-reviews
 ---
 
