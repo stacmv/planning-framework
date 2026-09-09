@@ -302,6 +302,8 @@ This test plan verifies all 9 acceptance criteria for the test suite runtime imp
 | TC-008 | Environment hypothesis measured | Manual | Medium | | Manual reason: human-judgment |
 | TC-009 | Parallel output TC-ID matching intact | Auto | High | | |
 | TC-010 | Escalation if budget not achieved | Manual | High | | Manual reason: cost |
+| TC-011 | Mutation replace stays literal, never glob | Auto | Critical | | Added 2026-09-09 — safety-audit.sh step 8 |
+| TC-012 | pf_repo_copy refuses to run in a git worktree | Auto | Critical | | Added 2026-09-09 — safety-audit.sh step 7 |
 
 ---
 
@@ -329,3 +331,42 @@ TC-001 converted to Auto (timing wrapper harness). TC-008 stays Manual (human-ju
 ## Step 5: Known Issues
 
 *Omitted — small tier does not include Known Issues section.*
+
+
+---
+
+## Обновление 2026-09-09 — два добавленных тест-кейса
+
+### TC-011 — литеральная замена в мутационном сьюте
+
+**Что проверяет:** `test/pf-idea-semantic-mutations.sh` не использует
+`${content/$var/...}` — глоб-подстановку — для литеральной замены текста
+мутации.
+
+**Почему Critical:** возврат старой формы стоил 137 с из 145 с сьюта и 84%
+всего wall-clock `make test` (57.9 с на одну строку манифеста против 0.00 с у
+`awk index()`). Это не стилевая придирка, а единственная причина, по которой
+прогон занимал минуты.
+
+**Как проверяется:** `test/safety-audit.sh` step 8 — grep по исполняемым (не
+закомментированным) строкам `test/*.sh`. Гард проверен в обе стороны: красный
+при возврате старой формы, зелёный на текущей.
+
+### TC-012 — гард `pf_repo_copy` против git-worktree
+
+**Что проверяет:** `pf_repo_copy` отказывается работать, когда `.git` — не
+каталог (linked worktree или не-git каталог).
+
+**Почему Critical:** без гарда `cp -a` копирует указатель на настоящий
+репозиторий, и коммиты, которые TC-041 делает намеренно, попадают в реальную
+ветку, а `assert_repo_untouched` при этом зелёный — S-5 обходится молча.
+Наблюдалось на практике 09.09.
+
+**Как проверяется:** `test/safety-audit.sh` step 7. Тест написан до фикса и
+наблюдался красным.
+
+### Статус TC-001
+
+Бюджет AC-01 — 5-7 минут. Фактический замер на этой машине: `develop` 194 с,
+после изменений 10.7 с. TC-008 (гипотеза Dev Drive/Defender) остаётся Manual и
+непроверяем на Linux — не гейт этой issue.

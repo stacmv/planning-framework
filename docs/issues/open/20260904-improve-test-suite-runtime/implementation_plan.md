@@ -122,16 +122,64 @@
 - Автоматизация применения настроек ОС — вне скоупа
 
 **Acceptance Criteria:**
-- [x] Выполнен один контролируемый замер (with/without Dev Drive или исключение Defender)
+- [ ] Выполнен один контролируемый замер (with/without Dev Drive или исключение Defender)
+      — НЕ выполнен: гипотеза относится к Windows 11, на Ubuntu непроверяема.
+      Не гейт этой issue (см. BRD, AC-07).
 - [x] Результат записан в issue: hypothesis confirmed / not confirmed
 - [x] Если подтверждена — рекомендуемая настройка указана
 - [x] Никаких изменений ОС или автоматизации их применения
 
 ---
 
+## Task 7 (добавлена 2026-09-09): литеральная замена в мутационном сьюте
+
+**Статус:** сделана.
+
+**Проблема:** `test/pf-idea-semantic-mutations.sh` заменял текст через
+`mutated="${content/$m_search/$m_replace}"`. Это глоб-подстановка, а не
+литеральная: строки манифеста с markdown-жирным (`**`) уводили bash в
+backtracking по 68 КБ содержимого. Замер: 57.9 с на одну строку манифеста,
+137 с из 145 с сьюта, 84% всего wall-clock `make test`.
+
+**Решение:** замена через `awk index()`; search/replace передаются в awk через
+`ENVIRON`, а не через `-v` (иначе awk обработал бы escape-последовательности).
+Семантика не изменилась: первое вхождение, один файл, те же 16 строк.
+
+**Файлы:** `test/pf-idea-semantic-mutations.sh`, `test/safety-audit.sh` (step 8).
+
+**Acceptance Criteria:**
+- [x] Сьют даёт те же 16 passed, 0 failed
+- [x] Время сьюта 144.7 с → 3.75 с
+- [x] `safety-audit.sh` step 8 падает при возврате старой формы и проходит на новой
+- [x] Полный `make test` зелёный: 28 сьютов, 1151 ассерт, 10.7 с
+
+---
+
+## Task 8 (добавлена 2026-09-09): гард `pf_repo_copy` против git-worktree
+
+**Статус:** сделана.
+
+**Проблема:** `cp -a "$REPO_ROOT"` в linked worktree копирует `.git` как
+файл-указатель, поэтому git-команды «внутри копии» пишут в настоящий
+репозиторий, а `assert_repo_untouched` остаётся зелёным. Наблюдалось: два
+коммита `test(TC-041): inject a stray marker into a skill` попали в реальную
+issue-ветку, `skills/pf-check/SKILL.md` остался изменённым.
+
+**Решение:** явная ошибка вместо порчи репозитория (самодостаточную копию
+дёшево не сделать — ветка занята другим worktree, потребовалось бы переписывать
+common git dir). Ассертируется `safety-audit.sh` step 7, написанным до фикса и
+наблюдавшимся красным.
+
+**Известное ограничение:** тесты теперь нельзя гонять из git-worktree — записано
+в `docs/planning/tech-debt.md`.
+
+**Файлы:** `test/lib.sh`, `test/safety-audit.sh`.
+
+---
+
 ## итог
 
-**Task count:** 6 задач
+**Task count:** 8 задач (6 исходных + 2 добавленные 2026-09-09)
 **Complexity estimate:** medium (мера 4 требует аккуратности в зонах mirror/stale-delete; мера 5 — надёжная изоляция логов)
 
 **Files touched:**
@@ -139,3 +187,10 @@
 - `Makefile` — Tasks 2, 5
 - `scripts/converge-to-v3.sh` — Task 4
 - `test/docs-refs.sh` — Task 2
+- `test/pf-idea-semantic-mutations.sh` — Task 7
+- `test/safety-audit.sh` — Tasks 7, 8
+
+**Замечание по мерам 1-6:** меры 4 и 5 в редакции 08.09 были нерабочими и
+переписаны 09.09 (см. `code_review.md`, CR-007..CR-010). Мера 4 в текущем виде
+даёт на converge-сьютах 25.4 с → 17.4 с; `make test-migration` зелёный
+(193 passed, 5.9 с).
