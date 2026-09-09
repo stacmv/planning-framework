@@ -971,7 +971,14 @@ t6_mirror_templates() {
     if [ "${#dirs[@]}" -gt 0 ]; then
       mkdir -p "${dirs[@]}"
     fi
-    ( cd "$TEMPLATES_SRC" && cp -f --parents "${rels[@]}" "$dst/" )
+    # NOT `cp --parents`: that is a GNU extension and BSD cp (macOS, which
+    # README.md and scripts/install.sh both advertise) does not have it — T6
+    # would fail there while the run still reported success. A tar pipe is
+    # POSIX, keeps the relative paths, and is still two forks for the whole set.
+    if ! ( cd "$TEMPLATES_SRC" && tar -cf - "${rels[@]}" ) | ( cd "$dst" && tar -xf - ); then
+      err "failed to mirror templates into $dst"
+      return 1
+    fi
   fi
 
   while IFS= read -r -d '' rel; do

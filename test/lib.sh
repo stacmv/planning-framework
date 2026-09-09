@@ -244,6 +244,19 @@ pf_repo_copy() {
 # result is byte-identical to the original (same approach as pf_repo_copy).
 pf_repo_copy_reset() {
   local copy="${1:?pf_repo_copy_reset: copy path required}"
+  # The reset is `git checkout -- .` + `git clean -fdx`, which restores the
+  # copy to HEAD — not to the state pf_repo_copy actually copied. If the source
+  # tree is dirty, the first case runs against the uncommitted work and every
+  # later case runs against HEAD, so results become order-dependent. Worse, the
+  # uncommitted `scripts/`/`skills/` edits under development would stop being
+  # tested at all — the exact reason prompt.md rejected `git clone --local`.
+  if [ -n "$(git -C "$REPO_ROOT" status --porcelain 2>/dev/null)" ]; then
+    printf 'FATAL: %s has uncommitted changes.\n' "$REPO_ROOT" >&2
+    printf '       pf_repo_copy_reset restores a copy to HEAD, so cases after the\n' >&2
+    printf '       first would silently test committed code instead of your edits.\n' >&2
+    printf '       Commit or stash before running this suite.\n' >&2
+    exit 1
+  fi
   git -C "$copy" checkout -- . 2>/dev/null || true
   git -C "$copy" clean -fdx -q 2>/dev/null || true
 }
@@ -362,11 +375,17 @@ snapshot_tree() {
         printf 'l %s -> %s\n' "$p" "$(readlink "$p")"
       done
 
-    # Files — single pipeline: find | sort | xargs sha256sum (no per-file subshell)
-    find . -name .git -prune -o -type f -print0 |
-      LC_ALL=C sort -z |
-      xargs -0 sha256sum |
-      awk '{sub(/\*/, "", $2); sub(/^\.\//, "", $2); print "f", $2, $1}'
+    # Files — one hashing pass, no per-file subshell. `-exec … +` rather than
+    # `xargs -0`: xargs without the GNU-only `-r` still runs sha256sum once on
+    # an empty list, which hashes stdin and emits a phantom `-` entry, so an
+    # empty tree and a tree holding one file named `-` produced equal
+    # manifests. Fields are cut by POSITION, not by `$2`: sha256sum writes
+    # `<64 hex><space><mode><path>`, so a filename containing spaces survives
+    # (splitting on whitespace truncated it). Sorting the finished lines keeps
+    # the manifest deterministic, since `-exec … +` has no ordering of its own.
+    find . -name .git -prune -o -type f -exec sha256sum {} + 2>/dev/null |
+      awk '{ h = substr($0, 1, 64); p = substr($0, 67); sub(/^\.\//, "", p); print "f", p, h }' |
+      LC_ALL=C sort
   )
 }
 

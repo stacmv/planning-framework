@@ -123,11 +123,24 @@ fi
 # another worktree, and the common git dir would have to be rewritten), so the
 # contract is: fail loudly instead of corrupting the repository.
 
-if grep -q 'is a git worktree' "$TEST_DIR/lib.sh" &&
-  grep -qE 'pf_repo_copy\(\)' "$TEST_DIR/lib.sh"; then
-  pf_pass "step 7: pf_repo_copy refuses to copy a git worktree instead of defeating S-5"
+# This EXERCISES the guard rather than grepping for its wording: a fake repo
+# root whose `.git` is a file (exactly what a linked worktree has) is built in a
+# temp dir, lib.sh is sourced there so its REPO_ROOT resolves to that fake root,
+# and pf_repo_copy is called. Grepping for the comment text would keep passing
+# after someone deleted the guard but left the comment behind.
+wt_probe="$(mktemp -d)"
+mkdir -p "$wt_probe/test"
+cp "$TEST_DIR/lib.sh" "$wt_probe/test/lib.sh"
+printf 'gitdir: /nonexistent/.git/worktrees/probe\n' >"$wt_probe/.git"
+wt_out="$(bash -c '. "$1/test/lib.sh"; pf_repo_copy' _ "$wt_probe" 2>&1)"
+wt_rc=$?
+rm -rf "$wt_probe"
+
+if [ "$wt_rc" -ne 0 ] && printf '%s' "$wt_out" | grep -qi 'worktree'; then
+  pf_pass "step 7: pf_repo_copy refuses to run where .git is a file (exit $wt_rc) instead of defeating S-5"
 else
-  pf_fail "step 7: pf_repo_copy has no git-worktree guard — a copy would still point at the real repo"
+  pf_fail "step 7: pf_repo_copy did not refuse a worktree-shaped repo root (exit $wt_rc) — a copy would still point at the real repo"
+  printf '%s\n' "$wt_out" | head -5 >&2
 fi
 
 # ─── Step 8: no glob substitution where a literal replace is meant ────────────
