@@ -1,6 +1,6 @@
 PORT ?=
 
-.PHONY: help test test-migration test-ui install uninstall update-skills issue-status converge tui lint
+.PHONY: help test lint test-migration test-ui install uninstall update-skills issue-status converge tui
 
 help:
 	@echo "Planning Framework - Commands"
@@ -20,7 +20,7 @@ help:
 	@echo "  make converge TARGET=<path>       Converge a specific project directory"
 	@echo "  make converge TARGET=<path> YES=1    Converge non-interactively (skip confirmation prompt)"
 	@echo "  make tui                          Launch the interactive onboarding/update wizard"
-	@echo "  make tui TARGET=<path>            Run against a specific project directory"
+	@echo "  make tui TARGET=<path>            Run against a specific target project directory"
 
 # `test` is .PHONY on purpose: a directory named test/ exists, and without it
 # make would consider the target already up to date and run nothing.
@@ -31,51 +31,55 @@ help:
 # migrated. The suite is NOT deleted — it is the slowest part of the run (20 of
 # the 80 real converge invocations) and is still correct, so it is kept and run
 # on demand with `make test-migration`.
-#
-# Bash suites run in parallel via xargs -P 4, each writing to its own log file.
-# After all parallel jobs complete, logs are concatenated in alphabetical order.
-# This produces output equivalent to a sequential run — each suite's log is a
-# proper prefix of the final output in alphabetical order.
 test:
-	@# Collect bash suite files (skip lib.sh and converge-migrate.sh)
-	@ls test/*.sh 2>/dev/null | grep -v '/lib\.sh$$' | grep -v '/converge-migrate\.sh$$' | sort > /tmp/pf-suites.txt || true
-	@ran=$$(wc -l < /tmp/pf-suites.txt); \
+	@rc=0; ran=0; \
+	work=$$(mktemp -d "$${TMPDIR:-/tmp}/pf-make-test.XXXXXXXX") || exit 1; \
+	for t in test/*.sh; do \
+		[ -f "$$t" ] || continue; \
+		case "$$t" in */lib.sh) continue ;; esac; \
+		case "$$t" in */converge-migrate.sh) continue ;; esac; \
+		ran=$$((ran + 1)); \
+		printf '%s\n' "$$t" >> "$$work/suites"; \
+	done; \
 	if [ "$$ran" -eq 0 ]; then \
 		printf '\n=== test/*.sh\n'; \
 		echo "  no bash test suites yet — nothing to run"; \
-		echo 0 > /tmp/pf-test.rc; \
 	else \
-		rm -f /tmp/pf-suite-*.log /tmp/pf-suite-*.rc; \
-		cat /tmp/pf-suites.txt | xargs -P 4 bash -c 'name=$$(basename "$$1" .sh); bash "$$1" > /tmp/pf-suite-$$name.log 2>&1; echo $$? > /tmp/pf-suite-$$name.rc' _; \
-		rc=0; \
-		for f in /tmp/pf-suite-*.rc; do \
-			[ -f "$$f" ] && [ "$$(cat "$$f")" -ne 0 ] && rc=1; \
-		done; \
-		echo $$rc > /tmp/pf-test.rc; \
-		cat $$(ls /tmp/pf-suite-*.log | sort); \
-	fi
-	@# Node tests run after all bash suites complete (sequentially, not in parallel)
-	@nodetests=0; \
+		jobs=$${PF_TEST_JOBS:-$$(nproc 2>/dev/null || echo 4)}; \
+		PF_WORK="$$work" xargs -n 1 -P "$$jobs" \
+			sh -c 'n=$$(basename "$$1" .sh); bash "$$1" > "$$PF_WORK/$$n.log" 2>&1; printf %s "$$?" > "$$PF_WORK/$$n.rc"' _ \
+			< "$$work/suites"; \
+		while IFS= read -r t; do \
+			n=$$(basename "$$t" .sh); \
+			printf '\n=== %s\n' "$$t"; \
+			if [ -f "$$work/$$n.log" ]; then cat "$$work/$$n.log"; fi; \
+			if [ ! -f "$$work/$$n.rc" ] || [ "$$(cat "$$work/$$n.rc")" != "0" ]; then \
+				rc=1; \
+				if [ ! -f "$$work/$$n.rc" ]; then echo "  suite did not report an exit status — treated as FAILED"; fi; \
+			fi; \
+		done < "$$work/suites"; \
+	fi; \
+	rm -rf "$$work"; \
+	nodetests=0; \
 	for t in tools/onboarding-tui/test/*.test.js; do \
 		[ -f "$$t" ] && nodetests=1; \
 	done; \
 	printf '\n=== node --test tools/onboarding-tui/test/\n'; \
 	if [ "$$nodetests" -eq 1 ]; then \
-		node --test "tools/onboarding-tui/test/*.test.js" || echo 1 >> /tmp/pf-test.rc; \
+		node --test "tools/onboarding-tui/test/*.test.js" || rc=1; \
 	else \
 		echo "  no node test suites yet — nothing to run"; \
-	fi
-	@uitests=0; \
+	fi; \
+	uitests=0; \
 	for t in tools/manual-test-ui/test/*.test.js; do \
 		[ -f "$$t" ] && uitests=1; \
 	done; \
 	printf '\n=== node --test tools/manual-test-ui/test/\n'; \
 	if [ "$$uitests" -eq 1 ]; then \
-		node --test "tools/manual-test-ui/test/*.test.js" || echo 1 >> /tmp/pf-test.rc; \
+		node --test "tools/manual-test-ui/test/*.test.js" || rc=1; \
 	else \
 		echo "  no node test suites yet — nothing to run"; \
-	fi
-	@rc=$$(cat /tmp/pf-test.rc 2>/dev/null || echo 0); \
+	fi; \
 	printf '\n'; \
 	if [ "$$rc" -eq 0 ]; then echo "make test: OK"; else echo "make test: FAILED"; fi; \
 	exit $$rc
@@ -100,8 +104,16 @@ test-ui:
 	fi
 	node tools/manual-test-ui/server.js $(if $(PORT),--port $(PORT),)
 
+# Measure 2: shellcheck used to run inside test/docs-refs.sh, where it cost ~88s
+# of the run and duplicated the QA gate's own shellcheck step. It lives here now
+# so `make test` does not pay for it twice. CI and the QA gate must run BOTH
+# targets. Missing shellcheck is an error, not a silent skip.
 lint:
-	shellcheck scripts/*.sh test/*.sh || exit 1
+	@if ! command -v shellcheck >/dev/null 2>&1; then \
+		echo "make lint: shellcheck not found — install it (apt install shellcheck)"; \
+		exit 1; \
+	fi; \
+	shellcheck scripts/*.sh test/*.sh && echo "make lint: OK"
 
 install:
 	sh scripts/install.sh

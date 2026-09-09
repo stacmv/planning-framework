@@ -950,18 +950,29 @@ t6_mirror_templates() {
   fi
   mkdir -p "$dst"
 
-  # Batch: collect all files first, then create dirs in one mkdir -p call, then copy
-  # This replaces 18x (mkdir -p per file) with a single directory creation phase
-  local files=()
+  # Same mirror semantics as the per-file loop this replaces, with the forks
+  # batched: one `mkdir -p` for every parent directory and one `cp --parents`
+  # for every file, instead of mkdir + dirname + cp per file. `${rel%/*}`
+  # replaces the `dirname` fork; the file/directory collision guard below is a
+  # shell builtin test, so it costs nothing.
+  local -a rels=() dirs=()
   while IFS= read -r -d '' rel; do
-    files+=("$rel")
+    rels+=("${rel#./}")
   done < <(cd "$TEMPLATES_SRC" && find . -type f -print0 | LC_ALL=C sort -z)
 
-  # Create all unique parent directories in one batch (reduces fork overhead)
-  printf '%s\n' "${files[@]}" | xargs -0 dirname | sort -uz | xargs -0 mkdir -p
-
-  # Copy files via tar-pipe (single process tree, no per-file fork)
-  printf '%s\n' "${files[@]}" | tar --no-recursion -cf - -T - | tar -C "$dst" -xf -
+  if [ "${#rels[@]}" -gt 0 ]; then
+    for rel in "${rels[@]}"; do
+      case "$rel" in
+        */*) dirs+=("$dst/${rel%/*}") ;;
+      esac
+      # A directory sitting where a file must go would make `cp` fail.
+      [ -d "$dst/$rel" ] && rm -rf -- "${dst:?}/$rel"
+    done
+    if [ "${#dirs[@]}" -gt 0 ]; then
+      mkdir -p "${dirs[@]}"
+    fi
+    ( cd "$TEMPLATES_SRC" && cp -f --parents "${rels[@]}" "$dst/" )
+  fi
 
   while IFS= read -r -d '' rel; do
     rel="${rel#./}"
@@ -985,28 +996,25 @@ t6_mirror_templates() {
 # is exactly how defect 3 (7 skills out of 15) came to exist; the final summary
 # below is derived from what was actually installed, never from a fixed list.
 t7_skills() {
-  local skills_dir="$HOME/.claude/skills"
+  local skills_dir="$HOME/.claude/skills" src name
+  local -a srcs=()
   mkdir -p "$skills_dir"
-
-  # Batch copy: single cp -r for all skill dirs (dynamic discovery preserved via SKILL.md check below)
-  # First pass: collect skill names that have SKILL.md
-  local skill_names=()
+  # Discovery stays dynamic and per-directory (a skill is a directory holding a
+  # SKILL.md); only the copying is batched, into a single `cp -r` for the whole
+  # set instead of mkdir + cp per skill. `${src%/}` and `${name##*/}` replace
+  # the `basename` fork.
   for src in "$SKILLS_SRC"/*/; do
     [ -d "$src" ] || continue
     [ -f "${src}SKILL.md" ] || continue
-    skill_names+=("$(basename "$src")")
-  done
-
-  # Copy all at once using brace expansion (exactly ONE cp -r fork)
-  local brace_srcs
-  printf -v brace_srcs '%s/.,' "$SKILLS_SRC"/*/
-  brace_srcs="${brace_srcs%,,}"
-  # shellcheck disable=SC2086  # brace_srcs is intentionally unquoted (brace expansion)
-  cp -r $brace_srcs "$skills_dir/"
-  for name in "${skill_names[@]}"; do
+    name="${src%/}"; name="${name##*/}"
+    # A file sitting where the skill directory must go would make `cp` fail.
+    [ -e "$skills_dir/$name" ] && [ ! -d "$skills_dir/$name" ] && rm -f -- "$skills_dir/$name"
+    srcs+=("${src%/}")
     REPORT_SKILLS+=("$name")
   done
-
+  if [ "${#srcs[@]}" -gt 0 ]; then
+    cp -r "${srcs[@]}" "$skills_dir/"
+  fi
   say "  installed ${#REPORT_SKILLS[@]} skill(s) -> $skills_dir"
 }
 
