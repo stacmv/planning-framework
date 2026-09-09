@@ -255,7 +255,16 @@ pf_repo_copy_reset() {
   # not an error here — it just makes the fast path unusable. Fall back to a
   # fresh copy (~0.16s, vs ~0.02s for a reset) and SAY SO: a silent fallback
   # would be the very failure mode this suite exists to catch.
-  if [ -n "$(git -C "$REPO_ROOT" status --porcelain 2>/dev/null)" ]; then
+  # Computed once per process: `git status` on this repo costs ~0.15s, and
+  # paying it on every case was 2.4s of the suite on its own.
+  if [ -z "${PF_SRC_DIRTY:-}" ]; then
+    if [ -n "$(git -C "$REPO_ROOT" status --porcelain 2>/dev/null)" ]; then
+      PF_SRC_DIRTY=yes
+    else
+      PF_SRC_DIRTY=no
+    fi
+  fi
+  if [ "$PF_SRC_DIRTY" = yes ]; then
     if [ -z "${PF_RESET_FALLBACK_ANNOUNCED:-}" ]; then
       printf '  ----  repo has uncommitted changes: using a fresh copy per case, not a reset\n'
       PF_RESET_FALLBACK_ANNOUNCED=1
