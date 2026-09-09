@@ -1346,7 +1346,14 @@ t2_version_marker
 t3_planning_md
 t4_claude_md
 t5_global_docs
-t6_mirror_templates
+# t6 returns non-zero when the templates source is missing or the mirror copy
+# fails. That status was previously discarded, so converge could print its
+# success report and exit 0 with docs/planning/templates/ missing or only
+# half-written. Phase 6 is a top-up, not a transfer, so a failure here does not
+# roll anything back — but it must reach the exit status.
+if ! t6_mirror_templates; then
+  EXIT_CODE=1
+fi
 t7_skills
 t8_shim
 say ""

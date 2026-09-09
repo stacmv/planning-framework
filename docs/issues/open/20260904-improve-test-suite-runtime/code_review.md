@@ -42,10 +42,12 @@ code.
 | CR-010 | 3 | P1 | `make test` used fixed `/tmp/pf-suites.txt` and `/tmp/pf-suite-*.log`, which the issue's own "must not be weakened" list rules out (`mktemp -d` instead of fixed directories), and `echo 1 >> /tmp/pf-test.rc` made the rc file two lines long, breaking the `-eq` comparison | fixed 2026-09-09 |
 | CR-011 | 3 | P1 | `test/lib.sh` `pf_repo_copy`: `cp -a` of a git **worktree** copies `.git` as a pointer file, so git commands "in the copy" mutate the real repository. TC-041's deliberate probe commits landed on the real branch. Guard added; asserted by `safety-audit.sh` step 7 | fixed 2026-09-09 |
 | CR-012 | 3 | P1 | The `16a3eaf` commit suppressed SC2086 on the exact line CR-008 describes, silencing the one check that would have caught it | fixed 2026-09-09 (suppression removed with the code) |
-| CR-013 | 4 | P1 | [Codex] `converge-to-v3.sh:974` — `cp -f --parents` is a GNU extension; BSD `cp` on macOS has no `--parents`. README.md and scripts/install.sh both advertise Linux/macOS, so T6 would fail there, and the unchecked command lets the run report success with templates missing | open |
-| CR-014 | 4 | P2 | [Codex] `test/lib.sh:247` — `pf_repo_copy_reset` is not equivalent to a fresh `cp -a` when the source tree is dirty: `git checkout -- .` + `git clean -fdx` wipe the uncommitted state the first mutation ran against, so results become order-dependent. Note this contradicts prompt.md's own reason for rejecting `git clone --local` (uncommitted work must be under test) | open |
-| CR-015 | 4 | P2 | [Codex] `test/lib.sh:366` — `snapshot_tree`'s single pipeline is not filename-safe: `xargs -0` without `-r` runs `sha256sum` on an empty list (fake `-` entry), and `awk $2` truncates names containing spaces. The per-file loop it replaced was safe, so measure 1 introduced this | open |
-| CR-016 | 4 | P2 | [Codex] `test/safety-audit.sh:126` — step 7 greps for the phrase `is a git worktree`, which survives in comments after the guard itself is deleted; it asserts prose, not behaviour | open |
+| CR-013 | 4 | P1 | [Codex] `converge-to-v3.sh:974` — `cp -f --parents` is a GNU extension; BSD `cp` on macOS has no `--parents`. README.md and scripts/install.sh both advertise Linux/macOS, so T6 would fail there, and the unchecked command lets the run report success with templates missing | fixed |
+| CR-014 | 4 | P2 | [Codex] `test/lib.sh:247` — `pf_repo_copy_reset` is not equivalent to a fresh `cp -a` when the source tree is dirty: `git checkout -- .` + `git clean -fdx` wipe the uncommitted state the first mutation ran against, so results become order-dependent. Note this contradicts prompt.md's own reason for rejecting `git clone --local` (uncommitted work must be under test) | fixed |
+| CR-015 | 4 | P2 | [Codex] `test/lib.sh:366` — `snapshot_tree`'s single pipeline is not filename-safe: `xargs -0` without `-r` runs `sha256sum` on an empty list (fake `-` entry), and `awk $2` truncates names containing spaces. The per-file loop it replaced was safe, so measure 1 introduced this | fixed |
+| CR-016 | 4 | P2 | [Codex] `test/safety-audit.sh:126` — step 7 greps for the phrase `is a git worktree`, which survives in comments after the guard itself is deleted; it asserts prose, not behaviour | fixed |
+| CR-017 | 5 | P2 | [Codex] `pf_repo_copy_reset` used `git clean -fdx`, deleting ignored files (e.g. `.claude/`) that `pf_repo_copy` had copied, so later cases saw a different tree than the first. A first attempt (hard-fail on a dirty tree) turned out to break the ordinary edit-and-rerun loop — `make test` went red on any uncommitted change | fixed — `clean -fd` plus a hybrid: fast reset on a clean tree, fresh copy per case on a dirty one, announced in the output rather than silent |
+| CR-018 | 5 | P2 | [Codex] `converge-to-v3.sh` phase 6 called `t6_mirror_templates` without checking its status, so a missing templates source or a failed mirror copy still exited 0 with a success report. Pre-existing on develop (the `return 1` for a missing source was already discarded); the new error-checked copy makes it reachable more often | fixed — status now sets EXIT_CODE |
 
 ## Note on measure 6
 
@@ -57,6 +59,15 @@ issue on Linux.
 
 ## Verdict
 
-**FAIL** — round 4 (Codex) found one P1 and three P2. Reviewer: Codex
-(`codex review --base develop`, codex-cli 0.152.1, authenticated on this
-machine — no fallback to self-review this time).
+**PASS** — after round 5.
+
+Round 4 (Codex): one P1 + three P2, all fixed. Round 5 (Codex, re-review of the
+fix diff): no P0/P1; two P2, both fixed rather than deferred. No finding is left
+`open`, and no P0/P1 was ever resolved by anything but a fix.
+
+Reviewer: Codex (`codex review --base develop`, codex-cli 0.152.1,
+authenticated on this machine — unlike the 08.09 run, no silent fallback to
+self-review occurred).
+
+Verification after the last fix: `make test` OK — 28 suites, 1151 assertions;
+`make lint` OK; `make test-migration` OK — 193 assertions.
