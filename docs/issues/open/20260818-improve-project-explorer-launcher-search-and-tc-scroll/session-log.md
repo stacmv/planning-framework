@@ -15,3 +15,18 @@
 
 [pf-check PASSED] brd.md — раунд 2 (Codex): находок нет.
 @ 2026-09-09
+
+[pf-check, Codex] test_plan.md: verdict needs-attention — 9 findings severity=high
+(→P0), 2 severity=low (→P2). P0: TC-008/TC-005 нереализуемый маршрут по
+инбоксу; TC-004/TC-005 обходят контракт Origin→tcId; TC-006 принимает
+aria-label без видимой подписи; TC-001 не проверяет границы поиска; нет
+проверки персистентности запроса при асинхронных перерисовках; BR-2
+(read-only) не в целях/трассировке; TC-007 требует конкретную сигнатуру
+функции сверх AC-05; TC-009 не исключает sessionStorage/URL; TC-005 не
+утверждает вызов scrollIntoView. P2: неверная ссылка TC-005→TC-009,
+противоречие Preconditions/«данные не требуются» в TC-008.
+[autopilot default] pf-check auto-applied Fix now — 9 P0 addressed (agent
+verified fixes against brd.md и реальный код tools/manual-test-ui).
+@ 2026-09-14
+
+[pf-check PASSED] test_plan.md @ 2026-09-14T12:33:01Z
