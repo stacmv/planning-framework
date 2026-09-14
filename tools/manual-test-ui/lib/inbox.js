@@ -159,7 +159,7 @@ function parseStatusTrackerRows(content) {
  * @param {Map<string, {root: string}>|Iterable<[string, {root: string}]>} projects
  *   Keyed by project name, mapping to (at least) its `root` directory — the
  *   same shape `server.js`'s `loadProjects()` returns.
- * @returns {Array<{project: string, issueId: string, ptcId: string, area: string,
+ * @returns {Array<{project: string, issueId: string, tcId: string, ptcId: string, area: string,
  *   testCase: string, priority: string, origin: string}>}
  */
 function collectManualTests(projects) {
@@ -189,6 +189,7 @@ function collectManualTests(projects) {
       manualTests.push({
         project: projectName,
         issueId: match[1],
+        tcId: match[2],
         ptcId: row.ptc,
         area: row.area,
         testCase: row.testCase,
