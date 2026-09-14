@@ -4,6 +4,10 @@
 // own tests (test/launcher.test.js) already exercise this rendering
 // end-to-end via mount(); this file covers the module directly/in
 // isolation, since it now has independent callers beyond the launcher.
+//
+// @pf-issue 20260818-improve-project-explorer-launcher-search-and-tc-scroll
+// (filterProjectsByQuery — TC-001; renderProjectSelector never growing a
+// search field — TC-007)
 "use strict";
 
 const test = require("node:test");
@@ -312,4 +316,151 @@ test("renderProjectSections: empty roleIds stays unfiltered — every open issue
 
   const titles = root.findAll((n) => n.className === "project-section-title").map((n) => n.textContent);
   assert.deepStrictEqual(titles, [mod.SECTION_TITLES.open]);
+});
+
+// ---------------------------------------------------------------------------
+// filterProjectsByQuery — TC-001 (AC-01): substring match on project name OR
+// an open issue's id, case-insensitive, literal (never regex) substring.
+// ---------------------------------------------------------------------------
+
+function issue(issueId, status) {
+  return { issueId, status };
+}
+
+// Fixture shared across TC-001 steps: proj-a's second (not first) open
+// issue id, a closed issue whose id would otherwise match, and a project
+// name containing regex metacharacters that must be treated literally
+// (step 8: "." must not match as "any character", and the unbalanced "("
+// must not blow up as invalid regex syntax).
+const TC001_PROJECTS = [{ name: "alpha-project" }, { name: "beta.project" }, { name: "gamma(project" }];
+const TC001_ISSUES_BY_NAME = {
+  "alpha-project": [issue("20260101-feat-alpha", "open")],
+  "beta.project": [issue("20260201-feat-beta", "closed"), issue("20260202-fix-beta", "open")],
+  "gamma(project": [issue("20260301-feat-gamma", "open")],
+};
+
+// @pf-issue 20260818-improve-project-explorer-launcher-search-and-tc-scroll TC-001
+test("filterProjectsByQuery: step 1 — substring match on project name returns only that project", async () => {
+  const { filterProjectsByQuery } = await loadModule();
+  const result = filterProjectsByQuery(TC001_PROJECTS, TC001_ISSUES_BY_NAME, "alpha");
+  assert.deepStrictEqual(result.map((p) => p.name), ["alpha-project"]);
+});
+
+// @pf-issue 20260818-improve-project-explorer-launcher-search-and-tc-scroll TC-001
+test("filterProjectsByQuery: step 2 — substring match on an open issue id (not the project name) returns that project", async () => {
+  const { filterProjectsByQuery } = await loadModule();
+  const result = filterProjectsByQuery(TC001_PROJECTS, TC001_ISSUES_BY_NAME, "20260202-fix-beta");
+  assert.deepStrictEqual(result.map((p) => p.name), ["beta.project"]);
+});
+
+// @pf-issue 20260818-improve-project-explorer-launcher-search-and-tc-scroll TC-001
+test("filterProjectsByQuery: step 3 — matching is case-insensitive for both name and issue-id matches", async () => {
+  const { filterProjectsByQuery } = await loadModule();
+  const byName = filterProjectsByQuery(TC001_PROJECTS, TC001_ISSUES_BY_NAME, "ALPHA");
+  assert.deepStrictEqual(byName.map((p) => p.name), ["alpha-project"]);
+  const byIssue = filterProjectsByQuery(TC001_PROJECTS, TC001_ISSUES_BY_NAME, "20260202-FIX-Beta");
+  assert.deepStrictEqual(byIssue.map((p) => p.name), ["beta.project"]);
+});
+
+// @pf-issue 20260818-improve-project-explorer-launcher-search-and-tc-scroll TC-001
+test("filterProjectsByQuery: step 4 — a substring matching nothing returns an empty array", async () => {
+  const { filterProjectsByQuery } = await loadModule();
+  const result = filterProjectsByQuery(TC001_PROJECTS, TC001_ISSUES_BY_NAME, "no-such-thing-anywhere");
+  assert.deepStrictEqual(result, []);
+});
+
+// @pf-issue 20260818-improve-project-explorer-launcher-search-and-tc-scroll TC-001
+test("filterProjectsByQuery: step 5 — a substring matching one project's name AND a different project's issue id returns both", async () => {
+  const { filterProjectsByQuery } = await loadModule();
+  // A query hitting alpha's name and a different project's issue id, so the
+  // two matches are genuinely via different fields.
+  const projects = [{ name: "alpha-project" }, { name: "zzz" }];
+  const issuesByName = { "alpha-project": [], zzz: [issue("20260301-alpha-carrier", "open")] };
+  const result = filterProjectsByQuery(projects, issuesByName, "alpha");
+  assert.deepStrictEqual(result.map((p) => p.name).sort(), ["alpha-project", "zzz"]);
+});
+
+// @pf-issue 20260818-improve-project-explorer-launcher-search-and-tc-scroll TC-001
+test("filterProjectsByQuery: step 6 — a match on a CLOSED issue's id alone does not pass the project", async () => {
+  const { filterProjectsByQuery } = await loadModule();
+  // "20260201-feat-beta" is beta.project's closed issue; it shares no
+  // substring with beta.project's name or its other (open) issue.
+  const result = filterProjectsByQuery(TC001_PROJECTS, TC001_ISSUES_BY_NAME, "20260201-feat-beta");
+  assert.deepStrictEqual(result, []);
+});
+
+// @pf-issue 20260818-improve-project-explorer-launcher-search-and-tc-scroll TC-001
+test("filterProjectsByQuery: step 7 — matches a non-first open issue in a project with several open issues", async () => {
+  const { filterProjectsByQuery } = await loadModule();
+  const projects = [{ name: "multi-issue-project" }];
+  const issuesByName = {
+    "multi-issue-project": [
+      issue("20260401-feat-first", "open"),
+      issue("20260402-feat-second", "open"),
+      issue("20260403-feat-third", "open"),
+    ],
+  };
+  const result = filterProjectsByQuery(projects, issuesByName, "20260403-feat-third");
+  assert.deepStrictEqual(result.map((p) => p.name), ["multi-issue-project"]);
+});
+
+// @pf-issue 20260818-improve-project-explorer-launcher-search-and-tc-scroll TC-001
+test("filterProjectsByQuery: step 8 — regex metacharacters are treated as literal text, never as regex syntax", async () => {
+  const { filterProjectsByQuery } = await loadModule();
+
+  // (a) "." as a literal substring of "beta.project" matches only that
+  // project; as a regex it would ALSO match names with any character where
+  // the dot sits. Guard against a regex-mode implementation with a decoy
+  // name that has some other character in that position.
+  const projectsWithDecoy = [...TC001_PROJECTS, { name: "betaXproject" }];
+  const dotResult = filterProjectsByQuery(projectsWithDecoy, TC001_ISSUES_BY_NAME, "beta.");
+  assert.deepStrictEqual(dotResult.map((p) => p.name), ["beta.project"], '"." must match only the literal dot, not "any character"');
+
+  // (b) an unbalanced "(" is invalid regex syntax (`new RegExp("(")` throws)
+  // — a literal-substring search must not throw on it, and must still find
+  // the project whose name literally contains it.
+  assert.doesNotThrow(() => filterProjectsByQuery(TC001_PROJECTS, TC001_ISSUES_BY_NAME, "gamma("));
+  const parenResult = filterProjectsByQuery(TC001_PROJECTS, TC001_ISSUES_BY_NAME, "gamma(");
+  assert.deepStrictEqual(parenResult.map((p) => p.name), ["gamma(project"]);
+});
+
+// @pf-issue 20260818-improve-project-explorer-launcher-search-and-tc-scroll TC-001
+test("filterProjectsByQuery: empty/whitespace-only query returns every project unfiltered (AC-03)", async () => {
+  const { filterProjectsByQuery } = await loadModule();
+  const names = TC001_PROJECTS.map((p) => p.name);
+  assert.deepStrictEqual(filterProjectsByQuery(TC001_PROJECTS, TC001_ISSUES_BY_NAME, "").map((p) => p.name), names);
+  assert.deepStrictEqual(filterProjectsByQuery(TC001_PROJECTS, TC001_ISSUES_BY_NAME, "   ").map((p) => p.name), names);
+  assert.deepStrictEqual(filterProjectsByQuery(TC001_PROJECTS, TC001_ISSUES_BY_NAME, undefined).map((p) => p.name), names);
+});
+
+// ---------------------------------------------------------------------------
+// renderProjectSelector — TC-007 step 1 (AC-05): the header dropdown never
+// grows a search field, unlike the launcher's own grid (test/launcher.test.js
+// asserts the positive side of this contrast — the search field IS present
+// there).
+// ---------------------------------------------------------------------------
+
+// @pf-issue 20260818-improve-project-explorer-launcher-search-and-tc-scroll TC-007
+test("renderProjectSelector: an open panel never contains a search input/label, regardless of how many projects are passed (TC-007 step 1)", async () => {
+  installFakeDocument();
+  const mod = await loadModule();
+
+  const wrap = mod.renderProjectSelector({
+    triggerLabel: "Все проекты",
+    isOpen: true,
+    onToggle: () => {},
+    projects: [{ name: "alpha-project" }, { name: "beta.project" }],
+    projectIssuesByName: TC001_ISSUES_BY_NAME,
+    roleIds: [],
+    inbox: null,
+    hrefFor: (name) => `#/p/${name}`,
+    onOpenProject: () => {},
+  });
+
+  assert.strictEqual(wrap.findAll((n) => n.className === "project-search").length, 0, "project-selector panel must not grow a .project-search block");
+  assert.strictEqual(wrap.findAll((n) => n.tagName === "INPUT").length, 0, "project-selector panel must contain no <input> at all");
+  assert.strictEqual(
+    wrap.findAll((n) => n.getAttribute("role") === "searchbox" || n.getAttribute("role") === "textbox").length,
+    0
+  );
 });

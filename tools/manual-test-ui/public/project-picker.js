@@ -19,6 +19,30 @@ function h(tag, className, text) {
   return node;
 }
 
+/**
+ * Client-side substring filter for the launcher/search box (AC-01).
+ *
+ * A project passes when the (trimmed, lowercased) `query` is a literal
+ * substring — never a regex — of either `project.name`, or the `issueId`
+ * of at least one of its issues in `projectIssuesByName` whose
+ * `status !== "closed"`.
+ *
+ * @param {Array<{name: string}>} projects
+ * @param {Object<string, object[]>} projectIssuesByName — `{[project]: issues[]}`
+ * @param {string} query
+ * @returns {Array<{name: string}>}
+ */
+export function filterProjectsByQuery(projects, projectIssuesByName, query) {
+  const trimmed = (query || "").trim();
+  if (!trimmed) return projects;
+  const needle = trimmed.toLowerCase();
+  return projects.filter((project) => {
+    if (project.name.toLowerCase().includes(needle)) return true;
+    const issues = (projectIssuesByName && projectIssuesByName[project.name]) || [];
+    return issues.some((issue) => issue.status !== "closed" && issue.issueId.toLowerCase().includes(needle));
+  });
+}
+
 export const SECTION_TITLES = {
   open: "Есть открытые issue",
   problems: "Есть проблемы с документами",

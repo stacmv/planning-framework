@@ -21,12 +21,18 @@
 //      `<button>`/`<a>` (TC-014 step 3) — checked by cross-referencing every
 //      `h("div"|"span", ...)`-built element's variable name against every
 //      `<var>.addEventListener("click", ...)` call site in the same file.
+//
+// @pf-issue 20260818-improve-project-explorer-launcher-search-and-tc-scroll
+// (launcher search box a11y — TC-006, real fake-DOM assertions rather than
+// source-level ones, since TC-006 needs the actual rendered attributes/
+// association, not just a pattern match on the source text)
 "use strict";
 
 const test = require("node:test");
 const assert = require("node:assert");
 const fs = require("node:fs");
 const path = require("node:path");
+const { pathToFileURL } = require("node:url");
 
 const PUBLIC_DIR = path.join(__dirname, "..", "public");
 const STYLE_CSS_PATH = path.join(PUBLIC_DIR, "style.css");
@@ -126,4 +132,159 @@ test("every click-handled element in launcher.js/inbox.js/workspace.js is a real
     const wired = [...buttonOrAnchorVars].filter((v) => clickListenerVars.has(v));
     assert.ok(wired.length > 0, `${name}: expected at least one native <button>/<a> wired to a click handler`);
   }
+});
+
+// ---------------------------------------------------------------------------
+// TC-006 (AC-06) — the launcher's search <input> is keyboard-focusable
+// without any artificial tabindex, its <label> is visible and programmatically
+// associated, and its aria-live region's content actually changes with the
+// query. Unlike the source-level checks above, this needs the real rendered
+// DOM (attribute values, for/id association, live text), so it mounts the
+// launcher against the same minimal fake DOM test/launcher.test.js uses.
+// ---------------------------------------------------------------------------
+
+const LAUNCHER_PATH = path.join(PUBLIC_DIR, "launcher.js");
+
+async function loadLauncher() {
+  return import(pathToFileURL(LAUNCHER_PATH).href);
+}
+
+class FakeElement {
+  constructor(tag) {
+    this.tagName = String(tag).toUpperCase();
+    this.className = "";
+    this._text = "";
+    this.children = [];
+    this.dataset = {};
+    this.attributes = {};
+    this._listeners = {};
+    this._href = undefined;
+  }
+  get textContent() {
+    return this._text;
+  }
+  set textContent(v) {
+    this._text = v;
+    this.children = [];
+  }
+  set innerHTML(v) {
+    if (v === "") this.children = [];
+  }
+  appendChild(child) {
+    this.children.push(child);
+    return child;
+  }
+  setAttribute(name, value) {
+    this.attributes[name] = String(value);
+  }
+  getAttribute(name) {
+    return Object.prototype.hasOwnProperty.call(this.attributes, name) ? this.attributes[name] : null;
+  }
+  hasAttribute(name) {
+    return Object.prototype.hasOwnProperty.call(this.attributes, name);
+  }
+  addEventListener(type, fn) {
+    (this._listeners[type] || (this._listeners[type] = [])).push(fn);
+  }
+  dispatchClick() {
+    for (const fn of this._listeners.click || []) fn({ preventDefault() {} });
+  }
+  set href(v) {
+    this._href = v;
+  }
+  get href() {
+    return this._href;
+  }
+  findAll(predicate) {
+    const out = [];
+    for (const child of this.children) {
+      if (predicate(child)) out.push(child);
+      out.push(...child.findAll(predicate));
+    }
+    return out;
+  }
+}
+
+function installFakeDocument() {
+  global.document = { createElement: (tag) => new FakeElement(tag) };
+}
+
+function routedFetch(routes) {
+  return async (url) => {
+    if (!(url in routes)) throw new Error(`unexpected fetch in test: ${url}`);
+    return { ok: true, status: 200, json: async () => routes[url] };
+  };
+}
+
+function baseRoutes(overrides = {}) {
+  return {
+    "/api/roles": { roles: [] },
+    "/api/projects": [{ name: "alpha-project" }, { name: "beta-project" }],
+    "/api/projects/alpha-project/issues": { issues: [] },
+    "/api/projects/beta-project/issues": { issues: [] },
+    "/api/inbox": { manualTests: [], humanTasks: [], totalCount: 0 },
+    ...overrides,
+  };
+}
+
+async function mountLauncherFor(container) {
+  const mod = await loadLauncher();
+  const handle = mod.mount(container, { fetchImpl: routedFetch(baseRoutes()) });
+  await handle.ready;
+  return mod;
+}
+
+// @pf-issue 20260818-improve-project-explorer-launcher-search-and-tc-scroll TC-006
+test("launcher search <input>: no tabindex, disabled, hidden or aria-hidden — plain native tab order (TC-006 step 1)", async () => {
+  installFakeDocument();
+  const container = new FakeElement("div");
+  await mountLauncherFor(container);
+
+  const input = container.findAll((n) => n.className === "project-search-input")[0];
+  assert.ok(input, "expected the .project-search-input <input> to be rendered");
+  assert.strictEqual(input.tagName, "INPUT");
+  assert.strictEqual(input.hasAttribute("tabindex"), false, "no tabindex must be set on the native input");
+  assert.strictEqual(input.hasAttribute("disabled"), false);
+  assert.strictEqual(input.hasAttribute("hidden"), false);
+  assert.notStrictEqual(input.getAttribute("aria-hidden"), "true");
+});
+
+// @pf-issue 20260818-improve-project-explorer-launcher-search-and-tc-scroll TC-006
+test("launcher search <input> has a visible <label> with non-empty text, programmatically associated via for/id (TC-006 step 2)", async () => {
+  installFakeDocument();
+  const container = new FakeElement("div");
+  await mountLauncherFor(container);
+
+  const input = container.findAll((n) => n.className === "project-search-input")[0];
+  const label = container.findAll((n) => n.tagName === "LABEL")[0];
+  assert.ok(label, "expected a <label> for the search input");
+  assert.ok(label.textContent && label.textContent.trim().length > 0, "the <label> must carry visible, non-empty text");
+  assert.notStrictEqual(label.className, "visually-hidden", "the label must be visible, not screen-reader-only");
+  assert.notStrictEqual(label.getAttribute("aria-hidden"), "true");
+  assert.ok(input.id, "the search <input> must have an id for the label to reference");
+  assert.strictEqual(label.htmlFor, input.id, "the <label>'s `for` must match the <input>'s `id` (programmatic association)");
+});
+
+// @pf-issue 20260818-improve-project-explorer-launcher-search-and-tc-scroll TC-006
+test("launcher search has an aria-live=\"polite\" region whose text changes with the query/match count (TC-006 step 3)", async () => {
+  installFakeDocument();
+  const container = new FakeElement("div");
+  await mountLauncherFor(container);
+
+  function liveRegion() {
+    return container.findAll((n) => n.getAttribute("aria-live") === "polite")[0];
+  }
+
+  const before = liveRegion();
+  assert.ok(before, 'expected an aria-live="polite" element');
+  const textBeforeQuery = before.textContent;
+
+  const input = container.findAll((n) => n.className === "project-search-input")[0];
+  input.value = "alpha";
+  for (const fn of input._listeners.input || []) fn();
+
+  const after = liveRegion();
+  assert.ok(after, 'expected an aria-live="polite" element to still be present after typing');
+  assert.notStrictEqual(after.textContent, textBeforeQuery, "the aria-live region's text must change when the query/match count changes");
+  assert.ok(after.textContent.length > 0, "the aria-live region must report something, not stay silently empty");
 });

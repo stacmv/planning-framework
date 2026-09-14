@@ -1,5 +1,7 @@
 ---
 doc_language: Russian
+size_tier: small
+profile: claude-writes-codex-reviews
 ---
 
 Доработки Project Explorer (`tools/manual-test-ui`), обнаруженные при

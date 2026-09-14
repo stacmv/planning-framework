@@ -110,6 +110,7 @@ export function manualTestItemView(item) {
       roleId: "tester",
       doc: "manual_test_checklist.md",
       ptcId: item.ptcId,
+      tcId: item.tcId,
     },
     label: item.ptcId ? `${item.ptcId} — ${item.testCase}` : item.testCase,
     meta: [item.project, item.issueId, item.area].filter(Boolean).join(" · "),

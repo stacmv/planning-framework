@@ -2,6 +2,12 @@
 // lib/inbox.js's collectManualTests()/collectHumanTasks()), exercised
 // end-to-end and across more than one project.
 //
+// @pf-issue 20260818-improve-project-explorer-launcher-search-and-tc-scroll
+// TC-004: collectManualTests() must also carry the issue-local `tcId` parsed
+// out of Origin (lib/inbox.js's ORIGIN_RE match[2]), on top of the existing
+// `issueId` (match[1]) — and a malformed Origin must still exclude its row
+// entirely, unchanged by that addition.
+//
 // Two questions this suite answers that a unit test of lib/inbox.js alone
 // cannot:
 //   * is the route reachable without being "scoped" to any one project —
@@ -217,6 +223,38 @@ test("GET /api/inbox aggregates manualTests[]/humanTasks[] across every configur
   // -------------------------------------------------------------------
 
   assert.strictEqual(body.totalCount, body.manualTests.length + body.humanTasks.length);
+});
+
+// ---------------------------------------------------------------------------
+// TC-004: collectManualTests() returns the issue-local tcId (lib/inbox.js's
+// ORIGIN_RE match[2], this issue's Task 1) on top of the existing issueId
+// (match[1]); a malformed Origin still excludes its row entirely, no
+// regression from the tcId addition.
+// ---------------------------------------------------------------------------
+
+// @pf-issue 20260818-improve-project-explorer-launcher-search-and-tc-scroll TC-004
+test("GET /api/inbox: manualTests[] carries the issue-local tcId from a well-formed Origin, and a malformed Origin still excludes the row entirely (TC-004 steps 1-2)", async (t) => {
+  const fx = buildFixture(t);
+  const server = await startServerFor(t, { configPath: fx.configPath });
+
+  const res = await server.get("/api/inbox");
+  assert.strictEqual(res.status, 200, `GET /api/inbox → ${res.status}: ${res.text}`);
+  const body = res.json;
+
+  // Step 1 — the valid-Origin row (20260101-feat-fixture-full#TC-001) must
+  // carry the issue-local tcId, not just issueId/the product-level ptcId.
+  const manualEntry = body.manualTests.find((m) => m.origin === VALID_ORIGIN);
+  assert.ok(manualEntry, `expected the valid-Origin row in manualTests[], got ${JSON.stringify(body.manualTests)}`);
+  assert.strictEqual(manualEntry.tcId, "TC-001", "collectManualTests() must return the issue-local tcId parsed from Origin");
+  assert.strictEqual(manualEntry.issueId, VALID_ISSUE_ID, "tcId must be added alongside issueId, not in place of it");
+
+  // Step 2 — the malformed-Origin row is still excluded entirely (unchanged
+  // behavior, already asserted in the aggregation test above; re-asserted
+  // here so this contract-focused test does not depend on that one).
+  assert.ok(
+    !body.manualTests.some((m) => m.origin === INVALID_ORIGIN),
+    "a row with a malformed Origin must still be excluded entirely from manualTests[] — no regression from the tcId addition"
+  );
 });
 
 // ---------------------------------------------------------------------------

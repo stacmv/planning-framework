@@ -77,7 +77,7 @@ const SCREENS = {
 // `location.hash` again (the rule Tasks 15/24 established) — this file
 // still never writes a query string of its own, `inbox.js` does, once, for
 // the initial navigation only.
-const NULL_ROUTE_EXTRAS = { initialRole: null, initialTab: null, initialPtcId: null, initialIssueId: null };
+const NULL_ROUTE_EXTRAS = { initialRole: null, initialTab: null, initialPtcId: null, initialTcId: null, initialIssueId: null };
 
 export function parseRoute(hash) {
   const full = String(hash || "").replace(/^#/, "");
@@ -91,6 +91,12 @@ export function parseRoute(hash) {
     initialRole: query.get("role") || null,
     initialTab: query.get("tab") || null,
     initialPtcId: query.get("ptcId") || null,
+    // `?tcId=<id>` — the issue-local TC number (`lib/inbox.js`'s
+    // `collectManualTests()`, Task 1 of this plan), distinct from `ptcId`
+    // (the product-level PTC number, a different namespace) — read back by
+    // `workspace.js`'s `mount()` to scroll the checklist tab's matching
+    // `[data-tc-id]` into view (BR-3: silent no-op when not found).
+    initialTcId: query.get("tcId") || null,
     // `?issue=<id>` — the global inbox's per-project issue summary table
     // links to `#/p/<project>/inbox?issue=<id>` to jump straight to that
     // issue's own group on the dedicated inbox screen
@@ -129,12 +135,15 @@ function navigate(hash) {
 }
 
 // `public/inbox.js`'s `where` (manualTestItemView/humanTaskItemView) carries
-// fields beyond `hash` — `roleId`/`doc`/`ptcId` for a manual TC, `tab`/
+// fields beyond `hash` — `roleId`/`doc`/`ptcId`/`tcId` for a manual TC, `tab`/
 // `stageKey` for a human task (CR-005: previously every field but `hash` was
 // silently dropped here). Encoded as the target hash's OWN query string
-// (`role=`/`tab=`/`ptcId=`), not a separate route — `parseRoute` above reads
-// it back into `{initialRole, initialTab, initialPtcId}` for
-// `workspace.js`'s `mount()`. `doc` (a document filename, e.g.
+// (`role=`/`tab=`/`ptcId=`/`tcId=`), not a separate route — `parseRoute` above
+// reads it back into `{initialRole, initialTab, initialPtcId, initialTcId}`
+// for `workspace.js`'s `mount()`. `ptcId` (the product-level PTC number) and
+// `tcId` (the issue-local TC number, `lib/inbox.js`'s `collectManualTests()`)
+// are two different namespaces and are forwarded as two separate query
+// params — never conflated into one. `doc` (a document filename, e.g.
 // "manual_test_checklist.md") is forwarded verbatim as `tab` — the ".md"
 // stripping that turns a doc name into a tab id is `workspace.js`'s own
 // `tabIdFor` rule (`buildTabSet`), not duplicated here, so this file still
@@ -156,6 +165,7 @@ export function inboxTargetHash(target) {
   const tab = target.doc || target.tab;
   if (tab) params.set("tab", tab);
   if (target.ptcId) params.set("ptcId", target.ptcId);
+  if (target.tcId) params.set("tcId", target.tcId);
   const qs = params.toString();
   return qs ? `${base}?${qs}` : base;
 }
@@ -188,6 +198,7 @@ function optionsFor(route) {
         initialRoles: route.initialRole ? [route.initialRole] : undefined,
         initialTab: route.initialTab || undefined,
         initialPtcId: route.initialPtcId || undefined,
+        initialTcId: route.initialTcId || undefined,
         onNavigate: navigate,
       };
     default:
