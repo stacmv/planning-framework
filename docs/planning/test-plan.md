@@ -3,7 +3,7 @@
 Ручные тест-кейсы продукта. Автотесты — `make test`.
 Прогон перед релизом: пройти строки со статусом `pending`, начиная с `Critical`.
 
-Last allocated: PTC-0007
+Last allocated: PTC-0008
 
 | PTC | Area | Test case | Prio | Origin | Last run | Status |
 | --- | --- | --- | --- | --- | --- | --- |
@@ -14,3 +14,4 @@ Last allocated: PTC-0007
 | PTC-0005 | test | Manual-бюджет `/pf-test-plan`: гейт превышения — выбор «Разбить issue» корректно фиксирует в test_plan.md рекомендацию о разбиении и перечисляет лишние кейсы | High | 20260806-improve-manual-test-budget#TC-011 | 2026-08-17 | ✓ |
 | PTC-0006 | test | Manual-бюджет `/pf-test-plan`: гейт превышения — выбор «Поднять tier» запрашивает обоснование, обновляет `size_tier` в prompt.md и укладывает Manual-кейсы в новый бюджет | High | 20260806-improve-manual-test-budget#TC-012 | 2026-08-17 | ✓ |
 | PTC-0007 | test | Manual-бюджет `/pf-test-plan`: гейт превышения — выбор «Отложить избыток» фиксирует в test_plan.md, какие кейсы отложены и почему, не меняя Status Tracker | High | 20260806-improve-manual-test-budget#TC-013 | 2026-08-17 | ✓ |
+| PTC-0008 | manual-test-ui | Project Explorer: подсветка и прокрутка к нужному тест-кейсу при переходе из инбокса реально воспринимаются в браузере, по реальному навигационному пути | Med | 20260818-improve-project-explorer-launcher-search-and-tc-scroll#TC-008 | — | pending |
