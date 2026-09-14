@@ -34,10 +34,11 @@
 //   resolveLandingRoute()   — TC-004, gives <=2 clicks project -> document.
 //   formatInboxCardLabel()  — TC-019, the `.inbox-card` label text.
 
-import { renderProjectSections } from "./project-picker.js";
+import { renderProjectSections, filterProjectsByQuery } from "./project-picker.js";
 import { totalAttentionForRoles } from "./attention.js";
 
 export const ROLE_STORAGE_KEY = "pf.role";
+export const SEARCH_INPUT_ID = "launcher-search-input";
 
 function lastIssueStorageKey(project) {
   return `pf.lastIssue.${project}`;
@@ -227,9 +228,57 @@ function renderInboxCard(state, onOpenInbox) {
   return card;
 }
 
+// The search box (AC-01/AC-03/AC-06) — launcher-only (specs.md §2.1),
+// deliberately not part of `project-picker.js`'s `renderProjectSelector()`
+// header (AC-05, TC-007): a visible `<label>` bound via `for`/`id` to a
+// native `<input type="search">` (no `tabindex`/`disabled`/`hidden` — plain
+// tab order, TC-006), plus an `aria-live="polite"` region reporting the
+// match count so a filter that changes what's on screen isn't silent to
+// assistive tech. Purely client-side: the `input` handler only touches
+// `state.searchQuery` (module memory, never `options.storage`/
+// localStorage/sessionStorage/the URL hash — AC-04/BR-1/TC-009) and
+// re-renders; no network round-trip.
+function renderProjectSearch(state, matchCount, onQueryChange) {
+  const wrap = h("div", "project-search");
+
+  const label = h("label", "project-search-label", "Поиск по проектам и issue");
+  label.htmlFor = SEARCH_INPUT_ID;
+  wrap.appendChild(label);
+
+  const input = document.createElement("input");
+  input.type = "search";
+  input.id = SEARCH_INPUT_ID;
+  input.className = "project-search-input";
+  input.value = state.searchQuery;
+  input.placeholder = "название проекта или ID issue";
+  input.addEventListener("input", () => onQueryChange(input.value));
+  wrap.appendChild(input);
+
+  const status = h(
+    "p",
+    "project-search-status",
+    state.searchQuery.trim() === ""
+      ? ""
+      : matchCount === 0
+        ? "Ничего не найдено."
+        : `Найдено проектов: ${matchCount}.`
+  );
+  status.setAttribute("aria-live", "polite");
+  wrap.appendChild(status);
+
+  return wrap;
+}
+
 function renderLauncherProjectSections(state, onOpenProject) {
+  const filteredProjects =
+    state.projects === null ? state.projects : filterProjectsByQuery(state.projects, state.projectIssues, state.searchQuery);
+
+  if (state.projects !== null && state.projects.length > 0 && state.searchQuery.trim() !== "" && filteredProjects.length === 0) {
+    return h("p", "notice muted-notice", "Ничего не найдено — попробуйте другой запрос.");
+  }
+
   return renderProjectSections({
-    projects: state.projects,
+    projects: filteredProjects,
     projectIssuesByName: state.projectIssues,
     roleIds: state.roleIds,
     inbox: state.inbox,
@@ -256,6 +305,12 @@ export function mount(container, options = {}) {
     lastIssueByProject: {},
     inbox: null,
     error: null,
+    // Search box query (AC-01/AC-03) — module memory only, kept out of
+    // `options.storage`/localStorage/sessionStorage/the URL hash on purpose
+    // (AC-04/BR-1, TC-009): it survives a `render()` triggered within this
+    // visit (role toggle, `loadProjectIssues()` completing) but resets to
+    // "" on every fresh `mount()`, unlike `state.roleIds` above.
+    searchQuery: "",
   };
 
   function navigate(hash) {
@@ -280,6 +335,11 @@ export function mount(container, options = {}) {
     navigate("#/inbox");
   }
 
+  function setSearchQuery(query) {
+    state.searchQuery = query;
+    render();
+  }
+
   function render() {
     container.innerHTML = "";
     if (typeof document !== "undefined") document.title = "Project Explorer";
@@ -289,9 +349,13 @@ export function mount(container, options = {}) {
       return;
     }
 
+    const matchCount =
+      state.projects === null ? 0 : filterProjectsByQuery(state.projects, state.projectIssues, state.searchQuery).length;
+
     const root = h("div", "launcher");
     root.appendChild(renderRoleSwitch(state, toggleRole));
     root.appendChild(renderInboxCard(state, openInbox));
+    root.appendChild(renderProjectSearch(state, matchCount, setSearchQuery));
     root.appendChild(renderLauncherProjectSections(state, openProject));
     container.appendChild(root);
   }

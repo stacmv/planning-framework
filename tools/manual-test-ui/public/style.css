@@ -171,6 +171,18 @@ a {
   padding: 12px;
 }
 
+/* Temporary highlight applied by workspace.js's `maybeScrollToTcId` when an
+   inbox click's `tcId` lands on this TC panel — removed again via
+   `setTimeout` (this issue's Task 2). Visually distinct from a plain
+   `.panel` (accent border + tinted background), never `.loose-sections`'s
+   own dashed-border look. `transition` scoped to just this class, not
+   `.panel` at large, so every other panel's blast radius is unaffected. */
+.panel--tc-highlight {
+  transition: background-color 0.4s ease, border-color 0.4s ease;
+  border-color: var(--accent);
+  background-color: rgba(92, 196, 212, 0.12);
+}
+
 .panel h2 {
   font-size: 11px;
   text-transform: uppercase;
@@ -852,6 +864,44 @@ table.steps tr:last-child td { border-bottom: none; }
   color: var(--accent);
   font-weight: 600;
   font-size: 15px;
+}
+
+/* Client-side project/issue search (AC-01/AC-03/AC-06) — launcher-only,
+   rendered above `.project-sections`, never inside the header's
+   `renderProjectSelector()` dropdown (AC-05). */
+.project-search {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.project-search-label {
+  color: var(--text);
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.project-search-input {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  color: var(--text);
+  font-size: 14px;
+  padding: 8px 12px;
+  max-width: 360px;
+  width: 100%;
+}
+
+/* No `outline: none` here (same reasoning as .note-input:focus above) — a
+   scoped `:focus` rule would outrank the global `:focus-visible` ring and
+   silently swallow the keyboard focus indicator on this input. */
+.project-search-input:focus { border-color: var(--accent); }
+
+.project-search-status {
+  color: var(--muted);
+  font-size: 12px;
+  margin: 0;
+  min-height: 1em;
 }
 
 /* Three labeled sections (`status.js`'s `projectCategory`, dogfooding round

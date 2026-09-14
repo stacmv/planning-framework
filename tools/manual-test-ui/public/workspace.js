@@ -1708,14 +1708,15 @@ function renderDocPanel(tab, runtime) {
       .then((data) => {
         if (runtime.getActiveEndpoint() !== endpoint) return; // reader moved on while it loaded
         renderChecklistBody(body, data, runtime);
-        // CR-005 fix: an inbox manual-TC click's `ptcId` (Task 33) — scroll
-        // the corresponding `.panel[data-tc-id="..."]` into view once the
-        // checklist has actually rendered. `runtime.tryScrollToInitialPtcId`
+        // This issue's Task 2 (supersedes CR-005's `ptcId`-only mechanism):
+        // an inbox manual-TC click's issue-local `tcId` — scroll the
+        // corresponding `.panel[data-tc-id="..."]` into view and highlight it
+        // once the checklist has actually rendered. `runtime.tryScrollToInitialTcId`
         // is one-shot and self-guarding (see `mount()`) — safe to call on
         // every checklist render, including a later tab revisit, since it is
         // a no-op after the first landing.
-        if (typeof runtime.tryScrollToInitialPtcId === "function") {
-          runtime.tryScrollToInitialPtcId(body);
+        if (typeof runtime.tryScrollToInitialTcId === "function") {
+          runtime.tryScrollToInitialTcId(body);
         }
       })
       .catch((err) => {
@@ -1765,24 +1766,65 @@ function renderDocPanel(tab, runtime) {
   return panel;
 }
 
-// One-shot, best-effort scroll to a checklist TC panel (CR-005 fix, Task 33:
-// an inbox manual-TC click's `ptcId` reaching the checklist tab). `container`
-// is the checklist tab's own `.checklist-body` node — real in a browser,
-// a `querySelector`-less stand-in under `node --test`'s fake DOM
-// (test/workspace-ui.test.js's `FakeElement`), so both `querySelector` and
-// `scrollIntoView` are feature-detected rather than assumed: landing on the
-// right TAB is this task's primary fix (see the module-level Task 33 comment
-// group), this scroll is strictly a nice-to-have on top of it and must never
-// throw if the DOM doesn't support it.
-function maybeScrollToPtcId(container, ptcId) {
-  if (!ptcId || !container || typeof container.querySelector !== "function") return;
+// Temporary highlight class applied to the checklist TC panel a click
+// scrolled to (this issue's Task 2, superseding CR-005's `ptcId`-only
+// mechanism): distinct from `.panel` alone so it is visually findable
+// against neighboring TC panels (style.css), removed again after a short
+// delay via `setTimeout` — a one-shot visual cue, not a persistent state.
+// Marked BOTH as a class (`classList`, real browsers) AND as a plain
+// attribute (`setAttribute`/`getAttribute` — supported by every DOM-ish
+// object, including `test/workspace-ui.test.js`'s minimal `FakeElement`,
+// which has no `classList` at all) so the highlight is asserted the same
+// "класс/атрибут подсветки" way test_plan.md's TC-005 step 6 describes,
+// regardless of which one a given environment can render/query.
+export const TC_HIGHLIGHT_CLASS = "panel--tc-highlight";
+export const TC_HIGHLIGHT_ATTR = "data-tc-highlight";
+
+// Default highlight duration — long enough for a human to notice and read
+// (TC-008), short enough not to look stuck.
+const TC_HIGHLIGHT_MS = 2500;
+
+// One-shot, best-effort scroll-and-highlight to a checklist TC panel
+// (this issue's Task 2: an inbox manual-TC click's issue-local `tcId`
+// reaching the checklist tab; supersedes CR-005's `ptcId`-only
+// `maybeScrollToPtcId`). `container` is the checklist tab's own
+// `.checklist-body` node — real in a browser, a `querySelector`-less
+// stand-in under `node --test`'s fake DOM (test/workspace-ui.test.js's
+// `FakeElement`), so `querySelector`/`classList`/`scrollIntoView`/
+// `setTimeout` are all feature-detected rather than assumed.
+//
+// BR-3 (silent degradation): when `tcId` is falsy, or no `[data-tc-id]`
+// matches it, this is a complete no-op — no `scrollIntoView` call, no
+// highlight applied to any element, no exception thrown, no notice/error
+// shown. Landing on the right TAB is the primary fix; this scroll+highlight
+// is strictly a nice-to-have on top of it.
+function maybeScrollToTcId(container, tcId) {
+  if (!tcId || !container || typeof container.querySelector !== "function") return;
   let el = null;
   try {
-    el = container.querySelector(`[data-tc-id="${String(ptcId).replace(/"/g, '\\"')}"]`);
+    el = container.querySelector(`[data-tc-id="${String(tcId).replace(/"/g, '\\"')}"]`);
   } catch {
     return; // malformed selector (e.g. an id containing characters the query can't express) — skip, don't throw
   }
-  if (el && typeof el.scrollIntoView === "function") el.scrollIntoView({ block: "start" });
+  if (!el) return; // not found — silent no-op (BR-3), no highlight, no scroll, no error
+
+  if (typeof el.scrollIntoView === "function") el.scrollIntoView({ block: "start" });
+
+  const addHighlight = () => {
+    if (el.classList && typeof el.classList.add === "function") el.classList.add(TC_HIGHLIGHT_CLASS);
+    if (typeof el.setAttribute === "function") el.setAttribute(TC_HIGHLIGHT_ATTR, "true");
+  };
+  const removeHighlight = () => {
+    if (el.classList && typeof el.classList.remove === "function") el.classList.remove(TC_HIGHLIGHT_CLASS);
+    if (typeof el.removeAttribute === "function") {
+      el.removeAttribute(TC_HIGHLIGHT_ATTR);
+    } else if (typeof el.setAttribute === "function") {
+      el.setAttribute(TC_HIGHLIGHT_ATTR, "false");
+    }
+  };
+
+  addHighlight();
+  if (typeof setTimeout === "function") setTimeout(removeHighlight, TC_HIGHLIGHT_MS);
 }
 
 /**
@@ -1796,20 +1838,25 @@ function maybeScrollToPtcId(container, ptcId) {
  * so the initial selection comes from `options.initialRoles`, then
  * `localStorage`'s `pf.role`, then (if still empty) every role at once —
  * the same fallback chain `public/launcher.js` uses. `options.initialTab`/
- * `options.initialPtcId`
+ * `options.initialTcId`
  * come from an inbox item's `where` (`public/inbox.js`), forwarded through
  * `app.js`'s hash query string: `initialTab` is applied once the FIRST
  * `buildTabSet()` of this mount resolves (a manual-TC click's `where.doc` or
  * a human-task click's `where.tab`, normalized through the same `tabIdFor`
- * rule every doc tab id already follows), `initialPtcId` scrolls the
- * checklist tab's matching `.panel[data-tc-id]` into view once that tab has
- * actually rendered (`maybeScrollToPtcId` above) — both apply ONLY on this
- * mount's initial landing, never on a later role/issue switch within the
- * same mount (`selectRole`/`toggleRole`/`selectIssue` never re-consult them).
+ * rule every doc tab id already follows), `initialTcId` — the issue-local TC
+ * number (`lib/inbox.js`'s `collectManualTests()`), NOT the product-level
+ * `ptcId` — scrolls the checklist tab's matching `.panel[data-tc-id]` into
+ * view and applies a temporary highlight class once that tab has actually
+ * rendered (`maybeScrollToTcId` above; supersedes CR-005's `initialPtcId`/
+ * `maybeScrollToPtcId` mechanism) — both `initialTab`/`initialTcId` apply
+ * ONLY on this mount's initial landing, never on a later role/issue switch
+ * within the same mount (`selectRole`/`toggleRole`/`selectIssue` never
+ * re-consult them). BR-3: when no matching `[data-tc-id]` exists, this is a
+ * silent no-op — no scroll, no highlight, no error.
  *
  * @param {Element} container
  * @param {{project: string, issueId?: string|null, initialRoles?: string[],
- *   initialTab?: string, initialPtcId?: string,
+ *   initialTab?: string, initialTcId?: string,
  *   fetchImpl?: typeof fetch, storage?: Storage,
  *   confirmImpl?: (message: string) => boolean,
  *   onNavigate?: (hash: string) => void}} options
@@ -1846,16 +1893,16 @@ export function mount(container, options = {}) {
   //     actually resolves a tab set (its success path only — see
   //     `loadRoleContents` below), so a first-load fetch failure does not
   //     burn `options.initialTab` before it ever had a tab set to apply to.
-  //   * `initialPtcIdConsumed` starts already-true when there is no
-  //     `options.initialPtcId` to begin with (nothing to consume), so
-  //     `tryScrollToInitialPtcId` is a guaranteed no-op for every mount that
+  //   * `initialTcIdConsumed` starts already-true when there is no
+  //     `options.initialTcId` to begin with (nothing to consume), so
+  //     `tryScrollToInitialTcId` is a guaranteed no-op for every mount that
   //     didn't ask for one, at negligible cost.
   let initialTabApplied = false;
-  let initialPtcIdConsumed = !options.initialPtcId;
-  function tryScrollToInitialPtcId(checklistContainer) {
-    if (initialPtcIdConsumed) return;
-    initialPtcIdConsumed = true; // one-shot regardless of whether the panel was actually found
-    maybeScrollToPtcId(checklistContainer, options.initialPtcId);
+  let initialTcIdConsumed = !options.initialTcId;
+  function tryScrollToInitialTcId(checklistContainer) {
+    if (initialTcIdConsumed) return;
+    initialTcIdConsumed = true; // one-shot regardless of whether the panel was actually found
+    maybeScrollToTcId(checklistContainer, options.initialTcId);
   }
 
   function navigate(hash) {
@@ -2007,7 +2054,7 @@ export function mount(container, options = {}) {
           fetchImpl: options.fetchImpl,
           confirmImpl: options.confirmImpl,
           invalidateDoc,
-          tryScrollToInitialPtcId,
+          tryScrollToInitialTcId,
           afterCheckout,
           fetchInboxOnce,
           onSelectRole: selectRole,

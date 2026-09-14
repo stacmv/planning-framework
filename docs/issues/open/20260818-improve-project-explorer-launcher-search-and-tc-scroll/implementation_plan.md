@@ -56,8 +56,8 @@
 - BR-3: не найден кейс → тихая деградация, `scrollIntoView` не вызывается нигде, никакой другой `[data-tc-id]` не подсвечивается.
 
 **Acceptance Criteria:**
-- [ ] TC-004 шаги 2-5 passes
-- [ ] TC-005 шаги 2-6 passes
+- [x] TC-004 шаги 2-5 passes
+- [x] TC-005 шаги 2-6 passes
 
 ---
 
@@ -89,7 +89,7 @@
 - Никакого `new RegExp(query)` — иначе TC-001 шаг 8 (метасимволы, непарные скобки) ломается.
 
 **Acceptance Criteria:**
-- [ ] TC-001 (все 8 шагов) passes
+- [x] TC-001 (все 8 шагов) passes
 
 ---
 
@@ -107,7 +107,7 @@
 - `state.searchQuery` переживает `render()` из `loadProjectIssues()`/`toggleRole()` (обычное поведение состояния модуля) и обнуляется только при новом `mount()`.
 
 **Acceptance Criteria:**
-- [ ] TC-002, TC-003, TC-006, TC-007, TC-009 (реализационная часть) passes
+- [x] TC-002, TC-003, TC-006, TC-007, TC-009 (реализационная часть) passes
 
 ---
 
