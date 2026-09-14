@@ -4,6 +4,9 @@ Findings that reached a `PASS` verdict without being fixed. Each line carries
 the finding's stable ID, its priority, the issue it came from, and its final
 state, so a remnant can always be traced back to the review that produced it.
 
+- `CR-003` (P2, 20260818-improve-project-explorer-launcher-search-and-tc-scroll) — `scrollIntoView({block: "start"})` in `workspace.js` can leave the highlighted TC panel hidden under the variable-height sticky header — state: `open`
+- `CR-004` (P2, 20260818-improve-project-explorer-launcher-search-and-tc-scroll) — launcher search input still loses focus if the user types while `loadProjectIssues()`'s own async render is in flight (narrower residual of the fixed CR-001) — state: `open`
+- `CR-005` (P2, 20260818-improve-project-explorer-launcher-search-and-tc-scroll) — a correctly-applied TC highlight can be discarded almost immediately when `loadIssueTodoCount()`'s later render replaces the DOM before the one-shot flag would otherwise reapply it — state: `open`
 - `CR-006` (P2, 20260902-feat-idea-stage) — `pf-idea-critique` checks predecessors by existence only, so a non-empty stub left by an interrupted `research.md` write satisfies it; the shared stage-completion criterion should apply here as it already does in `pf-idea-research`. The analogous check in `pf-idea-verdict` is loose the same way — state: `open`
 - `CR-007` (P2, 20260904-improve-test-suite-runtime) — Round 2 reviewer flagged `xargs -0` with newline-delimited input; false positive — `xargs -0` splits on all whitespace, `basename` correctly extracts filename per argument — state: `wont-fix`
 - `CR-008` (P2, 20260904-improve-test-suite-runtime) — t7_skills `brace_srcs` unquoted in `cp -r` — pre-existing pattern (`cp -r "${src}."` already in codebase), minimal risk for `$FRAMEWORK_ROOT` paths without spaces — state: `wont-fix`

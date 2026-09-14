@@ -1482,6 +1482,93 @@ test("mount(): initialTcId is a one-shot — revisiting the checklist tab later 
   assert.ok(!tcWrap._scrollIntoViewCalls, "a tab revisit must not re-trigger the initial-landing scroll");
 });
 
+// CR-002 regression (code_review.md) — `initialTcIdConsumed` is one-shot per
+// mount, but the checklist `body` node `tryScrollToInitialTcId` scrolls/
+// highlights is a brand-new node on every `render()`. `toggleRole()` renders
+// immediately (still the OLD tab set, same checklist endpoint) and then
+// AGAIN once `loadRoleContents()` resolves — both calls share the same
+// `docCache`-deduped checklist fetch promise, so if that promise resolves
+// only after BOTH renders have already happened, both renders' `.then()`
+// callbacks fire against the same (still-pending-until-now) promise, in the
+// order their renders occurred: an EARLIER render's callback must not win
+// the one-shot flag and scroll/highlight its own now-detached `body` while
+// the LATEST render's (the only one actually attached to `container`) never
+// gets scrolled at all.
+//
+// @pf-issue 20260818-improve-project-explorer-launcher-search-and-tc-scroll TC-005
+test("mount(): initialTcId lands on the LATEST render's checklist body, not a stale one from a superseded render sharing the same endpoint (CR-002)", async () => {
+  installFakeDocument();
+  const container = new FakeElement("div");
+
+  // The checklist GET is deliberately held open (a manually-resolved
+  // deferred) so multiple renders' `fetchDoc(endpoint).then(...)` chains can
+  // stack up against the SAME still-pending promise before it resolves —
+  // reproducing the race CR-002 describes deterministically instead of
+  // relying on incidental timing.
+  let resolveChecklist;
+  const checklistPromise = new Promise((resolve) => {
+    resolveChecklist = resolve;
+  });
+  const checklistUrl = "/api/projects/proj-a/issues/20260101-feat-a/checklist";
+  const routes = baseRoutes();
+  const fetchImpl = async (url) => {
+    if (url === checklistUrl) return checklistPromise;
+    return routedFetch(routes)(url);
+  };
+
+  const mod = await loadModule();
+  const handle = mod.mount(container, {
+    project: "proj-a",
+    issueId: "20260101-feat-a",
+    // Two roles selected (not the empty-selection "every role" case) so
+    // toggling one off keeps `roleIds` non-empty and `fetchRoleContentsForRoles`
+    // fetches only the remaining, already-fixtured role.
+    initialRoles: ["tester", "developer"],
+    initialTab: "manual_test_checklist.md",
+    initialTcId: "TC-001",
+    fetchImpl,
+  });
+  await handle.ready; // first render() of the checklist tab has already fired fetchDoc(endpoint) — render generation 1
+
+  // toggleRole()'s own immediate render() (still the pre-toggle tab set,
+  // same checklist endpoint) is render generation 2, then its
+  // `loadRoleContents(true)` rebuilds the tab set and renders again once
+  // role contents resolve — render generation 3. Both stack a fresh
+  // `fetchDoc(checklistUrl).then(...)` onto the SAME still-pending
+  // `checklistPromise` (docCache dedup), alongside generation 1's.
+  const toggled = handle.toggleRole("developer");
+  await flush();
+  await toggled;
+
+  // Only now does the one checklist GET actually resolve — after THREE
+  // renders' worth of `.then()` callbacks are already queued against it.
+  resolveChecklist({ ok: true, status: 200, json: async () => checklistFixture() });
+  await flush();
+  await flush();
+
+  // Exactly one `.checklist-body` ever ends up attached to `container` — the
+  // latest render's; the two superseded ones were discarded by an earlier
+  // render's `container.innerHTML = ""` and are unreachable here, proving
+  // the flag wasn't consumed against either of them.
+  const bodies = container.findAll((n) => n.className === "checklist-body");
+  assert.strictEqual(bodies.length, 1, "expected exactly one attached .checklist-body (the latest render's)");
+
+  // Same lookup `maybeScrollToTcId`'s own `container.querySelector(...)`
+  // uses (test/workspace-ui.test.js's `FakeElement.querySelector`: the
+  // first DFS match for `[data-tc-id="TC-001"]`) — mirrors the existing
+  // TC-005 test above rather than counting every `dataset.tcId`-bearing
+  // node (a single TC panel legitimately carries it on several elements:
+  // the panel wrap, each step's checkbox/note/save button, the notes
+  // textarea, etc.).
+  const tcWrap = container.findAll((n) => n.dataset && n.dataset.tcId === "TC-001")[0];
+  assert.ok(tcWrap, "expected the TC-001 panel to have rendered in the live checklist body");
+  assert.strictEqual(
+    tcWrap._scrollIntoViewCalls,
+    1,
+    "the live, currently-attached checklist panel must be the one that gets scrolled/highlighted — not a stale render's detached copy"
+  );
+});
+
 test("checklist: renders one checkbox/note/Save control per step, pre-filled from the fetched checklist", async () => {
   const { fetchImpl } = checklistFetchMock();
   const { container } = await mountOnChecklistTab(fetchImpl);

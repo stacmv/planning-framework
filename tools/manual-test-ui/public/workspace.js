@@ -1899,8 +1899,26 @@ export function mount(container, options = {}) {
   //     didn't ask for one, at negligible cost.
   let initialTabApplied = false;
   let initialTcIdConsumed = !options.initialTcId;
-  function tryScrollToInitialTcId(checklistContainer) {
+
+  // CR-002 fix: `render()` bumps this on every call, and each render's own
+  // checklist-tab async fetch closes over the value current at THAT render
+  // (`myGeneration` below) via the `tryScrollToInitialTcId` wrapper it hands
+  // to `renderDocPanel`. `selectIssue()` triggers two renders in quick
+  // succession for the same (project, issue) — an immediate one, then
+  // another once `loadIssueTodoCount()`/`loadRoleContents()` resolves —
+  // while the checklist endpoint itself stays identical, so the pre-existing
+  // `getActiveEndpoint() === endpoint` guard alone cannot tell "my `body`
+  // got superseded by a newer render" from "nothing changed". If the first
+  // render's checklist fetch resolves after the second render already threw
+  // away its `body` (via `container.innerHTML = ""`), `generation !==
+  // renderGeneration` here and the call is dropped WITHOUT consuming the
+  // one-shot flag — leaving it available for the second render's own fetch
+  // (already in flight, same endpoint, `docCache`-deduped) to consume against
+  // its still-attached `body` once that resolves instead.
+  let renderGeneration = 0;
+  function tryScrollToInitialTcId(checklistContainer, generation) {
     if (initialTcIdConsumed) return;
+    if (generation !== renderGeneration) return; // superseded by a later render — its body, not this stale one, should get the scroll/highlight
     initialTcIdConsumed = true; // one-shot regardless of whether the panel was actually found
     maybeScrollToTcId(checklistContainer, options.initialTcId);
   }
@@ -2016,6 +2034,8 @@ export function mount(container, options = {}) {
 
   function render() {
     container.innerHTML = "";
+    renderGeneration += 1;
+    const myGeneration = renderGeneration; // CR-002: this render's own generation, closed over below
     if (typeof document !== "undefined") {
       document.title = state.project
         ? state.issueId
@@ -2054,7 +2074,10 @@ export function mount(container, options = {}) {
           fetchImpl: options.fetchImpl,
           confirmImpl: options.confirmImpl,
           invalidateDoc,
-          tryScrollToInitialTcId,
+          // CR-002: bound to THIS render's generation, not a live reference
+          // to `tryScrollToInitialTcId` itself — see the comment above its
+          // definition.
+          tryScrollToInitialTcId: (checklistContainer) => tryScrollToInitialTcId(checklistContainer, myGeneration),
           afterCheckout,
           fetchInboxOnce,
           onSelectRole: selectRole,

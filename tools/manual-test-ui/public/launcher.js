@@ -238,6 +238,17 @@ function renderInboxCard(state, onOpenInbox) {
 // `state.searchQuery` (module memory, never `options.storage`/
 // localStorage/sessionStorage/the URL hash — AC-04/BR-1/TC-009) and
 // re-renders; no network round-trip.
+// The search status text (`.project-search-status`, `aria-live="polite"`) —
+// factored out so both the initial full render and the per-keystroke
+// incremental update (CR-001) compute it identically.
+function searchStatusText(state, matchCount) {
+  return state.searchQuery.trim() === ""
+    ? ""
+    : matchCount === 0
+      ? "Ничего не найдено."
+      : `Найдено проектов: ${matchCount}.`;
+}
+
 function renderProjectSearch(state, matchCount, onQueryChange) {
   const wrap = h("div", "project-search");
 
@@ -254,17 +265,14 @@ function renderProjectSearch(state, matchCount, onQueryChange) {
   input.addEventListener("input", () => onQueryChange(input.value));
   wrap.appendChild(input);
 
-  const status = h(
-    "p",
-    "project-search-status",
-    state.searchQuery.trim() === ""
-      ? ""
-      : matchCount === 0
-        ? "Ничего не найдено."
-        : `Найдено проектов: ${matchCount}.`
-  );
+  const status = h("p", "project-search-status", searchStatusText(state, matchCount));
   status.setAttribute("aria-live", "polite");
   wrap.appendChild(status);
+
+  // Exposed so `render()` can keep a stable reference to this exact node
+  // (CR-001) — the per-keystroke path patches its `textContent` in place
+  // rather than tearing down and recreating the `aria-live` region.
+  wrap._statusEl = status;
 
   return wrap;
 }
@@ -335,13 +343,38 @@ export function mount(container, options = {}) {
     navigate("#/inbox");
   }
 
+  // CR-001 fix: a keystroke in the search box must never go through the full
+  // `render()` below — that does `container.innerHTML = ""` and rebuilds a
+  // brand-new `<input>`, dropping keyboard focus (and interrupting IME
+  // composition) after every single character. `searchStatusEl`/
+  // `sectionsSlotEl` are the last full render's actual attached nodes;
+  // `setSearchQuery()` only patches those two in place, leaving the
+  // `<input>`/`<label>` subtree (and its focus) completely untouched.
+  let searchStatusEl = null;
+  let sectionsSlotEl = null;
+
+  function computeMatchCount() {
+    return state.projects === null ? 0 : filterProjectsByQuery(state.projects, state.projectIssues, state.searchQuery).length;
+  }
+
+  function updateSearchResults() {
+    const matchCount = computeMatchCount();
+    if (searchStatusEl) searchStatusEl.textContent = searchStatusText(state, matchCount);
+    if (sectionsSlotEl) {
+      sectionsSlotEl.innerHTML = "";
+      sectionsSlotEl.appendChild(renderLauncherProjectSections(state, openProject));
+    }
+  }
+
   function setSearchQuery(query) {
     state.searchQuery = query;
-    render();
+    updateSearchResults();
   }
 
   function render() {
     container.innerHTML = "";
+    searchStatusEl = null;
+    sectionsSlotEl = null;
     if (typeof document !== "undefined") document.title = "Project Explorer";
 
     if (state.error) {
@@ -349,14 +382,25 @@ export function mount(container, options = {}) {
       return;
     }
 
-    const matchCount =
-      state.projects === null ? 0 : filterProjectsByQuery(state.projects, state.projectIssues, state.searchQuery).length;
+    const matchCount = computeMatchCount();
 
     const root = h("div", "launcher");
     root.appendChild(renderRoleSwitch(state, toggleRole));
     root.appendChild(renderInboxCard(state, openInbox));
-    root.appendChild(renderProjectSearch(state, matchCount, setSearchQuery));
-    root.appendChild(renderLauncherProjectSections(state, openProject));
+
+    const searchWrap = renderProjectSearch(state, matchCount, setSearchQuery);
+    searchStatusEl = searchWrap._statusEl;
+    root.appendChild(searchWrap);
+
+    // Plain, class-less wrapper (no `h()` className argument, so it needs no
+    // matching `style.css` rule per the css-class-coverage guard) around the
+    // project sections — a stable slot `setSearchQuery()`/`updateSearchResults()`
+    // can clear and refill on every keystroke without touching anything else
+    // in `root` (CR-001).
+    sectionsSlotEl = h("div");
+    sectionsSlotEl.appendChild(renderLauncherProjectSections(state, openProject));
+    root.appendChild(sectionsSlotEl);
+
     container.appendChild(root);
   }
 

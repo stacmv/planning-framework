@@ -30,3 +30,21 @@ verified fixes against brd.md и реальный код tools/manual-test-ui).
 @ 2026-09-14
 
 [pf-check PASSED] test_plan.md @ 2026-09-14T12:33:01Z
+
+[pf-codereview round 1, Codex] verdict FAIL — CR-001 (P1, launcher search
+loses focus every keystroke — full DOM rebuild on input), CR-002 (P1,
+workspace TC-scroll race — concurrent render can strand highlight on a
+detached checklist body), CR-003 (P2, sticky header can overlap the scrolled
+TC panel).
+[autopilot default] pf-codereview auto-applied Fix now — 2 P1 addressed (no
+interactive user in this run; front-loaded interaction not set for this
+issue, so this is a one-time autopilot default, not a recorded assumption
+in prompt.md).
+
+[pf-codereview round 2, Codex] CR-001/CR-002 confirmed fixed (regression test
+added for CR-002 race, verified fails without fix). New round-2 findings,
+both P2: CR-004 (narrower residual of CR-001 — typing during
+loadProjectIssues()'s own async render), CR-005 (highlight discarded by a
+later todo-count render before reapplication). Verdict PASS — no open
+P0/P1. CR-003/CR-004/CR-005 carried to docs/planning/tech-debt.md.
+@ 2026-09-14
