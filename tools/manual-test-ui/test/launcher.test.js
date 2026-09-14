@@ -20,6 +20,9 @@
 // This suite is new: `test/workspace-ui.test.js` covers `public/workspace.js`
 // only, and no existing file exercises `public/launcher.js` or
 // `public/app.js` at all — nothing here duplicates prior coverage.
+//
+// @pf-issue 20260818-improve-project-explorer-launcher-search-and-tc-scroll
+// (project search box — TC-002, TC-003, TC-007 step 2, TC-009)
 "use strict";
 
 const test = require("node:test");
@@ -106,6 +109,45 @@ function installFakeDocument() {
   global.document = {
     createElement: (tag) => new FakeElement(tag),
   };
+}
+
+// Minimal Storage stand-in (getItem/setItem/removeItem, backed by a Map) —
+// no such fake existed anywhere in this suite yet (checked before adding
+// this one: no test file references getItem/setItem/localStorage), so this
+// is a new, self-contained double rather than a reused one. Used for TC-009
+// (search must never reach any storage) and passed as `options.storage` —
+// the same seam `readStoredRoles`/`storeRoles` already read/write through.
+class FakeStorage {
+  constructor() {
+    this._data = new Map();
+  }
+  getItem(key) {
+    return this._data.has(key) ? this._data.get(key) : null;
+  }
+  setItem(key, value) {
+    this._data.set(key, String(value));
+  }
+  removeItem(key) {
+    this._data.delete(key);
+  }
+  get length() {
+    return this._data.size;
+  }
+  entries() {
+    return [...this._data.entries()];
+  }
+}
+
+// Finds the search <input> (public/launcher.js's `.project-search-input`)
+// and simulates typing `text` into it. The real `input` listener only reads
+// the closed-over `input.value` (not an event target), so setting the
+// property and invoking the stored listener is a faithful simulation.
+function typeIntoSearch(container, text) {
+  const input = container.findAll((n) => n.className === "project-search-input")[0];
+  assert.ok(input, "expected the .project-search-input <input> to be present");
+  input.value = text;
+  for (const fn of input._listeners.input || []) fn();
+  return input;
 }
 
 function routedFetch(routes) {
@@ -613,4 +655,289 @@ test("source: app.js's SCREENS table maps \"projectInbox\" to project-inbox.js's
     ),
     "SCREENS.projectInbox must import ./project-inbox.js via its mountInbox entry"
   );
+});
+
+// ---------------------------------------------------------------------------
+// TC-007 step 2 (AC-05) — the launcher's own grid DOES grow the search box,
+// in contrast to renderProjectSelector() (test/project-picker.test.js's own
+// TC-007 step 1, which asserts the header dropdown never does).
+// ---------------------------------------------------------------------------
+
+// @pf-issue 20260818-improve-project-explorer-launcher-search-and-tc-scroll TC-007
+test("mount(): the launcher screen grows a .project-search block (label + input) that renderProjectSelector's panel never does (TC-007 step 2)", async () => {
+  installFakeDocument();
+  const container = new FakeElement("div");
+  const fetchImpl = routedFetch(baseRoutes());
+
+  const mod = await loadLauncher();
+  const handle = mod.mount(container, { fetchImpl });
+  await handle.ready;
+
+  const searchBlocks = container.findAll((n) => n.className === "project-search");
+  assert.strictEqual(searchBlocks.length, 1, "expected exactly one .project-search block on the launcher screen");
+  assert.strictEqual(searchBlocks[0].findAll((n) => n.tagName === "INPUT").length, 1);
+  assert.strictEqual(searchBlocks[0].findAll((n) => n.tagName === "LABEL").length, 1);
+});
+
+// ---------------------------------------------------------------------------
+// TC-002 (AC-03) — an empty (or whitespace-only) search query means "show
+// everything," and searching/clearing never causes any non-GET fetch call
+// (BR-2: the search box is a pure client-side filter over already-fetched
+// data).
+// ---------------------------------------------------------------------------
+
+// @pf-issue 20260818-improve-project-explorer-launcher-search-and-tc-scroll TC-002
+test("mount(): an empty search query shows every project, identical to no search at all (TC-002 step 1)", async () => {
+  installFakeDocument();
+  const container = new FakeElement("div");
+  const fetchImpl = routedFetch(baseRoutes());
+
+  const mod = await loadLauncher();
+  const handle = mod.mount(container, { fetchImpl });
+  await handle.ready;
+
+  const cards = container.findAll((n) => n.className === "project-card");
+  assert.deepStrictEqual(cards.map((c) => c.dataset.project).sort(), PROJECTS_RESPONSE.map((p) => p.name).sort());
+});
+
+// @pf-issue 20260818-improve-project-explorer-launcher-search-and-tc-scroll TC-002
+test("mount(): typing a query then clearing it back to empty restores the full project list — the filter never sticks (TC-002 step 2)", async () => {
+  installFakeDocument();
+  const container = new FakeElement("div");
+  const fetchImpl = routedFetch(baseRoutes());
+
+  const mod = await loadLauncher();
+  const handle = mod.mount(container, { fetchImpl });
+  await handle.ready;
+
+  typeIntoSearch(container, "proj-a");
+  assert.deepStrictEqual(container.findAll((n) => n.className === "project-card").map((c) => c.dataset.project), ["proj-a"]);
+
+  typeIntoSearch(container, "");
+  const cardsAfterClear = container.findAll((n) => n.className === "project-card");
+  assert.deepStrictEqual(cardsAfterClear.map((c) => c.dataset.project).sort(), PROJECTS_RESPONSE.map((p) => p.name).sort());
+});
+
+// @pf-issue 20260818-improve-project-explorer-launcher-search-and-tc-scroll TC-002
+test("mount(): a whitespace-only query behaves like an empty query, not like a non-matching one (TC-002 step 3)", async () => {
+  installFakeDocument();
+  const container = new FakeElement("div");
+  const fetchImpl = routedFetch(baseRoutes());
+
+  const mod = await loadLauncher();
+  const handle = mod.mount(container, { fetchImpl });
+  await handle.ready;
+
+  typeIntoSearch(container, "   ");
+  const cards = container.findAll((n) => n.className === "project-card");
+  assert.deepStrictEqual(cards.map((c) => c.dataset.project).sort(), PROJECTS_RESPONSE.map((p) => p.name).sort());
+  assert.strictEqual(container.findAll((n) => n.className === "notice muted-notice").length, 0, "whitespace must not be treated as a non-matching query");
+});
+
+// @pf-issue 20260818-improve-project-explorer-launcher-search-and-tc-scroll TC-002
+test("mount(): typing, clearing and re-typing in the search box never triggers an extra/non-GET fetch call (TC-002 step 4, BR-2)", async () => {
+  installFakeDocument();
+  const container = new FakeElement("div");
+  const calls = [];
+  const fetchImpl = async (url, init) => {
+    calls.push({ url, method: (init && init.method) || "GET" });
+    const routes = baseRoutes();
+    if (!(url in routes)) throw new Error(`unexpected fetch in test: ${url}`);
+    return { ok: true, status: 200, json: async () => routes[url] };
+  };
+
+  const mod = await loadLauncher();
+  const handle = mod.mount(container, { fetchImpl });
+  await handle.ready;
+
+  const callCountAfterMount = calls.length;
+  typeIntoSearch(container, "proj-a");
+  typeIntoSearch(container, "");
+  typeIntoSearch(container, "   ");
+  typeIntoSearch(container, "proj-b");
+
+  assert.strictEqual(calls.length, callCountAfterMount, "search interactions must not trigger any additional fetch");
+  assert.ok(
+    calls.every((c) => c.method === "GET"),
+    `expected every fetch call to be GET, got: ${JSON.stringify(calls)}`
+  );
+});
+
+// ---------------------------------------------------------------------------
+// TC-003 (AC-02) — a section with no matches is hidden entirely (never
+// rendered with an empty grid), and a query matching nothing anywhere shows
+// a distinct "no results" message.
+// ---------------------------------------------------------------------------
+
+// @pf-issue 20260818-improve-project-explorer-launcher-search-and-tc-scroll TC-003
+test("mount(): a query matching only the \"open\" section hides the other sections entirely, not as empty grids (TC-003 step 1)", async () => {
+  installFakeDocument();
+  const container = new FakeElement("div");
+  const fetchImpl = routedFetch(baseRoutes());
+
+  const mod = await loadLauncher();
+  const handle = mod.mount(container, { fetchImpl });
+  await handle.ready;
+
+  typeIntoSearch(container, "proj-a"); // matches proj-a only, which lands in "open"
+
+  const sectionTitles = container.findAll((n) => n.className === "project-section-title").map((n) => n.textContent);
+  assert.deepStrictEqual(sectionTitles, ["Есть открытые issue"]);
+  assert.strictEqual(container.findAll((n) => n.className === "project-card").length, 1);
+});
+
+// @pf-issue 20260818-improve-project-explorer-launcher-search-and-tc-scroll TC-003
+test("mount(): a query matching nothing anywhere renders no sections and a distinct \"no results\" message (TC-003 step 2)", async () => {
+  installFakeDocument();
+  const container = new FakeElement("div");
+  const fetchImpl = routedFetch(baseRoutes());
+
+  const mod = await loadLauncher();
+  const handle = mod.mount(container, { fetchImpl });
+  await handle.ready;
+
+  typeIntoSearch(container, "no-such-project-or-issue-anywhere");
+
+  assert.strictEqual(container.findAll((n) => n.className === "project-section").length, 0);
+  assert.strictEqual(container.findAll((n) => n.className === "project-card").length, 0);
+  const notice = container.findAll((n) => n.className === "notice muted-notice")[0];
+  assert.ok(notice, "expected a no-results notice element");
+  assert.strictEqual(notice.textContent, "Ничего не найдено — попробуйте другой запрос.");
+});
+
+// @pf-issue 20260818-improve-project-explorer-launcher-search-and-tc-scroll TC-003
+test("mount(): the no-results search message is distinct from \"Загрузка…\" and \"Нет настроенных проектов.\" (TC-003 step 3)", async () => {
+  installFakeDocument();
+  const container = new FakeElement("div");
+  const fetchImpl = routedFetch(baseRoutes());
+
+  const mod = await loadLauncher();
+  const handle = mod.mount(container, { fetchImpl });
+  await handle.ready;
+
+  typeIntoSearch(container, "no-such-project-or-issue-anywhere");
+
+  const notice = container.findAll((n) => n.className === "notice muted-notice")[0];
+  assert.notStrictEqual(notice.textContent, "Загрузка…");
+  assert.notStrictEqual(notice.textContent, "Нет настроенных проектов.");
+});
+
+// ---------------------------------------------------------------------------
+// TC-009 (AC-04, BR-1) — the search query survives every in-visit re-render
+// (async issue loading, a role toggle) but is absent from localStorage,
+// sessionStorage and location.hash/query, and resets to "" on a fresh
+// mount() regardless of any stored pf.role.
+// ---------------------------------------------------------------------------
+
+test.beforeEach(() => {
+  delete global.location;
+});
+
+// @pf-issue 20260818-improve-project-explorer-launcher-search-and-tc-scroll TC-009
+test("mount(): a search query entered before the async issue-loading re-render survives it (TC-009 step 1)", async () => {
+  installFakeDocument();
+  const container = new FakeElement("div");
+  let releaseIssues;
+  const issuesGate = new Promise((resolve) => {
+    releaseIssues = resolve;
+  });
+  const fetchImpl = async (url) => {
+    if (url.startsWith("/api/projects/") && url.endsWith("/issues")) await issuesGate;
+    const routes = baseRoutes();
+    if (!(url in routes)) throw new Error(`unexpected fetch in test: ${url}`);
+    return { ok: true, status: 200, json: async () => routes[url] };
+  };
+
+  const mod = await loadLauncher();
+  const handle = mod.mount(container, { fetchImpl }); // initial synchronous paint has happened
+  typeIntoSearch(container, "proj-a"); // typed before the issues fetch (and its re-render) resolves
+  releaseIssues();
+  await handle.ready;
+
+  const input = container.findAll((n) => n.className === "project-search-input")[0];
+  assert.strictEqual(input.value, "proj-a", "the query must survive the re-render triggered by loadProjectIssues() completing");
+  assert.deepStrictEqual(container.findAll((n) => n.className === "project-card").map((c) => c.dataset.project), ["proj-a"]);
+});
+
+// @pf-issue 20260818-improve-project-explorer-launcher-search-and-tc-scroll TC-009
+test("mount(): a search query survives a .role-switch toggle's full re-render too (TC-009 step 2)", async () => {
+  installFakeDocument();
+  const container = new FakeElement("div");
+  const fetchImpl = routedFetch(baseRoutes());
+
+  const mod = await loadLauncher();
+  const handle = mod.mount(container, { fetchImpl });
+  await handle.ready;
+
+  typeIntoSearch(container, "proj-a");
+  container.findAll((n) => n.tagName === "BUTTON" && n.dataset.roleId === "tester")[0].dispatchClick();
+
+  const input = container.findAll((n) => n.className === "project-search-input")[0];
+  assert.strictEqual(input.value, "proj-a", "the query must survive a role-toggle re-render");
+  assert.deepStrictEqual(container.findAll((n) => n.className === "project-card").map((c) => c.dataset.project), ["proj-a"]);
+});
+
+// @pf-issue 20260818-improve-project-explorer-launcher-search-and-tc-scroll TC-009
+test("mount(): the search query never lands in localStorage, sessionStorage or location.hash, even after typing and a role toggle (TC-009 steps 3-4)", async () => {
+  installFakeDocument();
+  global.location = { hash: "" };
+  const container = new FakeElement("div");
+  const storage = new FakeStorage(); // stands in for localStorage via options.storage
+  const sessionStorageDouble = new FakeStorage();
+  global.sessionStorage = sessionStorageDouble; // launcher.js must never touch this at all
+  const fetchImpl = routedFetch(baseRoutes());
+
+  const mod = await loadLauncher();
+  const handle = mod.mount(container, { fetchImpl, storage });
+  await handle.ready;
+
+  typeIntoSearch(container, "proj-a-needle");
+  container.findAll((n) => n.tagName === "BUTTON" && n.dataset.roleId === "tester")[0].dispatchClick();
+
+  const needle = "proj-a-needle";
+  for (const [key, value] of storage.entries()) {
+    assert.ok(!String(key).includes(needle) && !String(value).includes(needle), `localStorage stand-in key/value leaked the search query: ${key}=${value}`);
+  }
+  assert.strictEqual(sessionStorageDouble.length, 0, "launcher.js must never write to sessionStorage");
+  assert.strictEqual(global.location.hash, "", "the search query must never reach location.hash");
+
+  delete global.sessionStorage;
+});
+
+// @pf-issue 20260818-improve-project-explorer-launcher-search-and-tc-scroll TC-009
+test("mount(): a fresh mount() always starts with an empty search query and the full grid, regardless of a stored pf.role (TC-009 steps 5-6)", async () => {
+  installFakeDocument();
+  const storage = new FakeStorage();
+  const fetchImpl = routedFetch(baseRoutes());
+
+  // First visit: type a query, then discard this mount (simulating navigating away).
+  const container1 = new FakeElement("div");
+  const mod = await loadLauncher();
+  const handle1 = mod.mount(container1, { fetchImpl, storage });
+  await handle1.ready;
+  typeIntoSearch(container1, "proj-a");
+  assert.strictEqual(container1.findAll((n) => n.className === "project-search-input")[0].value, "proj-a");
+
+  // Second visit ("next open"): same storage instance carried over, no
+  // location.hash restored either — the search box must come back empty.
+  const container2 = new FakeElement("div");
+  const handle2 = mod.mount(container2, { fetchImpl, storage });
+  await handle2.ready;
+  const input2 = container2.findAll((n) => n.className === "project-search-input")[0];
+  assert.strictEqual(input2.value, "", "a fresh mount() must start with an empty search query (AC-04)");
+  assert.deepStrictEqual(
+    container2.findAll((n) => n.className === "project-card").map((c) => c.dataset.project).sort(),
+    PROJECTS_RESPONSE.map((p) => p.name).sort()
+  );
+
+  // Step 6: same check, but with a non-empty pf.role already stored — the
+  // role persists across visits (existing, unchanged behavior) while the
+  // search box still resets.
+  storage.setItem("pf.role", JSON.stringify(["tester"]));
+  const container3 = new FakeElement("div");
+  const handle3 = mod.mount(container3, { fetchImpl, storage });
+  await handle3.ready;
+  assert.deepStrictEqual(handle3.getState().roleIds, ["tester"], "pf.role must persist across visits");
+  const input3 = container3.findAll((n) => n.className === "project-search-input")[0];
+  assert.strictEqual(input3.value, "", "the search query resets to empty on a fresh mount() regardless of pf.role");
 });

@@ -74,7 +74,7 @@
 - Переиспользовать существующий `dispatchClick()` из `test/inbox-ui.test.js`/`test/workspace-ui.test.js`.
 
 **Acceptance Criteria:**
-- [ ] TC-004, TC-005 — полностью зелёные
+- [x] TC-004, TC-005 — полностью зелёные
 
 ---
 
@@ -125,7 +125,7 @@
 - TC-009 использует те же фейковые `localStorage`/`sessionStorage`/`location.hash`, что и существующие тесты `.role-switch`.
 
 **Acceptance Criteria:**
-- [ ] TC-001, TC-002, TC-003, TC-006, TC-007, TC-009 — зелёные под `node --test`
+- [x] TC-001, TC-002, TC-003, TC-006, TC-007, TC-009 — зелёные под `node --test`
 
 ---
 

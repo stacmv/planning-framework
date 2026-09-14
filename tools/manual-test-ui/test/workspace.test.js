@@ -3,6 +3,10 @@
 // against a running server (test/helpers/server.js) rather than hand-built
 // response fixtures.
 //
+// @pf-issue 20260818-improve-project-explorer-launcher-search-and-tc-scroll
+// TC-004 — mount()'s initialTcId BR-3 degradation, against a real
+// server-backed checklist that genuinely does not contain the named TC.
+//
 // test/workspace-ui.test.js already covers this module thoroughly with
 // hand-built `buildRoleContents()`-shaped objects (Task 24's own
 // self-verification). This file deliberately does NOT repeat that ground —
@@ -30,6 +34,8 @@
 //     `GET .../issues/:id/checklist` response containing a genuine
 //     `looseSections` entry (produced by `lib/checklist.js` itself, not
 //     fabricated) — block order and CSS class, end to end.
+//   * TC-004 — `mount()`'s `initialTcId` BR-3 degradation (see this file's
+//     top-of-file `@pf-issue` marker above).
 //
 // Run: node --test test/workspace.test.js
 "use strict";
@@ -122,6 +128,9 @@ class FakeElement {
   setAttribute(name, value) {
     this.attributes[name] = String(value);
   }
+  getAttribute(name) {
+    return Object.prototype.hasOwnProperty.call(this.attributes, name) ? this.attributes[name] : null;
+  }
   addEventListener(type, fn) {
     (this._listeners[type] || (this._listeners[type] = [])).push(fn);
   }
@@ -141,6 +150,21 @@ class FakeElement {
       out.push(...child.findAll(predicate));
     }
     return out;
+  }
+  // @pf-issue 20260818-improve-project-explorer-launcher-search-and-tc-scroll
+  // Same minimal querySelector/scrollIntoView stand-in test/workspace-ui.test.js
+  // already uses for workspace.js's maybeScrollToTcId — needed here too for
+  // the TC-004 (BR-3 degradation) test below, against a REAL server-backed
+  // checklist response.
+  querySelector(selector) {
+    const m = /^\[data-tc-id="([^"]*)"\]$/.exec(selector);
+    if (!m) return null;
+    const wanted = m[1];
+    return this.findAll((n) => n.dataset && n.dataset.tcId === wanted)[0] || null;
+  }
+  scrollIntoView(options) {
+    this._scrollIntoViewCalls = (this._scrollIntoViewCalls || 0) + 1;
+    this._lastScrollIntoViewOptions = options;
   }
 }
 
@@ -283,6 +307,70 @@ test("mount(): switching Issue against a real server keeps the active tab, even 
   assert.strictEqual(panels[0].dataset.tabId, "brd");
   const badges = panels[0].findAll((n) => n.className === "badge");
   assert.ok(badges.some((b) => b.textContent === "missing"));
+});
+
+// ---------------------------------------------------------------------------
+// TC-004: BR-3 silent degradation — `initialTcId` names a TC that the real
+// checklist genuinely does not contain (FULL's own manual_test_checklist.md
+// only has TC-001/TC-002, real content served by the real server — not a
+// hand-built fixture, same "real HTTP round trip" reasoning as every other
+// test in this file). The right TAB still opens; no scroll, no highlight, no
+// notice/error.
+// ---------------------------------------------------------------------------
+
+// @pf-issue 20260818-improve-project-explorer-launcher-search-and-tc-scroll TC-004
+test("mount(): initialTcId naming a TC absent from the real checklist lands on the right tab, no scroll/highlight/notice (TC-004 steps 3-5, BR-3)", async (t) => {
+  autoCleanup(t);
+  const repo = makeTempRepo({ name: "main", issues: [FULL] }); // FULL's real checklist only has TC-001/TC-002
+  const config = makeConfig({ projects: [{ name: "main", path: repo.root }] });
+  const server = await startServerFor(t, { configPath: config.configPath });
+  const mod = await loadModule();
+
+  installFakeDocument();
+  const container = new FakeElement("div");
+  const fetchImpl = (pathname, init) => fetch(server.baseUrl + pathname, init);
+
+  const handle = mod.mount(container, {
+    project: "main",
+    issueId: FULL,
+    initialRoles: ["tester"],
+    initialTab: "manual_test_checklist.md",
+    initialTcId: "TC-007", // does not exist in the real fixture checklist
+    fetchImpl,
+  });
+  await handle.ready;
+  await waitFor(() => container.findAll((n) => n.dataset && n.dataset.tcId).length > 0);
+
+  assert.strictEqual(
+    handle.getState().activeTabId,
+    "manual_test_checklist",
+    "the checklist tab must still open even though TC-007 doesn't exist"
+  );
+
+  const tcWraps = container.findAll((n) => n.dataset && n.dataset.tcId);
+  assert.ok(tcWraps.length >= 2, "expected the real fixture's TC-001/TC-002 panels to have rendered");
+  for (const wrap of tcWraps) {
+    assert.ok(!wrap._scrollIntoViewCalls, `scrollIntoView must not be called on ${wrap.dataset.tcId} (BR-3)`);
+    const classes = String(wrap.className || "").split(/\s+/);
+    assert.ok(!classes.includes(mod.TC_HIGHLIGHT_CLASS), `${wrap.dataset.tcId} must not carry the highlight class`);
+    assert.strictEqual(
+      wrap.getAttribute(mod.TC_HIGHLIGHT_ATTR),
+      null,
+      `${wrap.dataset.tcId} must not carry the highlight attribute`
+    );
+  }
+
+  // Scoped to "notice error" specifically (the class `renderDocPanel`'s
+  // checklist-fetch `.catch()` uses, `public/workspace.js`) — not "notice"
+  // generally, which also covers unrelated, legitimate document notices
+  // (e.g. "manual_test_checklist.md is in the working tree.", present on
+  // every real checklist render regardless of `initialTcId`). BR-3 is about
+  // a resolution FAILURE never surfacing as an error, not about suppressing
+  // pre-existing document notices.
+  const errorNotices = container.findAll(
+    (n) => n.className && String(n.className).split(/\s+/).includes("error") && String(n.className).split(/\s+/).includes("notice")
+  );
+  assert.strictEqual(errorNotices.length, 0, "an unresolvable tcId must never surface a notice/error (BR-3 silent degradation)");
 });
 
 // ---------------------------------------------------------------------------

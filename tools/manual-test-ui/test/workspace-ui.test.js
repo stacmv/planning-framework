@@ -14,6 +14,12 @@
 //     issue switch keeps the active tab (even into `missing`) and a role
 //     switch replaces the whole tab set (TC-002 steps 1-3).
 //
+// @pf-issue 20260818-improve-project-explorer-launcher-search-and-tc-scroll
+//   * TC-005 — the full click path: a real `.inbox-item` (public/inbox.js)
+//     -> `inboxTargetHash()`/`parseRoute()` (public/app.js) -> `mount()`'s
+//     `initialTcId`, scrolling/highlighting only the matching TC panel,
+//     read-only (BR-2) throughout.
+//
 // Task 27 (test/workspace.test.js) owns the fuller integration suite for
 // this file, including the real `GET .../roles/:role` HTTP round trip
 // through `test/helpers/server.js`; this file's fixtures are hand-built
@@ -1406,14 +1412,18 @@ async function mountOnChecklistTab(fetchImpl) {
   return { mod, container, handle };
 }
 
-// CR-005 fix (Task 33) — a manual-TC inbox click's `ptcId`, forwarded as
-// `options.initialPtcId`, scrolls the matching TC's `.tc-wrap[data-tc-id]`
-// into view once the checklist tab has actually rendered. Landing on the
-// right TAB (asserted above) is the primary fix; this is the "nice-to-have
-// on top" the implementation notes describe — asserted here via
-// `FakeElement.querySelector`/`scrollIntoView` (see the class definition
-// above), a minimal-but-real stand-in, not a DOM library.
-test("mount(): initialPtcId scrolls the matching TC panel into view once the checklist tab has rendered (CR-005 nice-to-have)", async () => {
+// CR-005 fix (Task 33), superseded by this issue's Task 2 — a manual-TC
+// inbox click's issue-local `tcId`, forwarded as `options.initialTcId` (was
+// `options.initialPtcId`/product-level `ptcId` before this issue), scrolls
+// the matching TC's `.tc-wrap[data-tc-id]` into view once the checklist tab
+// has actually rendered. Landing on the right TAB (asserted above) is the
+// primary fix; this is the "nice-to-have on top" the implementation notes
+// describe — asserted here via `FakeElement.querySelector`/`scrollIntoView`
+// (see the class definition above), a minimal-but-real stand-in, not a DOM
+// library.
+//
+// @pf-issue 20260818-improve-project-explorer-launcher-search-and-tc-scroll TC-005
+test("mount(): initialTcId scrolls the matching TC panel into view once the checklist tab has rendered (TC-005 step 5)", async () => {
   installFakeDocument();
   const container = new FakeElement("div");
   const { fetchImpl } = checklistFetchMock();
@@ -1424,7 +1434,7 @@ test("mount(): initialPtcId scrolls the matching TC panel into view once the che
     issueId: "20260101-feat-a",
     initialRoles: ["tester"],
     initialTab: "manual_test_checklist.md",
-    initialPtcId: "TC-001",
+    initialTcId: "TC-001",
     fetchImpl,
   });
   await handle.ready;
@@ -1437,7 +1447,8 @@ test("mount(): initialPtcId scrolls the matching TC panel into view once the che
   assert.strictEqual(tcWrap._scrollIntoViewCalls, 1, "expected exactly one scrollIntoView call on the matching TC panel");
 });
 
-test("mount(): initialPtcId is a one-shot — revisiting the checklist tab later does not scroll again", async () => {
+// @pf-issue 20260818-improve-project-explorer-launcher-search-and-tc-scroll TC-005
+test("mount(): initialTcId is a one-shot — revisiting the checklist tab later does not scroll again", async () => {
   installFakeDocument();
   const container = new FakeElement("div");
   const { fetchImpl } = checklistFetchMock();
@@ -1448,7 +1459,7 @@ test("mount(): initialPtcId is a one-shot — revisiting the checklist tab later
     issueId: "20260101-feat-a",
     initialRoles: ["tester"],
     initialTab: "manual_test_checklist.md",
-    initialPtcId: "TC-001",
+    initialTcId: "TC-001",
     fetchImpl,
   });
   await handle.ready;
@@ -2546,4 +2557,159 @@ test("checklist tab: a case whose prepare is not offered renders no per-case pre
     container.findAll((n) => n.className === "btn subtle" && n.textContent.includes("Prepare test data for TC-001")).length,
     0
   );
+});
+
+// ---------------------------------------------------------------------------
+// TC-005 — the full click path (this issue's Task 3): a REAL rendered
+// `.inbox-item` (`public/inbox.js`'s `renderManualTestsSection`/
+// `renderIssueGroup`, the same tree `project-inbox.js`'s `mountInbox()`
+// mounts on `#/p/<project>/inbox`) -> `dispatchClick()` -> the intercepted
+// `onNavigate(where)` -> `inboxTargetHash()`/`parseRoute()` (`public/app.js`)
+// -> this file's own `mount()`, landing on the checklist tab and
+// scrolling/highlighting exactly the matching `.tc-wrap[data-tc-id]` — never
+// its neighbour. Not a direct `manualTestItemView()` call: test_plan.md
+// TC-005 step 2 is explicit that the click must go through the real DOM node
+// public/inbox.js builds.
+// ---------------------------------------------------------------------------
+
+const INBOX_MODULE_PATH = path.join(TOOL_DIR, "public", "inbox.js");
+const APP_MODULE_PATH = path.join(TOOL_DIR, "public", "app.js");
+
+async function loadInboxModule() {
+  return import(pathToFileURL(INBOX_MODULE_PATH).href);
+}
+async function loadAppModule() {
+  return import(pathToFileURL(APP_MODULE_PATH).href);
+}
+
+function twoCaseChecklistFixture() {
+  return {
+    meta: { "Feature Name": "Fixture" },
+    tcs: [
+      {
+        id: "TC-001",
+        name: "First case",
+        headingLineIndex: 0,
+        prerequisites: [],
+        requiredData: [],
+        dataStatus: "unknown",
+        steps: [],
+        notesLineIndex: 5,
+        notesText: "",
+        parseWarnings: [],
+      },
+      {
+        id: "TC-002",
+        name: "Second case",
+        headingLineIndex: 10,
+        prerequisites: [],
+        requiredData: [],
+        dataStatus: "unknown",
+        steps: [],
+        notesLineIndex: 15,
+        notesText: "",
+        parseWarnings: [],
+      },
+    ],
+    looseSections: [],
+  };
+}
+
+// @pf-issue 20260818-improve-project-explorer-launcher-search-and-tc-scroll TC-005
+test("TC-005: a real .inbox-item click carries the issue-local tcId through inboxTargetHash()/parseRoute() to mount(), scrolling+highlighting only the matching TC panel, read-only throughout (BR-2)", async () => {
+  installFakeDocument();
+
+  const inboxMod = await loadInboxModule();
+  const appMod = await loadAppModule();
+  const mod = await loadModule();
+
+  // Step 1 — the same collectManualTests()-shaped row (lib/inbox.js, Task 1
+  // of this plan), rendered through public/inbox.js's real DOM tree, not a
+  // direct manualTestItemView() call.
+  const manualTestItem = {
+    project: "proj-a",
+    issueId: "20260101-feat-a",
+    ptcId: "PTC-002",
+    area: "Checklist",
+    testCase: "Verify TC-002",
+    priority: "High",
+    origin: "20260101-feat-a#TC-002",
+    tcId: "TC-002",
+  };
+
+  const navigated = [];
+  const section = inboxMod.renderManualTestsSection([manualTestItem], (where) => navigated.push(where));
+  const inboxItemNode = section.findAll((n) => String(n.className).split(/\s+/).includes("inbox-item"))[0];
+  assert.ok(inboxItemNode, "expected a real .inbox-item node to have rendered");
+
+  // Step 2 — dispatchClick() on the real rendered node (same helper this
+  // file already uses for tab/role buttons), intercepted by onNavigate.
+  inboxItemNode.dispatchClick();
+  assert.strictEqual(navigated.length, 1, "expected exactly one onNavigate call from the click");
+  const where = navigated[0];
+  assert.strictEqual(where.tcId, "TC-002", "onNavigate must carry the issue-local tcId, not just the product-level ptcId");
+
+  // Step 3 — inboxTargetHash().
+  const hash = appMod.inboxTargetHash(where);
+  assert.match(hash, /tab=manual_test_checklist/, "expected the checklist doc to be forwarded as tab=");
+  assert.match(hash, /(?:[?&])tcId=TC-002(?:&|$)/, "expected TC-002 to be carried as a tcId= query value");
+
+  // Step 4 — parseRoute().
+  const route = appMod.parseRoute(hash);
+  assert.strictEqual(route.initialTcId, "TC-002", "parseRoute() must hand back the issue-local TC-002 as initialTcId");
+
+  // Step 5 — mount() a workspace with this route's extras and a real
+  // rendered checklist containing both TC-002 (wanted) and TC-001
+  // (neighbour) — plus a record of every fetch made across this whole
+  // scenario, for the BR-2 read-only check below.
+  const fetchCalls = [];
+  const routes = {
+    "/api/roles": ROLES_RESPONSE,
+    "/api/projects/proj-a/issues": ISSUES_RESPONSE,
+    "/api/projects/proj-a/issues/20260101-feat-a/roles/tester": testerContents("20260101-feat-a", { qaReportPresent: true }),
+    "/api/inbox": EMPTY_INBOX_RESPONSE,
+    "/api/projects/proj-a/issues/20260101-feat-a/checklist": twoCaseChecklistFixture(),
+  };
+  const fetchImpl = async (url, init) => {
+    fetchCalls.push({ url, method: (init && init.method) || "GET" });
+    if (!(url in routes)) throw new Error(`unexpected fetch in TC-005 scenario: ${url}`);
+    return { ok: true, status: 200, json: async () => routes[url] };
+  };
+
+  const container = new FakeElement("div");
+  const handle = mod.mount(container, {
+    project: "proj-a",
+    issueId: "20260101-feat-a",
+    initialRoles: ["tester"],
+    initialTab: route.initialTab,
+    initialTcId: route.initialTcId,
+    fetchImpl,
+  });
+  await handle.ready;
+  await flush();
+  await flush(); // let the checklist's own async fetchDoc().then(renderChecklistBody) + scroll settle
+
+  assert.strictEqual(handle.getState().activeTabId, "manual_test_checklist");
+
+  const tc002 = container.findAll((n) => n.dataset && n.dataset.tcId === "TC-002")[0];
+  const tc001 = container.findAll((n) => n.dataset && n.dataset.tcId === "TC-001")[0];
+  assert.ok(tc002 && tc001, "expected both TC-001 and TC-002 panels to have rendered");
+
+  // Step 5 assertions — scrollIntoView exactly once, on TC-002 only.
+  assert.strictEqual(tc002._scrollIntoViewCalls, 1, "expected exactly one scrollIntoView call, on TC-002");
+  assert.ok(!tc001._scrollIntoViewCalls, "TC-001 (the neighbour) must never receive a scrollIntoView call");
+
+  // Step 6 — the highlight (class or attribute — TC_HIGHLIGHT_CLASS/
+  // TC_HIGHLIGHT_ATTR, Task 2) appears only on TC-002.
+  assert.strictEqual(tc002.getAttribute(mod.TC_HIGHLIGHT_ATTR), "true", "TC-002 must carry the highlight attribute");
+  const tc001Classes = String(tc001.className || "").split(/\s+/);
+  const tc001Highlighted = tc001Classes.includes(mod.TC_HIGHLIGHT_CLASS) || tc001.getAttribute(mod.TC_HIGHLIGHT_ATTR) === "true";
+  assert.ok(!tc001Highlighted, "TC-001 (the neighbour) must never be highlighted");
+
+  // Step 7 (BR-2) — read-only: every fetch made across the WHOLE scenario
+  // (click through mount) must be a GET, never a mutating verb.
+  assert.ok(fetchCalls.length > 0, "expected at least one fetch during mount()");
+  for (const call of fetchCalls) {
+    assert.strictEqual(call.method, "GET", `expected every fetch to be a GET (BR-2), got ${call.method} ${call.url}`);
+  }
 });
