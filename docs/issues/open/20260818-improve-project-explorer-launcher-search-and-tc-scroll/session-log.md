@@ -48,3 +48,6 @@ loadProjectIssues()'s own async render), CR-005 (highlight discarded by a
 later todo-count render before reapplication). Verdict PASS — no open
 P0/P1. CR-003/CR-004/CR-005 carried to docs/planning/tech-debt.md.
 @ 2026-09-14
+
+[autopilot default] pf-close Phase 1 confirmation auto-answered "yes" (no
+interactive user in this run). QA PASS, all prerequisites met.
